@@ -1,0 +1,10 @@
+[Unit]
+Description=Mise off-machine backup (media+DB to mickey) + restore-test gate
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=kevin-lee
+ExecStart=/opt/mise/ops/offsite-sync.sh
+ExecStart=/opt/mise/ops/restore-test.sh

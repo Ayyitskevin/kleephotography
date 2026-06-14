@@ -1,0 +1,10 @@
+[Unit]
+Description=Mise off-machine backup + restore-test (03:00, after the 02:30 local snapshot)
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
