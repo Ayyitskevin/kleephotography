@@ -1,11 +1,17 @@
 {% extends "site/base_site.html" %}
 {% block title %}Press — {{ site_name }}{% endblock %}
 {% block site_content %}
-<main class="site-main site-narrow">
-  <h1>Press</h1>
+
+<section class="page-hero">
+  <div class="page-hero-inner" data-reveal>
+    <p class="eyebrow">Press</p>
+    <h1>Where the work <span class="it-accent">has run.</span></h1>
+    <p class="lede">In print and online.</p>
+  </div>
+</section>
+
+<section class="page-body" data-reveal>
   {% if press %}
-  <p>Where the work has run — restaurants, menus, and food brands featured in
-     print and online.</p>
   <ul class="press-list">
     {% for p in press %}
     <li class="press-item">
@@ -24,5 +30,5 @@
   <p>Featured press is on its way — check back soon.</p>
   {% endif %}
   <p><a class="btn" href="/contact">Work with me</a></p>
-</main>
+</section>
 {% endblock %}

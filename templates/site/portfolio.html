@@ -1,8 +1,17 @@
 {% extends "site/base_site.html" %}
 {% block title %}Portfolio — {{ site_name }}{% endblock %}
 {% block site_content %}
-<main class="site-main">
-  <h1>Portfolio</h1>
+
+<section class="page-hero">
+  <div class="page-hero-inner" data-reveal>
+    <p class="eyebrow">Portfolio</p>
+    <h1>The work, <span class="it-accent">plated.</span></h1>
+    <p class="lede">Dishes, drinks, and the rooms they live in — restaurants,
+       cafés, and food brands.</p>
+  </div>
+</section>
+
+<main class="site-main flush-top">
   {% if tags %}
   <nav class="portfolio-filter" aria-label="Filter portfolio by tag">
     <button class="pf-chip pf-chip-active" data-filter="">All
@@ -27,7 +36,34 @@
   {% else %}
   <p class="muted">Portfolio coming soon.</p>
   {% endif %}
-  <p class="center"><a class="btn" href="/book">Book a shoot</a></p>
+
+  {% if studies %}
+  <section class="featured-clients">
+    <p class="eyebrow">Featured clients</p>
+    <h2>The story behind the plate.</h2>
+    <p class="muted">Full shoots, start to finish — restaurants, cafés, and brands.</p>
+    <ul class="work-list">
+      {% for s in studies %}
+      <li class="work-card">
+        <a href="/work/{{ s.slug }}" class="work-card-img">
+          {% if s.hero_id %}
+          <img src="/site/img/{{ s.hero_id }}" loading="lazy"
+               alt="{{ s.cs_tagline or s.title }}">
+          {% else %}
+          <span class="placeholder">no hero photo starred yet</span>
+          {% endif %}
+        </a>
+        <div class="work-card-body">
+          <h3><a href="/work/{{ s.slug }}">{{ s.cs_tagline or s.title }}</a></h3>
+          <p class="muted">{{ s.client_name or "" }}{% if s.client_name and s.cs_location %} · {% endif %}{{ s.cs_location or "" }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <p class="center"><a class="btn" href="/contact">Request a quote</a></p>
 </main>
 {% include "site/_lightbox.html" %}
 {% if tags %}

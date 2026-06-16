@@ -14,7 +14,7 @@
 {% block site_content %}
 <main class="site-main">
   <article class="work-detail">
-    <header class="work-head">
+    <header class="work-head" data-reveal>
       <p class="muted work-eyebrow">
         {{ g.client_name or "Case study" }}{% if g.client_name and g.cs_location %} · {% endif %}{{ g.cs_location or "" }}
       </p>
@@ -47,7 +47,7 @@
 
     <footer class="work-cta">
       <p>Like the look?</p>
-      <a class="btn" href="/book">Book a shoot</a>
+      <a class="btn" href="/contact">Request a quote</a>
       <a class="btn link" href="/work">More work →</a>
     </footer>
   </article>

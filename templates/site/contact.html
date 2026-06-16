@@ -1,20 +1,54 @@
 {% extends "site/base_site.html" %}
 {% block title %}Contact — {{ site_name }}{% endblock %}
 {% block site_content %}
-<main class="site-main site-narrow">
-  <h1>Work with me</h1>
+
+<section class="page-hero">
+  <div class="page-hero-inner" data-reveal>
+    <p class="eyebrow">Contact</p>
+    <h1>Let's make your menu <span class="it-accent">look hungry.</span></h1>
+    <p class="lede">Tell me about your business and what you need — the more you
+       share, the faster I can send a tailored quote, usually within a business
+       day.</p>
+  </div>
+</section>
+
+<section class="page-body" data-reveal>
   {% if sent %}
-  <p class="sent-note">Thanks — your inquiry is in. I read every message and
-     I'll get back to you within a business day.</p>
+  <p class="sent-note">Thanks — your inquiry's in. I'll get back to you within
+     a business day.</p>
   {% else %}
-  <p>Tell me about your restaurant, café, bar, or brand and what you need —
-     a menu refresh, a launch, or ongoing content.</p>
   <form method="post" action="/contact" class="stack-form contact-form">
     <label>Name <input type="text" name="name" required></label>
     <label>Email <input type="email" name="email" required></label>
     <label>Business <input type="text" name="business"
            value="{{ prefill.business if prefill else '' }}"
            placeholder="Restaurant / café / brand name"></label>
+    <label>Project type
+      <select name="service">
+        <option value="">Not sure yet — help me choose</option>
+        <option value="Photography">Photography</option>
+        <option value="Videography">Videography</option>
+        <option value="Photography + Videography">Photography + Videography</option>
+        <option value="Brand Partner (monthly retainer)">Brand Partner (monthly retainer)</option>
+      </select></label>
+    <label>Target date <input type="date" name="shoot_date"></label>
+    <label>How many dishes or setups? <input type="text" name="dish_count"
+           placeholder="e.g. 12 dishes, 2 cocktails, full menu"></label>
+    <label>Usage / licensing
+      <select name="usage">
+        <option value="">Standard — web &amp; social</option>
+        <option value="Extended — advertising / paid media">Extended — advertising / paid media</option>
+        <option value="Exclusive / talent release">Exclusive / talent release</option>
+        <option value="Not sure">Not sure</option>
+      </select></label>
+    <label>Budget range
+      <select name="budget">
+        <option value="">Prefer to discuss</option>
+        <option value="Under $1,000">Under $1,000</option>
+        <option value="$1,000–$2,500">$1,000–$2,500</option>
+        <option value="$2,500–$5,000">$2,500–$5,000</option>
+        <option value="$5,000+">$5,000+</option>
+      </select></label>
     <label>Message <textarea name="message" rows="6" required
            placeholder="What are we shooting?">{{ prefill.message if prefill else '' }}</textarea></label>
     <input type="text" name="website" class="hp-field" tabindex="-1"
@@ -24,5 +58,5 @@
   </form>
   {% endif %}
   {% include "site/_faq.html" %}
-</main>
+</section>
 {% endblock %}
