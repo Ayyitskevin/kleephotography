@@ -1227,6 +1227,85 @@ def test_proposal_duplicate(admin):
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
 
 
+def test_contract_duplicate(admin):
+    # A locked/signed contract clones into a fresh editable draft: same body + title,
+    # new slug, no hash or signature carried over. Original untouched.
+    admin.post("/admin/studio/clients",
+               data={"name": "Nadia Okafor", "company": "Olive & Ash",
+                     "email": "nadia@oliveash.test", "phone": ""},
+               follow_redirects=False)
+    c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
+    admin.post(f"/admin/studio/clients/{c['id']}/projects",
+               data={"title": "Cookbook shoot"}, follow_redirects=False)
+    p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
+    src = db.run("""INSERT INTO contracts (project_id, slug, title, body, body_sha256,
+                    status, signer_name, signer_ip, signed_at)
+                    VALUES (?,?,?,?,?,?,?,?,datetime('now'))""",
+                 (p["id"], "cdup-src", "Services Agreement", "BODY TEXT",
+                  "a" * 64, "signed", "Nadia Okafor", "1.2.3.4"))
+
+    page = admin.get(f"/admin/studio/contracts/{src}")
+    assert f"/admin/studio/contracts/{src}/duplicate" in page.text
+    r = admin.post(f"/admin/studio/contracts/{src}/duplicate", follow_redirects=False)
+    assert r.status_code == 303
+    new_id = int(r.headers["location"].rsplit("/", 1)[1])
+    new = db.one("SELECT * FROM contracts WHERE id=?", (new_id,))
+    assert new["status"] == "draft" and new["slug"] != "cdup-src"
+    assert new["title"] == "Services Agreement" and new["body"] == "BODY TEXT"
+    assert new["body_sha256"] is None and new["signer_name"] is None
+    assert db.one("SELECT status FROM contracts WHERE id=?", (src,))["status"] == "signed"
+
+    db.run("DELETE FROM contracts WHERE id IN (?,?)", (src, new_id))
+    admin.post(f"/admin/studio/clients/{c['id']}/delete",
+               data={"force": "1"}, follow_redirects=False)
+
+
+def test_invoice_duplicate(admin):
+    # A paid invoice clones into a fresh draft copying line items/total/deposit/due/
+    # terms — but no payments, Stripe session, or paid status. The original and the
+    # payments recorded against it are left intact.
+    admin.post("/admin/studio/clients",
+               data={"name": "Ravi Shah", "company": "Tiffin Box",
+                     "email": "ravi@tiffin.test", "phone": ""},
+               follow_redirects=False)
+    c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
+    admin.post(f"/admin/studio/clients/{c['id']}/projects",
+               data={"title": "Lunch service shoot"}, follow_redirects=False)
+    p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
+    items = '[{"label": "Half-day shoot", "qty": 1, "unit_cents": 90000}]'
+    src = db.run("""INSERT INTO invoices (project_id, slug, title, line_items, total_cents,
+                    deposit_cents, due_date, terms, status, paid_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))""",
+                 (p["id"], "idup-src", "Lunch invoice", items, 90000, 30000,
+                  "2026-07-01", "50% deposit, balance on delivery", "paid"))
+    db.run("""INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
+              amount_cents, kind) VALUES (?,?,?,?,?)""",
+           (src, "evt_idup", "cs_idup", 90000, "full"))
+
+    page = admin.get(f"/admin/studio/invoices/{src}")
+    assert f"/admin/studio/invoices/{src}/duplicate" in page.text
+    r = admin.post(f"/admin/studio/invoices/{src}/duplicate", follow_redirects=False)
+    assert r.status_code == 303
+    new_id = int(r.headers["location"].rsplit("/", 1)[1])
+    new = db.one("SELECT * FROM invoices WHERE id=?", (new_id,))
+    assert new["status"] == "draft" and new["slug"] != "idup-src"
+    assert (new["title"] == "Lunch invoice" and new["line_items"] == items
+            and new["total_cents"] == 90000 and new["deposit_cents"] == 30000
+            and new["due_date"] == "2026-07-01"
+            and new["terms"] == "50% deposit, balance on delivery")
+    assert new["paid_at"] is None and new["stripe_session_id"] is None
+    # the copy has no payments; the original keeps its one
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?",
+                  (new_id,))["n"] == 0
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?",
+                  (src,))["n"] == 1
+
+    db.run("DELETE FROM payments WHERE invoice_id=?", (src,))
+    db.run("DELETE FROM invoices WHERE id IN (?,?)", (src, new_id))
+    admin.post(f"/admin/studio/clients/{c['id']}/delete",
+               data={"force": "1"}, follow_redirects=False)
+
+
 def test_admin_global_search(admin):
     # The search box is the jump-to across the admin. It must find a client by
     # business name and its project by title, and link straight to each. It must

@@ -31,7 +31,12 @@
   {% else %}
   <p class="muted">Locked — awaiting client signature.</p>
   {% endif %}
-  <p class="muted">SHA-256: <code>{{ d.body_sha256 }}</code></p>
+  <p class="muted">SHA-256: <code>{{ d.body_sha256 }}</code>
+    <form method="post" action="/admin/studio/contracts/{{ d.id }}/duplicate"
+          class="inline-form"
+          onsubmit="return confirm('Make an editable copy of this contract as a new draft?')">
+      <button type="submit" class="link">Duplicate as draft</button>
+    </form></p>
   <pre class="doc-body">{{ d.body }}</pre>
 
   {% set email_action = "/admin/studio/contracts/" ~ d.id ~ "/email" %}

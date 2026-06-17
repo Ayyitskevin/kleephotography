@@ -70,6 +70,22 @@ async def update_invoice(request: Request, invoice_id: int):
     return RedirectResponse(f"/admin/studio/invoices/{invoice_id}", status_code=303)
 
 
+@router.post("/invoices/{invoice_id}/duplicate")
+async def duplicate_invoice(invoice_id: int):
+    """Clone a locked invoice (sent/viewed/paid) into a fresh editable draft.
+    Copies title/line items/total/deposit/due date/terms under a new slug; the new
+    draft carries no payments, Stripe session, or paid status. The original — and the
+    payments recorded against it — is untouched."""
+    d = get_invoice(invoice_id)
+    did = db.run("""INSERT INTO invoices (project_id, slug, title, line_items,
+                    total_cents, deposit_cents, due_date, terms)
+                    VALUES (?,?,?,?,?,?,?,?)""",
+                 (d["project_id"], security.new_slug(), d["title"], d["line_items"],
+                  d["total_cents"], d["deposit_cents"], d["due_date"], d["terms"]))
+    log.info("invoice %s duplicated → %s (new draft)", invoice_id, did)
+    return RedirectResponse(f"/admin/studio/invoices/{did}", status_code=303)
+
+
 @router.post("/invoices/{invoice_id}/send")
 async def mark_invoice_sent(invoice_id: int):
     d = get_invoice(invoice_id)

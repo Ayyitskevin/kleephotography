@@ -46,7 +46,12 @@
     <button type="submit">Mark sent (locks editing)</button>
   </form>
   {% else %}
-  <p class="muted">Locked — invoices can’t be edited after sending.</p>
+  <p class="muted">Locked — invoices can’t be edited after sending.
+    <form method="post" action="/admin/studio/invoices/{{ d.id }}/duplicate"
+          class="inline-form"
+          onsubmit="return confirm('Make an editable copy of this invoice as a new draft? Payments stay with the original.')">
+      <button type="submit" class="link">Duplicate as draft</button>
+    </form></p>
   <table class="list">
     <tr><th>Line item</th><th>Qty</th><th>Unit</th><th>Amount</th></tr>
     {% for row in rows if row.label %}

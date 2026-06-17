@@ -135,6 +135,19 @@ async def update_contract(contract_id: int, title: str = Form(...), body: str = 
     return RedirectResponse(f"/admin/studio/contracts/{contract_id}", status_code=303)
 
 
+@router.post("/contracts/{contract_id}/duplicate")
+async def duplicate_contract(contract_id: int):
+    """Clone a locked contract (sent/viewed/signed) into a fresh editable draft.
+    Copies the resolved body snapshot + title under a new slug; the new draft has
+    no hash or signature until it is sent and signed in its own right. The original
+    is untouched."""
+    d = get_contract(contract_id)
+    did = db.run("INSERT INTO contracts (project_id, slug, title, body) VALUES (?,?,?,?)",
+                 (d["project_id"], security.new_slug(), d["title"], d["body"]))
+    log.info("contract %s duplicated → %s (new draft)", contract_id, did)
+    return RedirectResponse(f"/admin/studio/contracts/{did}", status_code=303)
+
+
 @router.post("/contracts/{contract_id}/send")
 async def mark_contract_sent(contract_id: int):
     d = get_contract(contract_id)
