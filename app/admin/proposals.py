@@ -96,20 +96,20 @@ PRESETS = {
         {"label": "Standing portal + concierge scheduling", "qty": 1, "unit_cents": 0},
     ]},
 
-    # ── Portrait Sessions (placeholder pricing — set tiers, then update) ─────
+    # ── Portrait Sessions ───────────────────────────────────────────────────
     "portrait_starter": {"title": "Portrait Session — Tier I", "items": [
-        {"label": "Portrait session (~1 hr, one look) — [Tier I price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Portrait session (~1 hr, one look)", "qty": 1, "unit_cents": 35000},
         {"label": "Up to 10 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
         {"label": "Online gallery delivery + personal-use rights", "qty": 1, "unit_cents": 0},
     ]},
     "portrait_standard": {"title": "Portrait Session — Tier II", "items": [
-        {"label": "Portrait session (~2 hrs, two looks) — [Tier II price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Portrait session (~2 hrs, two looks)", "qty": 1, "unit_cents": 60000},
         {"label": "Up to 25 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
         {"label": "Wardrobe change + location guidance", "qty": 1, "unit_cents": 0},
         {"label": "Online gallery delivery + personal-use rights", "qty": 1, "unit_cents": 0},
     ]},
     "portrait_premium": {"title": "Portrait Session — Tier III", "items": [
-        {"label": "Extended portrait session (~3 hrs, multiple looks) — [Tier III price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Extended portrait session (~3 hrs, multiple looks)", "qty": 1, "unit_cents": 85000},
         {"label": "Up to 40 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
         {"label": "Multiple looks + on-location options", "qty": 1, "unit_cents": 0},
         {"label": "Rush turnaround available", "qty": 1, "unit_cents": 0},
