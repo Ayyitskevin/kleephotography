@@ -641,8 +641,25 @@ async def client_detail(request: Request, client_id: int):
         "n_invoices": inv["n_invoices"],
         "n_delivered": n_delivered,
     }
+    # Cross-session activity feed — the same per-doc events the project page
+    # shows, but spanning every session this client has, newest first. Pure-read
+    # narration of state already stored (reuses _build_timeline); no new state,
+    # so nothing writes to the Notion Activity Log.
+    proj_ids = [p["id"] for p in projects]
+    timeline = []
+    if proj_ids:
+        ph = ",".join("?" * len(proj_ids))
+        c_proposals = db.all_("SELECT * FROM proposals WHERE project_id IN (%s)" % ph, proj_ids)
+        c_contracts = db.all_("SELECT * FROM contracts WHERE project_id IN (%s)" % ph, proj_ids)
+        c_invoices = db.all_("SELECT * FROM invoices WHERE project_id IN (%s)" % ph, proj_ids)
+        c_emails = db.all_("SELECT * FROM emails_log WHERE project_id IN (%s)" % ph, proj_ids)
+        c_payments = db.all_("SELECT pm.* FROM payments pm JOIN invoices i ON i.id=pm.invoice_id "
+                             "WHERE i.project_id IN (%s)" % ph, proj_ids)
+        timeline = _build_timeline(c_proposals, c_contracts, c_invoices,
+                                   c_payments, c_emails)[:40]
     return templates.TemplateResponse(request, "admin/client.html",
                                       {"c": c, "projects": projects, "portal": portal,
+                                       "timeline": timeline,
                                        "galleries": galleries, "brand": brand,
                                        "brand_kits": brand_kits,
                                        "parent": parent, "parent_choices": parent_choices,

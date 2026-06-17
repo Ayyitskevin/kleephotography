@@ -787,6 +787,47 @@ def test_studio_clients_projects(admin):
     assert r.status_code == 400
 
 
+def test_client_activity_timeline(admin):
+    # The client page must narrate document history across ALL of a client's
+    # sessions in one reverse-chron feed — the gap the per-project timeline left
+    # open (you had to open each session to see what happened). If a sent
+    # proposal's event never reaches the client page, this view is broken.
+    r = admin.post("/admin/studio/clients",
+                   data={"name": "Marco Feed", "company": "Trattoria",
+                         "email": "marco@trattoria.com", "phone": ""},
+                   follow_redirects=False)
+    assert r.status_code == 303
+    c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
+
+    admin.post(f"/admin/studio/clients/{c['id']}/projects",
+               data={"title": "Autumn menu shoot"}, follow_redirects=False)
+    p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
+
+    # empty state before any document activity
+    page = admin.get(f"/admin/studio/clients/{c['id']}").text
+    assert "Recent activity" in page
+    assert "No document activity yet" in page
+
+    # a sent proposal produces drafted + sent events that must surface here,
+    # not only on the project page
+    admin.post(f"/admin/studio/projects/{p['id']}/proposals",
+               data={"preset": "photo_starter"}, follow_redirects=False)
+    d = db.one("SELECT * FROM proposals ORDER BY id DESC LIMIT 1")
+    admin.post(f"/admin/studio/proposals/{d['id']}/send", follow_redirects=False)
+
+    page = admin.get(f"/admin/studio/clients/{c['id']}").text
+    assert "No document activity yet" not in page
+    assert 'class="timeline"' in page
+    assert f"Proposal “{d['title']}” sent" in page
+
+    # Clean up: force-delete this client so the "latest client/project" rows the
+    # downstream studio lifecycle tests depend on revert to their fixtures.
+    r = admin.post(f"/admin/studio/clients/{c['id']}/delete",
+                   data={"force": "1"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
+
+
 def test_proposal_lifecycle(admin):
     from app import config
     p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")

@@ -206,6 +206,23 @@
   </table>
   {% if not projects %}<p class="muted">No sessions yet.</p>{% endif %}
 
+  <h2>Recent activity</h2>
+  {% if timeline %}
+  <ul class="timeline">
+    {% for e in timeline %}
+    <li class="timeline-item timeline-{{ e.kind }}">
+      <span class="timeline-dot" aria-hidden="true"></span>
+      <span class="timeline-when">{{ e.ts[:16] }}</span>
+      <span class="timeline-kind"><span class="kind-badge kind-{{ e.kind }}">{{ e.kind }}</span></span>
+      <span class="timeline-text">{{ e.text }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No document activity yet — sent proposals, signed contracts,
+    payments and emails across this client's sessions show up here.</p>
+  {% endif %}
+
   <h2>Licenses <a href="/admin/studio/licenses" class="muted" style="font-size:0.7em">(all)</a></h2>
   <p class="muted">Usage-rights grants this client holds. The free-text "Usage rights"
     field above is a quick note; these are the structured, auditable records.</p>
