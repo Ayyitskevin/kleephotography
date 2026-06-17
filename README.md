@@ -24,7 +24,9 @@ Live: <https://kleephotography.com> · Runs on a single always-on node behind a 
 
 FastAPI · Jinja2 · HTMX (no front-end build) · SQLite (WAL) · Pillow + pillow-heif (imaging) ·
 ffmpeg (video transcode/poster) · Stripe (payments) · itsdangerous (signed cookies).
-Python deps pinned in `requirements.txt`. ~17.5K LOC.
+Python deps pinned in `requirements.txt`. ~10K LOC Python, ~20K total; one 115-case
+end-to-end smoke suite. No ORM, no JS framework, no message broker — the platform is the
+standard library plus four well-chosen packages.
 
 ## Architecture
 
@@ -38,7 +40,7 @@ Three surfaces, one process:
 | Machine API | `app/service_api.py` | Internal automation | bearer token (`/api/shots`) |
 
 **Spine:** `main.py` (app factory + middleware), `config.py` (env-driven), `db.py`
-(SQLite, short-lived connections, 27 forward-only migrations in `migrations/`),
+(SQLite, short-lived connections, 48 forward-only migrations in `migrations/`),
 `security.py` (slugs/PINs/lockout/cookies), `jobs.py` (in-process queue for image
 derivatives + video transcodes), `scheduler.py` (retainer thread — drafts only).
 
@@ -46,6 +48,39 @@ derivatives + video transcodes), `scheduler.py` (retainer thread — drafts only
 status **outward only**: to Notion (`notion_sync.py`) and an external Odysseus CRM
 (`caption_ai.py`, `reopen_notify.py`). There is **no bidirectional sync anywhere** — that is a
 deliberate constraint, not a missing feature.
+
+## Notable engineering decisions
+
+The deliberate constraints — each is a choice, not an omission, and most trade scale I
+don't need for operability I do:
+
+- **SQLite over Postgres.** One operator, one node, low write concurrency. WAL mode handles
+  the read-heavy gallery traffic; the whole DB backs up with a file copy. A network DB would
+  add an ops surface with no payoff at this scale.
+- **In-process job queue over Celery/Redis.** Derivatives and transcodes run on a small
+  executor pool with a startup reconcile for jobs orphaned by a crash (`jobs.py`). No broker
+  to run, monitor, or secure — uploads still return fast.
+- **HTMX over a SPA.** Server-rendered Jinja with HTMX for partial swaps. No build step, no
+  bundle, no client-state duplication. Four hand-written vanilla JS files cover the rest.
+- **Forward-only migrations.** Plain numbered `.sql` applied on startup, idempotent, with a
+  parallel `rollback/` mirror. Schema history is readable in `git log`, not hidden behind a tool.
+- **Money/media truth is local; integrations are one-way.** Avoids the split-brain class of
+  bug entirely — nothing external can write back and disagree with what Stripe charged.
+- **Defense in depth at the edge.** App-level PIN lockout + unguessable slugs *and*
+  Cloudflare Access on `/admin/*`, so a single layer failing is not a breach.
+
+## Testing
+
+`tests/test_smoke.py` is one end-to-end suite (115 cases) that exercises real routes against
+a real SQLite DB via FastAPI's `TestClient` — auth gating, PIN lockout, the proposal →
+contract → invoice → receipt flow, Stripe webhook signature verification, and template
+rendering. Tests assert *intent* (e.g. a webhook with a bad signature is rejected), not just
+status codes.
+
+```bash
+MISE_DATA_DIR=$(mktemp -d) MISE_SECRET_KEY=test MISE_ADMIN_PASSWORD=pw \
+  MISE_ENV_FILE=/nonexistent .venv/bin/python -m pytest tests/test_smoke.py -q
+```
 
 ## Repo layout
 
@@ -58,11 +93,11 @@ app/
   service_api.py            bearer-gated /api/shots
   imaging.py video.py       media pipeline
   notion_sync.py caption_ai.py reopen_notify.py   one-way outbound integrations
-migrations/   001..027 forward-only (+ rollback/ mirror)
-templates/    admin/ · public/ · site/   (Jinja + HTMX)
-static/       mise.css + 4 vanilla JS (htmx, lightbox, copy-link, details-persist)
+migrations/   001..048 forward-only (+ rollback/ mirror)
+templates/    admin/ · public/ · site/   (80 Jinja + HTMX templates)
+static/       mise.css + htmx.min.js + 4 vanilla JS (lightbox, copy-link, details-persist, site)
 ops/          systemd units + nightly backup
-tests/        test_smoke.py (end-to-end smoke suite)
+tests/        test_smoke.py (115 end-to-end cases, real DB + TestClient)
 ```
 
 ## Running it
