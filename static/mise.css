@@ -2648,6 +2648,11 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .admin-shell {
   flex-direction: column;
 }
+/* Shell keeps align-items:flex-start, so in column mode the content wrapper
+   would shrink to its min-content width — pin it full-width to fill the row. */
+.admin-shell .admin-col {
+  width: 100%;
+}
 .admin-shell .admin-nav {
   position: sticky;
     top: 0;
