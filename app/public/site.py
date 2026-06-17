@@ -312,9 +312,9 @@ async def services(request: Request):
 
 
 @router.get("/contact", response_class=HTMLResponse)
-async def contact(request: Request, prefill: str = "", business: str = "",
-                  count: int = 0, gallery: str = ""):
-    """Optional ?prefill=<kind>&service=&tier= for cross-surface deep links."""
+async def contact(request: Request):
+    """Optional ?prefill=<kind>&service=&tier= for cross-surface deep links
+    (parsed in _contact_prefill straight off the query string)."""
     pf = _contact_prefill(request)
     return templates.TemplateResponse(request, "site/contact.html",
                                       {"sent": False, "error": None,
