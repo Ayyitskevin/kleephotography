@@ -35,7 +35,8 @@
   </section>
   {% endif %}
 
-  <p class="no-print"><button onclick="window.print()" class="link">Print / save as PDF</button></p>
+  <p class="no-print"><button onclick="window.print()" class="link">Print / save as PDF</button>
+    {% if paid_cents %}· <a href="/i/{{ d.slug }}/receipt" class="link">View receipt</a>{% endif %}</p>
 
   {% if d.status == 'paid' %}
   <p class="doc-accepted">✓ Paid in full {{ d.paid_at }} — thank you!</p>

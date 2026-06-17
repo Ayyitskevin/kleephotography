@@ -45,10 +45,31 @@ async def view_invoice(request: Request, slug: str):
                (d["id"],))
         log.info("invoice %s viewed from %s", d["id"], security.client_ip(request))
     amount, kind = next_payment(d)
+    paid_cents = db.one("""SELECT COALESCE(SUM(amount_cents), 0) AS c
+                           FROM payments WHERE invoice_id=?""", (d["id"],))["c"]
     return templates.TemplateResponse(request, "public/invoice.html",
                                       {"d": d, "items": json.loads(d["line_items"]),
                                        "amount_due": amount, "pay_kind": kind,
+                                       "paid_cents": paid_cents,
                                        "payments_on": bool(config.STRIPE_SECRET_KEY)})
+
+
+@router.get("/i/{slug}/receipt", response_class=HTMLResponse)
+async def view_receipt(request: Request, slug: str):
+    """Printable receipt — a read-only render of payments Stripe already
+    recorded, so it can never disagree with what was charged. 404 until at
+    least one payment exists."""
+    d = _invoice_or_404(slug)
+    payments = db.all_("""SELECT amount_cents, kind, created_at
+                          FROM payments WHERE invoice_id=?
+                          ORDER BY created_at""", (d["id"],))
+    if not payments:
+        raise HTTPException(status_code=404)
+    paid_cents = sum(p["amount_cents"] for p in payments)
+    return templates.TemplateResponse(request, "public/receipt.html",
+                                      {"d": d, "payments": payments,
+                                       "paid_cents": paid_cents,
+                                       "remaining_cents": max(0, d["total_cents"] - paid_cents)})
 
 
 @router.post("/i/{slug}/pay")

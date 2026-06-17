@@ -24,6 +24,8 @@
         <td><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></td></tr>
   </table>
 
+  <p class="no-print"><button onclick="window.print()" class="link">Print / save as PDF</button></p>
+
   {% if d.status == 'accepted' %}
   <p class="doc-accepted">✓ Accepted {{ d.accepted_at }} — thank you! Next step: contract &amp; invoice will follow by email.</p>
   {% elif d.status == 'declined' %}

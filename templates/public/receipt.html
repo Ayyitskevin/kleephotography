@@ -1,0 +1,40 @@
+{% extends "base_cream.html" %}
+{% block title %}Receipt · {{ d.title }} · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="doc-page">
+  <header class="doc-head">
+    <p class="muted">{{ site_name }}</p>
+    <h1>Receipt</h1>
+    <p class="muted">Invoice #{{ d.id }} · {{ d.title }}</p>
+    <p class="muted">Billed to {{ d.client_name }}{% if d.company %} · {{ d.company }}{% endif %}</p>
+  </header>
+
+  <table class="list doc-items">
+    <tr><th>Date</th><th>Payment</th><th>Amount</th></tr>
+    {% for p in payments %}
+    <tr>
+      <td>{{ p.created_at[:10] }}</td>
+      <td>{{ {"deposit": "Deposit", "balance": "Balance", "full": "Payment"}.get(p.kind, p.kind) }}</td>
+      <td>${{ "%.2f" % (p.amount_cents / 100) }}</td>
+    </tr>
+    {% endfor %}
+    <tr><td colspan="2"><strong>Total paid</strong></td>
+        <td><strong>${{ "%.2f" % (paid_cents / 100) }}</strong></td></tr>
+    {% if remaining_cents %}
+    <tr><td colspan="2">Remaining balance</td>
+        <td>${{ "%.2f" % (remaining_cents / 100) }}</td></tr>
+    {% endif %}
+  </table>
+
+  {% if not remaining_cents %}
+  <p class="doc-accepted">✓ Paid in full — thank you!</p>
+  {% endif %}
+  <p class="muted">Invoice total ${{ "%.2f" % (d.total_cents / 100) }}.
+    Payments processed securely by Stripe.</p>
+
+  <div class="doc-actions no-print">
+    <button onclick="window.print()" class="link">Print / save as PDF</button>
+    <a href="/i/{{ d.slug }}" class="link">Back to invoice</a>
+  </div>
+</main>
+{% endblock %}

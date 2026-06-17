@@ -1085,6 +1085,53 @@ def test_reports_top_clients(admin):
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
 
 
+def test_invoice_receipt(admin):
+    # A paid invoice must offer a printable receipt that lists the recorded
+    # payments and totals — for the client's accountant. The receipt is a pure
+    # read of the payments table (the source Stripe writes), so it can never
+    # disagree with what was charged. No payments → no receipt (404).
+    admin.post("/admin/studio/clients",
+               data={"name": "Priya Anand", "company": "Saffron Counter",
+                     "email": "priya@saffron.test", "phone": ""},
+               follow_redirects=False)
+    c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
+    admin.post(f"/admin/studio/clients/{c['id']}/projects",
+               data={"title": "Menu refresh"}, follow_redirects=False)
+    p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
+    # Deposit then balance, both recorded → receipt shows two lines, paid in full.
+    iid = db.run("""INSERT INTO invoices (project_id, slug, title, line_items,
+                                          total_cents, status, paid_at)
+                    VALUES (?,?,?,?,?,?,datetime('now'))""",
+                 (p["id"], "rcpt-test", "Menu refresh shoot", "[]", 500000, "paid"))
+    inv = db.one("SELECT * FROM invoices WHERE id=?", (iid,))
+    for kind, cents in (("deposit", 200000), ("balance", 300000)):
+        db.run("""INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
+                  amount_cents, kind) VALUES (?,?,?,?,?)""",
+               (iid, f"evt_{kind}_{iid}", f"cs_{kind}_{iid}", cents, kind))
+
+    r = admin.get(f"/i/{inv['slug']}/receipt")
+    assert r.status_code == 200
+    assert "Deposit" in r.text and "Balance" in r.text
+    assert "$2000.00" in r.text and "$3000.00" in r.text
+    assert "$5000.00" in r.text  # total paid
+    assert "Paid in full" in r.text
+    # The invoice page links to the receipt once a payment exists.
+    assert f"/i/{inv['slug']}/receipt" in admin.get(f"/i/{inv['slug']}").text
+
+    # An invoice with no payments has no receipt.
+    jid = db.run("""INSERT INTO invoices (project_id, slug, title, line_items,
+                                          total_cents, status)
+                    VALUES (?,?,?,?,?,?)""",
+                 (p["id"], "rcpt-empty", "Unpaid", "[]", 100000, "sent"))
+    assert admin.get("/i/rcpt-empty/receipt").status_code == 404
+
+    db.run("DELETE FROM payments WHERE invoice_id=?", (iid,))
+    db.run("DELETE FROM invoices WHERE id IN (?,?)", (iid, jid))
+    admin.post(f"/admin/studio/clients/{c['id']}/delete",
+               data={"force": "1"}, follow_redirects=False)
+    assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
+
+
 def test_admin_global_search(admin):
     # The search box is the jump-to across the admin. It must find a client by
     # business name and its project by title, and link straight to each. It must
