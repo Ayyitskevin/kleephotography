@@ -220,13 +220,64 @@ def _case_studies() -> list:
                       ORDER BY g.created_at DESC""")
 
 
+def _demo_gallery() -> dict | None:
+    """Prospect-facing sample gallery link (optional)."""
+    slug = (config.DEMO_GALLERY_SLUG or "").strip()
+    if slug:
+        g = db.one("SELECT slug, title FROM galleries WHERE slug=?", (slug,))
+    else:
+        g = db.one("""SELECT slug, title FROM galleries
+                      WHERE lower(title) LIKE '%sample%'
+                         OR lower(slug) LIKE '%sample%'
+                      ORDER BY id LIMIT 1""")
+    if not g:
+        return None
+    out = {"slug": g["slug"], "title": g["title"], "url": f"/g/{g['slug']}"}
+    if config.DEMO_GALLERY_PIN.strip():
+        out["pin"] = config.DEMO_GALLERY_PIN.strip()
+    return out
+
+
+def _contact_prefill(request: Request) -> dict:
+    """Build contact form prefill from ?prefill= / ?service= / ?tier= deep links."""
+    q = request.query_params
+    prefill_kind = (q.get("prefill") or "").strip()
+    service = (q.get("service") or "").strip()
+    tier = (q.get("tier") or "").strip()
+    business = (q.get("business") or "").strip()
+    try:
+        count = int(q.get("count") or 0)
+    except ValueError:
+        count = 0
+    gallery = (q.get("gallery") or "").strip()
+    message = ""
+    if prefill_kind == "gallery_formats" and count > 0:
+        message = (f"Hi — following up on the gallery delivery. Could I get "
+                   f"additional formats (or larger sizes) for the {count} "
+                   f"select{'s' if count != 1 else ''} I've favorited? Thanks!")
+    elif prefill_kind == "gallery_question" and gallery:
+        message = (f"Hi — I have a question about the \"{gallery}\" gallery "
+                   f"delivery. ")
+    elif prefill_kind == "demo_gallery":
+        message = ("Hi — I'd like to walk through the sample client gallery "
+                   "and see how proofing and social crops work.")
+    elif service and tier:
+        message = (f"Hi — I'm interested in the {tier} tier for {service}. "
+                   f"Here's a bit about my project:\n\n")
+    elif service:
+        message = (f"Hi — I'm interested in {service}. "
+                   f"Here's a bit about my project:\n\n")
+    return {"business": business, "message": message, "service": service, "tier": tier}
+
+
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     featured = _portfolio_assets()[:6]
     return templates.TemplateResponse(request, "site/home.html",
                                       {"featured": featured,
                                        "press": _press_features()[:12],
-                                       "testimonials": _testimonials(limit=3)})
+                                       "testimonials": _testimonials(limit=3),
+                                       "demo_gallery": _demo_gallery()})
 
 
 @router.get("/portfolio", response_class=HTMLResponse)
@@ -238,7 +289,8 @@ async def portfolio(request: Request):
     # /work index + /work/{slug} detail pages are public + crawlable too.
     return templates.TemplateResponse(request, "site/portfolio.html",
                                       {"assets": assets, "tags": tags,
-                                       "studies": _case_studies()})
+                                       "studies": _case_studies(),
+                                       "demo_gallery": _demo_gallery()})
 
 
 @router.get("/about", response_class=HTMLResponse)
@@ -262,21 +314,11 @@ async def services(request: Request):
 @router.get("/contact", response_class=HTMLResponse)
 async def contact(request: Request, prefill: str = "", business: str = "",
                   count: int = 0, gallery: str = ""):
-    """Optional ?prefill=<kind>&business=&count=&gallery= for cross-surface
-    deep links. Kinds drive a friendly canned message; unknown kinds fall
-    through clean so typos / future kinds / link tampering never break."""
-    p_msg = ""
-    if prefill == "gallery_formats" and count > 0:
-        p_msg = (f"Hi — following up on the gallery delivery. Could I get "
-                 f"additional formats (or larger sizes) for the {count} "
-                 f"select{'s' if count != 1 else ''} I've favorited? Thanks!")
-    elif prefill == "gallery_question" and gallery:
-        p_msg = (f"Hi — I have a question about the \"{gallery}\" gallery "
-                 f"delivery. ")
+    """Optional ?prefill=<kind>&service=&tier= for cross-surface deep links."""
+    pf = _contact_prefill(request)
     return templates.TemplateResponse(request, "site/contact.html",
                                       {"sent": False, "error": None,
-                                       "prefill": {"business": business,
-                                                   "message": p_msg}})
+                                       "prefill": pf})
 
 
 @router.post("/contact", response_class=HTMLResponse)
@@ -345,7 +387,8 @@ async def submit_inquiry(request: Request, name: str = Form(...), email: str = F
 @router.get("/work", response_class=HTMLResponse)
 async def work_index(request: Request):
     return templates.TemplateResponse(request, "site/work_index.html",
-                                      {"studies": _case_studies()})
+                                      {"studies": _case_studies(),
+                                       "demo_gallery": _demo_gallery()})
 
 
 @router.get("/work/{slug}", response_class=HTMLResponse)
@@ -366,7 +409,8 @@ async def work_detail(request: Request, slug: str):
 @router.get("/reels", response_class=HTMLResponse)
 async def reels(request: Request):
     return templates.TemplateResponse(request, "site/reels.html",
-                                      {"reels": _portfolio_reels()})
+                                      {"reels": _portfolio_reels(),
+                                       "demo_gallery": _demo_gallery()})
 
 
 @router.get("/site/img/{asset_id}")

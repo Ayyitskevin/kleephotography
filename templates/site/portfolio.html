@@ -32,11 +32,11 @@
       <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
            srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
            sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 25vw"
-           alt="Food and beverage photography by {{ site_name }}"></figure>
+           alt="{{ a|portfolio_alt }}"></figure>
     {% endfor %}
   </div>
   {% else %}
-  <p class="muted">Portfolio coming soon.</p>
+  {% include "site/_empty_portfolio.html" %}
   {% endif %}
 
   {% if studies %}

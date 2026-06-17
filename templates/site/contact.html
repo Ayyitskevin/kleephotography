@@ -26,10 +26,10 @@
     <label>Project type
       <select name="service">
         <option value="">Not sure yet — help me choose</option>
-        <option value="Photography">Photography</option>
-        <option value="Videography">Videography</option>
-        <option value="Photography + Videography">Photography + Videography</option>
-        <option value="Brand Partner (monthly retainer)">Brand Partner (monthly retainer)</option>
+        <option value="Photography"{% if prefill and prefill.service == 'Photography' %} selected{% endif %}>Photography</option>
+        <option value="Videography"{% if prefill and prefill.service == 'Videography' %} selected{% endif %}>Videography</option>
+        <option value="Photography + Videography"{% if prefill and prefill.service == 'Photography + Videography' %} selected{% endif %}>Photography + Videography</option>
+        <option value="Brand Partner (monthly retainer)"{% if prefill and prefill.service == 'Brand Partner (monthly retainer)' %} selected{% endif %}>Brand Partner (monthly retainer)</option>
       </select></label>
     <label>Target date <input type="date" name="shoot_date"></label>
     <label>How many dishes or setups? <input type="text" name="dish_count"

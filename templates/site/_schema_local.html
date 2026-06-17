@@ -1,0 +1,21 @@
+{# LocalBusiness / ProfessionalService JSON-LD — marketing pages only #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ProfessionalService",
+  "name": {{ site_name|tojson }},
+  "url": {{ base_url|tojson }},
+  "description": "Food and beverage photography and videography for restaurants, cafés, bars, and food brands.",
+  "areaServed": [
+    {"@type": "Place", "name": "Asheville, NC"},
+    {"@type": "Place", "name": "Western North Carolina"},
+    {"@type": "Place", "name": "Charlotte, NC"},
+    {"@type": "Place", "name": "Raleigh, NC"},
+    {"@type": "Place", "name": "Wilmington, NC"}
+  ],
+  "priceRange": "$$"{% if og_img %},
+  "image": {{ (base_url ~ "/site/img/" ~ og_img)|tojson }}{% endif %}{% if contact_email %},
+  "email": {{ contact_email|tojson }}{% endif %},
+  "sameAs": {% if instagram_url %}[{{ instagram_url|tojson }}]{% else %}[]{% endif %}
+}
+</script>

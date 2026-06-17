@@ -25,6 +25,23 @@ def _og_image_id() -> int | None:
 
 
 templates.env.globals["og_image_id"] = _og_image_id
+templates.env.globals["instagram_url"] = config.INSTAGRAM_URL
+templates.env.globals["contact_email"] = config.CONTACT_EMAIL
+templates.env.globals["plausible_domain"] = config.PLAUSIBLE_DOMAIN
+
+
+def _portfolio_alt(asset, site_name: str | None = None) -> str:
+    """Accessible alt text from portfolio_tag when present."""
+    name = site_name or config.SITE_NAME
+    tag = ""
+    if isinstance(asset, dict):
+        tag = (asset.get("portfolio_tag") or "").strip()
+    if tag:
+        return f"{tag.capitalize()} — food & beverage photography by {name}"
+    return f"Food & beverage photography by {name}"
+
+
+templates.env.filters["portfolio_alt"] = _portfolio_alt
 
 
 def _diff_tokens(value):

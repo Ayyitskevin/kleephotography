@@ -2283,7 +2283,7 @@ def test_case_studies(admin):
     with TestClient(app) as pub:
         # before publishing: /work is empty, /work/{slug} 404s, sitemap silent
         r = pub.get("/work")
-        assert r.status_code == 200 and "Case studies coming soon" in r.text
+        assert r.status_code == 200 and "New work is being curated" in r.text
         assert pub.get(f"/work/{g['slug']}").status_code == 404
         sm = pub.get("/sitemap.xml").text
         assert f"/work/{g['slug']}" not in sm
@@ -2338,7 +2338,7 @@ def test_case_studies(admin):
                          "captions": "", "cs_tagline": "", "cs_brief": "",
                          "cs_credits": "", "cs_location": ""})
         assert pub.get(f"/work/{g['slug']}").status_code == 404
-        assert "Case studies coming soon" in pub.get("/work").text
+        assert "New work is being curated" in pub.get("/work").text
         # client gallery still serves — the case-study flag is independent
         assert pub.get(f"/g/{g['slug']}").status_code == 200
 
@@ -2990,14 +2990,22 @@ def test_dashboard_selects_in_badge(admin):
     assert "selects in" in row
 
 
+def _spark_rect_count(html: str) -> int:
+    """Count sparkline bars only — nav SVG icons also use <rect>."""
+    start = html.index('class="sparklines"')
+    end = html.index("</section>", start)
+    return html[start:end].count("<rect")
+
+
 def test_studio_sparklines(admin):
     # baseline: studio loads with 3 sparkline cards regardless of state
     page = admin.get("/admin/studio").text
     assert "Inquiries" in page and "Downloads" in page and "Favorites" in page
     assert page.count('class="spark-card"') == 3
     assert page.count("spark-svg") == 3
-    # default = 7-day window → 7 x 3 = 21 <rect> bars
-    assert page.count("<rect") == 21
+    # default = 7-day window → 7 x 3 = 21 <rect> bars inside sparklines only
+    # (nav SVG icons also contain <rect> — scope to sparklines section)
+    assert _spark_rect_count(page) == 21
     # 3-button window picker, 7d active by default
     assert 'href="/admin/studio?days=7"' in page
     assert 'href="/admin/studio?days=30"' in page
@@ -3010,21 +3018,21 @@ def test_studio_sparklines(admin):
 
     # ?days=30 → 30 x 3 = 90 bars + the 30d button becomes active
     page30 = admin.get("/admin/studio?days=30").text
-    assert page30.count("<rect") == 90
+    assert _spark_rect_count(page30) == 90
     thirty_idx = page30.index('href="/admin/studio?days=30"')
     assert "spark-window-active" in page30[thirty_idx:page30.index("</a>", thirty_idx)]
 
     # ?days=90 → 90 x 3 = 270 bars
-    assert admin.get("/admin/studio?days=90").text.count("<rect") == 270
+    assert _spark_rect_count(admin.get("/admin/studio?days=90").text) == 270
 
     # bogus values clamp to the nearest allowed bucket: 999 → 90, 2 → 7, "abc" → 7
-    assert admin.get("/admin/studio?days=999").text.count("<rect") == 270
-    assert admin.get("/admin/studio?days=2").text.count("<rect") == 21
-    assert admin.get("/admin/studio?days=abc").text.count("<rect") == 21
+    assert _spark_rect_count(admin.get("/admin/studio?days=999").text) == 270
+    assert _spark_rect_count(admin.get("/admin/studio?days=2").text) == 21
+    assert _spark_rect_count(admin.get("/admin/studio?days=abc").text) == 21
     # 15 sits closer to 7 than 30 → clamps to 7
-    assert admin.get("/admin/studio?days=15").text.count("<rect") == 21
+    assert _spark_rect_count(admin.get("/admin/studio?days=15").text) == 21
     # 22 sits closer to 30 than 7 → clamps to 30
-    assert admin.get("/admin/studio?days=22").text.count("<rect") == 90
+    assert _spark_rect_count(admin.get("/admin/studio?days=22").text) == 90
 
     # seed a fresh inquiry → today's bar grows to >= 1
     db.run("INSERT INTO inquiries (name, email, message) VALUES (?,?,?)",

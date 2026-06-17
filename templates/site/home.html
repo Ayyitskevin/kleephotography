@@ -20,7 +20,7 @@
       <img data-hero-img src="/site/img/{{ featured[0].id }}?variant=web" fetchpriority="high" decoding="async"
            srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
            sizes="(max-width: 900px) 100vw, 55vw"
-           alt="Food &amp; beverage photography by {{ site_name }}">
+           alt="{{ featured[0]|portfolio_alt }}">
       {% if featured[0].portfolio_tag %}
       <figcaption>{{ featured[0].portfolio_tag|capitalize }}</figcaption>
       {% endif %}
@@ -62,7 +62,7 @@
         <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
              srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
              sizes="(max-width: 700px) 50vw, 25vw"
-             alt="Food &amp; beverage photography by {{ site_name }}">
+             alt="{{ a|portfolio_alt }}">
         {% if a.portfolio_tag %}
         <figcaption class="work-cap">{{ a.portfolio_tag|capitalize }}</figcaption>
         {% endif %}
@@ -111,6 +111,12 @@
       <h2>Delivery is the easy part.</h2>
       <p>Private gallery. Proof favorites, download full-res, grab social
          crops sized for every platform.</p>
+      {% if demo_gallery %}
+      <p class="delivery-demo-link"><a class="btn-ghost" href="{{ demo_gallery.url }}">Try the sample gallery &rarr;</a>
+        {% if demo_gallery.pin %}<span class="muted">PIN <b>{{ demo_gallery.pin }}</b></span>
+        {% else %}<a class="muted" href="/contact?prefill=demo_gallery">(ask for PIN)</a>{% endif %}
+      </p>
+      {% endif %}
     </div>
 
     <div class="delivery-grid">
@@ -181,7 +187,7 @@
       <img src="/site/img/{{ about_a.id }}?variant=thumb" loading="lazy" decoding="async"
            srcset="/site/img/{{ about_a.id }}?variant=thumb 480w, /site/img/{{ about_a.id }}?variant=web 2048w"
            sizes="(max-width: 900px) 100vw, 45vw"
-           alt="Food &amp; beverage work by {{ site_name }}">
+           alt="{{ about_a|portfolio_alt }}">
     </div>
     {% endif %}
     <div data-reveal>

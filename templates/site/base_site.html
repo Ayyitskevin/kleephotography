@@ -17,6 +17,10 @@
 <link rel="preload" href="/static/fonts/archivo-latin.woff2?v={{ static_rev }}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
 <script src="/static/site.js?v={{ static_rev }}" defer></script>
+{% if plausible_domain %}
+<script defer src="https://plausible.io/js/script.js" data-domain="{{ plausible_domain }}"></script>
+{% endif %}
+{% include "site/_schema_local.html" %}
 {% block site_head %}{% endblock %}
 {% endblock %}
 {% block bodyclass %}site-body{% endblock %}
@@ -28,6 +32,7 @@
   </a>
   <nav>
     <a href="/portfolio">Portfolio</a>
+    <a href="/work">Work</a>
     <a href="/reels">Reels</a>
     <a href="/services">Services</a>
     <a href="/about">About</a>
@@ -39,6 +44,7 @@
 
 <div class="nav-mobile" data-mobile-menu>
   <a href="/portfolio">Portfolio</a>
+  <a href="/work">Work</a>
   <a href="/reels">Reels</a>
   <a href="/services">Services</a>
   <a href="/about">About</a>
@@ -58,6 +64,7 @@
     <div class="footer-col">
       <b>Explore</b>
       <a href="/portfolio">Portfolio</a>
+      <a href="/work">Work</a>
       <a href="/reels">Reels</a>
       <a href="/services">Services</a>
       <a href="/about">About</a>
@@ -66,11 +73,13 @@
       <b>Start</b>
       <a href="/contact">Request a quote</a>
       <a href="/book">Book a call</a>
-      <a href="/services">Brand Partner</a>
+      <a href="/services#svc-brand_partner">Brand Partner</a>
     </div>
     <div class="footer-col">
       <b>Follow</b>
+      {% if instagram_url %}<a href="{{ instagram_url }}" rel="me noopener noreferrer" target="_blank">Instagram</a>{% endif %}
       <a href="/press">Press</a>
+      {% if contact_email %}<a href="mailto:{{ contact_email }}">Email</a>{% endif %}
       <a href="/contact">Get in touch</a>
     </div>
   </div>

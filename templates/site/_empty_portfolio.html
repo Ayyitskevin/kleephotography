@@ -1,0 +1,18 @@
+{# Shared empty-state when portfolio / reels / work have no public content yet #}
+<div class="empty-state" data-reveal>
+  <p><strong>New work is being curated for the site.</strong></p>
+  <p class="muted">The interactive delivery demo on the
+     <a href="/#delivery">home page</a> shows how proofing, downloads, and
+     social crops work after a shoot.</p>
+  <div class="empty-state-actions">
+    <a class="btn-pill" href="/contact">Request a quote <span>&rarr;</span></a>
+    {% if demo_gallery %}
+    <a class="btn-ghost" href="{{ demo_gallery.url }}">Try sample gallery</a>
+    {% if demo_gallery.pin %}
+    <span class="muted empty-pin">Gallery PIN: <b>{{ demo_gallery.pin }}</b></span>
+    {% else %}
+    <a class="btn-ghost" href="/contact?prefill=demo_gallery">Ask for gallery PIN</a>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
