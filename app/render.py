@@ -34,8 +34,12 @@ def _portfolio_alt(asset, site_name: str | None = None) -> str:
     """Accessible alt text from portfolio_tag when present."""
     name = site_name or config.SITE_NAME
     tag = ""
-    if isinstance(asset, dict):
-        tag = (asset.get("portfolio_tag") or "").strip()
+    try:  # works for dict and sqlite3.Row (which lacks .get)
+        keys = asset.keys() if hasattr(asset, "keys") else ()
+        if "portfolio_tag" in keys:
+            tag = (asset["portfolio_tag"] or "").strip()
+    except (TypeError, KeyError, IndexError):
+        tag = ""
     if tag:
         return f"{tag.capitalize()} — food & beverage photography by {name}"
     return f"Food & beverage photography by {name}"
