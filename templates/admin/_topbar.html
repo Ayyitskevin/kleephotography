@@ -1,0 +1,32 @@
+{# Global admin top bar: sticky across every admin page, with a single
+   quick-create menu. Native <details> dropdown — no framework; a small inline
+   script closes it on outside-click / Escape. The links point at the existing
+   inline create forms on each page, mirroring the Home "Create" row. #}
+<header class="admin-topbar">
+  <div class="admin-topbar-inner">
+    <details class="qc" id="quick-create">
+      <summary class="qc-btn" aria-haspopup="menu">
+        <span class="qc-plus" aria-hidden="true">+</span> New</summary>
+      <div class="qc-menu" role="menu" aria-label="Create new">
+        <a role="menuitem" href="/admin/galleries">Gallery</a>
+        <a role="menuitem" href="/admin/transfers">Transfer</a>
+        <a role="menuitem" href="/admin/studio#clients">Client</a>
+        <a role="menuitem" href="/admin/studio#projects">Session</a>
+        <a role="menuitem" href="/admin/studio#invoices">Invoice</a>
+        <a role="menuitem" href="/admin/forms">Form</a>
+      </div>
+    </details>
+  </div>
+</header>
+<script>
+  (function () {
+    var d = document.getElementById("quick-create");
+    if (!d) return;
+    document.addEventListener("click", function (e) {
+      if (d.open && !d.contains(e.target)) d.open = false;
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") d.open = false;
+    });
+  })();
+</script>
