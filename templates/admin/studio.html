@@ -5,7 +5,7 @@
 <main class="admin-main">
   <div class="admin-bar">
     <h1>Studio</h1>
-    <nav><a href="/admin/home">Home</a> · <a href="/admin/galleries">Galleries</a> · <a href="/admin/scheduling">Scheduling</a> · <a href="/admin/studio/licenses">Licenses</a> · <a href="/admin/studio/press">Press</a> · <a href="/admin/studio/presets">Crop presets</a> · <a href="/admin/studio/testimonials">Testimonials</a></nav>
+    <nav><a href="/admin/home">Home</a> · <a href="/admin/galleries">Galleries</a> · <a href="/admin/scheduling">Scheduling</a> · <a href="/admin/studio/licenses">Licenses</a> · <a href="/admin/studio/press">Press</a> · <a href="/admin/studio/presets">Crop presets</a> · <a href="/admin/studio/testimonials">Testimonials</a> · <a href="/admin/studio/playbook">Booking playbook</a></nav>
   </div>
 
   {% if licenses_expiring %}
@@ -406,13 +406,13 @@
     stageSel.addEventListener('change', applyFilter);
     sortSel.addEventListener('change', applySort);
 
-    document.querySelectorAll('.studio-view-toggle button').forEach(function (btn) {
+    sec.querySelectorAll('.studio-view-toggle button').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var view = btn.dataset.view;
         sec.setAttribute('data-studio-view', view);
         board.hidden = view !== 'board';
         listTable.hidden = view !== 'list';
-        document.querySelectorAll('.studio-view-toggle button').forEach(function (b) {
+        sec.querySelectorAll('.studio-view-toggle button').forEach(function (b) {
           var on = b === btn;
           b.classList.toggle('is-active', on);
           b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -498,10 +498,7 @@
   </table>
   {% if not clients %}<p class="muted">No clients yet.</p>{% endif %}
 
-  <h2>Inquiries</h2>
-  <table class="list">
-    <tr><th>Date</th><th>From</th><th>Business</th><th>Request</th><th>Message</th><th></th></tr>
-    {% for i in inquiries %}
+  {% macro inquiry_row(i) %}
     <tr class="{% if i.converted_at %}inquiry-converted{% elif i.dismissed_at %}inquiry-dismissed{% endif %}">
       <td class="muted">{{ i.created_at[:10] }}
         {% if not i.emailed %}<span class="warn" title="Email send failed — only stored here">⚠</span>{% endif %}</td>
@@ -538,9 +535,53 @@
         {% endif %}
       </td>
     </tr>
-    {% endfor %}
+  {% endmacro %}
+
+  <div class="admin-bar" id="inquiries">
+    <h2>Inquiries</h2>
+    <div class="studio-view-toggle" role="group" aria-label="Inquiries view" id="inq-toggle">
+      <button type="button" data-inq="active" class="is-active" aria-pressed="true">Active <span class="muted">{{ inquiries|length }}</span></button>
+      <button type="button" data-inq="archived" aria-pressed="false">Archived <span class="muted">{{ inquiries_archived|length }}</span></button>
+    </div>
+  </div>
+
+  <table class="list" id="inq-active" data-inq-view="active">
+    <tr><th>Date</th><th>From</th><th>Business</th><th>Request</th><th>Message</th><th></th></tr>
+    {% for i in inquiries %}{{ inquiry_row(i) }}{% endfor %}
   </table>
-  {% if not inquiries %}<p class="muted">No inquiries yet — the contact form and
+  {% if not inquiries %}<p class="muted" id="inq-active-empty">No new inquiries — the contact form and
     booking page on the marketing site land here (and in your inbox).</p>{% endif %}
+
+  <table class="list" id="inq-archived" data-inq-view="archived" hidden>
+    <tr><th>Date</th><th>From</th><th>Business</th><th>Request</th><th>Message</th><th></th></tr>
+    {% for i in inquiries_archived %}{{ inquiry_row(i) }}{% endfor %}
+  </table>
+  {% if not inquiries_archived %}<p class="muted" id="inq-archived-empty" hidden>Nothing archived yet — converted and dismissed leads land here.</p>{% endif %}
+
+  <script>
+  (function () {
+    var toggle = document.getElementById('inq-toggle');
+    if (!toggle) return;
+    var views = {
+      active: { table: document.getElementById('inq-active'), empty: document.getElementById('inq-active-empty') },
+      archived: { table: document.getElementById('inq-archived'), empty: document.getElementById('inq-archived-empty') }
+    };
+    toggle.querySelectorAll('button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var want = btn.dataset.inq;
+        Object.keys(views).forEach(function (k) {
+          var on = k === want;
+          if (views[k].table) views[k].table.hidden = !on;
+          if (views[k].empty) views[k].empty.hidden = !on;
+        });
+        toggle.querySelectorAll('button').forEach(function (b) {
+          var on = b === btn;
+          b.classList.toggle('is-active', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+      });
+    });
+  })();
+  </script>
 </main>
 {% endblock %}

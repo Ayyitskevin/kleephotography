@@ -1,0 +1,107 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Templates · Mise{% endblock %}
+{% block admin_body %}
+<main class="admin-main">
+  <div class="admin-bar">
+    <h1>Templates</h1>
+    <nav><a href="/admin/studio">Studio</a> · <a href="/admin/forms">Forms</a></nav>
+  </div>
+
+  <p class="muted">Your ready-made client documents. Pick one, choose the project,
+    and it opens a populated draft you can adjust before sending. Nothing goes out
+    automatically — every document still has its own Send button.</p>
+
+  {% if not projects %}
+  <p class="muted">You'll need a client &amp; project first —
+    <a href="/admin/studio">create one in Studio</a>, then come back to apply a template.</p>
+  {% endif %}
+
+  {% macro use_form(doc_type, key, projects) %}
+    {% if projects %}
+    <details class="tpl-use">
+      <summary>Use this template</summary>
+      <form method="post" action="/admin/templates/use" class="tpl-use-form">
+        <input type="hidden" name="doc_type" value="{{ doc_type }}">
+        <input type="hidden" name="key" value="{{ key }}">
+        <label>Apply to
+          <select name="project_id" required>
+            {% for pr in projects %}
+            <option value="{{ pr.id }}">{{ pr.client_name }} — {{ pr.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit">Create draft</button>
+      </form>
+    </details>
+    {% endif %}
+  {% endmacro %}
+
+  <section class="tpl-section">
+    <h2>Proposals</h2>
+    <p class="muted">F&amp;B package proposals — your “Our Story” cover note is baked in.
+      Edit line items per client after applying.</p>
+    {% for g in proposal_groups %}
+    <h3 class="tpl-grouplabel">{{ g.label }}</h3>
+    <div class="tpl-grid">
+      {% for c in g.cards %}
+      <article class="tpl-card">
+        <h4>{{ c.title }}</h4>
+        <ul class="tpl-inside">
+          {% for it in c.lines %}<li>{{ it }}</li>{% endfor %}
+        </ul>
+        {% if c.total_cents %}
+        <p class="tpl-price">From ${{ "%.0f" % (c.total_cents / 100) }}</p>
+        {% else %}
+        <p class="tpl-price muted">Pricing TBD</p>
+        {% endif %}
+        {{ use_form("proposal", c.key, projects) }}
+      </article>
+      {% endfor %}
+    </div>
+    {% endfor %}
+    <h3 class="tpl-grouplabel">From scratch</h3>
+    <div class="tpl-grid">
+      <article class="tpl-card tpl-card-blank">
+        <h4>Blank proposal</h4>
+        <p class="muted">No line items, no cover note — build it yourself.</p>
+        {{ use_form("proposal", "blank", projects) }}
+      </article>
+    </div>
+  </section>
+
+  <section class="tpl-section">
+    <h2>Invoices</h2>
+    <div class="tpl-grid">
+      <article class="tpl-card">
+        <h4>Simple Invoice</h4>
+        <ul class="tpl-inside">
+          <li>Line items + totals</li>
+          <li>Optional deposit / balance split</li>
+          <li>Editable payment-terms note</li>
+          <li>Secure Stripe pay link (card or bank transfer)</li>
+        </ul>
+        <p class="muted">Seeds from the accepted proposal automatically when there is one.</p>
+        {{ use_form("invoice", "", projects) }}
+      </article>
+    </div>
+  </section>
+
+  <section class="tpl-section">
+    <h2>Contracts</h2>
+    <p class="muted">Draft agreements — client &amp; contact details merge in automatically.
+      All are drafts pending your attorney's review; they only go out when you hit Send.</p>
+    <div class="tpl-grid">
+      {% for c in contracts %}
+      <article class="tpl-card">
+        <h4>{{ c.title }}</h4>
+        {% if c.blurb %}<p class="muted">{{ c.blurb }}</p>{% endif %}
+        {{ use_form("contract", c.key, projects) }}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <p class="muted tpl-foot">Looking for your rate card, à-la-carte pricing, or usage-rights tiers?
+    They moved to <a href="/admin/reference">Reference</a> — your private, internal-only shelf.</p>
+</main>
+{% endblock %}

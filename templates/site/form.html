@@ -14,6 +14,15 @@
     <label>Name <input type="text" name="name" required value="{{ values.get('name', '') }}"></label>
     <label>Email <input type="email" name="email" required value="{{ values.get('email', '') }}"></label>
     {% for fld in fields %}
+    {% if fld.ftype == "checkbox" %}
+    {% set sel = values.get(fld.id | string) or [] %}
+    <fieldset class="check-field">
+      <legend>{{ fld.label }}{% if fld.required %} <span class="req">*</span>{% endif %}</legend>
+      {% for o in fld.opts %}
+      <label class="check-opt"><input type="checkbox" name="field_{{ fld.id }}" value="{{ o }}" {% if o in sel %}checked{% endif %}> {{ o }}</label>
+      {% endfor %}
+    </fieldset>
+    {% else %}
     {% set val = values.get(fld.id | string, "") %}
     <label>{{ fld.label }}{% if fld.required %} <span class="req">*</span>{% endif %}
       {% if fld.ftype == "long_text" %}
@@ -37,6 +46,7 @@
         <input type="text" name="field_{{ fld.id }}" value="{{ val }}" {% if fld.required %}required{% endif %}>
       {% endif %}
     </label>
+    {% endif %}
     {% endfor %}
     <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
     {% if error %}<p class="error">{{ error }}</p>{% endif %}

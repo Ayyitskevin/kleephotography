@@ -65,8 +65,14 @@ async def submit_form(request: Request, slug: str):
 
     name = (posted.get("name") or "").strip()
     email = (posted.get("email") or "").strip()
-    values = {str(fld["id"]): (posted.get(f"field_{fld['id']}") or "").strip()
-              for fld in fields}
+    values = {}
+    for fld in fields:
+        key = str(fld["id"])
+        if fld["ftype"] == "checkbox":
+            values[key] = [v.strip() for v in posted.getlist(f"field_{fld['id']}")
+                           if v.strip()]
+        else:
+            values[key] = (posted.get(f"field_{fld['id']}") or "").strip()
 
     errors = []
     if not name:
@@ -91,7 +97,12 @@ async def submit_form(request: Request, slug: str):
     security.inquiry_record(ip, security.INQUIRY_BUCKET_FORM)
 
     label_by_id = {str(fld["id"]): fld["label"] for fld in fields}
-    answer_lines = "\n".join(f"{label_by_id[k]}: {values[k] or '—'}" for k in values)
+
+    def _fmt(v):
+        if isinstance(v, list):
+            return ", ".join(v) if v else "—"
+        return v or "—"
+    answer_lines = "\n".join(f"{label_by_id[k]}: {_fmt(values[k])}" for k in values)
 
     inquiry_id = None
     if f["kind"] == "lead":

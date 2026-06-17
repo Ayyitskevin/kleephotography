@@ -27,6 +27,13 @@
     {% endif %}
   </table>
 
+  {% if d.terms %}
+  <section class="doc-terms">
+    <h2>Payment terms</h2>
+    <p>{{ d.terms }}</p>
+  </section>
+  {% endif %}
+
   {% if d.status == 'paid' %}
   <p class="doc-accepted">✓ Paid in full {{ d.paid_at }} — thank you!</p>
   {% elif amount_due %}

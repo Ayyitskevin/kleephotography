@@ -32,8 +32,9 @@
       </header>
       <dl class="sub-answers">
         {% for fld in fields %}
+        {% set a = s.answers.get(fld.id | string) %}
         <dt>{{ fld.label }}</dt>
-        <dd>{{ s.answers.get(fld.id | string) or "—" }}</dd>
+        <dd>{% if a is string %}{{ a or "—" }}{% elif a %}{{ a | join(", ") }}{% else %}—{% endif %}</dd>
         {% endfor %}
       </dl>
       {% if s.inquiry_id %}<p class="muted sub-foot">&rarr; landed in Leads (inquiry #{{ s.inquiry_id }})</p>{% endif %}

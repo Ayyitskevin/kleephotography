@@ -21,6 +21,16 @@ router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.requir
 # IMPORTANT: Odysseus Products catalog on mickey :7010 was backfilled at the
 # previous prices (half-day $1,000 floor, Brand Partner Monthly $2,200). Update
 # the catalog separately or proposal_engine will draft against stale numbers.
+
+# Default proposal cover note — the "Our Story" brand voice, seeded on every
+# preset proposal (editable per client; blank proposals start with no intro).
+OUR_STORY_INTRO = (
+    "At Kevin Lee Photography, we're not just photographers — we're storytellers. "
+    "Every dish, every space, every detail is a chance to make your brand look as "
+    "good as it tastes. Here's what I'm proposing for your shoot — let's make "
+    "something worth sharing."
+)
+
 PRESETS = {
     "blank": {"title": "Proposal", "items": []},
 
@@ -85,6 +95,41 @@ PRESETS = {
         {"label": "Full social crop pack + extended usage rights", "qty": 1, "unit_cents": 0},
         {"label": "Standing portal + concierge scheduling", "qty": 1, "unit_cents": 0},
     ]},
+
+    # ── Portrait Sessions (placeholder pricing — set tiers, then update) ─────
+    "portrait_starter": {"title": "Portrait Session — Tier I", "items": [
+        {"label": "Portrait session (~1 hr, one look) — [Tier I price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Up to 10 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
+        {"label": "Online gallery delivery + personal-use rights", "qty": 1, "unit_cents": 0},
+    ]},
+    "portrait_standard": {"title": "Portrait Session — Tier II", "items": [
+        {"label": "Portrait session (~2 hrs, two looks) — [Tier II price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Up to 25 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
+        {"label": "Wardrobe change + location guidance", "qty": 1, "unit_cents": 0},
+        {"label": "Online gallery delivery + personal-use rights", "qty": 1, "unit_cents": 0},
+    ]},
+    "portrait_premium": {"title": "Portrait Session — Tier III", "items": [
+        {"label": "Extended portrait session (~3 hrs, multiple looks) — [Tier III price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Up to 40 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
+        {"label": "Multiple looks + on-location options", "qty": 1, "unit_cents": 0},
+        {"label": "Rush turnaround available", "qty": 1, "unit_cents": 0},
+        {"label": "Online gallery delivery + extended personal-use rights", "qty": 1, "unit_cents": 0},
+    ]},
+
+    # ── Brand Sessions (placeholder pricing — set rates, then update) ────────
+    "brand_halfday": {"title": "Brand Session — Half-Day", "items": [
+        {"label": "Half-day brand session (up to 4 hrs) — [Half-day price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Personal-brand + headshot mix (~25 edited images)", "qty": 1, "unit_cents": 0},
+        {"label": "Social crops (1:1, 4:5, 9:16) for hero selects", "qty": 1, "unit_cents": 0},
+        {"label": "Online gallery delivery + commercial usage rights", "qty": 1, "unit_cents": 0},
+    ]},
+    "brand_full": {"title": "Brand Session — Full Package", "items": [
+        {"label": "Full-day brand session (up to 8 hrs) — [Full package price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Headshots, lifestyle, product & workspace (~50 edited images)", "qty": 1, "unit_cents": 0},
+        {"label": "Full social crop pack (1:1, 4:5, 9:16) for every select", "qty": 1, "unit_cents": 0},
+        {"label": "Brand-story direction + shot planning", "qty": 1, "unit_cents": 0},
+        {"label": "Online gallery delivery + extended commercial usage rights", "qty": 1, "unit_cents": 0},
+    ]},
 }
 
 MAX_ITEM_ROWS = 12
@@ -118,9 +163,11 @@ def parse_items(form) -> tuple[str, int]:
 async def create_proposal(project_id: int, preset: str = Form("blank")):
     p = get_project(project_id)
     tpl = PRESETS.get(preset, PRESETS["blank"])
-    did = db.run("""INSERT INTO proposals (project_id, slug, title, line_items, total_cents)
-                    VALUES (?,?,?,?,?)""",
+    intro = None if preset == "blank" else OUR_STORY_INTRO
+    did = db.run("""INSERT INTO proposals (project_id, slug, title, intro, line_items, total_cents)
+                    VALUES (?,?,?,?,?,?)""",
                  (project_id, security.new_slug(), f"{tpl['title']} — {p['title']}",
+                  intro,
                   json.dumps(tpl["items"]),
                   sum(i["qty"] * i["unit_cents"] for i in tpl["items"])))
     log.info("proposal %s created for project %s (preset=%s)", did, project_id, preset)

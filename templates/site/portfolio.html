@@ -29,7 +29,9 @@
     <figure class="tile{% if a.portfolio_tag %} pf-tile{% endif %}"
             {% if a.portfolio_tag %}data-tag="{{ a.portfolio_tag|lower }}"{% endif %}
             data-web="/site/img/{{ a.id }}">
-      <img src="/site/img/{{ a.id }}" loading="lazy"
+      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+           srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
+           sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 25vw"
            alt="Food and beverage photography by {{ site_name }}"></figure>
     {% endfor %}
   </div>
@@ -47,7 +49,9 @@
       <li class="work-card">
         <a href="/work/{{ s.slug }}" class="work-card-img">
           {% if s.hero_id %}
-          <img src="/site/img/{{ s.hero_id }}" loading="lazy"
+          <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
+               srcset="/site/img/{{ s.hero_id }}?variant=thumb 480w, /site/img/{{ s.hero_id }}?variant=web 2048w"
+               sizes="(max-width: 700px) 100vw, 50vw"
                alt="{{ s.cs_tagline or s.title }}">
           {% else %}
           <span class="placeholder">no hero photo starred yet</span>

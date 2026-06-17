@@ -22,5 +22,6 @@ __pycache__/
 # Editor / OS cruft
 *.bak
 *.bak.*
+*.bak-*
 *.swp
 .DS_Store

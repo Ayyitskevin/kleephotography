@@ -63,9 +63,10 @@ async def update_invoice(request: Request, invoice_id: int):
     if deposit < 0 or deposit > total:
         raise HTTPException(status_code=400, detail="deposit must be between 0 and the total")
     db.run("""UPDATE invoices SET title=?, line_items=?, total_cents=?, deposit_cents=?,
-              due_date=? WHERE id=?""",
+              due_date=?, terms=? WHERE id=?""",
            ((form.get("title") or "").strip() or d["title"], items_json, total, deposit,
-            (form.get("due_date") or "").strip() or None, invoice_id))
+            (form.get("due_date") or "").strip() or None,
+            (form.get("terms") or "").strip() or None, invoice_id))
     return RedirectResponse(f"/admin/studio/invoices/{invoice_id}", status_code=303)
 
 

@@ -24,10 +24,14 @@ CONTRACT_TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "contract_temp
 CONTRACT_LIBRARY = {
     "nda": "Unilateral NDA",
     "photography_services": "Photography Services Agreement",
+    "photography_agreement": "Photography Agreement (plain-language)",
     "general_service": "General Client Service Agreement",
     "model_release": "Model Release",
     "independent_contractor": "Independent Contractor Agreement",
     "event": "Event Contract",
+    "styled_shoot": "Styled Shoot Photo Release",
+    "videography_services": "Videography Services Agreement",
+    "liability_waiver": "Liability Waiver & Release",
 }
 
 

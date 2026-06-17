@@ -81,6 +81,11 @@ def _spark_series(table: str, today: dt.date, window: int) -> tuple[list[int], i
     return series, sum(series)
 
 
+@router.get("/playbook", response_class=HTMLResponse)
+async def studio_playbook(request: Request):
+    return templates.TemplateResponse(request, "admin/studio_playbook.html", {})
+
+
 @router.get("", response_class=HTMLResponse)
 async def studio_home(request: Request):
     # Financial semantics: an invoice is overdue when its due_date is past on the
@@ -167,7 +172,13 @@ async def studio_home(request: Request):
              ELSE total_cents END), 0) AS cents
            FROM invoices WHERE status IN ('sent','viewed','deposit_paid')""")
     inquiries = db.all_(
-        "SELECT * FROM inquiries ORDER BY created_at DESC LIMIT 25")
+        "SELECT * FROM inquiries "
+        "WHERE converted_at IS NULL AND dismissed_at IS NULL "
+        "ORDER BY created_at DESC LIMIT 25")
+    inquiries_archived = db.all_(
+        "SELECT * FROM inquiries "
+        "WHERE converted_at IS NOT NULL OR dismissed_at IS NOT NULL "
+        "ORDER BY COALESCE(dismissed_at, converted_at) DESC LIMIT 50")
     # Licenses expiring within 45 days (or already lapsed) — active, dated,
     # non-perpetual. Silent when empty. Mirrors the dedicated /licenses strip.
     licenses_expiring = db.all_(
@@ -399,6 +410,7 @@ async def studio_home(request: Request):
                                        "stale_days": STALE_DAYS,
                                        "outstanding": outstanding,
                                        "inquiries": inquiries,
+                                       "inquiries_archived": inquiries_archived,
                                        "licenses_expiring": licenses_expiring,
                                        "retainer_drafts": retainer_drafts,
                                        "quota_behind": quota_behind,

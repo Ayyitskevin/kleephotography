@@ -17,10 +17,12 @@ log = logging.getLogger("mise.admin.forms")
 router = APIRouter(prefix="/admin/forms",
                    dependencies=[Depends(security.require_admin)])
 
-FTYPES = ["short_text", "long_text", "dropdown", "date", "email", "yesno"]
+FTYPES = ["short_text", "long_text", "dropdown", "checkbox", "date", "email", "yesno"]
 FTYPE_LABELS = {"short_text": "Short text", "long_text": "Long text",
-                "dropdown": "Dropdown", "date": "Date", "email": "Email",
-                "yesno": "Yes / No"}
+                "dropdown": "Dropdown", "checkbox": "Checkboxes (multi-select)",
+                "date": "Date", "email": "Email", "yesno": "Yes / No"}
+# Field types that carry a choice list (one option per line).
+OPTION_FTYPES = ("dropdown", "checkbox")
 KINDS = ["lead", "questionnaire"]
 
 
@@ -39,8 +41,8 @@ def get_field(field_id: int) -> "db.sqlite3.Row":
 
 
 def _parse_options(raw: str) -> str | None:
-    """Dropdown choices arrive as one-per-line text; store as a JSON array.
-    Non-dropdown fields carry no options."""
+    """Dropdown/checkbox choices arrive as one-per-line text; store as a JSON
+    array. Fields without a choice list carry no options."""
     opts = [ln.strip() for ln in raw.splitlines() if ln.strip()]
     return json.dumps(opts) if opts else None
 
@@ -135,7 +137,7 @@ async def field_add(form_id: int, label: str = Form(...), ftype: str = Form("sho
         raise HTTPException(status_code=400, detail="bad field type")
     nxt = db.one("SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM form_fields "
                  "WHERE form_id=?", (form_id,))["n"]
-    opts = _parse_options(options) if ftype == "dropdown" else None
+    opts = _parse_options(options) if ftype in OPTION_FTYPES else None
     db.run("""INSERT INTO form_fields (form_id, label, ftype, required, options, sort_order)
               VALUES (?,?,?,?,?,?)""",
            (form_id, label, ftype, 1 if required else 0, opts, nxt))
@@ -153,7 +155,7 @@ async def field_update(field_id: int, label: str = Form(...),
         raise HTTPException(status_code=400, detail="label required")
     if ftype not in FTYPES:
         raise HTTPException(status_code=400, detail="bad field type")
-    opts = _parse_options(options) if ftype == "dropdown" else None
+    opts = _parse_options(options) if ftype in OPTION_FTYPES else None
     db.run("UPDATE form_fields SET label=?, ftype=?, required=?, options=? WHERE id=?",
            (label, ftype, 1 if required else 0, opts, field_id))
     log.info("field %s updated", field_id)

@@ -7,7 +7,7 @@
       <h1>Scheduling</h1>
       <p class="muted">Your booking page — event types, weekly hours, and time off. Times shown in {{ tz }}.</p>
     </div>
-    <nav><a href="/admin/scheduling/bookings">Bookings</a></nav>
+    {% include "admin/_sched_tabs.html" %}
   </div>
 
   {% if g_error %}<p class="sched-flash sched-flash-err">{{ g_error }}</p>{% endif %}

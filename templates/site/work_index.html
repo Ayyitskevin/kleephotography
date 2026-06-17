@@ -17,7 +17,9 @@
     <li class="work-card">
       <a href="/work/{{ s.slug }}" class="work-card-img">
         {% if s.hero_id %}
-        <img src="/site/img/{{ s.hero_id }}" loading="lazy"
+        <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
+             srcset="/site/img/{{ s.hero_id }}?variant=thumb 480w, /site/img/{{ s.hero_id }}?variant=web 2048w"
+             sizes="(max-width: 700px) 100vw, 50vw"
              alt="{{ s.cs_tagline or s.title }}">
         {% else %}
         <span class="placeholder">no hero photo starred yet</span>

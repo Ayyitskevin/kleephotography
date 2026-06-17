@@ -1,0 +1,126 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Booking playbook · Studio · Mise{% endblock %}
+{% block admin_body %}
+<main class="admin-main playbook">
+  <div class="admin-bar">
+    <div>
+      <h1>Booking playbook</h1>
+      <p class="muted">Internal reference — the all-in-one booking flow for Kevin Lee Photography,
+        end to end. Not client-facing. Pricing and brand copy in [brackets] are placeholders for
+        Kevin to finalize. Each stage links to the Mise tool that already does the work.</p>
+    </div>
+    <nav><a href="/admin/studio">&larr; Studio</a></nav>
+  </div>
+
+  <section class="pb-note" aria-label="How to use">
+    <p>This mirrors the strongest HoneyBook all-in-one sample (proposal + invoice + contract +
+      questionnaire in one flow), rebuilt in our own structure. Work top to bottom for a new
+      booking; everything here is assembled from pieces Mise already has, so there is nothing
+      new to wire up — just follow the steps and fill the placeholders.</p>
+  </section>
+
+  <ol class="pb-stages">
+    <li class="pb-stage">
+      <h2>1 · Introduction</h2>
+      <p class="pb-voice">"At Kevin Lee Photography, we're not just photographers; we're
+        storytellers." <span class="muted">— Our Story voice anchor</span></p>
+      <p>Open with the brand intro: who we are, the F&amp;B / commercial focus, and what it's like
+        to work together. Keep it to headlines and fragments, not essay paragraphs.</p>
+      <p class="pb-fill">[Paste finalized Our Story intro + About copy here once approved.]</p>
+      <p class="pb-map"><strong>In Mise:</strong> this is the cover note on a Proposal
+        (<a href="/admin/studio">Studio</a> &rarr; open a Project &rarr; Proposal). The public
+        services page carries the same voice — <code>templates/site/services.html</code>.</p>
+    </li>
+
+    <li class="pb-stage">
+      <h2>2 · Proposed package</h2>
+      <p>Pick the collection that fits the shoot. Existing F&amp;B / commercial / video presets are
+        ready; portrait &amp; brand tiers are scaffolded with placeholder pricing.</p>
+      <ul class="pb-list">
+        <li><strong>Photography</strong> — Starter / Standard / Premium (live presets)</li>
+        <li><strong>Videography</strong> — Starter / Standard / Premium (live presets)</li>
+        <li><strong>Brand Partner (monthly)</strong> — Starter / Standard / Premium (live presets)</li>
+        <li><strong>Portrait sessions</strong> — [Tier I $___ / Tier II $___ / Tier III $___] <span class="muted">placeholder</span></li>
+        <li><strong>Brand sessions</strong> — [Half-day $___ / Full brand package $___] <span class="muted">placeholder</span></li>
+      </ul>
+      <p class="pb-map"><strong>In Mise:</strong> Project &rarr; Proposal &rarr; choose a preset
+        (<code>PRESETS</code> in <code>app/admin/proposals.py</code>). Add the portrait/brand tiers
+        as presets once pricing is set.</p>
+    </li>
+
+    <li class="pb-stage">
+      <h2>3 · Invoice</h2>
+      <p>Modeled on the "Simple Invoice" base: itemized services, deposit split, clear schedule.</p>
+      <table class="pb-invoice">
+        <thead><tr><th>Line item</th><th>Amount</th></tr></thead>
+        <tbody>
+          <tr><td>[Session / package name]</td><td>$[___]</td></tr>
+          <tr><td>[Add-on — e.g. album, extra setups, social crops]</td><td>$[___]</td></tr>
+          <tr><td class="pb-sub">Subtotal</td><td class="pb-sub">$[___]</td></tr>
+          <tr><td>Tax (8.75%)</td><td>$[___]</td></tr>
+          <tr><td class="pb-tot">Total</td><td class="pb-tot">$[___]</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Payment schedule (suggested):</strong> [deposit] due today to hold the date ·
+        [balance] due [2 weeks before the shoot] / [on delivery]. Default terms: deposits
+        non-refundable unless stated otherwise.</p>
+      <p class="pb-map"><strong>In Mise:</strong> Project &rarr; Invoice — per-project line items
+        (<code>app/admin/invoices.py</code>). Set deposit + due date there.</p>
+    </li>
+
+    <li class="pb-stage">
+      <h2>4 · Contract</h2>
+      <p>Attach the agreement that matches the work. All are in the contract library and gated as
+        drafts for attorney review before first use.</p>
+      <ul class="pb-list">
+        <li><strong>Photography Services Agreement</strong> — standard photo bookings</li>
+        <li><strong>Videography Services Agreement</strong> — video deliverables</li>
+        <li><strong>Styled Shoot Photo Release</strong> — collaborative / styled shoots with credits</li>
+        <li><strong>Event Contract</strong> — on-site events</li>
+        <li><strong>Model Release</strong> / <strong>Liability Waiver</strong> — talent / higher-risk shoots</li>
+        <li><strong>Unilateral NDA</strong> — brand/product work under embargo</li>
+      </ul>
+      <p class="pb-map"><strong>In Mise:</strong> Project &rarr; Contracts &rarr; pick a template &rarr;
+        review &rarr; Send (typed-name e-sign). Library: <code>app/admin/contracts.py</code>.</p>
+    </li>
+
+    <li class="pb-stage">
+      <h2>5 · Payment</h2>
+      <p>Client pays the deposit (and later the balance) from the invoice pay page. Status flows
+        back automatically.</p>
+      <p class="pb-map"><strong>In Mise:</strong> Send the invoice &rarr; client pays via Stripe
+        Checkout on the public <code>/i/{slug}</code> page &rarr; webhook marks it paid &rarr;
+        Notion Session props sync (keeps Odysseus balance_chaser / digest accurate).</p>
+    </li>
+
+    <li class="pb-stage">
+      <h2>6 · Questionnaire</h2>
+      <p>Send the right intake form so the shoot is dialed in, then a feedback form after delivery.</p>
+      <ul class="pb-list">
+        <li><strong>Before the shoot:</strong> Client Onboarding · Pre-shoot / Experience questionnaire</li>
+        <li><strong>After delivery:</strong> Satisfaction · Videographer Feedback · Request for a Testimonial</li>
+      </ul>
+      <p class="pb-map"><strong>In Mise:</strong> <a href="/admin/forms">Forms</a> — share the public
+        link or use a one-click templated email send.</p>
+    </li>
+
+    <li class="pb-stage">
+      <h2>7 · Next steps &amp; delivery</h2>
+      <p>Close the loop: deliver the gallery, capture a testimonial, request feedback.</p>
+      <p class="pb-map"><strong>In Mise:</strong> <a href="/admin/galleries">Galleries</a> for
+        delivery; email templates "Gallery delivery — sharing &amp; credit," "Request for a
+        testimonial," and "Video feedback — your film is ready" for the follow-ups.</p>
+    </li>
+  </ol>
+
+  <section class="pb-note" aria-label="Still to finalize">
+    <h2>Still to finalize</h2>
+    <ul class="pb-list">
+      <li>Our Story intro + About copy (Stage 1) — paste the approved version in.</li>
+      <li>Portrait &amp; brand session pricing tiers (Stage 2) — then add as proposal presets.</li>
+      <li>Invoice amounts + the default deposit/balance split (Stage 3).</li>
+      <li>Attorney review on the contract drafts before first client use (Stage 4).</li>
+    </ul>
+  </section>
+</main>
+{% endblock %}

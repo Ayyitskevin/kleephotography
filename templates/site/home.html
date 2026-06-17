@@ -17,7 +17,9 @@
     </div>
     <figure class="hero-photo" style="margin:0;">
       {% if featured %}
-      <img data-hero-img src="/site/img/{{ featured[0].id }}"
+      <img data-hero-img src="/site/img/{{ featured[0].id }}?variant=web" fetchpriority="high" decoding="async"
+           srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
+           sizes="(max-width: 900px) 100vw, 55vw"
            alt="Food &amp; beverage photography by {{ site_name }}">
       {% if featured[0].portfolio_tag %}
       <figcaption>{{ featured[0].portfolio_tag|capitalize }}</figcaption>
@@ -57,7 +59,9 @@
     <div class="work-grid" data-reveal>
       {% for a in featured %}
       <figure class="tile" data-web="/site/img/{{ a.id }}">
-        <img src="/site/img/{{ a.id }}" loading="lazy"
+        <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+             srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
+             sizes="(max-width: 700px) 50vw, 25vw"
              alt="Food &amp; beverage photography by {{ site_name }}">
         {% if a.portfolio_tag %}
         <figcaption class="work-cap">{{ a.portfolio_tag|capitalize }}</figcaption>
@@ -121,7 +125,7 @@
           {% if featured %}
           {% for a in featured %}
           <button class="proof-thumb" data-proof-thumb type="button" aria-label="Favorite">
-            <img src="/site/img/{{ a.id }}" loading="lazy" alt="Proof thumbnail">
+            <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async" alt="Proof thumbnail">
             <span class="proof-heart">&hearts;</span>
           </button>
           {% endfor %}
@@ -150,7 +154,9 @@
         </div>
         <div class="crop-stage">
           <div class="crop-preview" data-crop-preview style="aspect-ratio: 4 / 5;">
-            {% if featured %}<img src="/site/img/{{ featured[0].id }}" alt="Crop preview">
+            {% if featured %}<img src="/site/img/{{ featured[0].id }}?variant=thumb" decoding="async"
+              srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
+              sizes="(max-width: 700px) 80vw, 40vw" alt="Crop preview">
             {% else %}<span class="crop-ph"></span>{% endif %}
           </div>
           <div class="crop-meta">
@@ -171,8 +177,11 @@
   <div class="about-grid">
     {% if featured %}
     <div class="about-photo" data-reveal>
-      <img src="/site/img/{{ (featured[1] if featured|length > 1 else featured[0]).id }}"
-           loading="lazy" alt="Food &amp; beverage work by {{ site_name }}">
+      {% set about_a = featured[1] if featured|length > 1 else featured[0] %}
+      <img src="/site/img/{{ about_a.id }}?variant=thumb" loading="lazy" decoding="async"
+           srcset="/site/img/{{ about_a.id }}?variant=thumb 480w, /site/img/{{ about_a.id }}?variant=web 2048w"
+           sizes="(max-width: 900px) 100vw, 45vw"
+           alt="Food &amp; beverage work by {{ site_name }}">
     </div>
     {% endif %}
     <div data-reveal>

@@ -29,7 +29,9 @@
     <div class="grid site-grid work-grid">
       {% for a in photos %}
       <figure class="tile" data-web="/site/img/{{ a.id }}">
-        <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy"
+        <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+             srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
+             sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 25vw"
              alt="{{ g.cs_tagline or g.title }}{% if g.client_name %} — {{ g.client_name }}{% endif %}">
       </figure>
       {% endfor %}

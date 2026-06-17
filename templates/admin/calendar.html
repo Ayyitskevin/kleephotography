@@ -7,7 +7,7 @@
       <h1>{{ month_name }} {{ year }}</h1>
       <p class="muted">Shoots, consultations, task &amp; invoice due dates, and gallery expiries.</p>
     </div>
-    <nav><a href="/admin/scheduling">Scheduling</a> · <a href="/admin/scheduling/bookings">Bookings</a></nav>
+    {% include "admin/_sched_tabs.html" %}
   </div>
 
   <div class="cal-nav">

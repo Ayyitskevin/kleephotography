@@ -7,11 +7,22 @@
       <h1>Bookings</h1>
       <p class="muted">Confirmed appointments from your booking page. Times in {{ tz }}.</p>
     </div>
-    <nav>
-      <a href="/admin/scheduling/bookings">Bookings</a></nav>
+    {% include "admin/_sched_tabs.html" %}
   </div>
 
-  <section class="sched-block">
+  <div class="cal-summary" aria-label="Bookings summary">
+    <span class="cal-sum"><strong>{{ upcoming|length }}</strong> upcoming</span>
+    <span class="cal-sum"><strong>{{ past|length }}</strong> past &amp; cancelled</span>
+  </div>
+
+  <div class="cal-nav">
+    <div class="studio-view-toggle book-viewtoggle" role="group" aria-label="View">
+      <button type="button" data-bview="upcoming" class="is-active" aria-pressed="true">Upcoming</button>
+      <button type="button" data-bview="past" aria-pressed="false">Past &amp; cancelled</button>
+    </div>
+  </div>
+
+  <section class="sched-block" data-bview-pane="upcoming">
     <h2>Upcoming</h2>
     {% if upcoming %}
     <table class="sched-table">
@@ -39,7 +50,7 @@
     {% endif %}
   </section>
 
-  <section class="sched-block">
+  <section class="sched-block" data-bview-pane="past" hidden>
     <h2>Past &amp; cancelled</h2>
     {% if past %}
     <table class="sched-table sched-past">
@@ -59,5 +70,25 @@
     <p class="muted">Nothing here yet.</p>
     {% endif %}
   </section>
+
+  <script>
+  (function () {
+    var btns = document.querySelectorAll('.book-viewtoggle button');
+    if (!btns.length) return;
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var view = btn.dataset.bview;
+        document.querySelectorAll('[data-bview-pane]').forEach(function (pane) {
+          pane.hidden = pane.dataset.bviewPane !== view;
+        });
+        btns.forEach(function (b) {
+          var sel = b === btn;
+          b.classList.toggle('is-active', sel);
+          b.setAttribute('aria-pressed', sel ? 'true' : 'false');
+        });
+      });
+    });
+  })();
+  </script>
 </main>
 {% endblock %}

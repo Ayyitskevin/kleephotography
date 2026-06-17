@@ -59,7 +59,7 @@
               </select>
             </label>
             <label class="row"><input type="checkbox" name="required" value="true" {% if fld.required %}checked{% endif %}> Required</label>
-            <label>Dropdown choices (one per line, dropdown only)
+            <label>Choices (one per line — dropdown &amp; checkbox only)
               <textarea name="options" rows="3">{{ fld.opts | join("\n") }}</textarea></label>
             <button type="submit">Save field</button>
           </form>
@@ -79,7 +79,7 @@
           </select>
         </label>
         <label class="row"><input type="checkbox" name="required" value="true"> Required</label>
-        <label>Dropdown choices (one per line, dropdown only)
+        <label>Choices (one per line — dropdown &amp; checkbox only)
           <textarea name="options" rows="3" placeholder="Plated&#10;Family-style&#10;Flat-lay"></textarea></label>
         <button type="submit">Add field</button>
       </form>
