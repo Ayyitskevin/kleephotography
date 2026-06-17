@@ -1427,6 +1427,17 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .studio-view-toggle button.is-active { background: var(--accent); color: #fff; }
 .studio-match { font-size: 0.8rem; margin-left: auto; }
 
+/* Saved-view chips — quick filters layered over search + stage. */
+.studio-views { display: flex; flex-wrap: wrap; gap: 0.4rem;
+  margin: -0.4rem 0 0.9rem; }
+.studio-chip { background: var(--card); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 0.3rem 0.8rem; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; line-height: 1.2; }
+.studio-chip:hover { border-color: var(--accent); color: var(--accent); }
+.studio-chip.is-active { background: var(--accent); color: #fff;
+  border-color: var(--accent); }
+
 /* Scheduling / Bookings / Calendar shared sub-tab strip */
 .sched-tabs { display: inline-flex; border: 1px solid var(--line);
   border-radius: 8px; overflow: hidden; }

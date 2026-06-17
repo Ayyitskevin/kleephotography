@@ -223,6 +223,14 @@
       <span class="studio-match muted" id="studio-match" aria-live="polite"></span>
     </div>
 
+    <div class="studio-views" role="group" aria-label="Saved views">
+      <button type="button" class="studio-chip is-active" data-view-filter="all" aria-pressed="true">All</button>
+      <button type="button" class="studio-chip" data-view-filter="needs" aria-pressed="false">Needs action</button>
+      <button type="button" class="studio-chip" data-view-filter="booked" aria-pressed="false">Booked</button>
+      <button type="button" class="studio-chip" data-view-filter="overdue" aria-pressed="false">Overdue</button>
+      <button type="button" class="studio-chip" data-view-filter="month" aria-pressed="false">This month</button>
+    </div>
+
     <div class="kanban" id="studio-board">
       {% for s in statuses if s != 'archived' %}
       <div class="kanban-col status-col-{{ s }}" data-stage="{{ s }}">
@@ -239,7 +247,8 @@
                  data-search="{{ (p.title ~ ' ' ~ p.client_name ~ ' ' ~ (p.company or '')) | lower }}"
                  data-name="{{ p.title | lower }}" data-shoot="{{ p.shoot_date or '' }}"
                  data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
-                 data-created="{{ p.created_at or '' }}">
+                 data-created="{{ p.created_at or '' }}"
+                 data-flags="{% if p.n_overdue %}overdue {% endif %}{% if is_stale %}stale {% endif %}{% if p.status in ('retainer_paid', 'session_planning', 'project_closed') %}booked {% endif %}">
           <a class="kanban-card-title" href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
           <p class="kanban-card-client">{{ p.client_name }}{% if p.company %}<span class="muted"> · {{ p.company }}</span>{% endif %}</p>
           {% if p.value_cents %}<p class="kanban-card-meta kanban-card-val">&#128176; {{ usd(p.value_cents) }}</p>{% endif %}
@@ -273,7 +282,8 @@
           data-search="{{ (p.title ~ ' ' ~ p.client_name ~ ' ' ~ (p.company or '')) | lower }}"
           data-name="{{ p.title | lower }}" data-shoot="{{ p.shoot_date or '' }}"
           data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
-          data-created="{{ p.created_at or '' }}">
+          data-created="{{ p.created_at or '' }}"
+          data-flags="{% if p.n_overdue %}overdue {% endif %}{% if is_stale %}stale {% endif %}{% if p.status in ('retainer_paid', 'session_planning', 'project_closed') %}booked {% endif %}">
         <td><a href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
           {% if p.n_overdue %}<span class="warn" title="{{ p.n_overdue }} overdue invoice(s)">&#9888;</span>{% endif %}</td>
         <td>{{ p.client_name }}{% if p.company %}<span class="muted"> · {{ p.company }}</span>{% endif %}</td>
@@ -303,6 +313,25 @@
     var emptyMsg = document.getElementById('studio-empty');
     var matchEl = document.getElementById('studio-match');
     var listTable = document.getElementById('studio-list');
+    var chips = sec.querySelectorAll('.studio-chip');
+
+    // Saved-view chips layer one extra predicate on top of search + stage.
+    // "all" is the identity filter; the rest read precomputed data-flags tokens
+    // (overdue / stale / booked) or the local current month off data-shoot.
+    var now = new Date();
+    var curMonth = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+    var activeView = 'all';
+    try { activeView = localStorage.getItem('mise-studio-view') || 'all'; } catch (_) {}
+
+    function viewMatch(el, view) {
+      if (view === 'all') return true;
+      var flags = ' ' + (el.dataset.flags || '') + ' ';
+      if (view === 'overdue') return flags.indexOf(' overdue ') !== -1;
+      if (view === 'booked') return flags.indexOf(' booked ') !== -1;
+      if (view === 'needs') return flags.indexOf(' overdue ') !== -1 || flags.indexOf(' stale ') !== -1;
+      if (view === 'month') return (el.dataset.shoot || '').slice(0, 7) === curMonth;
+      return true;
+    }
 
     function applyFilter() {
       var q = (search.value || '').trim().toLowerCase();
@@ -310,7 +339,8 @@
       var shown = 0;
       document.querySelectorAll('.studio-row').forEach(function (el) {
         var ok = (!q || el.dataset.search.indexOf(q) !== -1) &&
-                 (!stage || el.dataset.stage === stage);
+                 (!stage || el.dataset.stage === stage) &&
+                 viewMatch(el, activeView);
         el.classList.toggle('studio-hidden', !ok);
         // count once per project (rows appear in both board + list)
       });
@@ -324,9 +354,25 @@
         col.classList.toggle('kanban-col-dim', stage ? col.dataset.stage !== stage : false);
         col.classList.toggle('kanban-col-empty', !hasVisible);
       });
-      if (matchEl) matchEl.textContent = (q || stage) ? (shown + ' match' + (shown === 1 ? '' : 'es')) : '';
+      if (matchEl) matchEl.textContent = (q || stage || activeView !== 'all') ? (shown + ' match' + (shown === 1 ? '' : 'es')) : '';
       if (emptyMsg) emptyMsg.hidden = shown !== 0;
     }
+
+    function setView(view) {
+      activeView = view;
+      try { localStorage.setItem('mise-studio-view', view); } catch (_) {}
+      chips.forEach(function (c) {
+        var on = c.dataset.viewFilter === view;
+        c.classList.toggle('is-active', on);
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      applyFilter();
+    }
+    chips.forEach(function (c) {
+      c.addEventListener('click', function () { setView(c.dataset.viewFilter); });
+    });
+    // Restore the last-used view on load (reflects chip UI + runs the filter).
+    setView(activeView);
 
     function sortKey(el, mode) {
       if (mode === 'value') return -(parseInt(el.dataset.value, 10) || 0);

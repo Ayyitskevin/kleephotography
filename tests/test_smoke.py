@@ -1974,7 +1974,10 @@ def test_pipeline_dashboard(admin):
     assert page.status_code == 200
     assert "Retainer Paid <strong>1</strong>" in page.text  # Dana's project sits at retainer paid
     assert "nothing outstanding" in page.text         # her invoice is fully paid
-    assert "overdue" not in page.text
+    # No overdue *indicators* when nothing is overdue. Checks the actual indicator
+    # text, not the bare word — the saved-view toolbar has a permanent "Overdue"
+    # filter chip (data-view-filter="overdue") that is a control, not a state.
+    assert "overdue invoice" not in page.text
 
     # a sent invoice past its due date flags the project row and the summary
     p = db.one("SELECT id, status FROM projects ORDER BY id LIMIT 1")
@@ -1988,7 +1991,7 @@ def test_pipeline_dashboard(admin):
     assert 'class="warn pipeline-overdue">(1 overdue)' in page
     # paid invoices stop counting even with a past due date
     db.run("UPDATE invoices SET status='paid' WHERE id=?", (iid,))
-    assert "overdue" not in admin.get("/admin/studio").text
+    assert "overdue invoice" not in admin.get("/admin/studio").text
     db.run("DELETE FROM invoices WHERE id=?", (iid,))
 
 
