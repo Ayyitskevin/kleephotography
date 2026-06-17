@@ -49,17 +49,17 @@
       <button type="submit" class="link">Duplicate as draft</button>
     </form></p>
   <table class="list">
-    <tr><th>Line item</th><th>Qty</th><th>Unit</th><th>Amount</th></tr>
+    <tr><th>Line item</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th></tr>
     {% for row in rows if row.label %}
     <tr>
       <td>{{ row.label }}</td>
-      <td>{{ row.qty }}</td>
-      <td>${{ "%.2f" % (row.unit_cents / 100) }}</td>
-      <td>${{ "%.2f" % (row.qty * row.unit_cents / 100) }}</td>
+      <td class="num">{{ row.qty }}</td>
+      <td class="num">${{ "%.2f" % (row.unit_cents / 100) }}</td>
+      <td class="num">${{ "%.2f" % (row.qty * row.unit_cents / 100) }}</td>
     </tr>
     {% endfor %}
     <tr><td colspan="3"><strong>Total</strong></td>
-        <td><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></td></tr>
+        <td class="num"><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></td></tr>
   </table>
 
   {% if d.status == 'accepted' %}

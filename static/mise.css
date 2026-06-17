@@ -2336,7 +2336,8 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  overflow: hidden;
+  /* No overflow:hidden — it would turn the table into a scroll container and
+     defeat viewport-sticky <th>. Corners are rounded per-cell below instead. */
 }
 .admin-shell table.list th {
   text-align: left;
@@ -2350,6 +2351,22 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
+/* Sticky header: pin the first/header row just below the global topbar (~47px).
+   Browsers wrap bare <tr> rows in an implicit <tbody>, so the first-row selector
+   covers both explicit-<thead> tables and the bare-row majority. The th carries
+   an opaque background, so scrolled rows don't bleed through. On mobile the table
+   becomes its own overflow-x scroller, which harmlessly disables the pin. */
+.admin-shell table.list thead th,
+.admin-shell table.list tr:first-child th {
+  position: sticky;
+  top: 47px;
+  z-index: 3;
+}
+/* Restore rounded outer corners now that overflow:hidden is gone. */
+.admin-shell table.list tr:first-child th:first-child { border-top-left-radius: var(--r); }
+.admin-shell table.list tr:first-child th:last-child { border-top-right-radius: var(--r); }
+.admin-shell table.list tr:last-child td:first-child { border-bottom-left-radius: var(--r); }
+.admin-shell table.list tr:last-child td:last-child { border-bottom-right-radius: var(--r); }
 .admin-shell table.list td {
   padding: .68rem .8rem;
   border-bottom: 1px solid var(--line-faint);
@@ -2358,6 +2375,13 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 }
 .admin-shell table.list tr:last-child td {
   border-bottom: none;
+}
+/* Zebra striping. Browsers wrap bare <tr> rows in an implicit <tbody>, so this
+   one rule covers both explicit-thead tables and the bare-row majority; the
+   header row carries <th> (not <td>) so it is never striped. Kept ABOVE the
+   hover rule on purpose — equal specificity, so hover must win on source order. */
+.admin-shell table.list tbody tr:nth-child(even) td {
+  background: rgba(29,26,22,.022);
 }
 .admin-shell table.list tbody tr:hover td, .admin-shell table.list tr:hover td {
   background: rgba(179,85,46,.035);

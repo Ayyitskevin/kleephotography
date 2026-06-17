@@ -232,7 +232,7 @@
   </form>
   {% if licenses %}
   <table class="list">
-    <tr><th>License</th><th>Tier</th><th>Term</th><th>Fee</th><th>Status</th></tr>
+    <tr><th>License</th><th>Tier</th><th>Term</th><th class="num">Fee</th><th>Status</th></tr>
     {% for l in licenses %}
     <tr>
       <td><a href="/admin/studio/licenses/{{ l.id }}">{{ l.title }}</a>
@@ -246,7 +246,7 @@
               {% else %}<span class="warn">({{ l.days_left }}d)</span>{% endif %}
             {% endif %}
           {% else %}—{% endif %}</td>
-      <td>{% if l.fee_cents %}${{ "%.2f" % (l.fee_cents / 100) }}{% else %}—{% endif %}</td>
+      <td class="num">{% if l.fee_cents %}${{ "%.2f" % (l.fee_cents / 100) }}{% else %}—{% endif %}</td>
       <td>{{ l.status }}</td>
     </tr>
     {% endfor %}

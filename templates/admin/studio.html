@@ -263,7 +263,7 @@
 
     <table class="list studio-list" id="studio-list" hidden>
       <thead>
-        <tr><th>Session</th><th>Client</th><th>Stage</th><th>Shoot</th><th>In stage</th><th>Value</th></tr>
+        <tr><th>Session</th><th>Client</th><th>Stage</th><th>Shoot</th><th>In stage</th><th class="num">Value</th></tr>
       </thead>
       <tbody>
       {% for p in projects %}
@@ -280,7 +280,7 @@
         <td><span class="studio-list-stage">{{ stage_label.get(p.status, p.status) }}</span></td>
         <td>{{ p.shoot_date or "—" }}</td>
         <td class="{% if is_stale %}warn{% endif %}">{% if p.status != 'project_closed' %}{{ p.days_in_stage }}d{% if is_stale %} · stalled{% endif %}{% else %}—{% endif %}</td>
-        <td>{% if p.value_cents %}{{ usd(p.value_cents) }}{% else %}—{% endif %}</td>
+        <td class="num">{% if p.value_cents %}{{ usd(p.value_cents) }}{% else %}—{% endif %}</td>
       </tr>
       {% endfor %}
       </tbody>
