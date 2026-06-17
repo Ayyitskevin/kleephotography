@@ -1060,6 +1060,12 @@ progress { width: 100%; }
 .home-tile-money .home-tile-n, .home-tile-money:hover { color: var(--accent); }
 .home-tile-warn { border-color: #c0392b; }
 .home-tile-warn .home-tile-n { color: #c0392b; }
+.home-tile-trend { margin-top: 0.15rem; font-size: 0.72rem; font-weight: 600;
+  display: inline-flex; align-items: baseline; gap: 0.3rem; color: var(--muted); }
+.home-tile-trend.up { color: #2e7d32; }
+.home-tile-trend.down { color: #c0392b; }
+.home-tile-trend.flat { font-weight: 500; color: var(--muted); }
+.home-tile-trend-cap { font-weight: 400; color: var(--muted); }
 @container admin (max-width: 360px) { .home-tiles { grid-template-columns: 1fr; } }
 
 .home-create { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;

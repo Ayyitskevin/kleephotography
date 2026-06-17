@@ -18,18 +18,29 @@
     <a class="home-tile" href="/admin/studio#inquiries">
       <span class="home-tile-n">{{ new_inquiries }}</span>
       <span class="home-tile-label">New inquiries</span>
+      {% set d = kpi.inquiries_delta %}
+      <span class="home-tile-trend {{ 'up' if d > 0 else 'down' if d < 0 else 'flat' }}">
+        {% if d > 0 %}&#9650; {{ d }}{% elif d < 0 %}&#9660; {{ -d }}{% else %}&#8226; 0{% endif %}
+        <span class="home-tile-trend-cap">vs last wk</span></span>
     </a>
     <a class="home-tile" href="/admin/studio#projects">
       <span class="home-tile-n">{{ upcoming_n }}</span>
       <span class="home-tile-label">Shoots next 14 days</span>
+      {% set d = kpi.bookings_delta %}
+      <span class="home-tile-trend {{ 'up' if d > 0 else 'down' if d < 0 else 'flat' }}">
+        {% if d > 0 %}&#9650; {{ d }}{% elif d < 0 %}&#9660; {{ -d }}{% else %}&#8226; 0{% endif %}
+        <span class="home-tile-trend-cap">booked vs last wk</span></span>
     </a>
     <a class="home-tile{% if action_items %} home-tile-warn{% endif %}" href="/admin/studio">
       <span class="home-tile-n">{{ action_items }}</span>
       <span class="home-tile-label">Action items</span>
+      <span class="home-tile-trend {{ 'down' if overdue_inv else 'flat' }}">
+        {% if overdue_inv %}{{ overdue_inv }} overdue now{% else %}none overdue{% endif %}</span>
     </a>
     <a class="home-tile home-tile-money" href="/admin/studio">
       <span class="home-tile-n">${{ "%.2f" % (outstanding.cents / 100) }}</span>
       <span class="home-tile-label">Outstanding · {{ outstanding.n }} open invoice{{ "s" if outstanding.n != 1 }}</span>
+      <span class="home-tile-trend flat">${{ "%.0f" % (kpi.collected_7d_cents / 100) }} collected this wk</span>
     </a>
   </section>
 

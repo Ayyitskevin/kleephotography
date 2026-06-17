@@ -63,6 +63,26 @@ async def home(request: Request):
              AND due_date <= date('now', 'localtime')""")["n"]
     action_items = overdue_inv + retainer_drafts + tasks_due
 
+    # KPI secondary lines. Flow tiles (inquiries, bookings) get an honest
+    # 7d-vs-prior-7d delta from a real timestamp. Stock tiles (action-items
+    # backlog, AR balance) have no stored history, so we show a point-in-time
+    # context figure instead of fabricating a week-over-week delta.
+    inq_7d = db.one("SELECT COUNT(*) AS n FROM inquiries "
+                    "WHERE created_at >= datetime('now', '-7 days')")["n"]
+    inq_prev = db.one("SELECT COUNT(*) AS n FROM inquiries "
+                      "WHERE created_at >= datetime('now', '-14 days') "
+                      "AND created_at < datetime('now', '-7 days')")["n"]
+    book_7d = db.one("SELECT COUNT(*) AS n FROM projects WHERE shoot_date IS NOT NULL "
+                     "AND created_at >= datetime('now', '-7 days')")["n"]
+    book_prev = db.one("SELECT COUNT(*) AS n FROM projects WHERE shoot_date IS NOT NULL "
+                       "AND created_at >= datetime('now', '-14 days') "
+                       "AND created_at < datetime('now', '-7 days')")["n"]
+    collected_7d = db.one("SELECT COALESCE(SUM(total_cents), 0) AS cents FROM invoices "
+                          "WHERE paid_at >= datetime('now', '-7 days')")["cents"]
+    kpi = {"inquiries_delta": inq_7d - inq_prev,
+           "bookings_delta": book_7d - book_prev,
+           "collected_7d_cents": collected_7d}
+
     open_tasks = db.all_(
         """SELECT t.id, t.title, t.due_date, t.project_id, p.title AS project_title,
                   (t.due_date IS NOT NULL AND t.due_date < date('now', 'localtime'))
@@ -247,6 +267,7 @@ async def home(request: Request):
                                        "outstanding": outstanding,
                                        "upcoming_n": upcoming_n,
                                        "action_items": action_items,
+                                       "kpi": kpi,
                                        "overdue_inv": overdue_inv,
                                        "retainer_drafts": retainer_drafts,
                                        "open_tasks": open_tasks,
