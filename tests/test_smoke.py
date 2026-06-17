@@ -1186,6 +1186,47 @@ def test_proposal_convert(admin):
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
 
 
+def test_proposal_duplicate(admin):
+    # A locked proposal (sent/accepted/declined) can be cloned into a fresh
+    # editable draft — the revise-and-re-send path. The copy carries the same
+    # title/intro/line items but its own slug and status='draft'; the original
+    # is left untouched.
+    admin.post("/admin/studio/clients",
+               data={"name": "Lena Voss", "company": "Copper Pot",
+                     "email": "lena@copper.test", "phone": ""},
+               follow_redirects=False)
+    c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
+    admin.post(f"/admin/studio/clients/{c['id']}/projects",
+               data={"title": "Brunch menu shoot"}, follow_redirects=False)
+    p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
+    items = '[{"label": "Half-day shoot", "qty": 1, "unit_cents": 90000}]'
+    src = db.run("""INSERT INTO proposals (project_id, slug, title, intro, line_items,
+                    total_cents, status, sent_at)
+                    VALUES (?,?,?,?,?,?,?,datetime('now'))""",
+                 (p["id"], "dup-src", "Brunch proposal", "Hi Lena", items, 90000,
+                  "declined"))
+
+    # the locked proposal page offers the duplicate action
+    page = admin.get(f"/admin/studio/proposals/{src}")
+    assert f"/admin/studio/proposals/{src}/duplicate" in page.text
+
+    r = admin.post(f"/admin/studio/proposals/{src}/duplicate", follow_redirects=False)
+    assert r.status_code == 303
+    new_id = int(r.headers["location"].rsplit("/", 1)[1])
+    assert new_id != src
+    new = db.one("SELECT * FROM proposals WHERE id=?", (new_id,))
+    assert new["status"] == "draft" and new["slug"] != "dup-src"
+    assert (new["title"] == "Brunch proposal" and new["intro"] == "Hi Lena"
+            and new["line_items"] == items and new["total_cents"] == 90000)
+    # original is untouched
+    assert db.one("SELECT status FROM proposals WHERE id=?", (src,))["status"] == "declined"
+
+    db.run("DELETE FROM proposals WHERE id IN (?,?)", (src, new_id))
+    admin.post(f"/admin/studio/clients/{c['id']}/delete",
+               data={"force": "1"}, follow_redirects=False)
+    assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
+
+
 def test_admin_global_search(admin):
     # The search box is the jump-to across the admin. It must find a client by
     # business name and its project by title, and link straight to each. It must

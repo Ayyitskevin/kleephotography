@@ -42,7 +42,12 @@
     <button type="submit">Mark sent (locks editing)</button>
   </form>
   {% else %}
-  <p class="muted">Locked — proposals can’t be edited after sending.</p>
+  <p class="muted">Locked — proposals can’t be edited after sending.
+    <form method="post" action="/admin/studio/proposals/{{ d.id }}/duplicate"
+          class="inline-form"
+          onsubmit="return confirm('Make an editable copy of this proposal as a new draft?')">
+      <button type="submit" class="link">Duplicate as draft</button>
+    </form></p>
   <table class="list">
     <tr><th>Line item</th><th>Qty</th><th>Unit</th><th>Amount</th></tr>
     {% for row in rows if row.label %}

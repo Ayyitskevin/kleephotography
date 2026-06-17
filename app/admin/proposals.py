@@ -222,6 +222,21 @@ async def convert_proposal(proposal_id: int):
     return RedirectResponse(f"/admin/studio/projects/{p['id']}", status_code=303)
 
 
+@router.post("/proposals/{proposal_id}/duplicate")
+async def duplicate_proposal(proposal_id: int):
+    """Clone a locked proposal (sent/viewed/accepted/declined) into a fresh
+    editable draft — the revise-and-re-send path. Copies title/intro/line items
+    into a new proposal with its own slug; the original is untouched. Useful when
+    a client declines and wants changes, or to reuse a package for someone new."""
+    d = get_proposal(proposal_id)
+    did = db.run("""INSERT INTO proposals (project_id, slug, title, intro, line_items,
+                    total_cents) VALUES (?,?,?,?,?,?)""",
+                 (d["project_id"], security.new_slug(), d["title"], d["intro"],
+                  d["line_items"], d["total_cents"]))
+    log.info("proposal %s duplicated → %s (new draft)", proposal_id, did)
+    return RedirectResponse(f"/admin/studio/proposals/{did}", status_code=303)
+
+
 @router.post("/proposals/{proposal_id}/send")
 async def mark_proposal_sent(proposal_id: int):
     d = get_proposal(proposal_id)
