@@ -1071,10 +1071,13 @@ progress { width: 100%; }
   color: var(--ink); }
 .home-create a:hover { border-color: var(--accent); color: var(--accent); }
 
-.home-panels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-@container admin (max-width: 640px) { .home-panels { grid-template-columns: 1fr; } }
-.home-panel { background: var(--card); border: 1px solid var(--line);
-  border-radius: 12px; padding: 0.9rem 1.1rem; }
+/* Unified home dashboard: one card system, one responsive grid */
+.home-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@container admin (max-width: 640px) { .home-grid { grid-template-columns: 1fr; } }
+.home-card { background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 0.9rem 1.1rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+.home-card--wide { grid-column: 1 / -1; }
 .home-panel-head { display: flex; align-items: baseline; justify-content: space-between;
   margin-bottom: 0.5rem; }
 .home-panel-head h2 { font-size: 0.9rem; text-transform: uppercase;
@@ -1099,9 +1102,7 @@ progress { width: 100%; }
   font-size: 1rem; line-height: 1; color: var(--muted); padding: 0; }
 .home-task-check button:hover { color: var(--accent); }
 
-/* ---- Home: revenue snapshot + monthly goal bar ---- */
-.home-revenue { background: var(--card); border: 1px solid var(--line);
-  border-radius: 12px; padding: 0.9rem 1.1rem; margin: 0 0 1.2rem; }
+/* ---- Home: revenue snapshot + monthly goal bar (chrome from .home-card) ---- */
 .home-revenue-figs { display: flex; flex-wrap: wrap; gap: 1.6rem; align-items: baseline; }
 .home-revenue-figs > div { display: flex; flex-direction: column; gap: 0.1rem; }
 .home-revenue-n { font-size: 1.45rem; font-weight: 600; line-height: 1; color: var(--accent); }
@@ -1113,9 +1114,7 @@ progress { width: 100%; }
 .home-goalbar-fill { height: 100%; background: var(--accent); border-radius: 999px; }
 .home-goalbar-cap { font-size: 0.76rem; margin: 0; }
 
-/* ---- Home: pipeline board strip ---- */
-.home-pipeline { background: var(--card); border: 1px solid var(--line);
-  border-radius: 12px; padding: 0.9rem 1.1rem; margin: 0 0 1.2rem; }
+/* ---- Home: pipeline board strip (chrome from .home-card) ---- */
 .home-stages { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
 .home-stage { background: var(--bg); border: 1px solid var(--line);
   border-radius: 8px; padding: 0.5rem 0.5rem 0.6rem; display: flex;
@@ -1133,9 +1132,7 @@ progress { width: 100%; }
 @container admin (max-width: 900px) { .home-stages { grid-template-columns: repeat(4, 1fr); } }
 @container admin (max-width: 560px) { .home-stages { grid-template-columns: repeat(2, 1fr); } }
 
-/* ---- Home: next-steps smart list ---- */
-.home-nextsteps { background: var(--card); border: 1px solid var(--line);
-  border-radius: 12px; padding: 0.9rem 1.1rem; margin: 0 0 1.2rem; }
+/* ---- Home: next-steps smart list (chrome from .home-card) ---- */
 .home-steplist { list-style: none; padding: 0; margin: 0; }
 .home-step { padding: 0.4rem 0; border-top: 1px solid var(--line);
   font-size: 0.9rem; border-left: 3px solid transparent; padding-left: 0.6rem; }

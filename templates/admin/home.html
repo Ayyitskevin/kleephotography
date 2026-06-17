@@ -33,7 +33,20 @@
     </a>
   </section>
 
-  <section class="home-revenue" aria-label="Revenue this month">
+  <section class="home-create" aria-label="Create new">
+    <span class="home-create-label">Create</span>
+    <a href="/admin/galleries">+ Gallery</a>
+    <a href="/admin/studio#clients">+ Client</a>
+    <a href="/admin/studio#projects">+ Session</a>
+    <a href="/admin/forms">+ Form</a>
+    <a href="/admin/studio/presets">Crop presets</a>
+    <a href="/admin/studio/licenses">Licenses</a>
+    <a href="/admin/studio/email-templates">Email templates</a>
+  </section>
+
+  <div class="home-grid">
+
+  <section class="home-card home-card--wide home-revenue" aria-label="Revenue this month">
     <div class="home-revenue-figs">
       <div>
         <span class="home-revenue-n">${{ "%.0f" % (revenue.paid_cents / 100) }}</span>
@@ -63,7 +76,7 @@
     {% endif %}
   </section>
 
-  <section class="home-pipeline" aria-label="Pipeline">
+  <section class="home-card home-card--wide home-pipeline" aria-label="Pipeline">
     <header class="home-panel-head">
       <h2>Pipeline</h2><a href="/admin/studio" class="muted">Go to studio &rarr;</a>
     </header>
@@ -88,7 +101,7 @@
   </section>
 
   {% if next_steps %}
-  <section class="home-nextsteps" aria-label="Next steps">
+  <section class="home-card home-card--wide home-nextsteps" aria-label="Next steps">
     <header class="home-panel-head">
       <h2>Next steps</h2><span class="muted">{{ next_steps|length }} suggestion{{ "s" if next_steps|length != 1 }}</span>
     </header>
@@ -102,20 +115,7 @@
   </section>
   {% endif %}
 
-  <section class="home-create" aria-label="Create new">
-    <span class="home-create-label">Create</span>
-    <a href="/admin/galleries">+ Gallery</a>
-    <a href="/admin/studio#clients">+ Client</a>
-    <a href="/admin/studio#projects">+ Session</a>
-    <a href="/admin/forms">+ Form</a>
-    <a href="/admin/studio/presets">Crop presets</a>
-    <a href="/admin/studio/licenses">Licenses</a>
-    <a href="/admin/studio/email-templates">Email templates</a>
-  </section>
-
-  <div class="home-panels">
-
-    <section class="home-panel" aria-label="Schedule">
+    <section class="home-card home-panel" aria-label="Schedule">
       <header class="home-panel-head">
         <h2>Schedule</h2>
         <div class="home-horizon" role="group" aria-label="Time horizon">
@@ -140,7 +140,7 @@
       {% else %}<p class="muted">Nothing in the next 7 days. Add a shoot date on a project.</p>{% endif %}
     </section>
 
-    <section class="home-panel" aria-label="Documents in flight">
+    <section class="home-card home-panel" aria-label="Documents in flight">
       <header class="home-panel-head">
         <h2>Documents in flight</h2><a href="/admin/studio" class="muted">Go to studio &rarr;</a>
       </header>
@@ -157,7 +157,7 @@
       {% else %}<p class="muted">No proposals, contracts, or invoices awaiting a client.</p>{% endif %}
     </section>
 
-    <section class="home-panel" aria-label="This month">
+    <section class="home-card home-panel" aria-label="This month">
       <header class="home-panel-head">
         <h2>{{ mini_cal.month_label }}</h2><a href="/admin/calendar" class="muted">Full calendar &rarr;</a>
       </header>
@@ -183,7 +183,7 @@
       </table>
     </section>
 
-    <section class="home-panel" aria-label="Tasks">
+    <section class="home-card home-panel" aria-label="Tasks">
       <header class="home-panel-head">
         <h2>Tasks</h2><a href="/admin/tasks" class="muted">Go to tasks &rarr;</a>
       </header>
@@ -202,7 +202,7 @@
       {% else %}<p class="muted">No open tasks. Add one from the Tasks page.</p>{% endif %}
     </section>
 
-    <section class="home-panel" aria-label="Leads">
+    <section class="home-card home-panel" aria-label="Leads">
       <header class="home-panel-head">
         <h2>Leads</h2><a href="/admin/studio#inquiries" class="muted">Go to inquiries &rarr;</a>
       </header>
@@ -220,7 +220,7 @@
       {% else %}<p class="muted">No open inquiries — the contact &amp; booking forms land here.</p>{% endif %}
     </section>
 
-    <section class="home-panel" aria-label="Payments">
+    <section class="home-card home-panel" aria-label="Payments">
       <header class="home-panel-head">
         <h2>Payments</h2><a href="/admin/studio" class="muted">Go to studio &rarr;</a>
       </header>
@@ -254,7 +254,7 @@
       {% endif %}
     </section>
 
-    <section class="home-panel" aria-label="Recent activity">
+    <section class="home-card home-panel" aria-label="Recent activity">
       <header class="home-panel-head">
         <h2>Activity</h2><a href="/admin/today" class="muted">Go to today &rarr;</a>
       </header>
