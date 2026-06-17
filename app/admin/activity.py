@@ -175,6 +175,17 @@ async def home(request: Request):
         next_steps.append({"tone": "info",
                            "text": f"Follow up proposal — {r['title']} · {who} ({seen})",
                            "url": f"/admin/studio/projects/{r['project_id']}"})
+    # Client-submitted testimonials sit unpublished until moderated — surface them
+    # so a self-submission never goes unnoticed (it has no other inbox).
+    pending_t = db.one(
+        """SELECT COUNT(*) AS n FROM testimonials t
+           JOIN testimonial_requests tr ON tr.testimonial_id = t.id
+           WHERE t.published = 0""")["n"]
+    if pending_t:
+        next_steps.append({"tone": "info",
+                           "text": f"Review {pending_t} client testimonial"
+                                   f"{'s' if pending_t != 1 else ''} awaiting publish",
+                           "url": "/admin/studio/testimonials"})
     next_steps = next_steps[:8]
 
     # --- Documents in flight (lifecycle: sent -> viewed -> signed/paid) ---

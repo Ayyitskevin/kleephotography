@@ -1131,6 +1131,16 @@ def test_testimonial_self_submit(admin):
                follow_redirects=False)
     assert db.one("SELECT COUNT(*) AS n FROM testimonials")["n"] == n_before
 
+    # Moderation surfacing: while it's unpublished, the admin home nudges to review
+    # it and the testimonials list flags it as client-submitted. Without this the
+    # self-submission has no inbox and would go unnoticed.
+    assert "awaiting publish" in admin.get("/admin/home").text
+    tlist = admin.get("/admin/studio/testimonials").text
+    assert "from client" in tlist
+    # Publishing clears the nudge (it only fires on unpublished client quotes).
+    db.run("UPDATE testimonials SET published=1 WHERE id=?", (t["id"],))
+    assert "awaiting publish" not in admin.get("/admin/home").text
+
     # Clean up so downstream order-coupled tests keep their fixtures.
     db.run("DELETE FROM testimonials WHERE id=?", (t["id"],))
     db.run("DELETE FROM testimonial_requests WHERE id=?", (req["id"],))

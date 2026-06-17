@@ -1062,7 +1062,9 @@ async def unpublish_workspace(project_id: int):
 
 @router.get("/testimonials", response_class=HTMLResponse)
 async def testimonials_list(request: Request):
-    rows = db.all_("""SELECT t.*, g.title AS gallery_title, g.slug AS gallery_slug
+    rows = db.all_("""SELECT t.*, g.title AS gallery_title, g.slug AS gallery_slug,
+                             EXISTS(SELECT 1 FROM testimonial_requests tr
+                                    WHERE tr.testimonial_id=t.id) AS from_client
                       FROM testimonials t
                       LEFT JOIN galleries g ON g.id=t.gallery_id
                       ORDER BY t.position, t.id DESC""")

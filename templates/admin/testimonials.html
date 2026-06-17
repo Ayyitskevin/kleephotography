@@ -41,6 +41,7 @@
   <details class="testimonial-row">
     <summary>
       {% if t.published %}<span class="ok">●</span>{% else %}<span class="muted">○</span>{% endif %}
+      {% if t.from_client and not t.published %}<span class="kind-badge kind-payment">new · from client</span>{% endif %}
       <strong>{{ t.attribution_name }}</strong>{% if t.business %} · {{ t.business }}{% endif %}
       {% if t.gallery_title %} · <span class="muted">↳ {{ t.gallery_title }}</span>{% endif %}
       <span class="muted"> · pos {{ t.position }}</span>
