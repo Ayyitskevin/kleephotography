@@ -147,6 +147,22 @@ async def reports(request: Request, year: int | None = None):
         "submissions": db.one("SELECT COUNT(*) AS n FROM form_submissions")["n"],
     }
 
+    # Top clients by lifetime cash collected (all-time). Cash from payments is the
+    # truth (R21); n_paid_projects counts distinct projects that actually paid, so
+    # >=2 flags a repeat booker. Only paying clients appear — it's a value table.
+    top_clients = db.all_(
+        """SELECT c.id, c.name, c.company,
+                  COALESCE(SUM(pm.amount_cents), 0) AS collected_cents,
+                  COUNT(DISTINCT i.project_id) AS n_paid_projects,
+                  MAX(pm.created_at) AS last_paid
+           FROM clients c
+           JOIN projects p ON p.client_id = c.id
+           JOIN invoices i ON i.project_id = p.id
+           JOIN payments pm ON pm.invoice_id = i.id
+           GROUP BY c.id
+           ORDER BY collected_cents DESC, last_paid DESC
+           LIMIT 10""")
+
     years = list(range(this_year, this_year - 4, -1))
 
     return templates.TemplateResponse(request, "admin/reports.html", {
@@ -158,7 +174,7 @@ async def reports(request: Request, year: int | None = None):
         "won": won, "archived": archived, "total_active": total_active,
         "leads_total": leads_total, "leads_converted": leads_converted,
         "conv_rate": conv_rate, "leads_by_kind": leads_by_kind,
-        "delivery": delivery,
+        "delivery": delivery, "top_clients": top_clients,
     })
 
 

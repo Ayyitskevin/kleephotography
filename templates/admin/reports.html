@@ -85,6 +85,30 @@
     <p class="muted funnel-note">“Reached” counts projects currently at or beyond a stage — stage moves are forward-only, so this approximates how many ever hit each stage (archived projects' depth isn't tracked). The day count is the longest a current project has sat in that stage.</p>
   </section>
 
+  <section class="report-block" aria-label="Top clients by lifetime value">
+    <h2>Top clients <span class="muted">· by cash collected, all time</span></h2>
+    {% if top_clients %}
+    <table class="report-table">
+      <thead>
+        <tr><th>Client</th><th class="num">Collected</th><th class="num">Bookings</th><th class="num">Last payment</th></tr>
+      </thead>
+      <tbody>
+        {% for r in top_clients %}
+        <tr>
+          <td><a href="/admin/studio/clients/{{ r.id }}">{{ r.company or r.name }}</a>
+            {% if r.n_paid_projects > 1 %}<span class="kind-badge kind-payment" title="paid for more than one project">repeat</span>{% endif %}</td>
+          <td class="num"><strong>${{ "%.2f" % (r.collected_cents / 100) }}</strong></td>
+          <td class="num">{{ r.n_paid_projects }}</td>
+          <td class="num">{{ r.last_paid[:10] if r.last_paid else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No payments collected yet — paying clients rank here once Stripe records a payment.</p>
+    {% endif %}
+  </section>
+
   <div class="report-cols">
     <section class="report-block" aria-label="Leads and conversion">
       <h2>Leads &amp; conversion <span class="muted">· all time</span></h2>

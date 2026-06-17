@@ -1041,6 +1041,50 @@ def test_invoice_lifecycle(admin, monkeypatch):
         assert "Paid in full" in pub.get(f"/i/{d['slug']}").text
 
 
+def test_reports_top_clients(admin):
+    # Reports must rank clients by cash actually collected (Stripe payments are the
+    # truth), not by invoiced/booked value — a client who never pays shouldn't top
+    # the list. A repeat payer (>=2 paid projects) must be flagged. If the collected
+    # total or the repeat signal is wrong here, the value leaderboard is misleading.
+    admin.post("/admin/studio/clients",
+               data={"name": "Lucia Vega", "company": "Osteria Vega",
+                     "email": "lucia@osteriavega.com", "phone": ""},
+               follow_redirects=False)
+    c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
+    # Two separate projects, each with a paid invoice → repeat booker.
+    pids, iids = [], []
+    for n, cents in (("Spring tasting", 600000), ("Autumn tasting", 400000)):
+        admin.post(f"/admin/studio/clients/{c['id']}/projects",
+                   data={"title": n}, follow_redirects=False)
+        p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
+        pids.append(p["id"])
+        iid = db.run("""INSERT INTO invoices (project_id, slug, title, line_items, total_cents)
+                        VALUES (?,?,?,?,?)""",
+                     (p["id"], f"inv-{p['id']}", "Invoice", "[]", cents))
+        iids.append(iid)
+        db.run("""INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
+                  amount_cents, kind) VALUES (?,?,?,?,?)""",
+               (iid, f"evt_{iid}", f"cs_{iid}", cents, "full"))
+
+    page = admin.get("/admin/reports").text
+    assert "Top clients" in page
+    assert "Osteria Vega" in page
+    assert "$10000.00" in page  # 600000 + 400000 cents collected
+    # Two paid projects → repeat badge.
+    block = page.split("Osteria Vega", 1)[1][:200]
+    assert "repeat" in block
+
+    # Clean up everything created so the latest-invoice / aggregate counts the
+    # downstream lifecycle tests depend on revert to their fixtures.
+    for iid in iids:
+        db.run("DELETE FROM payments WHERE invoice_id=?", (iid,))
+        db.run("DELETE FROM invoices WHERE id=?", (iid,))
+    r = admin.post(f"/admin/studio/clients/{c['id']}/delete",
+                   data={"force": "1"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
+
+
 def test_email_send(admin, monkeypatch):
     from app import config, mailer
     inv = db.one("SELECT * FROM invoices ORDER BY id DESC LIMIT 1")
