@@ -1,13 +1,27 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Today · Mise admin{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Today <span class="muted">· last 24h</span></h1>
+    <p class="pgtop-sub">
+      {% set everything = inquiries|length + downloads|length + favorites|length + sent|length + portal_visits|length %}
+      {% if everything %}
+      <b>{{ inquiries|length }}</b> inquir{{ "ies" if inquiries|length != 1 else "y" }}
+      · <b>{{ downloads|length }}</b> download{{ "s" if downloads|length != 1 else "" }}
+      · <b>{{ favorites|sum(attribute="n_assets") }}</b> favorite{{ "s" if (favorites|sum(attribute="n_assets")) != 1 else "" }}
+      · <b>{{ sent|length }}</b> sent · <b>{{ portal_visits|length }}</b> portal visit{{ "s" if portal_visits|length != 1 else "" }}
+      {% else %}Quiet day — nothing in the last 24 hours{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/studio">Studio</a>
+    <a class="pgtop-link" href="/admin/sent">Sent log</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1><a href="/admin/galleries">&larr;</a> Today &middot; last 24h</h1>
-    <nav><a href="/admin/studio">Studio</a> &middot;
-         <a href="/admin/sent">Sent log</a></nav>
-  </div>
-
   {% set everything = inquiries|length + downloads|length + favorites|length + sent|length + portal_visits|length %}
   {% if not everything %}
   <section class="today-quiet">
@@ -15,14 +29,6 @@
     <p class="muted">The sparklines on the <a href="/admin/studio">studio dashboard</a> still show this week's pulse. Check back later, or refresh after lunch.</p>
   </section>
   {% else %}
-  <p class="muted today-summary">
-    <strong>{{ inquiries|length }}</strong> inquir{{ "ies" if inquiries|length != 1 else "y" }}
-    &middot; <strong>{{ downloads|length }}</strong> download{{ "s" if downloads|length != 1 else "" }}
-    &middot; <strong>{{ favorites|sum(attribute="n_assets") }}</strong> favorite{{ "s" if (favorites|sum(attribute="n_assets")) != 1 else "" }} across {{ favorites|length }} galler{{ "ies" if favorites|length != 1 else "y" }}
-    &middot; <strong>{{ sent|length }}</strong> sent email{{ "s" if sent|length != 1 else "" }}
-    &middot; <strong>{{ portal_visits|length }}</strong> portal visit{{ "s" if portal_visits|length != 1 else "" }}
-  </p>
-
   <h2>Inquiries</h2>
   {% if inquiries %}
   <table class="list">

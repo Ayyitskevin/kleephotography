@@ -3130,7 +3130,7 @@ def test_today_consolidated_view(admin):
 
     page = admin.get("/admin/today").text
     # summary line carries the totals; quiet-day state is gated out
-    assert "<strong>1</strong>" in page  # at least one of each counted
+    assert "<b>1</b>" in page  # at least one of each counted
     assert "Quiet day" not in page
     assert "today@cafe.com" in page
     assert "today-recipient@cafe.com" in page
