@@ -2997,6 +2997,16 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   padding: .55rem 1.1rem; font-size: .84rem; font-weight: 600; white-space: nowrap;
 }
 .admin-shell .pgtop-new:hover { background: var(--terra-deep); color: #F3F0E2; text-decoration: none; }
+/* Calendar lead: month title sits inline with a compact ‹ Today › month nav. */
+.admin-shell .cal-lead { display: flex; align-items: baseline; gap: 14px; }
+.admin-shell .cal-monthnav { display: inline-flex; align-items: center; gap: 4px; }
+.admin-shell .cal-monthnav a {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; padding: 0 .6rem;
+  border: 1px solid var(--line); border-radius: 8px; background: #FFFEF8;
+  font-size: .85rem; font-weight: 600; color: var(--ink-soft); text-decoration: none;
+}
+.admin-shell .cal-monthnav a:hover { border-color: var(--line-strong); color: var(--ink); }
 
 /* ── KPI strip ──────────────────────────────────────────────────────────── */
 .admin-shell .dash-kpis {

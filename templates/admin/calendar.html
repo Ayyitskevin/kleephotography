@@ -1,19 +1,23 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ month_name }} {{ year }} · Calendar · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead cal-lead">
+    <h1>{{ month_name }} {{ year }}</h1>
+    <span class="cal-monthnav">
+      <a href="/admin/calendar?year={{ prev_year }}&month={{ prev_month }}" aria-label="Previous month">&lsaquo;</a>
+      <a href="/admin/calendar" class="cal-today-btn">Today</a>
+      <a href="/admin/calendar?year={{ next_year }}&month={{ next_month }}" aria-label="Next month">&rsaquo;</a>
+    </span>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-new" href="/admin/scheduling"><span class="qc-plus" aria-hidden="true">+</span> Event</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <div>
-      <h1>{{ month_name }} {{ year }}</h1>
-      <p class="muted">Shoots, consultations, task &amp; invoice due dates, and gallery expiries.</p>
-    </div>
-    {% include "admin/_sched_tabs.html" %}
-  </div>
-
   <div class="cal-nav">
-    <a href="/admin/calendar?year={{ prev_year }}&month={{ prev_month }}">&larr; Prev</a>
-    <a href="/admin/calendar">Today</a>
-    <a href="/admin/calendar?year={{ next_year }}&month={{ next_month }}">Next &rarr;</a>
     <div class="studio-view-toggle cal-viewtoggle" role="group" aria-label="View">
       <button type="button" data-view="month" class="is-active" aria-pressed="true">Month</button>
       <button type="button" data-view="agenda" aria-pressed="false">Agenda</button>
