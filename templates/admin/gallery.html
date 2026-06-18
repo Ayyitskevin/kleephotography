@@ -1,13 +1,26 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ g.title }} · Mise admin{% endblock %}
 {% import "admin/_copy_link.html" as cp %}
+{% block topbar %}
+{% set n_fav = assets | selectattr("n_fav") | list | length %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>{{ g.title }}</h1>
+    <p class="pgtop-sub">
+      {{ 'Transfer' if g.type == 'drop' else 'Client gallery' }} ·
+      <b>{{ assets | length }}</b> file{{ "s" if assets|length != 1 }}
+      {% if g.published %}· <span class="pos">published</span>{% else %}· draft{% endif %}
+      {% if n_fav %}· <b>{{ n_fav }}</b> favorited{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/galleries">&larr; Galleries</a>
+    <a class="pgtop-link" href="/admin/galleries/{{ g.id }}/activity">Activity <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1><a href="/admin/galleries">&larr;</a> {{ g.title }}</h1>
-    <a href="/admin/galleries/{{ g.id }}/activity">Activity</a>
-  </div>
-
   {% set show_pin = g.type != 'drop' or g.require_pin %}
   <p>{{ 'Transfer' if g.type == 'drop' else 'Client' }} link:
      <code class="slug">{{ base_url }}/g/{{ g.slug }}</code>
