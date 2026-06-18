@@ -1,12 +1,23 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Share-card debugger · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Share-card debugger</h1>
+    <p class="pgtop-sub">
+      {% if urls %}<b>{{ urls|length }}</b> indexable URL{{ "s" if urls|length != 1 }} ·
+        <b>{{ urls|selectattr("og_image_id")|list|length }}</b> with og:image
+      {% else %}OpenGraph preview for every indexable URL{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/galleries">Galleries</a>
+    <a class="pgtop-link" href="/admin/studio">Studio <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1><a href="/admin/galleries">&larr;</a> Share-card debugger</h1>
-    <nav><a href="/admin/galleries">Galleries</a> · <a href="/admin/studio">Studio</a></nav>
-  </div>
-
   <p class="muted">Every indexable URL on the marketing site plus every published
     case study. The preview shows what's computed server-side (what Facebook,
     LinkedIn, and OpenGraph.xyz will scrape). If a freshly-edited case-study
