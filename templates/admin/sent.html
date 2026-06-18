@@ -1,15 +1,21 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Sent emails · Mise admin{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Sent emails</h1>
+    <p class="pgtop-sub">
+      {% if total %}<b>{{ total }}</b> total send{{ "s" if total != 1 }}
+      {% else %}A log of every manual client send{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/emails">Captured</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1><a href="/admin/galleries">&larr;</a> Sent emails</h1>
-    <nav>
-      <a href="/admin/emails">Captured</a> ·
-      <span class="muted">{{ total }} total send{{ "s" if total != 1 }}</span>
-    </nav>
-  </div>
-
   {% if kinds %}
   <p class="muted sent-kinds">
     {% for k in ["proposal", "contract", "invoice", "other"] %}
