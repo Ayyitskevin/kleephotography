@@ -1,14 +1,23 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ d.title }} · Studio · Mise{% endblock %}
 {% import "admin/_copy_link.html" as cp %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Invoice</h1>
+    <p class="pgtop-sub">
+      {{ d.status }} · <b>${{ "%.2f" % (d.total_cents / 100) }}</b>
+      {% if d.paid_at %}· <span class="pos">paid {{ d.paid_at[:10] }}</span>
+      {% elif d.sent_at %}· sent {{ d.sent_at[:10] }}{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/studio/projects/{{ p.id }}">{{ p.title }} <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1>Invoice · {{ d.status }}</h1>
-    <nav><a href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a> ·
-         <a href="/admin/studio">Studio</a></nav>
-  </div>
-
   <p>Client link: <code class="slug">{{ base_url }}/i/{{ d.slug }}</code>
   {{ cp.copy_link(base_url ~ "/i/" ~ d.slug) }}
   {% if d.sent_at %}<span class="muted">· sent {{ d.sent_at }}</span>{% endif %}
