@@ -1,14 +1,22 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ d.title }} · Recurring · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>{{ d.title }}</h1>
+    <p class="pgtop-sub">
+      Recurring plan · {{ p.client_name }}
+      {% if d.active %}· <span class="pos">active</span>{% else %}· paused{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
+    <a class="pgtop-link" href="/admin/studio">Studio <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1>Recurring plan {% if d.active %}<span class="status-active">active</span>
-        {% else %}<span class="muted">paused</span>{% endif %}</h1>
-    <nav><a href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a> ·
-         <a href="/admin/studio">Studio</a></nav>
-  </div>
-
   <p class="muted">Monthly retainer for <strong>{{ p.client_name }}</strong>. This
     plan only ever creates a <strong>draft</strong> invoice — you still click Send,
     and Stripe still collects. Nothing here charges or emails automatically.</p>
