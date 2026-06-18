@@ -1,0 +1,56 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Audit log · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Audit log</h1>
+    <p class="pgtop-sub">
+      {% if total %}<b>{{ total }}</b> event{{ "s" if total != 1 }} · append-only, timestamped
+      {% else %}Every money &amp; delivery event — append-only, timestamped, your paper trail{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/audit.csv">&#10515; Export log</a>
+  </div>
+</header>
+{% endblock %}
+{% block admin_body %}
+<main class="admin-main">
+  <div class="audit-filters">
+    {% for f in filters %}
+    <a class="audit-chip{% if f.active %} is-active{% endif %}"
+       href="/admin/audit{% if f.key != 'all' %}?cat={{ f.key }}{% endif %}">
+      {{ f.label }} <span class="audit-chip-n">{{ f.n }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if events %}
+  <section class="audit-feed">
+    {% for e in events %}
+    <div class="audit-row">
+      <span class="audit-ic" aria-hidden="true"
+            style="background:{{ e.icon_bg }};color:{{ e.icon_color }}">{{ e.icon }}</span>
+      <div class="audit-body">
+        <div class="audit-head">
+          <span class="audit-title">{{ e.title }}</span>
+          <span class="audit-time">{{ e.created_at | localtime }}</span>
+        </div>
+        <div class="audit-detail">{{ e.detail }}</div>
+        <div class="audit-foot">
+          {% if e.amount %}<span class="audit-amount">{{ e.amount }}</span>{% endif %}
+          <span class="audit-actor">{{ e.actor }}</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% else %}
+  <p class="muted">No audit events{% if cat != 'all' %} in this category{% endif %} yet.
+    Money &amp; delivery actions land here as they happen.</p>
+  {% endif %}
+
+  <p class="audit-note muted">This log is append-only — entries can't be edited or
+    deleted, so it stands up as evidence for disputes, chargebacks, or an audit.</p>
+</main>
+{% endblock %}

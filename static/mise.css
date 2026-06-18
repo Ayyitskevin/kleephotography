@@ -3431,3 +3431,36 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   }
   .admin-shell .ns-cmd-txt, .admin-shell .ns-kbd { display: none; }
 }
+
+/* ── Audit log — category chips + append-only event feed (prototype 1:1) ──── */
+.admin-shell .audit-filters { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 20px; }
+.admin-shell .audit-chip {
+  display: inline-flex; align-items: center; gap: .45em;
+  padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px;
+  font-size: .78rem; font-weight: 600; color: var(--ink-soft); background: #FFFEF8;
+  white-space: nowrap; text-decoration: none;
+}
+.admin-shell .audit-chip:hover { border-color: var(--line-strong); color: var(--ink); }
+.admin-shell .audit-chip.is-active { background: var(--terra-deep); color: #F3F0E2; border-color: var(--terra-deep); }
+.admin-shell .audit-chip-n { opacity: .55; font-variant-numeric: tabular-nums; }
+.admin-shell .audit-chip.is-active .audit-chip-n { opacity: .75; }
+
+.admin-shell .audit-feed {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+  padding: 8px 24px 12px; max-width: 920px;
+}
+.admin-shell .audit-row { display: flex; gap: 16px; padding: 16px 0; border-top: 1px solid #EFEAE0; }
+.admin-shell .audit-row:first-child { border-top: 0; }
+.admin-shell .audit-ic {
+  flex: none; width: 32px; height: 32px; border-radius: 9px;
+  display: grid; place-items: center; font-size: .9rem; font-weight: 700;
+}
+.admin-shell .audit-body { flex: 1; min-width: 0; }
+.admin-shell .audit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.admin-shell .audit-title { font-size: .92rem; font-weight: 600; line-height: 1.3; color: var(--ink); }
+.admin-shell .audit-time { flex: none; font-size: .74rem; font-weight: 500; color: var(--ink-faint); white-space: nowrap; }
+.admin-shell .audit-detail { margin-top: 3px; font-size: .82rem; font-weight: 500; line-height: 1.4; color: var(--ink-soft); }
+.admin-shell .audit-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.admin-shell .audit-amount { font-size: .8rem; font-weight: 700; color: var(--ok); font-variant-numeric: tabular-nums; }
+.admin-shell .audit-actor { font-size: .7rem; font-weight: 500; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.admin-shell .audit-note { margin: 20px 0 0; max-width: 60em; font-size: .78rem; line-height: 1.5; }
