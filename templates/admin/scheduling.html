@@ -1,15 +1,23 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Scheduling · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Scheduling</h1>
+    <p class="pgtop-sub">
+      <b>{{ events|length }}</b> event type{{ "s" if events|length != 1 }} ·
+      {% if gcal.connected %}<span class="pos">Google Calendar synced</span>{% else %}Google Calendar off{% endif %} ·
+      times in {{ tz }}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/scheduling/bookings">Bookings <span aria-hidden="true">&rarr;</span></a>
+    <a class="pgtop-new" href="#new-event"><span class="qc-plus" aria-hidden="true">+</span> New event type</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <div>
-      <h1>Scheduling</h1>
-      <p class="muted">Your booking page — event types, weekly hours, and time off. Times shown in {{ tz }}.</p>
-    </div>
-    {% include "admin/_sched_tabs.html" %}
-  </div>
-
   {% if g_error %}<p class="sched-flash sched-flash-err">{{ g_error }}</p>{% endif %}
 
   <section class="sched-card">
@@ -70,7 +78,7 @@
     <p class="muted">No event types yet — add your first below.</p>
     {% endif %}
 
-    <form method="post" action="/admin/scheduling/event" class="sched-newevent">
+    <form method="post" action="/admin/scheduling/event" class="sched-newevent" id="new-event">
       <h3>New event type</h3>
       <label>Name <input name="name" required placeholder="Discovery Call"></label>
       <label>URL slug <input name="slug" required placeholder="discovery-call" pattern="[a-z0-9][a-z0-9-]*"></label>
