@@ -1,8 +1,0 @@
-{% set _p = request.url.path %}
-{% set _tab = 'bookings' if _p.startswith('/admin/scheduling/bookings')
-   else ('calendar' if _p.startswith('/admin/calendar') else 'scheduling') %}
-<nav class="sched-tabs" aria-label="Scheduling sections">
-  <a href="/admin/scheduling" class="sched-tab{% if _tab == 'scheduling' %} is-active{% endif %}"{% if _tab == 'scheduling' %} aria-current="page"{% endif %}>Scheduling</a>
-  <a href="/admin/scheduling/bookings" class="sched-tab{% if _tab == 'bookings' %} is-active{% endif %}"{% if _tab == 'bookings' %} aria-current="page"{% endif %}>Bookings</a>
-  <a href="/admin/calendar" class="sched-tab{% if _tab == 'calendar' %} is-active{% endif %}"{% if _tab == 'calendar' %} aria-current="page"{% endif %}>Calendar</a>
-</nav>

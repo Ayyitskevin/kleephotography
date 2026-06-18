@@ -1,16 +1,21 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ e.name }} · Scheduling · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>{{ e.name }}</h1>
+    <p class="pgtop-sub">
+      Event type · {{ e.duration_min }} min{% if e.location %} · {{ e.location }}{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/scheduling">&larr; All events</a>
+    <a class="pgtop-link" href="/book/{{ e.slug }}" target="_blank" rel="noopener">Public page <span aria-hidden="true">&nearr;</span></a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <div>
-      <h1>{{ e.name }}</h1>
-      <p class="muted">Public link:
-        <a href="/book/{{ e.slug }}">{{ base_url }}/book/{{ e.slug }}</a></p>
-    </div>
-    <nav><a href="/admin/scheduling">&larr; All events</a></nav>
-  </div>
-
   <form method="post" action="/admin/scheduling/event/{{ e.id }}" class="sched-eventform">
     <div class="sched-grid">
       <label>Name <input name="name" value="{{ e.name }}" required></label>
