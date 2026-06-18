@@ -1,16 +1,22 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Captured emails · Mise admin{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Captured emails</h1>
+    <p class="pgtop-sub">
+      {% if rows %}<b>{{ rows|length }}</b> capture{{ "s" if rows|length != 1 }} · <b>{{ distinct }}</b> unique
+      {% else %}Collected by the gallery download gate{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/sent">Sent log</a>
+    <a class="pgtop-link" href="/admin/emails.txt">Export .txt</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1><a href="/admin/galleries">&larr;</a> Captured emails</h1>
-    <nav>
-      <a href="/admin/sent">Sent log</a> ·
-      <span class="muted">{{ distinct }} unique</span> ·
-      <a href="/admin/emails.txt">Export .txt</a>
-    </nav>
-  </div>
-
   {% if rows %}
   <table class="list">
     <tr><th>Email</th><th>Gallery</th><th>Captured</th></tr>
