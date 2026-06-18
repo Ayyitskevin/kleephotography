@@ -1,17 +1,23 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Reference · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Reference</h1>
+    <p class="pgtop-sub">Private shelf — rate card &amp; internal notes, never shown to clients</p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/studio/playbook">Playbook <span aria-hidden="true">&rarr;</span></a>
+    <a class="pgtop-link" href="/admin/templates">Templates <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <div>
-      <h1>Reference</h1>
-      <p class="muted">Your private shelf — rate card, pricing guides, and internal
-        notes. <strong>For your eyes only:</strong> nothing here is shown to clients,
-        on the portal, or on the public site. Every <span class="tpl-fill">[bracketed]</span>
-        figure is a rate still to set.</p>
-    </div>
-    <nav><a href="/admin/studio/playbook">Booking playbook</a> · <a href="/admin/templates">Templates</a></nav>
-  </div>
+  <p class="muted">Your private shelf — rate card, pricing guides, and internal
+    notes. <strong>For your eyes only:</strong> nothing here is shown to clients,
+    on the portal, or on the public site. Every <span class="tpl-fill">[bracketed]</span>
+    figure is a rate still to set.</p>
 
   <section class="ref-head">
     <div class="ref-brand">
