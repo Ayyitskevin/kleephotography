@@ -1,11 +1,25 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Transfers · Mise admin{% endblock %}
 {% import "admin/_copy_link.html" as cp %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Transfers</h1>
+    <p class="pgtop-sub">
+      {% if transfers %}
+      <b>{{ totals.n }}</b> transfer{{ '' if totals.n == 1 else 's' }} ·
+      {{ totals.live }} live · <b>{{ totals.dl }}</b> download{{ '' if totals.dl == 1 else 's' }}
+      {% if totals.expired %}· <span class="neg">{{ totals.expired }} expired</span>{% endif %}
+      {% else %}Quick file sends — your own WeTransfer{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-new" href="#new-transfer"><span class="qc-plus" aria-hidden="true">+</span> New transfer</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1>Transfers</h1>
-  </div>
   <p class="muted">Quick file sends — your own WeTransfer. Upload final videos or
      reels, share the link, optionally set it to expire. No PIN needed unless you
      want one; clients just tap and download.</p>
