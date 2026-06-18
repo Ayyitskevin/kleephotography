@@ -1,0 +1,76 @@
+{% extends "admin/base_admin.html" %}
+{# Client P&L — REAL per-client collected revenue + project counts. Mise tracks
+   no costs (no blended rate, gear, travel, or fee data), so this honestly shows
+   revenue + each client's SHARE of total collected instead of a fabricated
+   profit/margin. The "P&L" framing waits on expense tracking. #}
+{% block topbar %}
+<div class="pgtop">
+  <div class="pgtop-lead">
+    <h1>Client P&amp;L</h1>
+    <p class="pgtop-sub">Who actually pays you — collected revenue, all-time</p>
+  </div>
+  <div class="pgtop-actions">
+    <div class="fin-range">
+      {% for s in sorts %}
+      <a href="/admin/financials/clients?sort={{ s.key }}"
+         class="fin-range-pill{% if s.on %} fin-range-on{% endif %}">{{ s.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block admin_body %}
+<div class="fin-wrap">
+  {% include "admin/_money_nav.html" %}
+
+  <section class="fin-summary fin-summary-4">
+    {% for c in cards %}
+    <div class="fin-card fin-card-{{ c.tone }}">
+      <span class="fin-card-label">{{ c.label }}</span>
+      <div class="fin-card-val">{{ c.value }}</div>
+      <span class="fin-card-sub">{{ c.sub }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="fin-panel">
+    <div class="fin-tbl-scroll">
+      <table class="fin-tbl pnl-tbl">
+        <thead><tr>
+          <th>Client</th>
+          <th class="fin-num">Projects</th>
+          <th class="fin-num">Revenue</th>
+          <th class="pnl-share-h">Share of total</th>
+        </tr></thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td>
+              <div class="pnl-client">
+                <span class="pnl-av" style="background: {{ r.av }};">{{ r.initials }}</span>
+                <span class="pnl-name">{{ r.name }}</span>
+              </div>
+            </td>
+            <td class="fin-num fin-muted">{{ r.projects }}</td>
+            <td class="fin-num fin-strong">{{ r.revenue }}</td>
+            <td>
+              <div class="pnl-share">
+                <div class="pnl-bar"><div class="pnl-bar-fill" style="width: {{ r.share_w }};"></div></div>
+                <span class="pnl-share-pct">{{ r.share }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="fin-empty-row">No client payments recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="fin-note">Revenue is real collected cash per client (from Stripe payment
+    events), and the bar shows each client's share of total collected. <b>Profit and
+    margin need expense tracking</b> — blended rate, gear, travel, fees — which Mise
+    doesn't capture yet, so they're left out rather than guessed.</p>
+</div>
+{% endblock %}

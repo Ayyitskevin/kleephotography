@@ -1,0 +1,15 @@
+{# Shared money sub-nav. Caller sets `active` to one of:
+   income · expenses · mileage · receipts · clients · audit #}
+{% set _items = [
+  ("income",   "Income",     "/admin/financials"),
+  ("expenses", "Expenses",   "/admin/financials/expenses"),
+  ("mileage",  "Mileage",    "/admin/financials/mileage"),
+  ("receipts", "Receipts",   "/admin/financials/receipts"),
+  ("clients",  "Client P&L", "/admin/financials/clients"),
+  ("audit",    "Audit",      "/admin/audit"),
+] %}
+<nav class="money-nav" aria-label="Financial sections">
+  {% for key, label, href in _items %}
+  <a href="{{ href }}" class="money-pill{% if key == active %} money-pill-on{% endif %}">{{ label }}</a>
+  {% endfor %}
+</nav>
