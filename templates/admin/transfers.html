@@ -38,13 +38,6 @@
   </details>
 
   {% if transfers %}
-  <div class="summary-strip">
-    <span><b>{{ totals.n }}</b> transfer{{ '' if totals.n == 1 else 's' }}</span>
-    <span><b>{{ totals.live }}</b> live</span>
-    <span><b>{{ totals.expired }}</b> expired</span>
-    <span><b>{{ totals.dl }}</b> download{{ '' if totals.dl == 1 else 's' }}</span>
-  </div>
-
   <ul class="transfer-list">
     {% for t in transfers %}
     {% set expired = t.expires_at and t.expires_at < today %}
