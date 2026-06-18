@@ -2893,3 +2893,307 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .admin-shell .ref-mark b { font-weight: 700; }
 .admin-shell .ref-contact { list-style: none; margin: 0; padding: 0;
   text-align: right; font-size: 0.84rem; line-height: 1.5; }
+
+/* ============================================================================
+   Home dashboard — redesign layer
+   Paste this block into static/mise.css (anywhere after the .admin-shell token
+   block near line ~1776). Everything is scoped under .admin-shell and uses the
+   existing design tokens, so it inherits the candlelit-editorial palette, the
+   self-hosted Newsreader / Hanken Grotesk faces, radii and shadows already
+   defined there. New class prefix `dash-` so it never collides with the legacy
+   `home-` rules — swap templates/admin/home.html to the redesign and these win.
+   ========================================================================== */
+
+/* Stage accent palette — kept inside Mise's warm editorial family so the
+   pipeline reads as one system, not a rainbow. */
+.admin-shell .dash {
+  --dash-inquiry:   #8a7d6a;  /* neutral    */
+  --dash-consult:   #6f8a76;  /* sage       */
+  --dash-proposal:  #b88a3e;  /* honey/gold */
+  --dash-contract:  #b3552e;  /* terra      */
+  --dash-retainer:  #566b3f;  /* ok green   */
+  --dash-planning:  #4f7a72;  /* teal-sage  */
+  --dash-closed:    #3b2a1e;  /* espresso   */
+  --dash-archived:  #b6ab9b;  /* ghost      */
+  --dash-gold:      #d99a32;  /* live gold accent on dark money panel */
+}
+
+/* Lift the content cap a touch — the dashboard wants two real columns. */
+.admin-shell .admin-main.dash { max-width: 1240px; }
+
+/* ── Greeting bar ───────────────────────────────────────────────────────── */
+.admin-shell .dash .admin-bar { align-items: center; }
+.admin-shell .dash-hello h1 { margin: 0; }
+.admin-shell .dash-hello p {
+  margin: .25rem 0 0; font-size: .85rem; font-weight: 500; color: var(--ink-faint);
+}
+.admin-shell .dash-bar-actions {
+  display: flex; align-items: center; gap: 1rem;
+}
+.admin-shell .dash-signout {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: .85rem; font-weight: 500; color: var(--ink-soft);
+}
+.admin-shell .dash-signout:hover { color: var(--terra); text-decoration: underline; text-underline-offset: 2px; }
+.admin-shell .dash-new {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--terra); color: #fff; border: 0; border-radius: 999px;
+  padding: .55rem 1.1rem; font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer;
+}
+.admin-shell .dash-new:hover { background: var(--terra-deep); text-decoration: none; color: #fff; }
+
+/* ── KPI strip ──────────────────────────────────────────────────────────── */
+.admin-shell .dash-kpis {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;
+}
+.admin-shell .dash-kpi {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm); padding: 1.1rem 1.25rem;
+  display: flex; flex-direction: column; gap: .5rem; text-decoration: none; color: inherit;
+}
+.admin-shell a.dash-kpi:hover { border-color: var(--line-strong); box-shadow: var(--shadow); }
+.admin-shell .dash-kpi-label {
+  font-size: .68rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint);
+}
+.admin-shell .dash-kpi-n {
+  font-family: var(--font-display); font-weight: 500; font-size: 2.1rem; line-height: 1; color: var(--ink);
+}
+.admin-shell .dash-kpi-trend { font-size: .76rem; font-weight: 600; color: var(--ink-faint); }
+.admin-shell .dash-kpi-trend .cap { color: var(--ink-faint); font-weight: 500; }
+.admin-shell .dash-kpi-trend.up   { color: var(--ok); }
+.admin-shell .dash-kpi-trend.warn { color: var(--clay); }
+.admin-shell .dash-kpi-trend.hold { color: var(--honey); }
+
+/* ── Two-column grid ────────────────────────────────────────────────────── */
+.admin-shell .dash-grid {
+  display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.3rem; align-items: start;
+}
+.admin-shell .dash-col { display: flex; flex-direction: column; gap: 1.3rem; min-width: 0; }
+
+/* Panel — reuses the .panel look but tightened for the dashboard. */
+.admin-shell .dash-panel {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-sm); padding: 1.25rem 1.35rem 1.35rem;
+}
+.admin-shell .dash-panel-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; margin-bottom: .35rem;
+}
+.admin-shell .dash-panel-head h2 { margin: 0; font-size: 1.22rem; }
+.admin-shell .dash-panel-head .link { font-size: .8rem; font-weight: 600; color: var(--ink-soft); }
+.admin-shell .dash-panel-head .count { font-size: .8rem; font-weight: 600; color: var(--terra); }
+
+/* ── Needs-you-today list ───────────────────────────────────────────────── */
+.admin-shell .dash-todo { list-style: none; margin: .25rem 0 0; padding: 0; }
+.admin-shell .dash-todo li {
+  display: flex; align-items: center; gap: .9rem; padding: .85rem 0;
+  border-top: 1px solid var(--line-faint);
+}
+.admin-shell .dash-todo li:first-child { border-top: 0; }
+.admin-shell .dash-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.admin-shell .dash-todo-body { flex: 1; min-width: 0; }
+.admin-shell .dash-todo-title { font-size: .94rem; font-weight: 600; color: var(--ink); }
+.admin-shell .dash-todo-title a { color: var(--ink); }
+.admin-shell .dash-todo-title a:hover { color: var(--terra); }
+.admin-shell .dash-todo-sub { font-size: .81rem; font-weight: 500; color: var(--ink-soft); margin-top: .1rem; }
+.admin-shell .dash-todo-meta { font-size: .8rem; font-weight: 600; white-space: nowrap; }
+.admin-shell .dash-todo-meta.warn { color: var(--clay); }
+.admin-shell .dash-todo-meta.hold { color: var(--honey); }
+.admin-shell .dash-todo-meta.go   { color: var(--ok); }
+.admin-shell .dash-todo-meta.mute { color: var(--ink-soft); }
+.admin-shell .dash-check {
+  width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line-strong);
+  background: none; color: transparent; cursor: pointer; flex: none;
+  display: grid; place-items: center; font-size: .7rem; padding: 0;
+}
+.admin-shell .dash-check:hover { border-color: var(--ok); }
+
+/* ── Schedule ───────────────────────────────────────────────────────────── */
+.admin-shell .dash-horizon {
+  display: inline-flex; background: var(--surface-sunk); border-radius: 999px; padding: 3px;
+}
+.admin-shell .dash-horizon button {
+  border: 0; cursor: pointer; background: none; color: var(--ink-soft);
+  padding: .35rem .8rem; border-radius: 999px; font: inherit; font-size: .76rem; font-weight: 600;
+}
+.admin-shell .dash-horizon button.is-active { background: var(--terra); color: #fff; }
+.admin-shell .dash-sched { list-style: none; margin: .4rem 0 0; padding: 0; }
+.admin-shell .dash-sched li {
+  display: flex; align-items: center; gap: 1rem; padding: .8rem 0; border-top: 1px solid var(--line-faint);
+}
+.admin-shell .dash-sched li:first-child { border-top: 0; }
+.admin-shell .dash-date { flex: none; width: 50px; text-align: center; }
+.admin-shell .dash-date .d { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; color: var(--terra-deep); }
+.admin-shell .dash-date .m {
+  font-size: .6rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin-top: .2rem;
+}
+.admin-shell .dash-sched-body { flex: 1; min-width: 0; border-left: 2px solid var(--line-strong); padding-left: .9rem; }
+.admin-shell .dash-sched-body.is-today { border-left-color: var(--terra); }
+.admin-shell .dash-sched-title { font-size: .94rem; font-weight: 600; color: var(--ink); }
+.admin-shell .dash-sched-title a { color: var(--ink); }
+.admin-shell .dash-sched-title a:hover { color: var(--terra); }
+.admin-shell .dash-sched-client { font-size: .81rem; font-weight: 500; color: var(--ink-soft); }
+.admin-shell .dash-sched-time { font-size: .8rem; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.admin-shell .dash-sched-when { font-size: .72rem; font-weight: 600; color: var(--ink-faint); white-space: nowrap; }
+.admin-shell .dash-sched-when.is-today { color: var(--terra); }
+.admin-shell .dash-empty { margin: 1rem 0 .2rem; font-size: .85rem; font-weight: 500; color: var(--ink-faint); text-align: center; }
+
+/* ── Pipeline ───────────────────────────────────────────────────────────── */
+.admin-shell .dash-stages { display: grid; grid-template-columns: repeat(4, 1fr); gap: .65rem; margin-top: .6rem; }
+.admin-shell .dash-stage {
+  background: var(--surface-sunk); border: 1px solid var(--line); border-left: 3px solid var(--neutral);
+  border-radius: var(--r-sm); padding: .7rem .75rem; display: flex; flex-direction: column; gap: .5rem;
+  text-decoration: none; color: inherit;
+}
+.admin-shell a.dash-stage:hover { border-color: var(--line-strong); }
+.admin-shell .dash-stage-label {
+  font-size: .58rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  min-height: 1.5em; line-height: 1.25;
+}
+.admin-shell .dash-stage-row { display: flex; align-items: baseline; justify-content: space-between; gap: .4rem; }
+.admin-shell .dash-stage-n { font-family: var(--font-display); font-size: 1.5rem; line-height: 1; color: var(--terra-deep); }
+.admin-shell .dash-stage-val { font-size: .7rem; font-weight: 600; color: var(--ink-faint); }
+
+/* ── Revenue (dark money panel) ─────────────────────────────────────────── */
+.admin-shell .dash-money {
+  background: linear-gradient(165deg, #2c2118 0%, #221a13 100%);
+  border: 1px solid #2c2118; border-radius: var(--r-lg); box-shadow: var(--shadow);
+  padding: 1.4rem 1.45rem; color: #f3ead9;
+}
+.admin-shell .dash-money h2 { color: #f7efe1; }
+.admin-shell .dash-money .pct { font-size: .76rem; font-weight: 600; color: var(--dash-gold); }
+.admin-shell .dash-money-body { display: flex; align-items: center; gap: 1.4rem; margin-top: 1rem; }
+.admin-shell .dash-ring { position: relative; flex: none; width: 116px; height: 116px; }
+.admin-shell .dash-ring svg { width: 116px; height: 116px; transform: rotate(-90deg); }
+.admin-shell .dash-ring-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.admin-shell .dash-ring-n { font-family: var(--font-display); font-size: 1.5rem; line-height: 1; color: #f7efe1; }
+.admin-shell .dash-ring-cap { font-size: .58rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #b09a7f; margin-top: .25rem; }
+.admin-shell .dash-money-figs { flex: 1; display: flex; flex-direction: column; gap: .9rem; }
+.admin-shell .dash-fig-n { font-family: var(--font-display); font-size: 1.5rem; line-height: 1; color: #f7efe1; }
+.admin-shell .dash-fig-cap { font-size: .72rem; font-weight: 600; color: #b09a7f; margin-top: .25rem; }
+.admin-shell .dash-money-paid { margin-top: 1.3rem; padding-top: 1rem; border-top: 1px solid rgba(243,234,217,.12); }
+.admin-shell .dash-money-paid .lead {
+  font-size: .64rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #b09a7f;
+}
+.admin-shell .dash-paid-row { display: flex; align-items: center; justify-content: space-between; padding-top: .55rem; }
+.admin-shell .dash-paid-row a { color: #f3ead9; font-weight: 600; font-size: .85rem; }
+.admin-shell .dash-paid-row a:hover { color: #fff; }
+.admin-shell .dash-paid-amt { font-size: .85rem; font-weight: 600; color: var(--dash-gold); }
+
+/* ── Leads ──────────────────────────────────────────────────────────────── */
+.admin-shell .dash-leads { list-style: none; margin: .3rem 0 0; padding: 0; }
+.admin-shell .dash-leads li { display: flex; align-items: center; gap: .75rem; padding: .7rem 0; border-top: 1px solid var(--line-faint); }
+.admin-shell .dash-leads li:first-child { border-top: 0; }
+.admin-shell .dash-avatar {
+  width: 34px; height: 34px; flex: none; border-radius: 50%;
+  background: var(--terra-tint); color: var(--terra-deep);
+  display: grid; place-items: center; font-size: .8rem; font-weight: 600;
+}
+.admin-shell .dash-lead-body { flex: 1; min-width: 0; }
+.admin-shell .dash-lead-name { font-size: .9rem; font-weight: 600; color: var(--ink); }
+.admin-shell .dash-lead-biz { font-size: .78rem; font-weight: 500; color: var(--ink-soft); }
+.admin-shell .dash-pill {
+  font-size: .62rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--terra-deep); background: var(--terra-tint); padding: .2rem .5rem; border-radius: 999px; white-space: nowrap;
+}
+.admin-shell .dash-ago { font-size: .74rem; font-weight: 500; color: var(--ink-faint); white-space: nowrap; }
+
+/* ── Activity ───────────────────────────────────────────────────────────── */
+.admin-shell .dash-activity { list-style: none; margin: .3rem 0 0; padding: 0; }
+.admin-shell .dash-activity li { display: flex; align-items: flex-start; gap: .75rem; padding: .65rem 0; border-top: 1px solid var(--line-faint); }
+.admin-shell .dash-activity li:first-child { border-top: 0; }
+.admin-shell .dash-activity .dash-dot { margin-top: .4rem; }
+.admin-shell .dash-act-text { flex: 1; min-width: 0; font-size: .84rem; font-weight: 500; line-height: 1.45; color: var(--ink-soft); }
+.admin-shell .dash-act-text b { color: var(--ink); font-weight: 600; }
+.admin-shell .dash-act-time { font-size: .74rem; font-weight: 500; color: var(--ink-faint); white-space: nowrap; }
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@container admin (max-width: 920px) {
+  .admin-shell .dash-grid { grid-template-columns: 1fr; }
+  .admin-shell .dash-kpis { grid-template-columns: repeat(2, 1fr); }
+  .admin-shell .dash-stages { grid-template-columns: repeat(2, 1fr); }
+}
+@container admin (max-width: 560px) {
+  .admin-shell .dash-kpis { grid-template-columns: 1fr 1fr; }
+}
+
+/* ===== FOREST + GOLD THEME — ADMIN ONLY (marketing section 1 intentionally held; public brand is locked candlelit-terracotta) ===== */
+/* ── 2. Admin shell tokens ──────────────────────────────────────────────── */
+.admin-shell {
+  --terra:        #20614a;   /* forest accent — links, focus rings           */
+  --terra-deep:   #143C2F;   /* hover / pressed                              */
+  --terra-tint:   #e7efe9;   /* tinted fills (avatars, chips, menu hover)    */
+  --terra-tint-2: #cfe0d4;   /* deeper tint                                  */
+  --gold:         #C8902F;   /* bright accent on cream                       */
+  --clay:         #7C2F38;   /* alerts / danger / overdue → oxblood          */
+  --clay-bg:      #f3e3e5;
+  --clay-line:    #e2c2c7;
+  /* --ok (olive) and --honey (amber) kept: they stay distinct from forest   */
+}
+
+/* primary button stays forest; nudge the quick-create + dashboard buttons    */
+.admin-shell .qc-btn,
+.admin-shell .dash-new { background: var(--terra-deep); }
+.admin-shell .qc-btn:hover,
+.admin-shell .dash-new:hover { background: #0f2e23; }
+
+/* hardcoded terracotta rgba → forest rgba */
+.admin-shell .admin-nav a:hover { background: rgba(20, 60, 47, .07); }
+.admin-shell table.list tbody tr:hover td,
+.admin-shell table.list tr:hover td { background: rgba(20, 60, 47, .035); }
+.admin-shell .project-head { background: linear-gradient(170deg, #fffdf9 0%, #f1f6f2 100%); }
+.admin-shell .project-head::after {
+  background: radial-gradient(circle at 80% 0%, rgba(20, 60, 47, .10), transparent 62%);
+}
+
+/* errors → oxblood (was terracotta) */
+.error { color: #7C2F38; }
+
+/* ── 3. Admin sidebar → forest green (the signature surface) ────────────── */
+.admin-shell .admin-nav {
+  background: linear-gradient(180deg, #163d2f 0%, #112f25 100%);
+  border-right-color: #0d2820;
+}
+.admin-shell .admin-brand { border-bottom-color: rgba(243, 240, 226, .14); }
+.admin-shell .admin-brand .mark { color: #f3f0e2; }
+.admin-shell .admin-brand .mark b { color: #EDB23C; }   /* gold */
+.admin-shell .admin-nav-search input {
+  background: rgba(255, 255, 255, .06);
+  border-color: rgba(243, 240, 226, .16);
+  color: #eef3ee;
+}
+.admin-shell .admin-nav-search input::placeholder { color: #8aa595; }
+.admin-shell .admin-nav-label { color: #7f9a88; }
+.admin-shell .admin-nav a { color: #b9cdbf; }
+.admin-shell .admin-nav a:hover { background: rgba(243, 240, 226, .07); color: #f3f0e2; }
+.admin-shell .admin-nav a.is-active {
+  background: #1C4A3A;
+  color: #f3f0e2;
+  border-color: rgba(243, 240, 226, .14);
+  box-shadow: none;
+}
+.admin-shell .admin-nav a .ico { color: #8aa595; }
+.admin-shell .admin-nav a.is-active .ico { color: #EDB23C; }   /* gold */
+.admin-shell .admin-nav-foot {
+  color: #8aa595;
+  border-top-color: rgba(243, 240, 226, .12);
+}
+.admin-shell .admin-nav-foot .dot { background: #6fae8a; box-shadow: 0 0 0 3px rgba(111, 174, 138, .18); }
+
+/* sidebar links shouldn't pick up the global forest link color */
+.admin-shell .admin-nav a:hover { text-decoration: none; }
+
+/* ── 4. Dashboard pipeline + money panel ────────────────────────────────── */
+/* the one terracotta stage color → oxblood, so the pipeline drops the old hue */
+.admin-shell .dash { --dash-contract: #7C2F38; --dash-gold: #EDB23C; }
+.admin-shell .dash-money {
+  background: linear-gradient(165deg, #1c4a3a 0%, #143c2f 100%);
+  border-color: #143c2f;
+}
+.admin-shell .dash-money .pct,
+.admin-shell .dash-paid-amt { color: #EDB23C; }
+.admin-shell .dash-ring-cap,
+.admin-shell .dash-fig-cap,
+.admin-shell .dash-money-paid .lead,
+.admin-shell .dash-paid-row a { color: #a9c8b5; }
+.admin-shell .dash-money-paid { border-top-color: rgba(243, 234, 217, .14); }

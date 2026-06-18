@@ -98,7 +98,14 @@ async def home(request: Request):
     horizon_shoots = db.all_(
         """SELECT p.id, p.title, c.name AS client_name, c.company,
                   CAST(julianday(p.shoot_date) -
-                       julianday(date('now', 'localtime')) AS INTEGER) AS days_out
+                       julianday(date('now', 'localtime')) AS INTEGER) AS days_out,
+                  CAST(strftime('%d', p.shoot_date) AS INTEGER) AS day,
+                  CASE strftime('%m', p.shoot_date)
+                    WHEN '01' THEN 'Jan' WHEN '02' THEN 'Feb' WHEN '03' THEN 'Mar'
+                    WHEN '04' THEN 'Apr' WHEN '05' THEN 'May' WHEN '06' THEN 'Jun'
+                    WHEN '07' THEN 'Jul' WHEN '08' THEN 'Aug' WHEN '09' THEN 'Sep'
+                    WHEN '10' THEN 'Oct' WHEN '11' THEN 'Nov' WHEN '12' THEN 'Dec'
+                  END AS mon
            FROM projects p JOIN clients c ON c.id=p.client_id
            WHERE p.status != 'archived' AND p.shoot_date IS NOT NULL
              AND p.shoot_date >= date('now', 'localtime')

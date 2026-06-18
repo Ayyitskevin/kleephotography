@@ -1,296 +1,266 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Home · Mise{% endblock %}
+{#
+  Home dashboard — redesign.
+  Drop-in replacement for the previous templates/admin/home.html. Same route,
+  same context object — every variable used here is already produced by the
+  existing home handler (greeting, today_str, kpi, new_inquiries, upcoming_n,
+  outstanding, overdue_inv, revenue, next_steps, horizon_shoots, pipeline,
+  leads, recent_paid, activity_24h).
+
+  Two small, optional context additions are noted inline with  {# +route #}:
+    • horizon_shoots[i].day / .mon  — short date parts for the date chip
+      (derive from the shoot datetime the handler already has).
+    • pipeline[i].value             — formatted $ sum for the stage (optional;
+      falls back to the project count when absent).
+  Styles live in static/mise.css under the `.dash` / `.dash-*` rules.
+#}
 {% block admin_body %}
-<main class="admin-main">
+<main class="admin-main dash">
+
   <div class="admin-bar">
-    <div>
+    <div class="dash-hello">
       <h1>{{ greeting }}, Kevin</h1>
-      <p class="muted">{{ today_str }}</p>
+      <p>{{ today_str }}</p>
     </div>
-    <nav>
-      <a href="/admin/today">Today</a> ·
-      <a href="/admin/sent">Sent</a> ·
-      <a href="/admin/jobs">Jobs</a></nav>
-    <form method="post" action="/admin/logout"><button class="link">Sign out</button></form>
+    <div class="dash-bar-actions">
+      <nav>
+        <a href="/admin/today">Today</a> ·
+        <a href="/admin/sent">Sent</a> ·
+        <a href="/admin/jobs">Jobs</a>
+      </nav>
+      <form method="post" action="/admin/logout">
+        <button class="dash-signout" type="submit">Sign out</button>
+      </form>
+    </div>
   </div>
 
-  <section class="home-tiles" aria-label="At a glance">
-    <a class="home-tile" href="/admin/studio#inquiries">
-      <span class="home-tile-n">{{ new_inquiries }}</span>
-      <span class="home-tile-label">New inquiries</span>
+  {# ── KPI strip ──────────────────────────────────────────────────────── #}
+  <section class="dash-kpis" aria-label="At a glance">
+    <a class="dash-kpi" href="/admin/studio#inquiries">
+      <span class="dash-kpi-label">New inquiries</span>
+      <span class="dash-kpi-n">{{ new_inquiries }}</span>
       {% set d = kpi.inquiries_delta %}
-      <span class="home-tile-trend {{ 'up' if d > 0 else 'down' if d < 0 else 'flat' }}">
+      <span class="dash-kpi-trend {{ 'up' if d > 0 else 'warn' if d < 0 else 'hold' }}">
         {% if d > 0 %}&#9650; {{ d }}{% elif d < 0 %}&#9660; {{ -d }}{% else %}&#8226; 0{% endif %}
-        <span class="home-tile-trend-cap">vs last wk</span></span>
+        <span class="cap">vs last wk</span></span>
     </a>
-    <a class="home-tile" href="/admin/studio#projects">
-      <span class="home-tile-n">{{ upcoming_n }}</span>
-      <span class="home-tile-label">Shoots next 14 days</span>
+    <a class="dash-kpi" href="/admin/studio#projects">
+      <span class="dash-kpi-label">Shoots · 14 days</span>
+      <span class="dash-kpi-n">{{ upcoming_n }}</span>
       {% set d = kpi.bookings_delta %}
-      <span class="home-tile-trend {{ 'up' if d > 0 else 'down' if d < 0 else 'flat' }}">
+      <span class="dash-kpi-trend {{ 'up' if d > 0 else 'warn' if d < 0 else 'hold' }}">
         {% if d > 0 %}&#9650; {{ d }}{% elif d < 0 %}&#9660; {{ -d }}{% else %}&#8226; 0{% endif %}
-        <span class="home-tile-trend-cap">booked vs last wk</span></span>
+        <span class="cap">booked</span></span>
     </a>
-    <a class="home-tile{% if action_items %} home-tile-warn{% endif %}" href="/admin/studio">
-      <span class="home-tile-n">{{ action_items }}</span>
-      <span class="home-tile-label">Action items</span>
-      <span class="home-tile-trend {{ 'down' if overdue_inv else 'flat' }}">
-        {% if overdue_inv %}{{ overdue_inv }} overdue now{% else %}none overdue{% endif %}</span>
+    <a class="dash-kpi" href="/admin/studio">
+      <span class="dash-kpi-label">Outstanding</span>
+      <span class="dash-kpi-n">${{ "%.0f" % (outstanding.cents / 100) }}</span>
+      <span class="dash-kpi-trend {{ 'warn' if overdue_inv else 'hold' }}">
+        {{ outstanding.n }} open<span class="cap">{% if overdue_inv %} · {{ overdue_inv }} overdue{% else %} · none overdue{% endif %}</span></span>
     </a>
-    <a class="home-tile home-tile-money" href="/admin/studio">
-      <span class="home-tile-n">${{ "%.2f" % (outstanding.cents / 100) }}</span>
-      <span class="home-tile-label">Outstanding · {{ outstanding.n }} open invoice{{ "s" if outstanding.n != 1 }}</span>
-      <span class="home-tile-trend flat">${{ "%.0f" % (kpi.collected_7d_cents / 100) }} collected this wk</span>
+    <a class="dash-kpi" href="/admin/studio">
+      <span class="dash-kpi-label">Collected · {{ revenue.month_label }}</span>
+      <span class="dash-kpi-n">${{ "%.0f" % (revenue.paid_cents / 100 / 1000) if revenue.paid_cents >= 100000 else "%.0f" % (revenue.paid_cents / 100) }}{{ "k" if revenue.paid_cents >= 100000 }}</span>
+      <span class="dash-kpi-trend hold">
+        {% if revenue.goal_cents %}{{ revenue.goal_pct }}%<span class="cap"> of goal</span>{% else %}{{ revenue.paid_n }} paid{% endif %}</span>
     </a>
   </section>
 
-  <section class="home-create" aria-label="Create new">
-    <span class="home-create-label">Create</span>
-    <a href="/admin/galleries">+ Gallery</a>
-    <a href="/admin/studio#clients">+ Client</a>
-    <a href="/admin/studio#projects">+ Session</a>
-    <a href="/admin/forms">+ Form</a>
-    <a href="/admin/studio/presets">Crop presets</a>
-    <a href="/admin/studio/licenses">Licenses</a>
-    <a href="/admin/studio/email-templates">Email templates</a>
-  </section>
+  <div class="dash-grid">
 
-  <div class="home-grid">
+    {# ── LEFT column: run the day ─────────────────────────────────────── #}
+    <div class="dash-col">
 
-  <section class="home-card home-card--wide home-revenue" aria-label="Revenue this month">
-    <div class="home-revenue-figs">
-      <div>
-        <span class="home-revenue-n">${{ "%.0f" % (revenue.paid_cents / 100) }}</span>
-        <span class="home-revenue-label">collected · {{ revenue.month_label }}</span>
-      </div>
-      <div>
-        <span class="home-revenue-n muted">${{ "%.0f" % (revenue.outstanding_cents / 100) }}</span>
-        <span class="home-revenue-label">outstanding</span>
-      </div>
-      {% if revenue.goal_cents %}
-      <div>
-        <span class="home-revenue-n muted">${{ "%.0f" % (revenue.goal_cents / 100) }}</span>
-        <span class="home-revenue-label">monthly goal</span>
-      </div>
-      {% endif %}
-    </div>
-    {% if revenue.goal_cents %}
-    <div class="home-goalbar" role="progressbar" aria-valuenow="{{ revenue.goal_pct }}"
-         aria-valuemin="0" aria-valuemax="100"
-         aria-label="{{ revenue.goal_pct }}% of monthly goal collected">
-      <div class="home-goalbar-fill" style="width: {{ revenue.goal_pct }}%;"></div>
-    </div>
-    <p class="home-goalbar-cap muted">{{ revenue.goal_pct }}% of goal · {{ revenue.paid_n }} invoice{{ "s" if revenue.paid_n != 1 }} paid</p>
-    {% else %}
-    <p class="home-goalbar-cap muted">{{ revenue.paid_n }} invoice{{ "s" if revenue.paid_n != 1 }} paid this month ·
-      set <code>MISE_MONTHLY_GOAL</code> to show a goal bar.</p>
-    {% endif %}
-  </section>
-
-  <section class="home-card home-card--wide home-pipeline" aria-label="Pipeline">
-    <header class="home-panel-head">
-      <h2>Pipeline</h2><a href="/admin/studio" class="muted">Go to studio &rarr;</a>
-    </header>
-    <div class="home-stages">
-      {% for s in pipeline %}
-      <div class="home-stage">
-        <div class="home-stage-head">
-          <span class="home-stage-label">{{ s.label }}</span>
-          <span class="home-stage-n">{{ s.n }}</span>
+      {# Needs you today — the app's own next-step engine #}
+      <section class="dash-panel" aria-label="Needs you today">
+        <div class="dash-panel-head">
+          <h2>Needs you today</h2>
+          {% if next_steps %}<span class="count">{{ next_steps|length }} open</span>{% endif %}
         </div>
-        {% for p in s.projects %}
-        <a class="home-chip" href="/admin/studio/projects/{{ p.id }}"
-           title="{{ p.title }} · {{ p.company or p.client_name }}">
-          {{ p.company or p.client_name }}</a>
-        {% endfor %}
-        {% if s.n > s.projects|length %}
-        <span class="home-chip-more">+{{ s.n - s.projects|length }} more</span>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  {% if next_steps %}
-  <section class="home-card home-card--wide home-nextsteps" aria-label="Next steps">
-    <header class="home-panel-head">
-      <h2>Next steps</h2><span class="muted">{{ next_steps|length }} suggestion{{ "s" if next_steps|length != 1 }}</span>
-    </header>
-    <ul class="home-steplist">
-      {% for n in next_steps %}
-      <li class="home-step home-step-{{ n.tone }}">
-        <a href="{{ n.url }}">{{ n.text }}</a>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-    <section class="home-card home-panel" aria-label="Schedule">
-      <header class="home-panel-head">
-        <h2>Schedule</h2>
-        <div class="home-horizon" role="group" aria-label="Time horizon">
-          <button type="button" class="is-active" data-h="7">7 days</button>
-          <button type="button" data-h="0">Today</button>
-          <button type="button" data-h="1">Tomorrow</button>
-        </div>
-      </header>
-      {% if horizon_shoots %}
-      <ul class="home-list" id="home-schedule">
-        {% for u in horizon_shoots %}
-        <li data-days="{{ u.days_out }}">
-          <a href="/admin/studio/projects/{{ u.id }}"><strong>{{ u.title }}</strong></a>
-          <span class="muted">{{ u.client_name }}{% if u.company %} · {{ u.company }}{% endif %}</span>
-          <span class="home-when">
-            {% if u.days_out == 0 %}today{% elif u.days_out == 1 %}tomorrow
-            {% else %}in {{ u.days_out }}d{% endif %}</span>
-        </li>
-        {% endfor %}
-      </ul>
-      <p class="home-empty muted" id="home-schedule-empty" hidden>Nothing in this window.</p>
-      {% else %}<p class="muted">Nothing in the next 7 days. Add a shoot date on a project.</p>{% endif %}
-    </section>
-
-    <section class="home-card home-panel" aria-label="Documents in flight">
-      <header class="home-panel-head">
-        <h2>Documents in flight</h2><a href="/admin/studio" class="muted">Go to studio &rarr;</a>
-      </header>
-      {% if docs_in_flight %}
-      <ul class="home-list">
-        {% for d in docs_in_flight %}
-        <li>
-          <a href="{{ d.url }}"><strong>{{ d.kind }}</strong></a>
-          <span class="muted">{{ d.title }} · {{ d.company or d.client_name }}</span>
-          <span class="home-pill home-pill-{{ d.status }}">{{ d.status.replace('_', ' ') }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-      {% else %}<p class="muted">No proposals, contracts, or invoices awaiting a client.</p>{% endif %}
-    </section>
-
-    <section class="home-card home-panel" aria-label="This month">
-      <header class="home-panel-head">
-        <h2>{{ mini_cal.month_label }}</h2><a href="/admin/calendar" class="muted">Full calendar &rarr;</a>
-      </header>
-      <table class="home-minical">
-        <thead><tr>
-          <th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th>
-        </tr></thead>
-        <tbody>
-          {% for week in mini_cal.weeks %}
-          <tr>
-            {% for day in week %}
-            {% if day == 0 %}
-            <td class="home-minical-empty"></td>
-            {% else %}
-            <td class="{% if day == mini_cal.today_day %}home-minical-today{% endif %}{% if day in mini_cal.shoot_days %} home-minical-shoot{% endif %}">
-              {{ day }}{% if day in mini_cal.shoot_days %}<span class="home-minical-dot"></span>{% endif %}
-            </td>
-            {% endif %}
-            {% endfor %}
-          </tr>
+        {% if next_steps %}
+        <ul class="dash-todo">
+          {% for n in next_steps %}
+          {% set dot = {'warn':'var(--clay)','hold':'var(--honey)','go':'var(--ok)'}.get(n.tone, 'var(--neutral)') %}
+          <li>
+            <span class="dash-dot" style="background: {{ dot }};"></span>
+            <div class="dash-todo-body">
+              <div class="dash-todo-title"><a href="{{ n.url }}">{{ n.text }}</a></div>
+              {% if n.detail %}<div class="dash-todo-sub">{{ n.detail }}</div>{% endif %}
+            </div>
+            {% if n.meta %}<span class="dash-todo-meta {{ n.tone or 'mute' }}">{{ n.meta }}</span>{% endif %}
+            <a class="dash-todo-meta go" href="{{ n.url }}" aria-label="Open">&rarr;</a>
+          </li>
           {% endfor %}
-        </tbody>
-      </table>
-    </section>
+        </ul>
+        {% else %}<p class="dash-empty">You're all caught up.</p>{% endif %}
+      </section>
 
-    <section class="home-card home-panel" aria-label="Tasks">
-      <header class="home-panel-head">
-        <h2>Tasks</h2><a href="/admin/tasks" class="muted">Go to tasks &rarr;</a>
-      </header>
-      {% if open_tasks %}
-      <ul class="home-list">
-        {% for t in open_tasks %}
-        <li class="{% if t.overdue %}home-overdue{% endif %}">
-          <form method="post" action="/admin/tasks/{{ t.id }}/toggle" class="home-task-check">
-            <button type="submit" title="Mark done">&#9744;</button></form>
-          <strong>{{ t.title }}</strong>
-          {% if t.project_title %}<span class="muted">{{ t.project_title }}</span>{% endif %}
-          {% if t.due_date %}<span class="home-when">due {{ t.due_date }}</span>{% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-      {% else %}<p class="muted">No open tasks. Add one from the Tasks page.</p>{% endif %}
-    </section>
+      {# Schedule #}
+      <section class="dash-panel" aria-label="Schedule">
+        <div class="dash-panel-head">
+          <h2>Schedule</h2>
+          <div class="dash-horizon" role="group" aria-label="Time horizon">
+            <button type="button" class="is-active" data-h="7">7 days</button>
+            <button type="button" data-h="0">Today</button>
+            <button type="button" data-h="1">Tomorrow</button>
+          </div>
+        </div>
+        {% if horizon_shoots %}
+        <ul class="dash-sched" id="dash-schedule">
+          {% for u in horizon_shoots %}
+          <li data-days="{{ u.days_out }}">
+            <div class="dash-date">
+              <div class="d">{{ u.day if u.day is defined else u.shoot_date[8:10] }}</div>{# +route: u.day #}
+              <div class="m">{{ u.mon if u.mon is defined else "" }}</div>{# +route: u.mon #}
+            </div>
+            <div class="dash-sched-body{% if u.days_out == 0 %} is-today{% endif %}">
+              <div class="dash-sched-title"><a href="/admin/studio/projects/{{ u.id }}">{{ u.title }}</a></div>
+              <div class="dash-sched-client">{{ u.client_name }}{% if u.company %} · {{ u.company }}{% endif %}</div>
+            </div>
+            {% if u.time %}<span class="dash-sched-time">{{ u.time }}</span>{% endif %}
+            <span class="dash-sched-when{% if u.days_out == 0 %} is-today{% endif %}">
+              {% if u.days_out == 0 %}today{% elif u.days_out == 1 %}tomorrow{% else %}in {{ u.days_out }}d{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="dash-empty" id="dash-schedule-empty" hidden>Nothing in this window.</p>
+        {% else %}<p class="dash-empty">Nothing in the next 7 days. Add a shoot date on a project.</p>{% endif %}
+      </section>
 
-    <section class="home-card home-panel" aria-label="Leads">
-      <header class="home-panel-head">
-        <h2>Leads</h2><a href="/admin/studio#inquiries" class="muted">Go to inquiries &rarr;</a>
-      </header>
-      {% if leads %}
-      <ul class="home-list">
-        {% for l in leads %}
-        <li>
-          <strong>{{ l.name }}</strong>
-          {% if l.kind == "booking" %}<span class="chip">&#128197; booking</span>{% endif %}
-          <span class="muted">{{ l.business or l.email }}</span>
-          <span class="home-when">{{ l.created_at[:10] }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-      {% else %}<p class="muted">No open inquiries — the contact &amp; booking forms land here.</p>{% endif %}
-    </section>
+      {# Pipeline #}
+      <section class="dash-panel" aria-label="Pipeline">
+        <div class="dash-panel-head">
+          <h2>Pipeline</h2>
+          <a class="link" href="/admin/studio">Studio &rarr;</a>
+        </div>
+        {% set stage_colors = {
+          'Inquiry':           'var(--dash-inquiry)',
+          'Consultation Call': 'var(--dash-consult)',
+          'Proposal Sent':     'var(--dash-proposal)',
+          'Contract Signed':   'var(--dash-contract)',
+          'Retainer Paid':     'var(--dash-retainer)',
+          'Session Planning':  'var(--dash-planning)',
+          'Project Closed':    'var(--dash-closed)',
+          'Archived':          'var(--dash-archived)'
+        } %}
+        <div class="dash-stages">
+          {% for s in pipeline %}
+          {% set c = stage_colors.get(s.label, 'var(--neutral)') %}
+          <a class="dash-stage" href="/admin/studio" style="border-left-color: {{ c }};">
+            <span class="dash-stage-label" style="color: {{ c }};">{{ s.label }}</span>
+            <span class="dash-stage-row">
+              <span class="dash-stage-n">{{ s.n }}</span>
+              <span class="dash-stage-val">{{ s.value if s.value is defined else (s.projects|length ~ " open" if s.projects else "—") }}</span>
+            </span>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
 
-    <section class="home-card home-panel" aria-label="Payments">
-      <header class="home-panel-head">
-        <h2>Payments</h2><a href="/admin/studio" class="muted">Go to studio &rarr;</a>
-      </header>
-      <p class="home-money-headline">${{ "%.2f" % (outstanding.cents / 100) }}
-        <span class="muted">outstanding</span>
-        {% if overdue_inv %}<span class="warn">· {{ overdue_inv }} overdue</span>{% endif %}</p>
-      {% if open_invoices %}
-      <ul class="home-list">
-        {% for i in open_invoices %}
-        <li class="{% if i.overdue %}home-overdue{% endif %}">
-          <a href="/admin/studio/invoices/{{ i.id }}"><strong>{{ i.title }}</strong></a>
-          <span class="muted">{{ i.company or i.client_name }}</span>
-          <span class="home-when">${{ "%.2f" % ((i.total_cents - (i.deposit_cents if i.status == 'deposit_paid' else 0)) / 100) }}
-            {% if i.due_date %}· due {{ i.due_date }}{% endif %}</span>
-        </li>
-        {% endfor %}
-      </ul>
-      {% else %}<p class="muted">Nothing outstanding.</p>{% endif %}
-      {% if recent_paid %}
-      <p class="home-subhead muted">Recently paid</p>
-      <ul class="home-list">
-        {% for i in recent_paid %}
-        <li>
-          <a href="/admin/studio/invoices/{{ i.id }}"><strong>{{ i.title }}</strong></a>
-          <span class="muted">{{ i.company or i.client_name }}</span>
-          <span class="home-when">${{ "%.2f" % (i.total_cents / 100) }}
-            {% if i.paid_at %}· {{ i.paid_at[:10] }}{% endif %}</span>
-        </li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-    </section>
+    {# ── RIGHT column: money & signals ────────────────────────────────── #}
+    <div class="dash-col">
 
-    <section class="home-card home-panel" aria-label="Recent activity">
-      <header class="home-panel-head">
-        <h2>Activity</h2><a href="/admin/today" class="muted">Go to today &rarr;</a>
-      </header>
-      {% if activity_24h %}
-      <ul class="home-list">
-        {% for a in activity_24h %}
-        <li>
-          <span class="chip">{{ a.kind }}</span>
-          <strong>{{ a.who }}</strong>
-          {% if a.detail %}<span class="muted">{{ a.detail }}</span>{% endif %}
-          <span class="home-when">{{ a.ts[11:16] }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-      {% else %}<p class="muted">Nothing in the last 24 hours.</p>{% endif %}
-    </section>
+      {# Revenue #}
+      <section class="dash-money" aria-label="Revenue this month">
+        <div class="dash-panel-head">
+          <h2>{{ revenue.month_label }} revenue</h2>
+          {% if revenue.goal_cents %}<span class="pct">{{ revenue.goal_pct }}% of goal</span>{% endif %}
+        </div>
+        <div class="dash-money-body">
+          {% set pct = revenue.goal_pct if revenue.goal_cents else 100 %}
+          {% set dash = 326.7 %}
+          <div class="dash-ring">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(243,234,217,.14)" stroke-width="12"></circle>
+              <circle cx="60" cy="60" r="52" fill="none" stroke="var(--dash-gold)" stroke-width="12"
+                      stroke-linecap="round" stroke-dasharray="{{ dash }}"
+                      stroke-dashoffset="{{ "%.1f" % (dash * (1 - pct / 100)) }}"></circle>
+            </svg>
+            <div class="dash-ring-c">
+              <span class="dash-ring-n">${{ "%.1f" % (revenue.paid_cents / 100 / 1000) }}k</span>
+              <span class="dash-ring-cap">collected</span>
+            </div>
+          </div>
+          <div class="dash-money-figs">
+            <div>
+              <div class="dash-fig-n">${{ "%.0f" % (revenue.outstanding_cents / 100) }}</div>
+              <div class="dash-fig-cap">outstanding · {{ outstanding.n }} open</div>
+            </div>
+            {% if revenue.goal_cents %}
+            <div>
+              <div class="dash-fig-n">${{ "%.0f" % (revenue.goal_cents / 100) }}</div>
+              <div class="dash-fig-cap">monthly goal</div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% if recent_paid %}
+        <div class="dash-money-paid">
+          <span class="lead">Recently paid</span>
+          {% for i in recent_paid %}
+          <div class="dash-paid-row">
+            <a href="/admin/studio/invoices/{{ i.id }}">{{ i.company or i.client_name }}</a>
+            <span class="dash-paid-amt">${{ "%.0f" % (i.total_cents / 100) }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </section>
 
+      {# Leads #}
+      <section class="dash-panel" aria-label="New leads">
+        <div class="dash-panel-head">
+          <h2>New leads</h2>
+          <a class="link" href="/admin/studio#inquiries">Inquiries &rarr;</a>
+        </div>
+        {% if leads %}
+        <ul class="dash-leads">
+          {% for l in leads %}
+          <li>
+            <span class="dash-avatar">{{ (l.name[:2]) | upper }}</span>
+            <div class="dash-lead-body">
+              <div class="dash-lead-name">{{ l.name }}</div>
+              <div class="dash-lead-biz">{{ l.business or l.email }}</div>
+            </div>
+            {% if l.kind == "booking" %}<span class="dash-pill">Booking</span>{% endif %}
+            <span class="dash-ago">{{ l.created_at[:10] }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="dash-empty">No open inquiries.</p>{% endif %}
+      </section>
+
+      {# Activity #}
+      <section class="dash-panel" aria-label="Recent activity">
+        <div class="dash-panel-head">
+          <h2>Activity</h2>
+          <a class="link" href="/admin/today">Today &rarr;</a>
+        </div>
+        {% if activity_24h %}
+        <ul class="dash-activity">
+          {% for a in activity_24h %}
+          {% set adot = {'paid':'var(--ok)','viewed':'var(--honey)','booking':'var(--clay)'}.get(a.kind, 'var(--neutral)') %}
+          <li>
+            <span class="dash-dot" style="background: {{ adot }};"></span>
+            <div class="dash-act-text"><b>{{ a.who }}</b> {{ a.detail or a.kind }}</div>
+            <span class="dash-act-time">{{ a.ts[11:16] }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="dash-empty">Nothing in the last 24 hours.</p>{% endif %}
+      </section>
+    </div>
   </div>
 
+  {# Schedule horizon filter — same progressive-enhancement pattern as before #}
   <script>
     (function () {
-      var grp = document.querySelector(".home-horizon");
-      var list = document.getElementById("home-schedule");
+      var grp = document.querySelector(".dash-horizon");
+      var list = document.getElementById("dash-schedule");
       if (!grp || !list) return;
-      var empty = document.getElementById("home-schedule-empty");
+      var empty = document.getElementById("dash-schedule-empty");
       var rows = list.querySelectorAll("li");
       grp.addEventListener("click", function (e) {
         var btn = e.target.closest("button[data-h]");
