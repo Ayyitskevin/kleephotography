@@ -1,16 +1,21 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Booking playbook · Studio · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Booking playbook</h1>
+    <p class="pgtop-sub">Internal reference — the all-in-one booking flow, end to end · not client-facing</p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/studio">&larr; Studio</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main playbook">
-  <div class="admin-bar">
-    <div>
-      <h1>Booking playbook</h1>
-      <p class="muted">Internal reference — the all-in-one booking flow for Kevin Lee Photography,
-        end to end. Not client-facing. Pricing and brand copy in [brackets] are placeholders for
-        Kevin to finalize. Each stage links to the Mise tool that already does the work.</p>
-    </div>
-    <nav><a href="/admin/studio">&larr; Studio</a></nav>
-  </div>
+  <p class="muted">Internal reference — the all-in-one booking flow for Kevin Lee Photography,
+    end to end. Not client-facing. Pricing and brand copy in [brackets] are placeholders for
+    Kevin to finalize. Each stage links to the Mise tool that already does the work.</p>
 
   <section class="pb-note" aria-label="How to use">
     <p>This mirrors the strongest HoneyBook all-in-one sample (proposal + invoice + contract +
