@@ -1,0 +1,88 @@
+{% extends "admin/base_admin.html" %}
+{# Portals overview — REAL client hubs (portals table). The prototype fabricated
+   a brand palette, typefaces, a caption generator, and a license number; this
+   shows only real publish state, share links, engagement, and contents counts,
+   linking out to the real per-client management (Studio) and the live hub.
+   Read-only. #}
+{% block topbar %}
+<div class="pgtop">
+  <div class="pgtop-lead">
+    <p class="pgtop-eyebrow">Content portal</p>
+    <h1>Client portals</h1>
+    <p class="pgtop-sub">The hubs you share — galleries, social crops, brand assets, usage rights</p>
+  </div>
+</div>
+{% endblock %}
+{% block admin_body %}
+<div class="fin-wrap">
+
+  <section class="fin-summary fin-summary-4">
+    {% for c in cards %}
+    <div class="fin-card fin-card-{{ c.tone }}">
+      <span class="fin-card-label">{{ c.label }}</span>
+      <div class="fin-card-val">{{ c.value }}</div>
+      <span class="fin-card-sub">{{ c.sub }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="ct-block">
+    <div class="ct-block-head">
+      <h2 class="ct-h2">Portals</h2>
+      <span class="ct-block-note">Publish + edit each hub on the client's <a href="/admin/studio">Studio</a> page</span>
+    </div>
+    {% if portals %}
+    <div class="pt-grid">
+      {% for p in portals %}
+      <div class="pt-card{% if not p.published %} pt-card-draft{% endif %}">
+        <div class="pt-head">
+          <span class="pt-biz">{{ p.biz }}</span>
+          <span class="ct-pill {% if p.published %}ct-pill-on{% else %}ct-pill-off{% endif %}">{{ 'Published' if p.published else 'Draft' }}</span>
+        </div>
+
+        <div class="pt-link">
+          <a class="pt-url" href="{{ p.path }}" target="_blank" rel="noopener">{{ p.url }}</a>
+          <span class="pt-pin">PIN {{ p.pin }}</span>
+        </div>
+
+        <div class="pt-stats">
+          <div class="pt-stat"><span class="pt-stat-n">{{ p.n_galleries }}</span><span class="pt-stat-l">galleries</span></div>
+          <div class="pt-stat"><span class="pt-stat-n">{{ p.n_faves }}</span><span class="pt-stat-l">selects → crops</span></div>
+          <div class="pt-stat"><span class="pt-stat-n">{{ p.n_brand }}</span><span class="pt-stat-l">brand files</span></div>
+          <div class="pt-stat"><span class="pt-stat-n">{{ p.visits }}</span><span class="pt-stat-l">visits</span></div>
+        </div>
+
+        <div class="pt-foot">
+          <span class="pt-meta">
+            Last opened {{ p.last }}
+            {% if p.rights %}· <span class="pt-rights">usage rights set</span>{% else %}· <span class="pt-norights">no usage rights</span>{% endif %}
+          </span>
+          <span class="pt-actions">
+            <a href="{{ p.share_href }}">Share</a>
+            <a href="/admin/studio/clients/{{ p.client_id }}">Manage &rarr;</a>
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="ct-empty">No client portals yet. Create one from a client's Studio page to share galleries, crops, and brand assets.</p>
+    {% endif %}
+  </section>
+
+  {% if no_portal %}
+  <section class="ct-block">
+    <div class="ct-block-head">
+      <h2 class="ct-h2">No portal yet</h2>
+      <span class="ct-block-note">Clients without a hub — set one up on their Studio page</span>
+    </div>
+    <div class="pt-none">
+      {% for c in no_portal %}
+      <a class="pt-none-chip" href="/admin/studio/clients/{{ c.id }}">{{ c.biz }} &rarr;</a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+{% endblock %}

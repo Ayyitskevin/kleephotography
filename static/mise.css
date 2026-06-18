@@ -3887,3 +3887,68 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 @media (max-width: 560px) {
   .admin-shell .ct-kit-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Portals overview (real client hubs + engagement) ── */
+.admin-shell .pt-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 1rem;
+}
+.admin-shell .pt-card {
+  display: flex; flex-direction: column; gap: .7rem; padding: 1rem 1.1rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+}
+.admin-shell .pt-card-draft { opacity: .72; }
+.admin-shell .pt-head {
+  display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+}
+.admin-shell .pt-biz {
+  font-family: var(--font-display); font-weight: 500; font-size: 1.1rem; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.admin-shell .pt-link {
+  display: flex; align-items: center; gap: .55rem; flex-wrap: wrap;
+  padding: .5rem .6rem; background: #f7f4ea; border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.admin-shell .pt-url {
+  flex: 1; min-width: 0; font-size: .76rem; color: var(--terra-deep); font-weight: 600;
+  word-break: break-all;
+}
+.admin-shell .pt-pin {
+  flex: none; font-family: ui-monospace, Menlo, monospace; font-size: .72rem;
+  font-weight: 700; letter-spacing: .04em; color: var(--ink-soft);
+  background: #efece0; padding: .12rem .45rem; border-radius: 6px;
+}
+.admin-shell .pt-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: .4rem;
+  padding: .6rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.admin-shell .pt-stat { display: flex; flex-direction: column; align-items: center; gap: .1rem; }
+.admin-shell .pt-stat-n {
+  font-family: var(--font-display); font-size: 1.25rem; font-weight: 500; color: var(--ink);
+}
+.admin-shell .pt-stat-l {
+  font-size: .64rem; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-faint);
+  text-align: center;
+}
+.admin-shell .pt-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+  flex-wrap: wrap;
+}
+.admin-shell .pt-meta { font-size: .76rem; color: var(--ink-soft); }
+.admin-shell .pt-rights { color: #2f7d57; font-weight: 600; }
+.admin-shell .pt-norights { color: var(--ink-faint); }
+.admin-shell .pt-actions { display: flex; gap: .8rem; }
+.admin-shell .pt-actions a {
+  font-size: .8rem; font-weight: 600; color: var(--terra-deep);
+}
+.admin-shell .pt-none { display: flex; flex-wrap: wrap; gap: .5rem; }
+.admin-shell .pt-none-chip {
+  padding: .4rem .7rem; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; font-size: .82rem; font-weight: 600; color: var(--ink-soft);
+}
+.admin-shell .pt-none-chip:hover { border-color: var(--line-strong); color: var(--ink); }
+
+@media (max-width: 560px) {
+  .admin-shell .pt-grid { grid-template-columns: 1fr; }
+}
