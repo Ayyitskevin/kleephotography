@@ -39,6 +39,7 @@ MEDIA_DIR = DATA_DIR / "media"
 ZIP_DIR = DATA_DIR / "zips"
 TMP_DIR = DATA_DIR / "tmp"
 BRAND_DIR = DATA_DIR / "brand"
+RECEIPTS_DIR = DATA_DIR / "receipts"  # uploaded expense-receipt scans (photo/PDF)
 
 SECRET_KEY = os.environ.get("MISE_SECRET_KEY", "")        # required in prod
 ADMIN_PASSWORD = os.environ.get("MISE_ADMIN_PASSWORD", "")  # required in prod
@@ -151,6 +152,10 @@ TELEGRAM_CHAT_ID = os.environ.get("MISE_TELEGRAM_CHAT_ID", "")
 # Refuse uploads when free disk drops below this (GB) — fail loud, not full.
 MIN_FREE_GB = int(os.environ.get("MISE_MIN_FREE_GB", "10"))
 
+# IRS standard mileage rate (cents per mile) stamped onto NEW trip rows. Frozen
+# per-row at creation so prior trips keep the rate they were logged at. 2026 = 70¢/mi.
+MILEAGE_RATE_CENTS = int(os.environ.get("MISE_MILEAGE_RATE_CENTS", "70"))
+
 # Revenue snapshot monthly goal (display-only bar on Home). Dollars via env;
 # 0 = no goal line — the widget just shows collected vs outstanding.
 MONTHLY_GOAL_CENTS = int(os.environ.get("MISE_MONTHLY_GOAL", "0")) * 100
@@ -161,5 +166,5 @@ COOKIE_SECURE = _b("MISE_COOKIE_SECURE", "false")  # true once behind the tunnel
 
 
 def ensure_dirs() -> None:
-    for d in (DATA_DIR, MEDIA_DIR, ZIP_DIR, TMP_DIR, BRAND_DIR):
+    for d in (DATA_DIR, MEDIA_DIR, ZIP_DIR, TMP_DIR, BRAND_DIR, RECEIPTS_DIR):
         d.mkdir(parents=True, exist_ok=True)

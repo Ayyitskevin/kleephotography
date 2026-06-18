@@ -1,0 +1,83 @@
+{% extends "admin/base_admin.html" %}
+{# Mileage — REAL operator-entered trip log. No calendar auto-detect (fabricated);
+   each trip is logged by hand. Deduction = miles × the IRS rate frozen per trip. #}
+{% block topbar %}
+<div class="pgtop">
+  <div class="pgtop-lead">
+    <h1>Mileage</h1>
+    <p class="pgtop-sub">Business miles, logged for the write-off · 2026 IRS rate {{ rate_cents }}¢/mi</p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/financials/mileage.csv">Export CSV &darr;</a>
+  </div>
+</div>
+{% endblock %}
+{% block admin_body %}
+<div class="fin-wrap">
+  {% include "admin/_money_nav.html" %}
+
+  <section class="fin-summary fin-summary-4">
+    {% for c in cards %}
+    <div class="fin-card fin-card-{{ c.tone }}">
+      <span class="fin-card-label">{{ c.label }}</span>
+      <div class="fin-card-val">{{ c.value }}</div>
+      <span class="fin-card-sub">{{ c.sub }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <div class="fin-cols">
+    <section class="fin-panel">
+      <div class="fin-panel-head">
+        <h2 class="fin-h2">Trip log</h2>
+        <span class="fin-card-sub">{{ count }} trip{{ '' if count == 1 else 's' }}</span>
+      </div>
+      <div class="fin-tbl-scroll">
+        <table class="fin-tbl">
+          <thead><tr>
+            <th>Date</th><th>Route</th><th>Purpose</th>
+            <th class="fin-num">Miles</th><th class="fin-num">Deduction</th><th></th>
+          </tr></thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td class="fin-muted">{{ r.date }}</td>
+              <td class="fin-strong">{{ r.route }}</td>
+              <td class="fin-soft">{{ r.purpose }}</td>
+              <td class="fin-num fin-strong">{{ r.miles }}</td>
+              <td class="fin-num fin-net">{{ r.ded }}</td>
+              <td class="fin-num">
+                <form method="post" action="/admin/financials/mileage/{{ r.id }}/delete"
+                      onsubmit="return confirm('Delete this trip?');">
+                  <button class="fin-del" type="submit" title="Delete">&times;</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="fin-empty-row">No trips logged yet — add one on the right.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="fin-rail">
+      <section class="fin-form-card">
+        <h2 class="fin-h2">Log a trip</h2>
+        <form method="post" action="/admin/financials/mileage" class="fin-form">
+          <label>Date <input type="date" name="drove_on" value="{{ today }}" required></label>
+          <label>From <input type="text" name="from_place" placeholder="Studio" required></label>
+          <label>To <input type="text" name="to_place" placeholder="Cúrate" required></label>
+          <label>Purpose <input type="text" name="purpose" placeholder="Summer menu shoot"></label>
+          <label>Miles <input type="text" name="miles" inputmode="decimal" placeholder="8.4" required></label>
+          <button type="submit">+ Log trip</button>
+        </form>
+      </section>
+    </aside>
+  </div>
+
+  <p class="fin-note">Log each business trip by hand — the IRS requires a contemporaneous
+    mileage record. Each trip freezes the rate it was logged at, so prior-year trips keep
+    their year's rate even after the standard rate changes.</p>
+</div>
+{% endblock %}

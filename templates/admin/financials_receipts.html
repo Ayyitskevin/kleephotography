@@ -1,0 +1,71 @@
+{% extends "admin/base_admin.html" %}
+{# Receipts — REAL uploaded scans (photo/PDF), manually linked to an expense.
+   No email-ingest address and no AI auto-matching (the prototype's "forward to
+   receipts@…, auto-matched" is fabricated) — linking is an explicit operator choice. #}
+{% block topbar %}
+<div class="pgtop">
+  <div class="pgtop-lead">
+    <h1>Receipt inbox</h1>
+    <p class="pgtop-sub">Upload a photo or PDF, then link it to an expense</p>
+  </div>
+</div>
+{% endblock %}
+{% block admin_body %}
+<div class="fin-wrap">
+  {% include "admin/_money_nav.html" %}
+
+  <section class="fin-summary fin-summary-3">
+    {% for c in cards %}
+    <div class="fin-card fin-card-{{ c.tone }}">
+      <span class="fin-card-label">{{ c.label }}</span>
+      <div class="fin-card-val">{{ c.value }}</div>
+      <span class="fin-card-sub">{{ c.sub }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="fin-form-card fin-upload">
+    <form method="post" action="/admin/financials/receipts" enctype="multipart/form-data" class="fin-upload-form">
+      <label class="fin-file">Receipt file
+        <input type="file" name="file" accept="image/*,application/pdf,.heic" required></label>
+      <label>Link to expense (optional)
+        <select name="expense_id">
+          <option value="">— leave unlinked —</option>
+          {% for e in expenses %}<option value="{{ e.id }}">{{ e.label }}</option>{% endfor %}
+        </select></label>
+      <button type="submit">+ Upload receipt</button>
+    </form>
+  </section>
+
+  <section class="rc-grid">
+    {% for r in rows %}
+    <div class="rc-card">
+      <a class="rc-thumb" href="/admin/financials/receipts/{{ r.id }}/file" target="_blank" rel="noopener">
+        <span class="rc-paper">
+          <span class="rc-line" style="width: 70%;"></span>
+          <span class="rc-line" style="width: 90%;"></span>
+          <span class="rc-line" style="width: 60%;"></span>
+          <span class="rc-line rc-line-bar"></span>
+        </span>
+        <span class="rc-badge {{ 'rc-badge-on' if r.linked else 'rc-badge-off' }}">{{ 'Linked' if r.linked else 'Unlinked' }}</span>
+        {% if r.is_pdf %}<span class="rc-pdf">PDF</span>{% endif %}
+      </a>
+      <div class="rc-foot">
+        <span class="rc-name" title="{{ r.filename }}">{{ r.filename }}</span>
+        <div class="rc-meta">{{ r.meta }}</div>
+        <form method="post" action="/admin/financials/receipts/{{ r.id }}/delete"
+              onsubmit="return confirm('Delete this receipt scan?');">
+          <button class="rc-del" type="submit">Delete</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="fin-empty-row">No receipts uploaded yet.</div>
+    {% endfor %}
+  </section>
+
+  <p class="fin-note">Scans live on your own server, never a third party. Linking is
+    manual and honest — an expense shows &ldquo;✓ Receipt&rdquo; once a scan points at it.
+    Deleting an expense leaves its receipt here (unlinked) rather than destroying the scan.</p>
+</div>
+{% endblock %}

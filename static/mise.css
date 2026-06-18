@@ -3838,36 +3838,120 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   width: 38px; text-align: right; font-variant-numeric: tabular-nums;
 }
 
-/* Honest empty scaffolds (Expenses / Mileage / Receipts) */
-.admin-shell .fin-soon { display: grid; place-items: center; padding: clamp(20px, 6vw, 70px) 0; }
-.admin-shell .fin-soon-card {
-  max-width: 30em; text-align: center;
+/* ── Bookkeeping: expenses / mileage / receipts (real CRUD) ── */
+.admin-shell .fin-summary-3 { grid-template-columns: repeat(3, 1fr); }
+.admin-shell .fin-cols {
+  display: grid; grid-template-columns: 1fr 320px;
+  gap: clamp(18px, 2vw, 26px); align-items: start;
+}
+.admin-shell .fin-rail { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.admin-shell .fin-form-card {
   background: var(--surface); border: 1px solid var(--line);
-  border-radius: 16px; padding: 38px 34px;
+  border-radius: 16px; padding: 20px 22px;
 }
-.admin-shell .fin-soon-mark {
-  display: inline-grid; place-items: center; width: 48px; height: 48px;
-  border-radius: 999px; background: #f1ece0; color: var(--ink-faint);
-  font-size: 1.4rem; margin-bottom: 16px;
+.admin-shell .fin-form-card .fin-h2 { margin: 0 0 14px; font-size: 1.2rem; }
+.admin-shell .fin-form { display: flex; flex-direction: column; gap: 11px; }
+.admin-shell .fin-form label,
+.admin-shell .fin-upload-form label {
+  display: flex; flex-direction: column; gap: 5px;
+  font-size: .72rem; font-weight: 600; letter-spacing: .02em;
+  text-transform: uppercase; color: var(--ink-faint);
 }
-.admin-shell .fin-soon-h {
-  margin: 0 0 10px; font-family: var(--font-display); font-weight: 500;
-  font-size: 1.4rem; color: var(--ink);
+.admin-shell .fin-form input,
+.admin-shell .fin-form select,
+.admin-shell .fin-upload-form input,
+.admin-shell .fin-upload-form select {
+  font: 500 .86rem/1.2 var(--font-ui); color: var(--ink);
+  background: #fff; border: 1px solid var(--line); border-radius: 9px;
+  padding: 9px 11px;
 }
-.admin-shell .fin-soon-body {
-  margin: 0 0 20px; font-size: .88rem; font-weight: 500;
-  line-height: 1.6; color: var(--ink-soft);
+.admin-shell .fin-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.admin-shell .fin-form button,
+.admin-shell .fin-upload-form button {
+  margin-top: 4px; align-self: flex-start; cursor: pointer;
+  padding: .7em 1.25em; border: 0; border-radius: 999px;
+  background: var(--terra-deep); color: #F3F0E2;
+  font: 600 .82rem/1 var(--font-ui);
 }
-.admin-shell .fin-soon-link {
-  font-size: .82rem; font-weight: 600; color: var(--terra-deep);
+.admin-shell .fin-cat { display: inline-flex; align-items: center; gap: 6px; }
+.admin-shell .fin-cat-dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+.admin-shell .fin-del {
+  cursor: pointer; border: 0; background: none; color: var(--ink-faint);
+  font-size: 1.1rem; line-height: 1; padding: 2px 6px; border-radius: 6px;
 }
+.admin-shell .fin-del:hover { background: #f3e3e5; color: var(--clay); }
+
+.admin-shell .fin-bycat { margin-bottom: 13px; }
+.admin-shell .fin-bycat:last-child { margin-bottom: 0; }
+.admin-shell .fin-bycat-top { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.admin-shell .fin-bycat-label { font-size: .82rem; font-weight: 600; color: var(--ink); }
+.admin-shell .fin-bycat-amt { font-size: .8rem; font-weight: 600; color: var(--ink-soft); }
+.admin-shell .fin-bycat-bar {
+  height: 7px; border-radius: 999px; background: #f1ece0; overflow: hidden;
+}
+.admin-shell .fin-bycat-fill { height: 100%; border-radius: 999px; }
+
+.admin-shell .fin-upload-form {
+  display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+}
+.admin-shell .fin-upload-form .fin-file { flex: 1 1 240px; }
+
+/* Receipt grid (real uploaded scans) */
+.admin-shell .rc-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(206px, 1fr)); gap: 16px;
+}
+.admin-shell .rc-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; overflow: hidden;
+  transition: transform .25s cubic-bezier(.2,.7,.2,1), box-shadow .25s ease;
+}
+.admin-shell .rc-card:hover { transform: translateY(-3px); box-shadow: 0 18px 34px -24px rgba(40,30,12,.4); }
+.admin-shell .rc-thumb {
+  position: relative; display: flex; flex-direction: column;
+  justify-content: center; align-items: center; height: 150px;
+  background: linear-gradient(160deg, #f3eee2, #e7dfcd);
+  border-bottom: 1px solid var(--line);
+}
+.admin-shell .rc-paper {
+  width: 76px; height: 96px; background: #fffdf8; border-radius: 4px;
+  box-shadow: 0 6px 16px -8px rgba(40,30,12,.4);
+  display: flex; flex-direction: column; gap: 5px; padding: 11px 9px;
+}
+.admin-shell .rc-line { height: 4px; background: #e6ddca; border-radius: 2px; }
+.admin-shell .rc-line-bar { margin-top: auto; height: 8px; width: 50%; background: var(--terra-deep); }
+.admin-shell .rc-badge {
+  position: absolute; top: 9px; right: 9px;
+  font-size: .6rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+  padding: 4px 8px; border-radius: 999px;
+}
+.admin-shell .rc-badge-on { color: #2f7d57; background: #e1f2e9; }
+.admin-shell .rc-badge-off { color: #9a7a2c; background: #f7ecd2; }
+.admin-shell .rc-pdf {
+  position: absolute; bottom: 9px; left: 9px;
+  font-size: .58rem; font-weight: 700; letter-spacing: .04em;
+  color: #fff; background: rgba(20,60,47,.85); padding: 3px 7px; border-radius: 5px;
+}
+.admin-shell .rc-foot { padding: 12px 14px 13px; }
+.admin-shell .rc-name {
+  display: block; font-size: .86rem; font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.admin-shell .rc-meta { margin-top: 3px; font-size: .74rem; font-weight: 500; color: var(--ink-faint); }
+.admin-shell .rc-del {
+  margin-top: 9px; cursor: pointer; border: 1px solid var(--line);
+  background: #fff; color: var(--ink-soft);
+  font: 600 .72rem/1 var(--font-ui); padding: 6px 11px; border-radius: 999px;
+}
+.admin-shell .rc-del:hover { border-color: var(--clay); color: var(--clay); }
 
 @media (max-width: 1080px) {
   .admin-shell .fin-summary,
   .admin-shell .fin-summary-4 { grid-template-columns: repeat(2, 1fr); }
+  .admin-shell .fin-cols { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .admin-shell .fin-summary,
+  .admin-shell .fin-summary-3,
   .admin-shell .fin-summary-4 { grid-template-columns: 1fr; }
 }
 

@@ -6545,3 +6545,87 @@ def test_inbox_reply_blocked_without_email(admin):
                        follow_redirects=False)
     assert r.status_code == 400
     send.assert_not_called()
+
+
+def test_expense_create_and_delete(admin):
+    """Expenses are real CRUD over operator-entered data: the row persists with
+    cents parsed from a dollar string, and deductible math is honest."""
+    r = admin.post("/admin/financials/expenses",
+                   data={"spent_on": "2026-06-15", "vendor": "B&H Photo",
+                         "category": "Equipment", "amount": "1,240.00",
+                         "deductible_pct": "100", "notes": "85mm lens"},
+                   follow_redirects=False)
+    assert r.status_code == 303
+    row = db.one("SELECT * FROM expenses WHERE vendor='B&H Photo'")
+    assert row is not None and row["amount_cents"] == 124000
+    assert row["category"] == "Equipment" and row["deductible_pct"] == 100
+
+    page = admin.get("/admin/financials/expenses")
+    assert page.status_code == 200 and "Expense log" in page.text
+
+    r = admin.post(f"/admin/financials/expenses/{row['id']}/delete",
+                   follow_redirects=False)
+    assert r.status_code == 303
+    assert db.one("SELECT id FROM expenses WHERE id=?", (row["id"],)) is None
+
+
+def test_expense_rejects_bad_amount(admin):
+    r = admin.post("/admin/financials/expenses",
+                   data={"spent_on": "2026-06-15", "vendor": "Junk",
+                         "amount": "not-a-number"}, follow_redirects=False)
+    assert r.status_code == 400
+
+
+def test_receipt_upload_links_and_serves(admin):
+    """A receipt scan uploads to disk, links to an expense, serves back its bytes,
+    and flags the expense as having a receipt — no auto-matching, the link is explicit."""
+    eid = db.run("INSERT INTO expenses (spent_on, vendor, category, amount_cents) "
+                 "VALUES (?,?,?,?)", ("2026-06-12", "Adobe", "Software", 5999))
+    png = _logo_png()
+    r = admin.post("/admin/financials/receipts",
+                   files={"file": ("adobe.png", io.BytesIO(png), "image/png")},
+                   data={"expense_id": str(eid)}, follow_redirects=False)
+    assert r.status_code == 303
+    rc = db.one("SELECT * FROM receipts WHERE expense_id=?", (eid,))
+    assert rc is not None and rc["filename"] == "adobe.png"
+
+    served = admin.get(f"/admin/financials/receipts/{rc['id']}/file")
+    assert served.status_code == 200 and served.content == png
+
+    # the linked expense now shows a receipt pill
+    page = admin.get("/admin/financials/expenses")
+    assert "Receipt" in page.text
+
+    # deleting the expense leaves the receipt (unlinked), not destroyed
+    admin.post(f"/admin/financials/expenses/{eid}/delete", follow_redirects=False)
+    still = db.one("SELECT expense_id FROM receipts WHERE id=?", (rc["id"],))
+    assert still is not None and still["expense_id"] is None
+
+
+def test_receipt_rejects_non_document(admin):
+    r = admin.post("/admin/financials/receipts",
+                   files={"file": ("notes.txt", io.BytesIO(b"hello"), "text/plain")},
+                   follow_redirects=False)
+    assert r.status_code == 400
+
+
+def test_mileage_create_deduction_and_delete(admin):
+    """Mileage is real CRUD; the deduction is miles × the IRS rate frozen per trip."""
+    from app import config
+    r = admin.post("/admin/financials/mileage",
+                   data={"drove_on": "2026-06-17", "from_place": "Studio",
+                         "to_place": "Cúrate", "purpose": "Summer menu shoot",
+                         "miles": "8.4"}, follow_redirects=False)
+    assert r.status_code == 303
+    trip = db.one("SELECT * FROM mileage WHERE to_place='Cúrate'")
+    assert trip is not None and abs(trip["miles"] - 8.4) < 1e-6
+    assert trip["rate_cents"] == config.MILEAGE_RATE_CENTS
+
+    page = admin.get("/admin/financials/mileage")
+    # 8.4 mi × 70¢ = $5.88
+    assert page.status_code == 200 and "$5.88" in page.text
+
+    r = admin.post(f"/admin/financials/mileage/{trip['id']}/delete",
+                   follow_redirects=False)
+    assert r.status_code == 303
+    assert db.one("SELECT id FROM mileage WHERE id=?", (trip["id"],)) is None

@@ -1,21 +1,28 @@
-"""Financials — honest money pages over Mise's REAL invoices + payments.
+"""Financials — honest money pages over Mise's REAL invoices + payments, plus
+the operator's own bookkeeping (expenses, mileage, receipts).
 
-Adapts the Admin Financials / Client P&L prototypes. Two pages run on real
-data: Income (collected cash from the `payments` table, outstanding from open
-`invoices`) and Client P&L (per-client collected revenue + project counts).
-Mise stores no sales-tax, no Stripe-fee, and no expense/mileage/receipt data,
-so those columns are shown honestly ($0.00 / "—" / not-tracked) and the
-Expenses, Mileage, and Receipts pages are honest "not built yet" scaffolds
-rather than fabricated ledgers. Everything here is read-only — no writes, so
-nothing narrates to the Notion Activity Log.
+Adapts the Admin Financials / Client P&L / Expenses / Mileage / Receipts
+prototypes. Income (collected cash from `payments`, outstanding from open
+`invoices`) and Client P&L are read-only over real Stripe data; Mise stores no
+sales-tax or processing fee, so those columns read honestly ($0.00 / "—").
+
+Expenses, Mileage, and Receipts are real CRUD over operator-entered data — Kevin's
+own bookkeeping, not client money. The prototypes' fabricated features (calendar
+auto-detect of trips, email auto-matching of receipts, hardcoded 1099 watch, and
+invented tax set-aside goals) are dropped: Mise has no data source for them.
+Deductible % and the IRS mileage rate are honest operator inputs.
 """
 
 import datetime as dt
+import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, Request,
+                     UploadFile)
+from fastapi.responses import (FileResponse, HTMLResponse, PlainTextResponse,
+                               RedirectResponse)
 
-from .. import db, security
+from .. import config, db, security
 from ..render import templates
 
 router = APIRouter(prefix="/admin/financials",
@@ -245,41 +252,255 @@ async def client_pnl(request: Request, sort: str = "revenue"):
     })
 
 
-_SOON = {
-    "expenses": {
-        "active": "expenses", "title": "Expenses & deductions",
-        "sub": "Receipts, write-offs, and tax set-aside",
-        "heading": "Expense tracking isn't built yet",
-        "body": "Mise records the money coming in — collected payments and open "
-                "invoices — but it doesn't yet track expenses, deductions, or "
-                "tax set-aside. Keep those in your accountant's tools for now; "
-                "the Income page and CSV export give them the revenue side.",
-    },
-    "mileage": {
-        "active": "mileage", "title": "Mileage",
-        "sub": "Business miles for the write-off",
-        "heading": "Mileage logging isn't built yet",
-        "body": "There's no mileage log in Mise yet. Track business miles in a "
-                "dedicated app or spreadsheet for the IRS standard-rate "
-                "deduction — Mise stays focused on the revenue side.",
-    },
-    "receipts": {
-        "active": "receipts", "title": "Receipt inbox",
-        "sub": "Snap, forward, and match receipts to expenses",
-        "heading": "The receipt inbox isn't built yet",
-        "body": "Mise has no receipt capture or matching yet. Hold onto "
-                "receipts in your accounting tool — when expense tracking "
-                "lands here, this is where they'll live.",
-    },
-}
+# ── Bookkeeping: expenses · receipts · mileage (operator-entered CRUD) ──
+
+# Honest fixed category set (the prototype's catMeta), each with its dot color.
+_EXP_CATS = [
+    ("Equipment", "#143C2F"), ("Software", "#2f6d8a"), ("Travel", "#EDB23C"),
+    ("Props & supplies", "#2f7d57"), ("Meals", "#7C2F38"),
+    ("Contract labor", "#9a7a2c"), ("Insurance", "#5C6A5E"), ("Other", "#8A9183"),
+]
+_EXP_CAT_COLOR = dict(_EXP_CATS)
+_RECEIPT_EXTS = {".jpg", ".jpeg", ".png", ".heic", ".webp", ".gif", ".pdf"}
 
 
-@router.get("/{page}", response_class=HTMLResponse)
-async def soon(request: Request, page: str):
-    ctx = _SOON.get(page)
-    if ctx is None:
-        # unknown sub-page → bounce to Income
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse("/admin/financials", status_code=303)
-    return templates.TemplateResponse(request, "admin/financials_soon.html",
-                                      {**ctx})
+def _to_cents(raw: str) -> int:
+    s = (raw or "").replace("$", "").replace(",", "").strip()
+    return round(float(s) * 100)  # raises ValueError on garbage → caller 400s
+
+
+def _ded(amount_cents: int, pct: int) -> int:
+    return round(amount_cents * pct / 100)
+
+
+@router.get("/expenses", response_class=HTMLResponse)
+async def expenses(request: Request):
+    rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
+    with_receipt = {r["expense_id"] for r in
+                    db.all_("SELECT expense_id FROM receipts WHERE expense_id IS NOT NULL")}
+
+    total = sum(r["amount_cents"] for r in rows)
+    deductible = sum(_ded(r["amount_cents"], r["deductible_pct"]) for r in rows)
+    n_receipts = sum(1 for r in rows if r["id"] in with_receipt)
+
+    cat_tot: dict[str, int] = {}
+    for r in rows:
+        cat_tot[r["category"]] = cat_tot.get(r["category"], 0) + _ded(
+            r["amount_cents"], r["deductible_pct"])
+    max_cat = max(cat_tot.values(), default=0)
+    by_cat = [{"label": k, "amount": _usd(v),
+               "w": f"{round(100 * v / max_cat) if max_cat else 0}%",
+               "color": _EXP_CAT_COLOR.get(k, "#5C6A5E")}
+              for k, v in sorted(cat_tot.items(), key=lambda x: -x[1])]
+
+    cards = [
+        {"label": "Total expenses", "value": _usd(total), "tone": "muted",
+         "sub": f"{len(rows)} logged"},
+        {"label": "Deductible", "value": _usd(deductible), "tone": "ok",
+         "sub": "after per-item %"},
+        {"label": "Receipts on file", "value": f"{n_receipts} / {len(rows)}",
+         "tone": "warn", "sub": f"{len(rows) - n_receipts} missing"
+         if rows else "none yet"},
+        {"label": "Categories", "value": str(len(cat_tot)), "tone": "dark",
+         "sub": "in use"},
+    ]
+    table = [{
+        "id": r["id"], "date": (r["spent_on"] or "")[5:10],
+        "vendor": r["vendor"], "cat": r["category"],
+        "cat_color": _EXP_CAT_COLOR.get(r["category"], "#5C6A5E"),
+        "amount": _usd(r["amount_cents"]),
+        "ded": _usd(_ded(r["amount_cents"], r["deductible_pct"]))
+               + (f" ({r['deductible_pct']}%)" if r["deductible_pct"] < 100 else ""),
+        "has_receipt": r["id"] in with_receipt,
+    } for r in rows]
+
+    return templates.TemplateResponse(request, "admin/financials_expenses.html", {
+        "active": "expenses", "cards": cards, "rows": table, "by_cat": by_cat,
+        "cats": [c for c, _ in _EXP_CATS], "today": dt.date.today().isoformat(),
+    })
+
+
+@router.post("/expenses")
+async def expense_create(spent_on: str = Form(...), vendor: str = Form(...),
+                         category: str = Form("Other"), amount: str = Form(...),
+                         deductible_pct: int = Form(100), notes: str = Form("")):
+    vendor = vendor.strip()
+    if not vendor:
+        raise HTTPException(status_code=400, detail="vendor required")
+    try:
+        cents = _to_cents(amount)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid amount")
+    if cents <= 0:
+        raise HTTPException(status_code=400, detail="amount must be positive")
+    if category not in _EXP_CAT_COLOR:
+        category = "Other"
+    pct = max(0, min(100, deductible_pct))
+    db.run("""INSERT INTO expenses (spent_on, vendor, category, amount_cents,
+                                    deductible_pct, notes)
+              VALUES (?,?,?,?,?,?)""",
+           (spent_on, vendor, category, cents, pct, notes.strip() or None))
+    return RedirectResponse("/admin/financials/expenses", status_code=303)
+
+
+@router.post("/expenses/{expense_id}/delete")
+async def expense_delete(expense_id: int):
+    db.run("DELETE FROM expenses WHERE id=?", (expense_id,))
+    return RedirectResponse("/admin/financials/expenses", status_code=303)
+
+
+@router.get("/expenses.csv", response_class=PlainTextResponse)
+async def expenses_csv():
+    rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
+    out = ["date,vendor,category,amount_usd,deductible_pct,deductible_usd,notes"]
+    for r in rows:
+        amt = f"{r['amount_cents'] / 100:.2f}"
+        ded = f"{_ded(r['amount_cents'], r['deductible_pct']) / 100:.2f}"
+        vendor = '"' + (r["vendor"] or "").replace('"', '""') + '"'
+        notes = '"' + (r["notes"] or "").replace('"', '""') + '"'
+        out.append(f"{r['spent_on']},{vendor},{r['category']},{amt},"
+                   f"{r['deductible_pct']},{ded},{notes}")
+    return "\n".join(out) + "\n"
+
+
+@router.get("/receipts", response_class=HTMLResponse)
+async def receipts(request: Request):
+    rows = db.all_("""SELECT rc.*, e.vendor AS exp_vendor, e.spent_on AS exp_date
+                      FROM receipts rc LEFT JOIN expenses e ON e.id = rc.expense_id
+                      ORDER BY rc.created_at DESC, rc.id DESC""")
+    linked = sum(1 for r in rows if r["expense_id"])
+    cards = [
+        {"label": "Captured", "value": str(len(rows)), "tone": "muted",
+         "sub": "receipt scans"},
+        {"label": "Linked", "value": str(linked), "tone": "dark",
+         "sub": "matched to an expense"},
+        {"label": "Unlinked", "value": str(len(rows) - linked), "tone": "warn",
+         "sub": "attach to an expense"},
+    ]
+    cells = [{
+        "id": r["id"], "filename": r["filename"],
+        "is_pdf": (r["content_type"] or "").endswith("pdf")
+                  or r["filename"].lower().endswith(".pdf"),
+        "linked": bool(r["expense_id"]),
+        "meta": (f"{r['exp_vendor']} · {(r['exp_date'] or '')[:10]}"
+                 if r["expense_id"] else
+                 (r["created_at"] or "")[:10] + " · unlinked"),
+    } for r in rows]
+    # open expenses to offer in the attach dropdown (newest first)
+    exp_opts = [{"id": e["id"],
+                 "label": f"{(e['spent_on'] or '')[5:10]} · {e['vendor']} · {_usd(e['amount_cents'])}"}
+                for e in db.all_(
+                    "SELECT id, spent_on, vendor, amount_cents FROM expenses "
+                    "ORDER BY spent_on DESC, id DESC LIMIT 200")]
+    return templates.TemplateResponse(request, "admin/financials_receipts.html", {
+        "active": "receipts", "cards": cards, "rows": cells, "expenses": exp_opts,
+    })
+
+
+@router.post("/receipts")
+async def receipt_upload(file: UploadFile = File(...),
+                         expense_id: int | None = Form(None)):
+    name = Path(file.filename or "receipt").name
+    ext = Path(name).suffix.lower()
+    if ext not in _RECEIPT_EXTS:
+        raise HTTPException(status_code=400,
+                            detail="receipt must be an image or PDF")
+    if expense_id and not db.one("SELECT id FROM expenses WHERE id=?", (expense_id,)):
+        raise HTTPException(status_code=400, detail="unknown expense")
+    config.RECEIPTS_DIR.mkdir(parents=True, exist_ok=True)
+    stored = f"{uuid.uuid4().hex}{ext}"
+    dest = config.RECEIPTS_DIR / stored
+    size = 0
+    with dest.open("wb") as out:
+        while chunk := await file.read(1 << 20):
+            out.write(chunk)
+            size += len(chunk)
+    db.run("""INSERT INTO receipts (filename, stored, content_type, size_bytes, expense_id)
+              VALUES (?,?,?,?,?)""",
+           (name, stored, file.content_type, size, expense_id or None))
+    return RedirectResponse("/admin/financials/receipts", status_code=303)
+
+
+@router.post("/receipts/{receipt_id}/delete")
+async def receipt_delete(receipt_id: int):
+    rc = db.one("SELECT stored FROM receipts WHERE id=?", (receipt_id,))
+    if rc:
+        (config.RECEIPTS_DIR / rc["stored"]).unlink(missing_ok=True)
+        db.run("DELETE FROM receipts WHERE id=?", (receipt_id,))
+    return RedirectResponse("/admin/financials/receipts", status_code=303)
+
+
+@router.get("/receipts/{receipt_id}/file")
+async def receipt_file(receipt_id: int):
+    rc = db.one("SELECT * FROM receipts WHERE id=?", (receipt_id,))
+    if not rc:
+        raise HTTPException(status_code=404)
+    path = config.RECEIPTS_DIR / rc["stored"]
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type=rc["content_type"] or "application/octet-stream",
+                        filename=rc["filename"])
+
+
+@router.get("/mileage", response_class=HTMLResponse)
+async def mileage(request: Request):
+    rows = db.all_("SELECT * FROM mileage ORDER BY drove_on DESC, id DESC")
+    miles = sum(r["miles"] for r in rows)
+    deduction = sum(round(r["miles"] * r["rate_cents"]) for r in rows)
+    cards = [
+        {"label": "Business miles", "value": f"{miles:,.0f}", "tone": "muted",
+         "sub": f"{len(rows)} trips"},
+        {"label": "Deduction", "value": _usd(deduction), "tone": "dark",
+         "sub": f"at {config.MILEAGE_RATE_CENTS}¢/mi"},
+        {"label": "Trips logged", "value": str(len(rows)), "tone": "ok",
+         "sub": "all confirmed" if rows else "none yet"},
+        {"label": "Current rate", "value": f"{config.MILEAGE_RATE_CENTS}¢",
+         "tone": "warn", "sub": "per mile · 2026 IRS"},
+    ]
+    table = [{
+        "id": r["id"], "date": (r["drove_on"] or "")[5:10],
+        "route": f"{r['from_place']} → {r['to_place']}",
+        "purpose": r["purpose"] or "—", "miles": f"{r['miles']:,.1f}",
+        "ded": _usd(round(r["miles"] * r["rate_cents"])),
+    } for r in rows]
+    return templates.TemplateResponse(request, "admin/financials_mileage.html", {
+        "active": "mileage", "cards": cards, "rows": table,
+        "count": len(rows), "today": dt.date.today().isoformat(),
+        "rate_cents": config.MILEAGE_RATE_CENTS,
+    })
+
+
+@router.post("/mileage")
+async def mileage_create(drove_on: str = Form(...), from_place: str = Form(...),
+                         to_place: str = Form(...), purpose: str = Form(""),
+                         miles: float = Form(...)):
+    from_place, to_place = from_place.strip(), to_place.strip()
+    if not from_place or not to_place:
+        raise HTTPException(status_code=400, detail="from and to required")
+    if miles <= 0:
+        raise HTTPException(status_code=400, detail="miles must be positive")
+    db.run("""INSERT INTO mileage (drove_on, from_place, to_place, purpose, miles, rate_cents)
+              VALUES (?,?,?,?,?,?)""",
+           (drove_on, from_place, to_place, purpose.strip() or None, miles,
+            config.MILEAGE_RATE_CENTS))
+    return RedirectResponse("/admin/financials/mileage", status_code=303)
+
+
+@router.post("/mileage/{trip_id}/delete")
+async def mileage_delete(trip_id: int):
+    db.run("DELETE FROM mileage WHERE id=?", (trip_id,))
+    return RedirectResponse("/admin/financials/mileage", status_code=303)
+
+
+@router.get("/mileage.csv", response_class=PlainTextResponse)
+async def mileage_csv():
+    rows = db.all_("SELECT * FROM mileage ORDER BY drove_on DESC, id DESC")
+    out = ["date,from,to,purpose,miles,rate_usd,deduction_usd"]
+    for r in rows:
+        rate = f"{r['rate_cents'] / 100:.2f}"
+        ded = f"{round(r['miles'] * r['rate_cents']) / 100:.2f}"
+        frm = '"' + (r["from_place"] or "").replace('"', '""') + '"'
+        to = '"' + (r["to_place"] or "").replace('"', '""') + '"'
+        purpose = '"' + (r["purpose"] or "").replace('"', '""') + '"'
+        out.append(f"{r['drove_on']},{frm},{to},{purpose},{r['miles']:.1f},{rate},{ded}")
+    return "\n".join(out) + "\n"

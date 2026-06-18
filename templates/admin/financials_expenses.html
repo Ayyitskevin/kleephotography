@@ -1,0 +1,103 @@
+{% extends "admin/base_admin.html" %}
+{# Expenses — REAL operator-entered ledger. No fabricated tax set-aside goal or
+   1099 watch (Mise has no data for those); deductible % is a per-row input. #}
+{% block topbar %}
+<div class="pgtop">
+  <div class="pgtop-lead">
+    <h1>Expenses &amp; deductions</h1>
+    <p class="pgtop-sub">Every business expense, logged for the write-off</p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/financials/expenses.csv">Export CSV &darr;</a>
+  </div>
+</div>
+{% endblock %}
+{% block admin_body %}
+<div class="fin-wrap">
+  {% include "admin/_money_nav.html" %}
+
+  <section class="fin-summary fin-summary-4">
+    {% for c in cards %}
+    <div class="fin-card fin-card-{{ c.tone }}">
+      <span class="fin-card-label">{{ c.label }}</span>
+      <div class="fin-card-val">{{ c.value }}</div>
+      <span class="fin-card-sub">{{ c.sub }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <div class="fin-cols">
+    <section class="fin-panel">
+      <div class="fin-panel-head"><h2 class="fin-h2">Expense log</h2></div>
+      <div class="fin-tbl-scroll">
+        <table class="fin-tbl">
+          <thead><tr>
+            <th>Date</th><th>Vendor</th><th>Category</th>
+            <th class="fin-num">Amount</th><th class="fin-num">Deductible</th>
+            <th>Receipt</th><th></th>
+          </tr></thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td class="fin-muted">{{ r.date }}</td>
+              <td class="fin-strong">{{ r.vendor }}</td>
+              <td><span class="fin-cat"><span class="fin-cat-dot" style="background: {{ r.cat_color }};"></span>{{ r.cat }}</span></td>
+              <td class="fin-num fin-strong">{{ r.amount }}</td>
+              <td class="fin-num fin-net">{{ r.ded }}</td>
+              <td>{% if r.has_receipt %}<span class="fin-pill fin-pill-paid">&checkmark; Receipt</span>{% else %}<span class="fin-pill fin-pill-out">Missing</span>{% endif %}</td>
+              <td class="fin-num">
+                <form method="post" action="/admin/financials/expenses/{{ r.id }}/delete"
+                      onsubmit="return confirm('Delete this expense?');">
+                  <button class="fin-del" type="submit" title="Delete">&times;</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="fin-empty-row">No expenses logged yet — add one on the right.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="fin-rail">
+      <section class="fin-form-card">
+        <h2 class="fin-h2">Add expense</h2>
+        <form method="post" action="/admin/financials/expenses" class="fin-form">
+          <label>Date <input type="date" name="spent_on" value="{{ today }}" required></label>
+          <label>Vendor <input type="text" name="vendor" placeholder="B&amp;H Photo" required></label>
+          <label>Category
+            <select name="category">
+              {% for c in cats %}<option value="{{ c }}"{% if c == 'Other' %} selected{% endif %}>{{ c }}</option>{% endfor %}
+            </select></label>
+          <div class="fin-form-row">
+            <label>Amount <input type="text" name="amount" inputmode="decimal" placeholder="124.00" required></label>
+            <label>Deductible % <input type="number" name="deductible_pct" min="0" max="100" value="100"></label>
+          </div>
+          <label>Notes <input type="text" name="notes" placeholder="Optional"></label>
+          <button type="submit">+ Add expense</button>
+        </form>
+      </section>
+
+      {% if by_cat %}
+      <section class="fin-form-card">
+        <h2 class="fin-h2">Write-offs by category</h2>
+        {% for c in by_cat %}
+        <div class="fin-bycat">
+          <div class="fin-bycat-top">
+            <span class="fin-bycat-label">{{ c.label }}</span>
+            <span class="fin-bycat-amt">{{ c.amount }}</span>
+          </div>
+          <div class="fin-bycat-bar"><div class="fin-bycat-fill" style="width: {{ c.w }}; background: {{ c.color }};"></div></div>
+        </div>
+        {% endfor %}
+      </section>
+      {% endif %}
+    </aside>
+  </div>
+
+  <p class="fin-note">This is your own bookkeeping — operator-entered, not pulled from
+    any bank or card. Deductible % is yours to set per item (meals are typically 50%).
+    Keep the receipts; the Receipts tab stores the scans and links them here.</p>
+</div>
+{% endblock %}
