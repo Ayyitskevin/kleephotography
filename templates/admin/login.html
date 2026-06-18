@@ -1,12 +1,29 @@
 {% extends "base_cream.html" %}
 {% block title %}Admin · {{ site_name }}{% endblock %}
+{% block cream_head %}
+<link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
+{% endblock %}
 {% block content %}
-<main class="center-card">
-  <h1>Kevin Lee admin</h1>
-  <form method="post" action="/admin/login" class="pin-form">
-    <input type="password" name="password" placeholder="Password" autofocus required>
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
-    <button type="submit">Sign in</button>
-  </form>
+<main class="login-wrap">
+  <div class="login-stack">
+    <div class="login-brand">
+      <span class="login-crest">K</span>
+      <div class="login-word">
+        <div class="login-name">Kevin <span>Lee</span></div>
+        <div class="login-eyebrow">Studio admin</div>
+      </div>
+    </div>
+
+    <form method="post" action="/admin/login" class="login-card">
+      <label for="login-pw">Password</label>
+      <input id="login-pw" type="password" name="password" autofocus required
+             autocomplete="current-password" placeholder="••••••••••">
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <button type="submit">Sign in</button>
+      <p class="login-note">Also gated by Cloudflare Access · per-IP lockout after 5 tries</p>
+    </form>
+
+    <p class="login-foot">Self-hosted · {{ base_url|replace("https://", "")|replace("http://", "") }}</p>
+  </div>
 </main>
 {% endblock %}

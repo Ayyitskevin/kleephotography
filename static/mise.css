@@ -4015,3 +4015,55 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 @media (max-width: 560px) {
   .admin-shell .pt-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================================
+   ADMIN LOGIN  —  1:1 of the "Admin Login" prototype, forest/gold live palette
+   ========================================================================== */
+.cream-theme .login-wrap {
+  min-height: 100vh; display: grid; place-items: center; padding: 24px;
+  background: radial-gradient(120% 90% at 50% 0%, #1c4a3a 0%, #143C2F 55%, #0f2f25 100%);
+  font-family: 'Archivo', system-ui, sans-serif;
+}
+.login-stack { width: 100%; max-width: 380px; text-align: center; }
+.login-brand {
+  display: inline-flex; flex-direction: column; align-items: center;
+  gap: 12px; margin-bottom: 26px;
+}
+.login-crest {
+  width: 52px; height: 52px; border-radius: 14px; background: #E0A43B; color: #143C2F;
+  display: grid; place-items: center;
+  font-family: 'Newsreader', Georgia, serif; font-weight: 600; font-size: 1.7rem;
+}
+.login-word { line-height: 1.1; }
+.login-name { font-family: 'Newsreader', Georgia, serif; font-size: 1.5rem; color: #F3F0E2; }
+.login-name span { color: #E0A43B; }
+.login-eyebrow {
+  font: 600 0.58rem/1 'Archivo', sans-serif; letter-spacing: 0.3em;
+  text-transform: uppercase; color: #6f9080; margin-top: 6px;
+}
+.login-card {
+  background: #FFFEF8; border-radius: 16px; padding: 28px 26px;
+  box-shadow: 0 40px 80px -40px rgba(0,0,0,0.6); text-align: left;
+}
+.login-card label {
+  display: block; font: 600 0.74rem/1 'Archivo', sans-serif; color: #5C6A5E;
+}
+.login-card input[type=password] {
+  width: 100%; margin: 9px 0 16px; padding: 12px 14px;
+  border: 1px solid #E1DDCE; border-radius: 10px; background: #FAF6EC;
+  font: 500 1rem 'Archivo', sans-serif; color: #18241E; outline: none;
+  letter-spacing: 0.04em;
+}
+.login-card input[type=password]:focus { border-color: #143C2F; }
+.login-card button {
+  width: 100%; padding: 0.95em; margin: 0; background: #143C2F; color: #F3F0E2;
+  border: 0; border-radius: 11px; font: 600 0.9rem/1 'Archivo', sans-serif; cursor: pointer;
+}
+.login-card .error { margin: 0 0 12px; }
+.login-note {
+  margin: 16px 0 0; font: 500 0.74rem/1.5 'Archivo', sans-serif;
+  color: #8A9183; text-align: center;
+}
+.login-foot {
+  margin: 20px 0 0; font: 500 0.74rem/1 'Archivo', sans-serif; color: #6f9080;
+}
