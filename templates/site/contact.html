@@ -2,61 +2,94 @@
 {% block title %}Contact — {{ site_name }}{% endblock %}
 {% block site_content %}
 
-<section class="page-hero">
-  <div class="page-hero-inner" data-reveal>
+<section class="contact-wrap">
+  {# LEFT — sticky intro + real contact channels + a food frame #}
+  <aside class="contact-aside" data-reveal>
     <p class="eyebrow">Contact</p>
-    <h1>Let's make your menu <span class="it-accent">look hungry.</span></h1>
+    <h1>Work with <span class="it-accent">me.</span></h1>
     <p class="lede">Tell me about your business and what you need — the more you
        share, the faster I can send a tailored quote, usually within a business
        day.</p>
+
+    <div class="contact-details">
+      {% if contact_email %}
+      <div class="contact-detail">
+        <span class="cd-label">Email</span>
+        <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
+      </div>
+      {% endif %}
+      <div class="contact-detail">
+        <span class="cd-label">Studio</span>
+        <span>Asheville &amp; Western North Carolina</span>
+      </div>
+      {% if instagram_url %}
+      <div class="contact-detail">
+        <span class="cd-label">Social</span>
+        <a href="{{ instagram_url }}" rel="me noopener noreferrer" target="_blank">Instagram</a>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if featured %}
+    <div class="contact-photo" data-reveal>
+      <img src="/site/img/{{ featured[0].id }}?variant=web" loading="lazy" decoding="async"
+           srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
+           sizes="(max-width: 900px) 100vw, 38vw"
+           alt="{{ featured[0]|portfolio_alt }}">
+    </div>
+    {% endif %}
+  </aside>
+
+  {# RIGHT — the real quote-request form, unchanged in scope #}
+  <div class="contact-card" data-reveal>
+    {% if sent %}
+    <p class="sent-note">Thanks — your inquiry's in. I'll get back to you within
+       a business day.</p>
+    {% else %}
+    <form method="post" action="/contact" class="stack-form contact-form">
+      <label>Name <input type="text" name="name" required></label>
+      <label>Email <input type="email" name="email" required></label>
+      <label>Business <input type="text" name="business"
+             value="{{ prefill.business if prefill else '' }}"
+             placeholder="Restaurant / café / brand name"></label>
+      <label>Project type
+        <select name="service">
+          <option value="">Not sure yet — help me choose</option>
+          <option value="Photography"{% if prefill and prefill.service == 'Photography' %} selected{% endif %}>Photography</option>
+          <option value="Videography"{% if prefill and prefill.service == 'Videography' %} selected{% endif %}>Videography</option>
+          <option value="Photography + Videography"{% if prefill and prefill.service == 'Photography + Videography' %} selected{% endif %}>Photography + Videography</option>
+          <option value="Brand Partner (monthly retainer)"{% if prefill and prefill.service == 'Brand Partner (monthly retainer)' %} selected{% endif %}>Brand Partner (monthly retainer)</option>
+        </select></label>
+      <label>Target date <input type="date" name="shoot_date"></label>
+      <label>How many dishes or setups? <input type="text" name="dish_count"
+             placeholder="e.g. 12 dishes, 2 cocktails, full menu"></label>
+      <label>Usage / licensing
+        <select name="usage">
+          <option value="">Standard — web &amp; social</option>
+          <option value="Extended — advertising / paid media">Extended — advertising / paid media</option>
+          <option value="Exclusive / talent release">Exclusive / talent release</option>
+          <option value="Not sure">Not sure</option>
+        </select></label>
+      <label>Budget range
+        <select name="budget">
+          <option value="">Prefer to discuss</option>
+          <option value="Under $1,000">Under $1,000</option>
+          <option value="$1,000–$2,500">$1,000–$2,500</option>
+          <option value="$2,500–$5,000">$2,500–$5,000</option>
+          <option value="$5,000+">$5,000+</option>
+        </select></label>
+      <label>Message <textarea name="message" rows="6" required
+             placeholder="What are we shooting?">{{ prefill.message if prefill else '' }}</textarea></label>
+      <input type="text" name="website" class="hp-field" tabindex="-1"
+             autocomplete="off" aria-hidden="true">
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <button type="submit">Send inquiry</button>
+    </form>
+    {% endif %}
   </div>
 </section>
 
-<section class="page-body" data-reveal>
-  {% if sent %}
-  <p class="sent-note">Thanks — your inquiry's in. I'll get back to you within
-     a business day.</p>
-  {% else %}
-  <form method="post" action="/contact" class="stack-form contact-form">
-    <label>Name <input type="text" name="name" required></label>
-    <label>Email <input type="email" name="email" required></label>
-    <label>Business <input type="text" name="business"
-           value="{{ prefill.business if prefill else '' }}"
-           placeholder="Restaurant / café / brand name"></label>
-    <label>Project type
-      <select name="service">
-        <option value="">Not sure yet — help me choose</option>
-        <option value="Photography"{% if prefill and prefill.service == 'Photography' %} selected{% endif %}>Photography</option>
-        <option value="Videography"{% if prefill and prefill.service == 'Videography' %} selected{% endif %}>Videography</option>
-        <option value="Photography + Videography"{% if prefill and prefill.service == 'Photography + Videography' %} selected{% endif %}>Photography + Videography</option>
-        <option value="Brand Partner (monthly retainer)"{% if prefill and prefill.service == 'Brand Partner (monthly retainer)' %} selected{% endif %}>Brand Partner (monthly retainer)</option>
-      </select></label>
-    <label>Target date <input type="date" name="shoot_date"></label>
-    <label>How many dishes or setups? <input type="text" name="dish_count"
-           placeholder="e.g. 12 dishes, 2 cocktails, full menu"></label>
-    <label>Usage / licensing
-      <select name="usage">
-        <option value="">Standard — web &amp; social</option>
-        <option value="Extended — advertising / paid media">Extended — advertising / paid media</option>
-        <option value="Exclusive / talent release">Exclusive / talent release</option>
-        <option value="Not sure">Not sure</option>
-      </select></label>
-    <label>Budget range
-      <select name="budget">
-        <option value="">Prefer to discuss</option>
-        <option value="Under $1,000">Under $1,000</option>
-        <option value="$1,000–$2,500">$1,000–$2,500</option>
-        <option value="$2,500–$5,000">$2,500–$5,000</option>
-        <option value="$5,000+">$5,000+</option>
-      </select></label>
-    <label>Message <textarea name="message" rows="6" required
-           placeholder="What are we shooting?">{{ prefill.message if prefill else '' }}</textarea></label>
-    <input type="text" name="website" class="hp-field" tabindex="-1"
-           autocomplete="off" aria-hidden="true">
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
-    <button type="submit">Send inquiry</button>
-  </form>
-  {% endif %}
+<section class="contact-faq">
   {% include "site/_faq.html" %}
 </section>
 {% endblock %}

@@ -295,7 +295,8 @@ async def portfolio(request: Request):
 
 @router.get("/about", response_class=HTMLResponse)
 async def about(request: Request):
-    return templates.TemplateResponse(request, "site/about.html")
+    return templates.TemplateResponse(request, "site/about.html",
+                                      {"featured": _portfolio_assets()[:1]})
 
 
 @router.get("/press", response_class=HTMLResponse)
@@ -318,7 +319,8 @@ async def contact(request: Request):
     pf = _contact_prefill(request)
     return templates.TemplateResponse(request, "site/contact.html",
                                       {"sent": False, "error": None,
-                                       "prefill": pf})
+                                       "prefill": pf,
+                                       "featured": _portfolio_assets()[:1]})
 
 
 @router.post("/contact", response_class=HTMLResponse)

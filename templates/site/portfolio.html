@@ -67,8 +67,20 @@
   </section>
   {% endif %}
 
-  <p class="center"><a class="btn" href="/contact">Request a quote</a></p>
 </main>
+
+{# CLOSING CTA #}
+<section class="cta">
+  <div class="cta-inner" data-reveal>
+    <h2>Let's add your restaurant to <span class="it-accent">the archive.</span></h2>
+    <p>Send your menu and your goal. Tailored proposal back within a business day.</p>
+    <div class="cta-actions">
+      <a class="btn-pill" href="/contact">Request a quote &rarr;</a>
+      <a class="btn-ghost" href="/services">See services &amp; tiers</a>
+    </div>
+  </div>
+</section>
+
 {% include "site/_lightbox.html" %}
 {% if tags %}
 <script>

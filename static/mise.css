@@ -927,6 +927,66 @@ progress { width: 100%; }
   border-radius: 10px; padding: 1rem 1.2rem; }
 .center { text-align: center; }
 
+/* ---- /about — editorial intro, process, stats band ---- */
+.ab-intro { padding: clamp(120px, 16vh, 175px) clamp(20px, 6vw, 88px) 0; }
+.ab-intro-grid { max-width: 1320px; margin: 0 auto; display: grid;
+  grid-template-columns: 1.1fr 0.9fr; gap: clamp(28px, 5vw, 70px); align-items: end; }
+.ab-intro h1 { margin: 0; font-family: var(--serif); font-weight: 400;
+  font-size: clamp(2.4rem, 5.4vw, 4.4rem); line-height: 1.0; letter-spacing: -0.022em; }
+.ab-photo { aspect-ratio: 4/5; }
+.ab-body { max-width: 720px; margin: 0 auto; padding: clamp(48px, 7vw, 90px) clamp(20px, 6vw, 88px) 0;
+  display: flex; flex-direction: column; gap: 22px; }
+.ab-body p { margin: 0; font-size: 1.08rem; line-height: 1.72; color: var(--ink-soft); }
+.ab-body .ab-lead { font-size: 1.18rem; line-height: 1.7; color: var(--ink); }
+.ab-proc { padding: clamp(64px, 9vw, 120px) clamp(20px, 6vw, 88px); max-width: 1320px;
+  margin: 0 auto; }
+.ab-proc .eyebrow { margin: 0 0 clamp(28px, 4vw, 48px); }
+.proc-grid { display: grid; gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.proc-card { background: var(--card); border: 1px solid #e3dacb; border-radius: 14px;
+  padding: 30px 26px; }
+.proc-num { font-family: var(--serif); font-size: 2.4rem; color: var(--accent-lt); }
+.proc-card h3 { margin: 14px 0 10px; font-family: var(--serif); font-weight: 500;
+  font-size: 1.4rem; color: var(--ink); }
+.proc-card p { margin: 0; color: var(--muted); line-height: 1.6; font-size: 0.97rem; }
+.ab-stats { padding: clamp(56px, 8vw, 100px) clamp(20px, 6vw, 88px);
+  background: var(--espresso); color: #f2e9dc; }
+.ab-stats-grid { max-width: 1320px; margin: 0 auto; display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 32px; }
+.ab-stats-lead { grid-column: 1 / -1; max-width: 30em; }
+.ab-stats-lead h2 { margin: 0; font-family: var(--serif); font-weight: 400;
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem); line-height: 1.1; color: var(--cream); }
+.ab-stats-lead p { margin: 16px 0 8px; color: #c7bba9; line-height: 1.6; }
+.ab-stat b { display: block; font-family: var(--serif); font-weight: 400;
+  font-size: 2.4rem; color: var(--accent-lt); }
+.ab-stat span { font: 500 0.78rem/1 var(--sans); letter-spacing: 0.06em;
+  text-transform: uppercase; color: #c7bba9; }
+
+/* ---- /contact — 2-column editorial (sticky aside + form card) ---- */
+.contact-wrap { max-width: 1320px; margin: 0 auto;
+  padding: clamp(120px, 16vh, 175px) clamp(20px, 6vw, 88px) 0;
+  display: grid; grid-template-columns: 0.85fr 1.15fr;
+  gap: clamp(32px, 5vw, 72px); align-items: start; }
+.contact-aside { position: sticky; top: 96px; align-self: start; }
+.contact-aside h1 { margin: 0; font-family: var(--serif); font-weight: 400;
+  font-size: clamp(2.2rem, 5vw, 3.8rem); line-height: 1.0; letter-spacing: -0.022em; }
+.contact-aside .lede { margin: 22px 0 0; max-width: 32em; font-size: 1.05rem;
+  line-height: 1.62; color: var(--ink-soft); }
+.contact-details { margin: 30px 0 0; display: flex; flex-direction: column; gap: 18px; }
+.contact-detail { display: flex; flex-direction: column; gap: 3px; }
+.cd-label { font: 600 0.68rem/1 var(--sans); letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--muted); }
+.contact-detail a { color: var(--accent); text-decoration: none; }
+.contact-detail a:hover { text-decoration: underline; }
+.contact-photo { margin-top: 32px; aspect-ratio: 16/10; border-radius: 8px;
+  overflow: hidden; background: #e0d6c8; }
+.contact-photo img { width: 100%; height: 100%; object-fit: cover; }
+.contact-card { background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: clamp(24px, 4vw, 40px);
+  box-shadow: 0 30px 60px -42px rgba(59,26,35,0.4); }
+.contact-faq { max-width: 1320px; margin: 0 auto;
+  padding: clamp(40px, 6vw, 80px) clamp(20px, 6vw, 88px) 0; }
+
 /* ---- footer (dark, 4-column) ---- */
 .site-footer { background: var(--espresso); color: #c7bba9; margin-top: 0;
   padding: clamp(56px, 7vw, 90px) clamp(20px, 6vw, 88px) 36px; text-align: left;
@@ -964,6 +1024,9 @@ progress { width: 100%; }
   .hero-photo { order: -1; }
   .delivery-grid { grid-template-columns: 1fr; }
   .about-grid { grid-template-columns: 1fr; }
+  .ab-intro-grid { grid-template-columns: 1fr; }
+  .contact-wrap { grid-template-columns: 1fr; }
+  .contact-aside { position: static; top: auto; }
   .footer-grid { grid-template-columns: 1fr 1fr; }
   .work-grid .tile:nth-child(3n+1),
   .work-grid .tile:nth-child(3n+2),

@@ -2,28 +2,87 @@
 {% block title %}About — {{ site_name }}{% endblock %}
 {% block site_content %}
 
-<section class="page-hero">
-  <div class="page-hero-inner" data-reveal>
-    <p class="eyebrow">About</p>
-    <h1>Food &amp; drink, <span class="it-accent">made irresistible.</span></h1>
-    <p class="lede">I'm Kevin Lee. It's the only work I take — the light, the
-       steam, the pour, shot to look the way it tastes.</p>
+{# INTRO — headline + a real food frame (no fabricated portrait) #}
+<section class="ab-intro">
+  <div class="ab-intro-grid">
+    <div data-reveal>
+      <p class="eyebrow">About</p>
+      <h1>I'm Kevin Lee, and I only shoot
+        <span class="it-accent">food &amp; drink.</span></h1>
+    </div>
+    {% if featured %}
+    <div class="about-photo ab-photo" data-reveal>
+      <img src="/site/img/{{ featured[0].id }}?variant=web" loading="lazy" decoding="async"
+           srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
+           sizes="(max-width: 900px) 100vw, 40vw"
+           alt="{{ featured[0]|portfolio_alt }}">
+    </div>
+    {% endif %}
   </div>
 </section>
 
-<section class="page-body" data-reveal>
-  <p>Shoots are planned around your service, not against it. We scout the
-     menu, build a shot list, and work fast — your kitchen has better things
-     to do than wait on a photographer.</p>
-  <h2>How a shoot day runs</h2>
-  <ol class="about-steps">
-    <li><strong>Scout</strong> — menu walk-through, shot list, and timing around your service.</li>
-    <li><strong>Shoot</strong> — natural light first; styled only when the dish needs it.</li>
-    <li><strong>Deliver</strong> — private gallery same week; proof favorites, full-res, social crops.</li>
-  </ol>
-  <p>Delivery is a private gallery: pick favorites, download full-res, grab
-     social crops sized for every platform.</p>
-  <p><a class="btn" href="/contact">Let's talk about your menu</a>
-     <a class="btn-ghost" href="/book" style="margin-left:0.6rem;">Book a call</a></p>
+{# BODY #}
+<section class="ab-body" data-reveal>
+  <p class="ab-lead">Restaurants, cafés, bars, and food brands are the only work
+     I take — because making food look honest and irresistible is a craft of its
+     own: the light, the steam, the pour, the thirty seconds before a dish stops
+     looking alive.</p>
+  <p>Shoots are planned around your service, not against it. We scout the menu
+     together, build a shot list, and work fast on the day — your kitchen has
+     better things to do than wait on a photographer.</p>
+  <p>Delivery is a private online gallery: pick your favorites, download
+     full-resolution files, and grab social-ready crops in square, portrait, and
+     story formats — already sized for every platform.</p>
+</section>
+
+{# PROCESS #}
+<section class="ab-proc">
+  <p class="eyebrow" data-reveal>How a shoot runs</p>
+  <div class="proc-grid">
+    <div class="proc-card" data-reveal>
+      <span class="proc-num">01</span>
+      <h3>Scout the menu</h3>
+      <p>We go through the menu together, agree on the hero dishes and drinks,
+         and build a shot list around your service window.</p>
+    </div>
+    <div class="proc-card" data-reveal>
+      <span class="proc-num">02</span>
+      <h3>Shoot fast, on the day</h3>
+      <p>Natural light first, styling minimal and honest. I work around the
+         kitchen — most full menus wrap between lunch and dinner.</p>
+    </div>
+    <div class="proc-card" data-reveal>
+      <span class="proc-num">03</span>
+      <h3>Deliver same week</h3>
+      <p>A private gallery lands within the week: full-res downloads, favorites,
+         and social crops already sized for every platform.</p>
+    </div>
+  </div>
+</section>
+
+{# SERVICE AREA + STATS (approved figures only) #}
+<section class="ab-stats">
+  <div class="ab-stats-grid" data-reveal>
+    <div class="ab-stats-lead">
+      <h2>Based in Asheville. On the road across Western North Carolina.</h2>
+      <p>Charlotte, Raleigh, and Wilmington are regulars too — travel is easy to
+         fold into a quote.</p>
+    </div>
+    <div class="ab-stat"><b>120+</b><span>Menus shot</span></div>
+    <div class="ab-stat"><b>Same week</b><span>Gallery delivery</span></div>
+    <div class="ab-stat"><b>1:1 · 4:5 · 9:16</b><span>Social crops included</span></div>
+  </div>
+</section>
+
+{# CTA #}
+<section class="cta">
+  <div class="cta-inner" data-reveal>
+    <h2>Let's talk about <span class="it-accent">your menu.</span></h2>
+    <p>Send your menu and your goal. Tailored proposal back within a business day.</p>
+    <div class="cta-actions">
+      <a class="btn-pill" href="/contact">Work with me &rarr;</a>
+      <a class="btn-ghost" href="/portfolio">View the portfolio</a>
+    </div>
+  </div>
 </section>
 {% endblock %}
