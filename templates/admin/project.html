@@ -1,24 +1,24 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ p.title }} · Studio · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>{{ p.title }}</h1>
+    <p class="pgtop-sub">{{ p.client_name }} · {{ p.status }}{% if p.shoot_date %} · {{ p.shoot_date }}{% endif %}</p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/studio/clients/{{ p.client_id }}">Client <span aria-hidden="true">&rarr;</span></a>
+    <a class="pgtop-link" href="/admin/studio">Studio <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-
-    <div class="admin-bar">
-      <div>
-        <span class="eyebrow">Project</span>
-        <h1>{{ p.title }}</h1>
-      </div>
-      <nav aria-label="Breadcrumb">
-        <a href="/admin/studio/clients/{{ p.client_id }}">{{ p.client_name }}</a> ·
-        <a href="/admin/studio">Studio</a>
-      </nav>
-    </div>
 
     {% set _cur = statuses.index(p.status) if p.status in statuses else -1 %}
     <header class="project-head">
       <div class="ph-top">
         <div>
-          <h1>{{ p.title }}</h1>
           <div class="ph-client">
             <a href="/admin/studio/clients/{{ p.client_id }}">{{ p.client_name }}</a>
           </div>
