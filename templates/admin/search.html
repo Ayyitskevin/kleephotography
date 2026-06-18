@@ -1,14 +1,18 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Search · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Search</h1>
+    <p class="pgtop-sub">
+      {% if q %}<b>{{ total }}</b> result{{ "s" if total != 1 }} for “{{ q }}”
+      {% else %}Clients, projects, proposals, invoices, galleries{% endif %}
+    </p>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <div>
-      <h1>Search</h1>
-      {% if q %}<p class="muted">{{ total }} result{{ "s" if total != 1 }} for “{{ q }}”</p>{% endif %}
-    </div>
-  </div>
-
   <form method="get" action="/admin/search" class="search-page-form" role="search">
     <input type="search" name="q" value="{{ q }}" autofocus
            placeholder="Clients, projects, proposals, invoices, galleries…">
