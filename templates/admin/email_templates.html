@@ -1,18 +1,29 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Email templates · Studio · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Email templates</h1>
+    <p class="pgtop-sub">
+      {% if rows %}<b>{{ rows|length }}</b> reusable snippet{{ "s" if rows|length != 1 }} for client sends
+      {% else %}Reusable email snippets — nothing auto-sends{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/studio">&larr; Studio</a>
+    <a class="pgtop-new" href="#new-template"><span class="qc-plus" aria-hidden="true">+</span> New template</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1><a href="/admin/studio">&larr;</a> Email templates</h1>
-  </div>
-
   <p class="muted">Reusable email snippets for client sends. Pick one on a
     proposal, contract, or invoice and it fills the subject and message — you
     still review and click Send. Nothing auto-sends.</p>
   <p class="muted">Merge fields (resolve at send time):
     {% for f in merge_fields %}<code>{{ "{" }}{{ f }}{{ "}" }}</code>{% if not loop.last %} {% endif %}{% endfor %}</p>
 
-  <h2>New template</h2>
+  <h2 id="new-template">New template</h2>
   <form method="post" action="/admin/studio/email-templates" class="stack-form" style="max-width:680px">
     <label>Name <input type="text" name="name" required placeholder="Proposal ready"></label>
     <label>Subject <input type="text" name="subject" required

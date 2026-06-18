@@ -685,7 +685,7 @@ def test_captured_emails(admin):
     # chef@bistro.com was captured by the download gate in the full flow above
     r = admin.get("/admin/emails")
     assert r.status_code == 200 and "chef@bistro.com" in r.text
-    assert "Test Bistro" in r.text and "1 unique" in r.text
+    assert "Test Bistro" in r.text and "<b>1</b> unique" in r.text
     assert admin.get("/admin/emails.txt").text == "chef@bistro.com\n"
     # admin-gated like the rest of /admin
     with TestClient(app) as anon:
