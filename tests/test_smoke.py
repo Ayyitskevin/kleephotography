@@ -3763,7 +3763,8 @@ def test_client_lifetime_rollup(admin):
     cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Rollup Cafe",))
     r = admin.get(f"/admin/studio/clients/{cid}")
     assert r.status_code == 200
-    assert "lifetime-rollup" not in r.text
+    # rollup now lives in the .pgtop topbar subtitle; absent when there's no money/delivery
+    assert "paid lifetime" not in r.text
 
     # one closed project, one archived (both count as delivered), one inquiry (doesn't)
     pid = db.run("INSERT INTO projects (client_id, title, status) VALUES (?,?,?)",
@@ -3783,13 +3784,13 @@ def test_client_lifetime_rollup(admin):
            (iid, 40000, "deposit"))
 
     r = admin.get(f"/admin/studio/clients/{cid}")
-    s_start = r.text.index('class="muted lifetime-rollup"')
+    s_start = r.text.index('class="pgtop-sub"')
     sec = r.text[s_start:r.text.index("</p>", s_start)]
-    assert "$400.00</strong> paid lifetime" in sec
+    assert "$400.00</b> paid lifetime" in sec
     assert "$1000.00 invoiced" in sec       # draft's $999.99 excluded
     assert "across 1 invoice" in sec        # draft not counted
     assert "$600.00 outstanding" in sec
-    assert "<strong>2</strong> shoots delivered" in sec  # delivered + archived, not lead
+    assert "<b>2</b> shoots delivered" in sec  # delivered + archived, not lead
 
 
 def test_testimonials(admin):
