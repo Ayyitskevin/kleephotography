@@ -2921,26 +2921,48 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 /* Lift the content cap a touch — the dashboard wants two real columns. */
 .admin-shell .admin-main.dash { max-width: 1240px; }
 
-/* ── Greeting bar ───────────────────────────────────────────────────────── */
-.admin-shell .dash .admin-bar { align-items: center; }
-.admin-shell .dash-hello h1 { margin: 0; }
-.admin-shell .dash-hello p {
-  margin: .25rem 0 0; font-size: .85rem; font-weight: 500; color: var(--ink-faint);
+/* ── Dashboard top bar — prototype strict-1:1 sticky chrome ──────────────── */
+/* greeting+date (left) · inline search (center) · Sign out + oxblood +New     */
+.admin-shell .dash-top {
+  display: flex; align-items: center; gap: clamp(.9rem, 2vw, 2rem);
+  background: rgba(245, 243, 235, .82);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  padding: 18px clamp(20px, 3vw, 40px);
 }
-.admin-shell .dash-bar-actions {
-  display: flex; align-items: center; gap: 1rem;
+.admin-shell .dash-top-lead h1 { margin: 0; font-size: 1.6rem; line-height: 1.1; }
+.admin-shell .dash-top-lead p {
+  margin: .2rem 0 0; font-size: .82rem; font-weight: 500; color: var(--ink-faint); white-space: nowrap;
 }
+.admin-shell .dash-search { position: relative; flex: 1; max-width: 440px; }
+.admin-shell .dash-search-ic {
+  position: absolute; left: .85rem; top: 50%; transform: translateY(-50%);
+  font-size: 1rem; color: var(--ink-faint); pointer-events: none;
+}
+.admin-shell .dash-search input {
+  width: 100%; box-sizing: border-box;
+  padding: .6rem 1rem .6rem 2.3rem;
+  background: #FFFEF8; border: 1px solid #E1DDCE; border-radius: 999px;
+  font: inherit; font-size: .88rem; color: var(--ink);
+}
+.admin-shell .dash-search input::placeholder { color: var(--ink-faint); }
+.admin-shell .dash-search input:focus {
+  outline: none; border-color: #143C2F; box-shadow: 0 0 0 3px rgba(20, 60, 47, .08);
+}
+.admin-shell .dash-top-actions { display: flex; align-items: center; gap: 1rem; margin-left: auto; }
+.admin-shell .dash-qc { position: relative; }
 .admin-shell .dash-signout {
   background: none; border: 0; padding: 0; cursor: pointer;
-  font: inherit; font-size: .85rem; font-weight: 500; color: var(--ink-soft);
+  font: inherit; font-size: .85rem; font-weight: 500; color: var(--ink-soft); white-space: nowrap;
 }
 .admin-shell .dash-signout:hover { color: var(--terra); text-decoration: underline; text-underline-offset: 2px; }
 .admin-shell .dash-new {
-  display: inline-flex; align-items: center; gap: .4rem;
-  background: var(--terra); color: #fff; border: 0; border-radius: 999px;
-  padding: .55rem 1.1rem; font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer;
+  list-style: none; display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--terra); color: #F3F0E2; border: 0; border-radius: 999px;
+  padding: .55rem 1.1rem; font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
-.admin-shell .dash-new:hover { background: var(--terra-deep); text-decoration: none; color: #fff; }
+.admin-shell .dash-new::-webkit-details-marker { display: none; }
+.admin-shell .dash-new:hover { background: var(--terra-deep); text-decoration: none; color: #F3F0E2; }
+.admin-shell .qc-plus { font-size: 1.05rem; line-height: 1; }
 
 /* ── KPI strip ──────────────────────────────────────────────────────────── */
 .admin-shell .dash-kpis {
@@ -3112,9 +3134,15 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   .admin-shell .dash-grid { grid-template-columns: 1fr; }
   .admin-shell .dash-kpis { grid-template-columns: repeat(2, 1fr); }
   .admin-shell .dash-stages { grid-template-columns: repeat(2, 1fr); }
+  /* desktop-only prototype bar → wrap on Mise's narrow bands: lead+actions on
+     row 1, the search drops to a full-width row 2 (no overflow). */
+  .admin-shell .dash-top { flex-wrap: wrap; row-gap: .85rem; }
+  .admin-shell .dash-search { order: 3; flex-basis: 100%; max-width: none; }
 }
 @container admin (max-width: 560px) {
   .admin-shell .dash-kpis { grid-template-columns: 1fr 1fr; }
+  .admin-shell .dash-top-lead h1 { font-size: 1.35rem; }
+  .admin-shell .dash-top-lead p { white-space: normal; }
 }
 
 /* ===== FOREST + GOLD THEME — ADMIN ONLY (marketing section 1 intentionally held; public brand is locked candlelit-terracotta) ===== */

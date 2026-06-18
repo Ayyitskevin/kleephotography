@@ -3194,7 +3194,10 @@ def test_sent_emails_log(admin):
 
     # nav cross-links between captured + sent
     assert 'href="/admin/sent"' in admin.get("/admin/emails").text
-    assert 'href="/admin/sent"' in admin.get("/admin").text
+    # the redesigned home (strict-1:1 prototype) dropped the old utility nav
+    # strip from its top bar; Sent is now reached from home via the ⌘K command
+    # palette (a JS-built CMDS entry), so assert that route is present there.
+    assert '"/admin/sent"' in admin.get("/admin").text
 
     # pagination: 60 more rows → first page is the latest 50, "Older" link shows
     for i in range(60):

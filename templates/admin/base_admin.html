@@ -16,7 +16,7 @@
 <div class="admin-shell">
   {% include "admin/_nav.html" %}
   <div class="admin-col">
-    {% include "admin/_topbar.html" %}
+    {% block topbar %}{% include "admin/_topbar.html" %}{% endblock %}
     {% block admin_body %}{% endblock %}
   </div>
 </div>

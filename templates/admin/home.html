@@ -15,25 +15,53 @@
       falls back to the project count when absent).
   Styles live in static/mise.css under the `.dash` / `.dash-*` rules.
 #}
+{# Dashboard owns its top bar — the prototype's strict-1:1 sticky chrome
+   (greeting+date · inline search · Sign out · oxblood +New). Overriding the
+   `topbar` block suppresses the shared _topbar so there's a single bar. #}
+{% block topbar %}
+<header class="admin-topbar dash-top">
+  <div class="dash-top-lead">
+    <h1>{{ greeting }}, Kevin</h1>
+    <p>{{ today_str }}</p>
+  </div>
+  <form class="dash-search" method="get" action="/admin/search" role="search">
+    <span class="dash-search-ic" aria-hidden="true">&#8981;</span>
+    <input type="search" name="q" placeholder="Search clients, projects, galleries&hellip;" autocomplete="off" aria-label="Search">
+  </form>
+  <div class="dash-top-actions">
+    <form method="post" action="/admin/logout">
+      <button class="dash-signout" type="submit">Sign out</button>
+    </form>
+    <details class="qc dash-qc" id="quick-create">
+      <summary class="dash-new" aria-haspopup="menu">
+        <span class="qc-plus" aria-hidden="true">+</span> New</summary>
+      <div class="qc-menu" role="menu" aria-label="Create new">
+        <a role="menuitem" href="/admin/galleries">Gallery</a>
+        <a role="menuitem" href="/admin/transfers">Transfer</a>
+        <a role="menuitem" href="/admin/studio#clients">Client</a>
+        <a role="menuitem" href="/admin/studio#projects">Session</a>
+        <a role="menuitem" href="/admin/studio#invoices">Invoice</a>
+        <a role="menuitem" href="/admin/forms">Form</a>
+      </div>
+    </details>
+  </div>
+</header>
+<script>
+  (function () {
+    var d = document.getElementById("quick-create");
+    if (!d) return;
+    document.addEventListener("click", function (e) {
+      if (d.open && !d.contains(e.target)) d.open = false;
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") d.open = false;
+    });
+  })();
+</script>
+{% endblock %}
+
 {% block admin_body %}
 <main class="admin-main dash">
-
-  <div class="admin-bar">
-    <div class="dash-hello">
-      <h1>{{ greeting }}, Kevin</h1>
-      <p>{{ today_str }}</p>
-    </div>
-    <div class="dash-bar-actions">
-      <nav>
-        <a href="/admin/today">Today</a> ·
-        <a href="/admin/sent">Sent</a> ·
-        <a href="/admin/jobs">Jobs</a>
-      </nav>
-      <form method="post" action="/admin/logout">
-        <button class="dash-signout" type="submit">Sign out</button>
-      </form>
-    </div>
-  </div>
 
   {# ── KPI strip ──────────────────────────────────────────────────────── #}
   <section class="dash-kpis" aria-label="At a glance">
