@@ -1,20 +1,21 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Bookings · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Bookings</h1>
+    <p class="pgtop-sub">
+      <b>{{ upcoming|length }}</b> upcoming · <b>{{ past|length }}</b> past &amp; cancelled · times in {{ tz }}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/scheduling">Scheduling</a>
+    <a class="pgtop-link" href="/admin/calendar">Calendar <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <div>
-      <h1>Bookings</h1>
-      <p class="muted">Confirmed appointments from your booking page. Times in {{ tz }}.</p>
-    </div>
-    {% include "admin/_sched_tabs.html" %}
-  </div>
-
-  <div class="cal-summary" aria-label="Bookings summary">
-    <span class="cal-sum"><strong>{{ upcoming|length }}</strong> upcoming</span>
-    <span class="cal-sum"><strong>{{ past|length }}</strong> past &amp; cancelled</span>
-  </div>
-
   <div class="cal-nav">
     <div class="studio-view-toggle book-viewtoggle" role="group" aria-label="View">
       <button type="button" data-bview="upcoming" class="is-active" aria-pressed="true">Upcoming</button>
