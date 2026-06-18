@@ -1,16 +1,21 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ f.title }} · Submissions · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>{{ f.title }} — submissions</h1>
+    <p class="pgtop-sub">
+      <b>{{ subs | length }}</b> total · {{ "lead form" if f.kind == "lead" else "questionnaire" }}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/forms/{{ f.id }}">&larr; Builder</a>
+    <a class="pgtop-link" href="/admin/forms">All forms</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <div>
-      <h1>{{ f.title }} — submissions</h1>
-      <p class="muted">{{ subs | length }} total · {{ "lead form" if f.kind == "lead" else "questionnaire" }}</p>
-    </div>
-    <nav><a href="/admin/forms/{{ f.id }}">&larr; Builder</a> ·
-      <a href="/admin/forms">All forms</a></nav>
-  </div>
-
   {% if subs %}
   <div class="studio-toolbar" id="sub-toolbar">
     <input type="search" class="studio-search" id="sub-search" placeholder="Search name or email…" aria-label="Search submissions">
