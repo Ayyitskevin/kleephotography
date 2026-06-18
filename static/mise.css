@@ -3785,3 +3785,105 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   .admin-shell .fin-summary,
   .admin-shell .fin-summary-4 { grid-template-columns: 1fr; }
 }
+
+/* ── Content portal (real brand kits + assets + presets + caption packs) ── */
+.admin-shell .pgtop-eyebrow {
+  margin: 0 0 .2rem; font-size: .72rem; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.admin-shell .ct-switch { flex-wrap: wrap; }
+.admin-shell .ct-block { margin-top: 1.6rem; }
+.admin-shell .ct-block-head {
+  display: flex; align-items: baseline; gap: .7rem; flex-wrap: wrap;
+  margin-bottom: .8rem;
+}
+.admin-shell .ct-h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 500;
+  font-size: 1.18rem; color: var(--ink);
+}
+.admin-shell .ct-block-note { font-size: .82rem; color: var(--ink-soft); }
+.admin-shell .ct-block-note a { color: var(--terra-deep); font-weight: 600; }
+.admin-shell .ct-empty {
+  padding: 1.1rem 1.2rem; border: 1px dashed var(--line-strong); border-radius: 12px;
+  background: var(--surface); color: var(--ink-soft); font-size: .88rem;
+}
+
+.admin-shell .ct-kit-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.admin-shell .ct-kit {
+  display: flex; gap: .9rem; padding: .9rem; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 14px;
+}
+.admin-shell .ct-kit-off { opacity: .62; }
+.admin-shell .ct-kit-logo {
+  flex: 0 0 84px; width: 84px; height: 84px; display: flex; align-items: center;
+  justify-content: center; border-radius: 10px; overflow: hidden;
+  background: repeating-conic-gradient(#eee 0% 25%, #f7f7f2 0% 50%) 50% / 16px 16px;
+  border: 1px solid var(--line);
+}
+.admin-shell .ct-kit-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.admin-shell .ct-kit-meta { flex: 1; min-width: 0; }
+.admin-shell .ct-kit-top {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+}
+.admin-shell .ct-kit-client {
+  font-weight: 700; font-size: .92rem; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.admin-shell .ct-kit-label { font-size: .8rem; color: var(--ink-soft); margin: .1rem 0 .55rem; }
+.admin-shell .ct-spec {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .25rem .8rem; margin: 0 0 .5rem;
+}
+.admin-shell .ct-spec div { display: flex; justify-content: space-between; gap: .4rem; }
+.admin-shell .ct-spec dt { font-size: .76rem; color: var(--ink-faint); }
+.admin-shell .ct-spec dd { margin: 0; font-size: .76rem; font-weight: 600; color: var(--ink); }
+.admin-shell .ct-kit-link { font-size: .8rem; font-weight: 600; color: var(--terra-deep); }
+
+.admin-shell .ct-pill {
+  display: inline-block; padding: .12rem .5rem; border-radius: 999px;
+  font-size: .68rem; font-weight: 700; letter-spacing: .02em; white-space: nowrap;
+}
+.admin-shell .ct-pill-on { background: #e1f2e9; color: #2f7d57; }
+.admin-shell .ct-pill-off { background: #efece0; color: var(--ink-soft); }
+.admin-shell .ct-pill-draft { background: #f7ecd2; color: #9a7a2c; }
+.admin-shell .ct-pill-ai { background: #ece4f5; color: #6a4aa0; }
+
+.admin-shell .ct-preset-row { display: flex; flex-wrap: wrap; gap: .7rem; }
+.admin-shell .ct-preset {
+  display: flex; flex-direction: column; gap: .12rem; padding: .65rem .85rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  min-width: 150px;
+}
+.admin-shell .ct-preset-ratio {
+  font-family: var(--font-display); font-size: 1.05rem; font-weight: 500; color: var(--terra-deep);
+}
+.admin-shell .ct-preset-name { font-size: .84rem; font-weight: 600; color: var(--ink); }
+.admin-shell .ct-preset-dims { font-size: .74rem; color: var(--ink-faint); }
+.admin-shell .ct-preset-ovl {
+  margin-top: .25rem; align-self: flex-start; padding: .1rem .45rem; border-radius: 999px;
+  background: #ece4f5; color: #6a4aa0; font-size: .66rem; font-weight: 700;
+}
+
+.admin-shell .ct-cap-list { display: grid; gap: .8rem; }
+.admin-shell .ct-cap {
+  padding: .85rem 1rem; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.admin-shell .ct-cap-head {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .4rem;
+}
+.admin-shell .ct-cap-client { font-weight: 700; font-size: .9rem; color: var(--ink); }
+.admin-shell .ct-cap-period { font-size: .78rem; color: var(--ink-faint); }
+.admin-shell .ct-cap-body {
+  margin: 0 0 .5rem; font-size: .88rem; line-height: 1.5; color: var(--ink-soft);
+  white-space: pre-wrap;
+}
+.admin-shell .ct-cap-link { font-size: .8rem; font-weight: 600; color: var(--terra-deep); }
+.admin-shell .ct-ai-on { color: #2f7d57; font-weight: 700; }
+.admin-shell .ct-ai-off { color: var(--ink-faint); font-weight: 600; }
+
+@media (max-width: 560px) {
+  .admin-shell .ct-kit-grid { grid-template-columns: 1fr; }
+}

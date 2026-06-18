@@ -1,0 +1,160 @@
+{% extends "admin/base_admin.html" %}
+{# Content portal — REAL brand kits + assets + crop presets + caption packs.
+   The prototype fabricated brand colours, voice tags, typefaces, and a fake
+   client-side AI caption generator; none of that data exists in Mise, so this
+   shows only what's real and links out to the actual management routes. All
+   read-only here. #}
+{% block topbar %}
+<div class="pgtop">
+  <div class="pgtop-lead">
+    <p class="pgtop-eyebrow">Content portal</p>
+    <h1>Brand kits &amp; caption packs</h1>
+    <p class="pgtop-sub">
+      {% if sel_client %}Scoped to {{ sel_client.company or sel_client.name }}{% else %}Across every client{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <div class="fin-range ct-switch">
+      {% for s in switch %}
+      <a href="/admin/content{% if s.id %}?client={{ s.id }}{% endif %}"
+         class="fin-range-pill{% if s.on %} fin-range-on{% endif %}">{{ s.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block admin_body %}
+<div class="fin-wrap">
+
+  <section class="fin-summary fin-summary-4">
+    {% for c in cards %}
+    <div class="fin-card fin-card-{{ c.tone }}">
+      <span class="fin-card-label">{{ c.label }}</span>
+      <div class="fin-card-val">{{ c.value }}</div>
+      <span class="fin-card-sub">{{ c.sub }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  {# ── Brand kits: real overlay logos + placement params ── #}
+  <section class="ct-block">
+    <div class="ct-block-head">
+      <h2 class="ct-h2">Brand kits</h2>
+      <span class="ct-block-note">Overlay logos composited into crops · edit on each client's Studio page</span>
+    </div>
+    {% if kits %}
+    <div class="ct-kit-grid">
+      {% for k in kits %}
+      <div class="ct-kit{% if not k.active %} ct-kit-off{% endif %}">
+        <a class="ct-kit-logo" href="/admin/studio/clients/{{ k.client_id }}/kits/{{ k.id }}/logo"
+           target="_blank" rel="noopener">
+          <img src="/admin/studio/clients/{{ k.client_id }}/kits/{{ k.id }}/logo"
+               alt="{{ k.label }} logo for {{ k.client }}" loading="lazy">
+        </a>
+        <div class="ct-kit-meta">
+          <div class="ct-kit-top">
+            <span class="ct-kit-client">{{ k.client }}</span>
+            <span class="ct-pill {% if k.active %}ct-pill-on{% else %}ct-pill-off{% endif %}">{{ 'Active' if k.active else 'Inactive' }}</span>
+          </div>
+          <div class="ct-kit-label">{{ k.label }}</div>
+          <dl class="ct-spec">
+            <div><dt>Position</dt><dd>{{ k.position }}</dd></div>
+            <div><dt>Opacity</dt><dd>{{ k.opacity }}%</dd></div>
+            <div><dt>Scale</dt><dd>{{ k.scale }}%</dd></div>
+            <div><dt>Margin</dt><dd>{{ k.margin }}%</dd></div>
+          </dl>
+          <a class="ct-kit-link" href="/admin/studio/clients/{{ k.client_id }}">Manage &rarr;</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="ct-empty">No brand kits yet. Upload a logo on a client's Studio page to overlay it on social crops.</p>
+    {% endif %}
+  </section>
+
+  {# ── Brand assets: file locker ── #}
+  <section class="ct-block">
+    <div class="ct-block-head">
+      <h2 class="ct-h2">Brand assets</h2>
+      <span class="ct-block-note">Files clients shared — logos, menus, vector art</span>
+    </div>
+    {% if assets %}
+    <div class="fin-tbl-scroll">
+      <table class="fin-tbl ct-asset-tbl">
+        <thead><tr>
+          <th>File</th><th>Client</th><th class="fin-num">Size</th><th>Added</th>
+        </tr></thead>
+        <tbody>
+          {% for a in assets %}
+          <tr>
+            <td class="fin-strong">{{ a.filename }}</td>
+            <td class="fin-muted">{{ a.client }}</td>
+            <td class="fin-num fin-muted">{{ a.bytes }}</td>
+            <td class="fin-muted">{{ a.date }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="ct-empty">No brand assets on file for this scope.</p>
+    {% endif %}
+  </section>
+
+  {# ── Export presets: global crop_presets, read-only ── #}
+  <section class="ct-block">
+    <div class="ct-block-head">
+      <h2 class="ct-h2">Export presets</h2>
+      <span class="ct-block-note">Global crop ratios · manage under <a href="/admin/studio/presets">Crop presets</a></span>
+    </div>
+    {% if presets %}
+    <div class="ct-preset-row">
+      {% for p in presets %}
+      <div class="ct-preset">
+        <span class="ct-preset-ratio">{{ p.ratio }}</span>
+        <span class="ct-preset-name">{{ p.name }}</span>
+        <span class="ct-preset-dims">{{ p.dims }} · {{ p.channel }}</span>
+        {% if p.overlay %}<span class="ct-preset-ovl">brand overlay</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="ct-empty">No active export presets.</p>
+    {% endif %}
+  </section>
+
+  {# ── Caption packs: real retainer_captions, read-only ── #}
+  <section class="ct-block">
+    <div class="ct-block-head">
+      <h2 class="ct-h2">Caption packs</h2>
+      <span class="ct-block-note">
+        Retainer deliverables · edit under <a href="/admin/recurring">Recurring</a> ·
+        {% if ai_enabled %}<span class="ct-ai-on">AI assist armed</span>{% else %}<span class="ct-ai-off">AI assist dormant</span>{% endif %}
+      </span>
+    </div>
+    {% if captions %}
+    <div class="ct-cap-list">
+      {% for c in captions %}
+      <div class="ct-cap">
+        <div class="ct-cap-head">
+          <span class="ct-cap-client">{{ c.client }}</span>
+          <span class="ct-cap-period">{{ c.period }} · {{ c.label }}</span>
+          <span class="ct-pill {% if c.approved %}ct-pill-on{% else %}ct-pill-draft{% endif %}">{{ 'Approved' if c.approved else 'Draft' }}</span>
+          {% if c.ai %}<span class="ct-pill ct-pill-ai" title="Drafted by Odysseus{% if c.model %} · {{ c.model }}{% endif %}">AI draft</span>{% endif %}
+        </div>
+        <p class="ct-cap-body">{{ c.body }}</p>
+        <a class="ct-cap-link" href="/admin/recurring/{{ c.plan_id }}">{{ c.plan }} &rarr;</a>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="fin-note">Captions are written and approved on the retainer plan. When AI assist
+      is armed, drafts are produced by <b>Odysseus</b> across the tailnet and land here as a
+      starting point — Mise never auto-posts a caption.</p>
+    {% else %}
+    <p class="ct-empty">No caption packs yet. They're created per period on a client's retainer plan.</p>
+    {% endif %}
+  </section>
+
+</div>
+{% endblock %}

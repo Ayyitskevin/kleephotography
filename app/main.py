@@ -14,7 +14,7 @@ from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import config, db, jobs, ratelimit, scheduler, service_api
-from .admin import (activity, audit, auth, contracts, doc_templates,
+from .admin import (activity, audit, auth, content, contracts, doc_templates,
                     email_templates, emails, financials, forms, galleries,
                     inbox, invoices, licenses, presets, press, proposals,
                     recurring, reference, reports, search, settings, share,
@@ -97,6 +97,7 @@ for r in (auth.router, galleries.router, uploads.router, activity.router,
           reference.router, search.router,
           shotlist.router, emails.router, share.router, forms.router,
           audit.router, inbox.router, settings.router, financials.router,
+          content.router,
           admin_scheduling.router,
           gallery.router, media.router,
           downloads.router, docs.router, pay.router, portal.router, workspace.router,
