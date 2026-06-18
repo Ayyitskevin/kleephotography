@@ -1,17 +1,28 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Testimonials · Studio · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Testimonials</h1>
+    <p class="pgtop-sub">
+      {% if testimonials %}<b>{{ testimonials|length }}</b> total ·
+        <b>{{ testimonials|selectattr("published")|list|length }}</b> published
+      {% else %}Client quotes for the home page, /services &amp; case studies{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/studio">&larr; Studio</a>
+    <a class="pgtop-new" href="#add-testimonial"><span class="qc-plus" aria-hidden="true">+</span> Add</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <h1><a href="/admin/studio">&larr;</a> Testimonials</h1>
-    <nav><a href="/admin/galleries">Galleries</a> · <a href="/admin/studio">Studio</a></nav>
-  </div>
-
   <p class="muted">Published testimonials with no gallery render on the home page
     and on <code>/services</code> (top 3 by position). Ones attached to a gallery
     show on that case-study page (<code>/work/&lt;slug&gt;</code>) above the photo grid.</p>
 
-  <h2>Add a testimonial</h2>
+  <h2 id="add-testimonial">Add a testimonial</h2>
   <form method="post" action="/admin/studio/testimonials" class="stack-form">
     <label>Quote
       <textarea name="quote" rows="3" required
