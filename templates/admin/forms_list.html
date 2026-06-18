@@ -1,15 +1,24 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Forms · Mise{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Forms</h1>
+    <p class="pgtop-sub">
+      {% if summary.total %}
+      <b>{{ summary.total }}</b> form{{ "s" if summary.total != 1 }} ·
+      {{ summary.active }} active · <b>{{ summary.subs }}</b> submission{{ "s" if summary.subs != 1 }}
+      {% else %}Build lead-capture forms and client questionnaires{% endif %}
+    </p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-new" href="#new-form"><span class="qc-plus" aria-hidden="true">+</span> New form</a>
+  </div>
+</header>
+{% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <div class="admin-bar">
-    <div>
-      <h1>Forms</h1>
-      <p class="muted">Build lead-capture forms and client questionnaires. Each gets a shareable public link.</p>
-    </div>
-  </div>
-
-  <section class="task-new" aria-label="New form">
+  <section class="task-new" id="new-form" aria-label="New form">
     <form method="post" action="/admin/forms" class="task-new-form">
       <input type="text" name="title" placeholder="Form name (e.g. Restaurant Shoot Brief)" required maxlength="120" autofocus>
       <select name="kind" aria-label="Form kind">
