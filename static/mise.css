@@ -2964,6 +2964,40 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .admin-shell .dash-new:hover { background: var(--terra-deep); text-decoration: none; color: #F3F0E2; }
 .admin-shell .qc-plus { font-size: 1.05rem; line-height: 1; }
 
+/* ── Inner-page top bar — prototype strict-1:1 (heading · stats · actions) ── */
+/* Reusable across P2 pages: left lead (h1 + live subtitle), right action pills. */
+.admin-shell .pgtop {
+  display: flex; align-items: center; gap: 20px;
+  background: rgba(245, 243, 235, .82);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  padding: 18px clamp(20px, 3vw, 34px);
+}
+.admin-shell .pgtop-lead h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 500;
+  font-size: 1.6rem; line-height: 1.1; letter-spacing: -.01em; color: var(--ink);
+}
+.admin-shell .pgtop-sub {
+  margin: .25rem 0 0; font-size: .82rem; font-weight: 500; color: var(--ink-soft);
+}
+.admin-shell .pgtop-sub b { color: var(--ink); font-weight: 700; }
+.admin-shell .pgtop-sub .pos { color: var(--ok); }
+.admin-shell .pgtop-sub a.neg { color: var(--clay); font-weight: 700; text-decoration: none; }
+.admin-shell .pgtop-sub a.neg:hover { text-decoration: underline; text-underline-offset: 2px; }
+.admin-shell .pgtop-actions { display: flex; align-items: center; gap: .75rem; margin-left: auto; }
+.admin-shell .pgtop-link {
+  display: inline-flex; align-items: center; gap: .5em;
+  padding: .62em 1.15em; border: 1px solid var(--line); border-radius: 999px;
+  font-size: .8rem; font-weight: 600; color: var(--ink); background: #FFFEF8; white-space: nowrap;
+}
+.admin-shell .pgtop-link:hover { border-color: var(--line-strong); text-decoration: none; }
+.admin-shell .pgtop-link span { color: var(--clay); }
+.admin-shell .pgtop-new {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--terra); color: #F3F0E2; border-radius: 999px;
+  padding: .55rem 1.1rem; font-size: .84rem; font-weight: 600; white-space: nowrap;
+}
+.admin-shell .pgtop-new:hover { background: var(--terra-deep); color: #F3F0E2; text-decoration: none; }
+
 /* ── KPI strip ──────────────────────────────────────────────────────────── */
 .admin-shell .dash-kpis {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;
@@ -3138,11 +3172,15 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
      row 1, the search drops to a full-width row 2 (no overflow). */
   .admin-shell .dash-top { flex-wrap: wrap; row-gap: .85rem; }
   .admin-shell .dash-search { order: 3; flex-basis: 100%; max-width: none; }
+  /* inner-page bar wraps the same way: lead on row 1, actions drop below */
+  .admin-shell .pgtop { flex-wrap: wrap; row-gap: .85rem; }
+  .admin-shell .pgtop-actions { margin-left: 0; flex-basis: 100%; }
 }
 @container admin (max-width: 560px) {
   .admin-shell .dash-kpis { grid-template-columns: 1fr 1fr; }
   .admin-shell .dash-top-lead h1 { font-size: 1.35rem; }
   .admin-shell .dash-top-lead p { white-space: normal; }
+  .admin-shell .pgtop-lead h1 { font-size: 1.35rem; }
 }
 
 /* ===== FOREST + GOLD THEME — ADMIN ONLY (marketing section 1 intentionally held; public brand is locked candlelit-terracotta) ===== */
