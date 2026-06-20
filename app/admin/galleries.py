@@ -40,6 +40,65 @@ def _fmt_size(n: int) -> str:
     return f"{n / 1e3:.0f} KB"
 
 
+# Strict 1:1 with the Admin Galleries prototype: each card carries a single
+# derived status (Delivered/Proofing/Expiring/Draft) and one bottom-right date.
+# All four are honest projections of real columns — published, expiry, proofing
+# progress, asset counts — never fabricated.
+_STATUS_STYLE = {
+    "Delivered": ("#2f7d57", "#e1f2e9"),
+    "Proofing":  ("#9a7a2c", "#f7ecd2"),
+    "Draft":     ("#5C6A5E", "#ecefe6"),
+    "Expiring":  ("#7C2F38", "#f3e3e5"),
+}
+
+
+def _short_date(stored: str) -> str:
+    """'2026-06-18 12:00:00' → 'Jun 18'. Tolerates a bare date or junk."""
+    if not stored:
+        return ""
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return dt.datetime.strptime(stored[:19], fmt).strftime("%b %-d")
+        except ValueError:
+            continue
+    return stored
+
+
+def _gallery_card(g, today_iso: str, soon_iso: str) -> dict:
+    exp = g["expires_at"]
+    expired = bool(exp and exp < today_iso)
+    expiring_soon = bool(exp and not expired and exp <= soon_iso)
+    if not g["published"]:
+        status = "Draft"
+    elif expired or expiring_soon:
+        status = "Expiring"
+    elif g["n_proof"] and g["n_proof_pending"]:
+        status = "Proofing"
+    else:
+        status = "Delivered"
+    color, bg = _STATUS_STYLE[status]
+    if status == "Expiring":
+        if expired:
+            date_label = "expired"
+        else:
+            days = (dt.date.fromisoformat(exp) - dt.date.fromisoformat(today_iso)).days
+            date_label = f"{days} day{'s' if days != 1 else ''}"
+        date_color = "#7C2F38"
+    else:
+        date_label = _short_date(g["created_at"])
+        date_color = "#8A9183"
+    n = g["n_assets"]
+    photos = f"{n} photo{'s' if n != 1 else ''}" if n else "No photos yet"
+    return {
+        "id": g["id"], "title": g["title"], "client": g["client_name"] or "—",
+        "cover_asset_id": g["cover_asset_id"], "pin": g["pin"],
+        "status": status, "status_lc": status.lower(),
+        "status_color": color, "status_bg": bg,
+        "photos": photos, "favs": g["n_fav"],
+        "date": date_label, "date_color": date_color,
+    }
+
+
 def get_gallery(gallery_id: int) -> "db.sqlite3.Row":
     g = db.one("SELECT * FROM galleries WHERE id=?", (gallery_id,))
     if not g:
@@ -103,18 +162,22 @@ async def dashboard(request: Request):
         "dl": sum(g["n_dl"] for g in gs),
         "size": _fmt_size(sum(sizes_b.values())),
     }
-    # Distinct client names present, for the client filter dropdown.
-    client_names = sorted({g["client_name"] for g in gs if g["client_name"]},
-                          key=str.lower)
+    soon_iso = (today + dt.timedelta(days=7)).isoformat()
+    cards = [_gallery_card(g, today_iso, soon_iso) for g in gs]
+    card_counts = {"all": len(cards)}
+    for k in ("delivered", "proofing", "expiring", "draft"):
+        card_counts[k] = sum(1 for c in cards if c["status_lc"] == k)
     free_gb = shutil.disk_usage(config.DATA_DIR).free / 1e9
     backup_dir = config.DATA_DIR / "backups"
     snaps = sorted(backup_dir.glob("*.db.gz")) if backup_dir.exists() else []
     backup_age_h = ((dt.datetime.now().timestamp() - snaps[-1].stat().st_mtime) / 3600
                     if snaps else None)
     return templates.TemplateResponse(request, "admin/dashboard.html",
-                                      {"galleries": gs, "base_url": config.BASE_URL,
+                                      {"galleries": gs, "cards": cards,
+                                       "card_counts": card_counts,
+                                       "base_url": config.BASE_URL,
                                        "today": today.isoformat(),
-                                       "soon": (today + dt.timedelta(days=7)).isoformat(),
+                                       "soon": soon_iso,
                                        "failed_jobs": failed_jobs, "sizes": sizes,
                                        "free_gb": free_gb,
                                        "min_free_gb": config.MIN_FREE_GB,
@@ -123,8 +186,7 @@ async def dashboard(request: Request):
                                        "orphans": orphans,
                                        "link_clients": link_clients,
                                        "sizes_b": sizes_b,
-                                       "totals": totals,
-                                       "client_names": client_names})
+                                       "totals": totals})
 
 
 @router.post("/galleries")

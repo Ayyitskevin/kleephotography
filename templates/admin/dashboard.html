@@ -55,49 +55,34 @@
   </details>
   {% endif %}
 
-  {% if galleries %}
-  <div class="gal-filters" role="group" aria-label="Filter by status">
-    <button type="button" class="gal-pill is-active" data-status="" aria-pressed="true">All <span>{{ totals.n }}</span></button>
-    <button type="button" class="gal-pill" data-status="published" aria-pressed="false">Published <span>{{ totals.published }}</span></button>
-    <button type="button" class="gal-pill" data-status="draft" aria-pressed="false">Draft <span>{{ totals.draft }}</span></button>
-    {% if totals.expired %}<button type="button" class="gal-pill" data-status="expired" aria-pressed="false">Expiring <span>{{ totals.expired }}</span></button>{% endif %}
+  {% if cards %}
+  <div class="gx-filters" role="group" aria-label="Filter by status">
+    <button type="button" class="gx-pill is-active" data-status="" aria-pressed="true">All <span>{{ card_counts.all }}</span></button>
+    <button type="button" class="gx-pill" data-status="delivered" aria-pressed="false">Delivered <span>{{ card_counts.delivered }}</span></button>
+    <button type="button" class="gx-pill" data-status="proofing" aria-pressed="false">Proofing <span>{{ card_counts.proofing }}</span></button>
+    <button type="button" class="gx-pill" data-status="expiring" aria-pressed="false">Expiring <span>{{ card_counts.expiring }}</span></button>
+    <button type="button" class="gx-pill" data-status="draft" aria-pressed="false">Drafts <span>{{ card_counts.draft }}</span></button>
   </div>
 
-  <div class="gal-grid" id="gal-grid">
-    {% for g in galleries %}
-    {% set expired = g.expires_at and g.expires_at < today %}
-    <article class="gal-card gal-item" data-gid="{{ g.id }}"
-             data-search="{{ (g.title ~ ' ' ~ (g.client_name or '')) | lower }}"
-             data-status="{{ 'published' if g.published else 'draft' }}"
-             data-expired="{{ 1 if expired else 0 }}"
-             data-client="{{ (g.client_name or '') | lower }}"
-             data-name="{{ g.title | lower }}" data-size="{{ sizes_b[g.id] }}"
-             data-assets="{{ g.n_assets }}" data-fav="{{ g.n_fav }}"
-             data-created="{{ g.created_at }}">
-      <a class="gal-card-cover" href="/admin/galleries/{{ g.id }}">
-        {% if g.cover_asset_id %}
-        <img loading="lazy" src="/admin/thumb/{{ g.id }}/{{ g.cover_asset_id }}" alt="Cover of {{ g.title }}">
-        {% else %}<span class="gal-card-nocover">no cover set</span>{% endif %}
-        <span class="gal-card-badge gal-status-{{ 'published' if g.published else 'draft' }}">{{ "Published" if g.published else "Draft" }}</span>
-        {% if expired %}<span class="gal-card-badge gal-badge-expired">Expired</span>{% endif %}
-      </a>
-      <div class="gal-card-body">
-        <a class="gal-card-title" href="/admin/galleries/{{ g.id }}">{{ g.title }}</a>
-        {% if g.n_proof and not g.n_proof_pending %}<span class="ok" title="Client hit the target on every proofing section">&#10003; selects in</span>{% endif %}
-        <p class="gal-card-client">{{ g.client_name or "—" }}{% if not g.client_id and g.published %}
-          <span class="warn" title="Published but not linked to a studio client">&#9888;</span>{% endif %}</p>
-        <p class="gal-card-stats">
-          <span title="assets">&#128247; {{ g.n_assets }}{% if g.n_pending %}<span class="muted">+{{ g.n_pending }}</span>{% endif %}</span>
-          <span title="favorites">&#9829; {{ g.n_fav }}</span>
-          <span title="downloads">&#8595; {{ g.n_dl }}</span>
-          <span class="muted" title="storage">{{ sizes[g.id] }}</span>
-        </p>
-        {% if g.expires_at and not expired and g.expires_at <= soon %}
-        <p class="gal-card-exp expiring">expires {{ g.expires_at }}</p>
-        {% elif expired %}<p class="gal-card-exp warn">expired {{ g.expires_at }}</p>{% endif %}
-        <p class="gal-card-foot"><code>{{ g.pin }}</code> · <a href="/admin/galleries/{{ g.id }}/activity">activity</a></p>
+  <div class="gx-grid" id="gal-grid">
+    {% for c in cards %}
+    <a class="gx-card gal-item" href="/admin/galleries/{{ c.id }}" data-status="{{ c.status_lc }}">
+      <div class="gx-card-cover">
+        {% if c.cover_asset_id %}
+        <img loading="lazy" src="/admin/thumb/{{ c.id }}/{{ c.cover_asset_id }}" alt="Cover of {{ c.title }}">
+        {% else %}<span class="gx-card-nocover">no cover set</span>{% endif %}
+        <span class="gx-badge" style="color: {{ c.status_color }}; background: {{ c.status_bg }};">{{ c.status }}</span>
+        {% if c.favs %}<span class="gx-favs">&#9829; {{ c.favs }}</span>{% endif %}
       </div>
-    </article>
+      <div class="gx-card-body">
+        <div class="gx-card-title">{{ c.title }}</div>
+        <div class="gx-card-client">{{ c.client }}</div>
+        <div class="gx-card-foot">
+          <span class="gx-card-photos">{{ c.photos }}</span>
+          <span class="gx-card-date" style="color: {{ c.date_color }};">{{ c.date }}</span>
+        </div>
+      </div>
+    </a>
     {% endfor %}
   </div>
 
@@ -116,14 +101,14 @@
 
   <script>
   (function () {
-    var pills = Array.prototype.slice.call(document.querySelectorAll('.gal-pill'));
+    var pills = Array.prototype.slice.call(document.querySelectorAll('.gx-pill'));
     if (!pills.length) return;
     var emptyMsg = document.getElementById('gal-empty');
 
     function applyFilter(st) {
       var shown = 0;
       document.querySelectorAll('#gal-grid .gal-item').forEach(function (el) {
-        var ok = !st || (st === 'expired' ? el.dataset.expired === '1' : el.dataset.status === st);
+        var ok = !st || el.dataset.status === st;
         el.classList.toggle('studio-hidden', !ok);
         if (ok) shown++;
       });

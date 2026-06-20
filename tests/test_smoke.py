@@ -693,16 +693,14 @@ def test_captured_emails(admin):
 
 
 def test_dashboard_storage(admin):
-    # full-flow gallery above has uploaded media — its row shows a real size
+    # Per-card storage was dropped in the strict-1:1 grid (prototype card has no
+    # size cell); storage now lives only in the library roll-up + the disk
+    # free-space footer. That footer + backup heartbeat are operational safety
+    # signals and must keep rendering loudly.
     page = admin.get("/admin/galleries").text
-    assert 'title="storage"' in page
-    assert " MB" in page or " KB" in page or " GB" in page
     # free-space line always renders; the test box is nowhere near the watermark
     assert "GB free" in page
     assert "uploads refused" not in page
-    # an empty gallery shows the dash, not 0 — storage cell is the muted span
-    admin.post("/admin/galleries", data={"title": "Empty Storage"})
-    assert '<span class="muted" title="storage">—</span>' in admin.get("/admin/galleries").text
     # no snapshots in the fresh test data dir → loud "none found" (silence ≠ evidence)
     assert "none found" in page
     # a fresh snapshot flips the line to a quiet age
@@ -714,9 +712,6 @@ def test_dashboard_storage(admin):
     fresh = admin.get("/admin/galleries").text
     assert "under an hour ago" in fresh and "none found" not in fresh
     snap.unlink()
-    g = db.one("SELECT id FROM galleries WHERE title='Empty Storage'")
-    db.run("DELETE FROM sections WHERE gallery_id=?", (g["id"],))
-    db.run("DELETE FROM galleries WHERE id=?", (g["id"],))
 
 
 def test_pin_lockout(admin):
@@ -732,22 +727,34 @@ def test_pin_lockout(admin):
 def test_expired_gallery(admin):
     import datetime as dt
     g = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
-    db.run("UPDATE galleries SET expires_at='2000-01-01' WHERE id=?", (g["id"],))
+    db.run("UPDATE galleries SET expires_at='2000-01-01', published=1 WHERE id=?",
+           (g["id"],))
     with TestClient(app) as pub:
         assert pub.get(f"/g/{g['slug']}").status_code == 410
 
-    # dashboard surfaces expiry so Kevin sees lockouts before clients do
-    assert "expired 2000-01-01" in admin.get("/admin/galleries").text
+    # the grid card derives an Expiring status from a real expiry so Kevin sees
+    # lockouts before clients do. Anchor on the grid card (last href occurrence —
+    # the orphan strip may mention it earlier) and read to the card's </a>.
+    def card_of(gid):
+        page = admin.get("/admin/galleries").text
+        start = page.rindex(f"/admin/galleries/{gid}")
+        return page[start:page.index("</a>", start)]
+
+    card = card_of(g["id"])
+    assert ">Expiring<" in card and "expired" in card  # past-due → dated "expired"
+
     near = (dt.date.today() + dt.timedelta(days=3)).isoformat()
     db.run("UPDATE galleries SET expires_at=? WHERE id=?", (near, g["id"]))
-    assert f"expires {near}" in admin.get("/admin/galleries").text
+    card = card_of(g["id"])
+    assert ">Expiring<" in card and "3 days" in card  # within the 7-day window
+
     far = (dt.date.today() + dt.timedelta(days=60)).isoformat()
     db.run("UPDATE galleries SET expires_at=? WHERE id=?", (far, g["id"]))
-    # far-future expiry isn't surfaced on the card grid — only soon/expired are;
-    # the full date lives on the gallery detail page (checked below)
+    # far-future expiry isn't flagged Expiring on the card grid — only soon/expired
+    # are; the full date lives on the gallery detail page (checked below)
+    assert ">Expiring<" not in card_of(g["id"])
 
     # delivery email prefill carries the expiry note (form renders when published)
-    db.run("UPDATE galleries SET published=1 WHERE id=?", (g["id"],))
     assert f"Available until {far}" in admin.get(f"/admin/galleries/{g['id']}").text
     db.run("UPDATE galleries SET expires_at=NULL, published=? WHERE id=?",
            (g["published"], g["id"]))
@@ -2364,14 +2371,12 @@ def test_dashboard_unlinked_warning(admin):
     assert n_warned() == baseline + 1
     page = admin.get("/admin/galleries").text
     assert "unlinked-warn" in page  # strip is now visible regardless of baseline
+    # the orphan picker strip is the single place orphans surface now — the
+    # per-card warning glyph was dropped in the strict-1:1 grid (prototype card
+    # has no warn icon). The strip lists this gallery with an inline link picker.
     assert f"/admin/galleries/{gid_draft}/link-client" in page
-    # per-card warning glyph in the main galleries grid (the orphan picker
-    # mentions the gallery first, so anchor on the LAST occurrence).
-    row_start = page.rindex("Loose draft")
-    row = page[row_start:page.index("</article>", row_start)]
-    assert "&#9888;" in row
 
-    # use the inline picker to link to a client — count drops back, badge clears
+    # use the inline picker to link to a client — count drops back, strip clears
     cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Linker Co",))
     r = admin.post(f"/admin/galleries/{gid_draft}/link-client",
                    data={"client_id": str(cid)}, follow_redirects=False)
@@ -2380,9 +2385,7 @@ def test_dashboard_unlinked_warning(admin):
                   (gid_draft,))["client_id"] == cid
     assert n_warned() == baseline
     page = admin.get("/admin/galleries").text
-    row_start = page.rindex("Loose draft")
-    row = page[row_start:page.index("</article>", row_start)]
-    assert "&#9888;" not in row
+    assert f"/admin/galleries/{gid_draft}/link-client" not in page
     # link-client refuses bogus client_id; the gallery's client_id isn't touched
     r = admin.post(f"/admin/galleries/{gid_draft}/link-client",
                    data={"client_id": "999999"}, follow_redirects=False)
@@ -3443,68 +3446,58 @@ def test_studio_portal_hint(admin):
     assert iso in row
 
 
-def test_dashboard_selects_in_badge(admin):
-    # baseline: no gallery on the dashboard should carry the badge
-    r = admin.get("/admin/galleries")
-    assert r.status_code == 200
-    assert "selects in" not in r.text
-
-    # gallery with no proofing sections at all → no badge
+def test_dashboard_proofing_status(admin):
+    # The strict-1:1 grid card carries a single derived status badge. A published
+    # gallery whose targeted proofing sections are still short of their pick count
+    # reads "Proofing"; once every targeted section hits target it flips to
+    # "Delivered". This replaces the old "✓ selects in" badge — same signal,
+    # rendered in the prototype's status-pill shape.
     gid = db.run("INSERT INTO galleries (slug, title, pin, published) "
                  "VALUES (?,?,?,1)", ("SelectsBadge001", "Loose pickin", "1234"))
-    assert "selects in" not in admin.get("/admin/galleries").text
 
-    # add a section with a target → row appears, badge does NOT (no picks yet)
+    def card():
+        # anchor on the grid card (last href — the orphan picker may list it
+        # earlier) and read to the card's closing </a>
+        page = admin.get("/admin/galleries").text
+        start = page.rindex(f"/admin/galleries/{gid}")
+        return page[start:page.index("</a>", start)]
+
+    # no proofing sections at all → nothing pending → Delivered
+    assert ">Delivered<" in card()
+
+    # add a targeted section with assets but no picks → Proofing
     sid = db.run("INSERT INTO sections (gallery_id, name, position, proof_target) "
                  "VALUES (?,?,?,?)", (gid, "Hero", 0, 2))
     aids = [db.run("INSERT INTO assets (gallery_id, section_id, kind, filename, "
                    "stored, status) VALUES (?,?,?,?,?,?)",
                    (gid, sid, "photo", f"p{i}.jpg",
                     f"selbadge0{i}.jpg", "ready")) for i in range(3)]
-    r = admin.get("/admin/galleries")
-    assert "Loose pickin" in r.text
-    # The orphan picker (ship #55) mentions the gallery title once before the
-    # main galleries grid, so anchor on the LAST occurrence for badge checks.
-    row_start = r.text.rindex("Loose pickin")
-    row_end = r.text.index("</article>", row_start)
-    row = r.text[row_start:row_end]
-    assert "selects in" not in row
+    assert ">Proofing<" in card()
 
-    # one fav of two needed → still not enough
+    # one fav of two needed → still short → Proofing
     vid = db.run("INSERT INTO visitors (gallery_id, token) VALUES (?,?)",
                  (gid, "vtok-badge"))
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)",
            (vid, aids[0]))
-    r = admin.get("/admin/galleries")
-    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</article>", r.text.rindex("Loose pickin"))]
-    assert "selects in" not in row
+    assert ">Proofing<" in card()
 
-    # hit the target → badge appears
+    # hit the target → proofing complete → Delivered
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)",
            (vid, aids[1]))
-    r = admin.get("/admin/galleries")
-    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</article>", r.text.rindex("Loose pickin"))]
-    assert "selects in" in row
-    assert "&#10003;" in row  # ✓ check mark
+    assert ">Delivered<" in card()
 
-    # add a SECOND proofing section that's still empty → badge disappears
-    # (the gallery is now "partially done", not "fully done")
+    # a SECOND targeted section that's still empty → partially done → Proofing
     sid2 = db.run("INSERT INTO sections (gallery_id, name, position, proof_target) "
                   "VALUES (?,?,?,?)", (gid, "Drinks", 1, 2))
     db.run("INSERT INTO assets (gallery_id, section_id, kind, filename, stored, "
            "status) VALUES (?,?,?,?,?,?)",
            (gid, sid2, "photo", "d.jpg", "selbadge99.jpg", "ready"))
-    r = admin.get("/admin/galleries")
-    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</article>", r.text.rindex("Loose pickin"))]
-    assert "selects in" not in row
+    assert ">Proofing<" in card()
 
-    # zero-target sections don't count (proof_target=0 is the "off" sentinel
-    # admin.py treats as cleared; verify it doesn't trip the badge math)
+    # zero-target sections don't count (proof_target=0 is the "off" sentinel) →
+    # only the first (complete) section remains → Delivered
     db.run("UPDATE sections SET proof_target=0 WHERE id=?", (sid2,))
-    # but we left sid at target 2 with 2 picks → badge back
-    r = admin.get("/admin/galleries")
-    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</article>", r.text.rindex("Loose pickin"))]
-    assert "selects in" in row
+    assert ">Delivered<" in card()
 
 
 def _spark_rect_count(html: str) -> int:
@@ -3611,18 +3604,20 @@ def test_invoice_overdue_judged_on_local_wall_clock(admin, monkeypatch):
                   anchor.isoformat(), "sent"))
 
     def row(page):
-        # Projects render as kanban <article> cards; scope the overdue check to
-        # this project's card so a stray "overdue invoice" elsewhere can't fool it.
+        # Projects render as board <article> cards; scope the overdue check to
+        # this project's card so a stray "overdue" elsewhere can't fool it. The
+        # card surfaces an overdue invoice via its step pill ("N overdue").
         i = page.index("Overdue Boundary Project")
         return page[page.rindex("<article", 0, i):page.index("</article>", i)]
 
     # due ON the wall-clock anchor -> still due today -> NOT overdue
-    assert "overdue invoice" not in row(admin.get("/admin/studio").text)
+    # ("1 overdue" is the step-pill text; bare "overdue" also lives in data-search)
+    assert "1 overdue" not in row(admin.get("/admin/studio").text)
 
     # due the day BEFORE the anchor -> genuinely past -> overdue
     db.run("UPDATE invoices SET due_date=? WHERE id=?",
            ((anchor - _dt.timedelta(days=1)).isoformat(), iid))
-    assert "overdue invoice" in row(admin.get("/admin/studio").text)
+    assert "1 overdue" in row(admin.get("/admin/studio").text)
 
 
 def test_studio_proofing_waiting(admin):
