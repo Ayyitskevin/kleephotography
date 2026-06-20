@@ -6,6 +6,8 @@ booking page offers is observable (R14). Slug is a public URL token (/book/{slug
 so it is charset-validated and IMMUTABLE after create, like crop-preset slugs.
 """
 
+import calendar as _calendar
+import datetime as dt
 import logging
 import re
 
@@ -63,6 +65,28 @@ def _get_event(event_id: int) -> "db.sqlite3.Row":
     return e
 
 
+def _fmt_dur(mins: int) -> str:
+    if mins < 60:
+        return f"{mins} min"
+    h, m = divmod(mins, 60)
+    if m == 0:
+        return f"{h} hr" if h == 1 else f"{h} hrs"
+    return f"{h}h {m}m"
+
+
+def _fmt_clock(total_min: int) -> str:
+    h, m = divmod(total_min, 60)
+    ap = "AM" if h < 12 else "PM"
+    return f"{h % 12 or 12}:{m:02d} {ap}"
+
+
+def _hours_label(hhmm_start: str, hhmm_end: str) -> str:
+    def _m(s: str) -> int:
+        hh, mm = s.split(":")
+        return int(hh) * 60 + int(mm)
+    return f"{_fmt_clock(_m(hhmm_start))} – {_fmt_clock(_m(hhmm_end))}"
+
+
 def _global_week() -> list[dict]:
     """The default weekly schedule (event_type_id IS NULL), one row per weekday.
     The UI edits a single window per day; the engine supports more (date overrides
@@ -91,6 +115,86 @@ _GERR = {
 }
 
 
+def _to_local(start_utc: str):
+    return scheduling._parse_utc(start_utc).astimezone(scheduling._biz_tz())
+
+
+def _sched_overview(events, week) -> dict:
+    """Honest projection of the booking page state onto the prototype's layout:
+    session-type cards, weekly-hours rows, a mini month calendar with booked-day
+    dots, and the next few upcoming bookings — all from real rows."""
+    tz = scheduling._biz_tz()
+    today = scheduling.now_utc().astimezone(tz).date()
+
+    types = [{
+        "id": e["id"], "slug": e["slug"], "name": e["name"], "dot": e["color"],
+        "on": bool(e["active"]),
+        "meta": f"{_fmt_dur(e['duration_min'])} · {e['location'] or 'No location set'}",
+        "upcoming": e["upcoming"],
+        "upcoming_label": (f"{e['upcoming']} upcoming" if e["upcoming"] else "No bookings"),
+    } for e in events]
+
+    days = [{**d,
+             "hours": _hours_label(d["start"], d["end"]) if d["on"] else "Unavailable"}
+            for d in week]
+
+    # Upcoming list (next 5 confirmed).
+    ups = db.all_("""SELECT b.start_utc, b.name, e.name AS event_name FROM bookings b
+                     JOIN event_types e ON e.id=b.event_type_id
+                     WHERE b.status='confirmed' AND b.start_utc >= datetime('now')
+                     ORDER BY b.start_utc LIMIT 5""")
+    upcoming = []
+    for b in ups:
+        ld = _to_local(b["start_utc"])
+        d = ld.date()
+        clock = ld.strftime("%-I:%M %p")
+        if d == today:
+            time_lbl, soon = f"Today · {clock}", True
+        elif d == today + dt.timedelta(days=1):
+            time_lbl, soon = f"Tomorrow · {clock}", False
+        else:
+            time_lbl, soon = clock, False
+        upcoming.append({"day": ld.strftime("%-d"), "mon": ld.strftime("%b"),
+                         "client": b["name"], "type": b["event_name"],
+                         "time": time_lbl, "soon": soon})
+
+    next_up = upcoming[0]["time"].replace("Today · ", "today ") \
+        .replace("Tomorrow · ", "tomorrow ").lower() if upcoming else None
+
+    # Mini calendar (current local month, Sunday-first) + booked-day dots.
+    ndays = _calendar.monthrange(today.year, today.month)[1]
+    first = today.replace(day=1)
+    lo = (first - dt.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
+    hi = (first + dt.timedelta(days=ndays + 1)).strftime("%Y-%m-%d 00:00:00")
+    booked: set[int] = set()
+    for r in db.all_("""SELECT start_utc FROM bookings
+                        WHERE status='confirmed' AND start_utc>=? AND start_utc<?""",
+                     (lo, hi)):
+        ld = _to_local(r["start_utc"]).date()
+        if ld.year == today.year and ld.month == today.month:
+            booked.add(ld.day)
+
+    cells = [{"empty": True}] * ((first.weekday() + 1) % 7)
+    cells += [{"day": n} for n in range(1, ndays + 1)]
+    while len(cells) % 7:
+        cells.append({"empty": True})
+    cal = []
+    for c in cells:
+        is_today = c.get("day") == today.day and not c.get("empty")
+        cal.append({"day": c.get("day", ""), "empty": c.get("empty", False),
+                    "today": is_today,
+                    "booked": (c.get("day") in booked) and not is_today})
+
+    week_mon = today - dt.timedelta(days=today.weekday())
+    booked_week = sum(1 for d in booked
+                      if 0 <= (first.replace(day=d) - week_mon).days <= 6)
+
+    return {"types": types, "days": days, "upcoming": upcoming, "next_up": next_up,
+            "booked_week": booked_week, "cal": cal,
+            "cal_label": first.strftime("%B %Y"),
+            "dow": ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]}
+
+
 @router.get("", response_class=HTMLResponse)
 async def home(request: Request):
     events = db.all_("""SELECT et.*,
@@ -98,28 +202,32 @@ async def home(request: Request):
                          WHERE b.event_type_id=et.id AND b.status='confirmed'
                            AND b.start_utc >= datetime('now')) AS upcoming
                         FROM event_types et ORDER BY et.position, et.id""")
-    overrides = db.all_("""SELECT * FROM date_overrides WHERE event_type_id IS NULL
-                           AND day >= date('now') ORDER BY day""")
-    return templates.TemplateResponse(request, "admin/scheduling.html",
-                                      {"events": events, "week": _global_week(),
-                                       "overrides": overrides,
-                                       "tz": scheduling.config.TIMEZONE,
-                                       "gcal": gcal.status(),
-                                       "g_error": _GERR.get(request.query_params.get("gerr"))})
+    week = _global_week()
+    ctx = {"events": events, "week": week, "tz": scheduling.config.TIMEZONE,
+           "gcal": gcal.status(),
+           "g_error": _GERR.get(request.query_params.get("gerr"))}
+    ctx.update(_sched_overview(events, week))
+    return templates.TemplateResponse(request, "admin/scheduling.html", ctx)
 
 
 @router.post("/availability")
 async def save_availability(request: Request):
-    """Replace the global weekly schedule from the 7-day form (idempotent)."""
+    """Replace the global weekly schedule from the 7-day form (idempotent).
+
+    The console renders one switch per day; clicking a switch posts the current
+    state (hidden on_/start_/end_ per day) plus toggle=<wd> for the day to flip."""
     form = await request.form()
+    flip = (form.get("toggle") or "").strip()
     rows = []
     for wd in range(7):
-        if form.get(f"on_{wd}"):
-            s = _hhmm_to_min(form.get(f"start_{wd}"))
-            e = _hhmm_to_min(form.get(f"end_{wd}"))
-            if s is None or e is None or e <= s:
-                raise HTTPException(status_code=400,
-                                    detail=f"{WEEKDAYS[wd]}: end must be after start")
+        on = form.get(f"on_{wd}") == "1"
+        if str(wd) == flip:
+            on = not on
+        if on:
+            s = _hhmm_to_min(form.get(f"start_{wd}")) or 9 * 60
+            e = _hhmm_to_min(form.get(f"end_{wd}")) or 17 * 60
+            if e <= s:
+                s, e = 9 * 60, 17 * 60
             rows.append((wd, s, e))
     with db.tx() as con:
         con.execute("DELETE FROM availability_rules WHERE event_type_id IS NULL")

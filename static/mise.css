@@ -1695,6 +1695,97 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .admin-shell .gx-card-photos { font: 600 0.76rem/1 var(--font-ui); color: #8A9183; }
 .admin-shell .gx-card-date { font: 600 0.76rem/1 var(--font-ui); }
 
+/* ── Scheduling home — strict 1:1 with the Admin Scheduling prototype ──── */
+.admin-shell .sch-compose { display: none; margin: 0 0 1.2rem; }
+.admin-shell .sch-compose:target { display: block; }
+.admin-shell .sch-compose-cancel { align-self: center; color: var(--ink-soft);
+  font: 500 0.82rem/1 var(--font-ui); }
+
+.admin-shell .sch-grid { display: grid; grid-template-columns: 1fr 320px;
+  gap: clamp(18px, 2.4vw, 28px); align-items: start; }
+.admin-shell .sch-col { display: flex; flex-direction: column;
+  gap: clamp(18px, 2.2vw, 24px); min-width: 0; }
+@media (max-width: 1120px) { .admin-shell .sch-grid { grid-template-columns: 1fr; } }
+
+.admin-shell .sch-h2 { font-family: var(--font-display); font-weight: 500;
+  font-size: 1.3rem; color: #18241E; margin: 0 0 14px; }
+.admin-shell .sch-sub { font: 500 0.8rem/1 var(--font-ui); color: #8A9183; margin: -10px 0 14px; }
+.admin-shell .sch-card { background: #FFFEF8; border: 1px solid #E1DDCE;
+  border-radius: 16px; padding: 20px 24px; }
+
+.admin-shell .sch-hero { background: #143C2F; color: #e6efe7; border-radius: 16px;
+  padding: 22px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.admin-shell .sch-hero-ico { width: 46px; height: 46px; flex: none; border-radius: 12px;
+  background: #1C4A3A; color: var(--gold); display: grid; place-items: center; font-size: 1.3rem; }
+.admin-shell .sch-hero-body { flex: 1; min-width: 180px; }
+.admin-shell .sch-hero-body h2 { margin: 0; font-family: var(--font-display); font-weight: 500;
+  font-size: 1.25rem; color: #F3F0E2; }
+.admin-shell .sch-hero-body p { margin: 5px 0 0; font: 500 0.82rem/1 var(--font-ui); color: #8fb09f; }
+.admin-shell .sch-hero-body code { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 5px; }
+.admin-shell .sch-hero-copy { flex: none; padding: 0.7em 1.3em; background: var(--gold);
+  color: #143C2F; border: 0; border-radius: 999px; font: 700 0.82rem/1 var(--font-ui); cursor: pointer; }
+
+.admin-shell .sch-types { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .admin-shell .sch-types { grid-template-columns: 1fr; } }
+.admin-shell .sch-type { background: #FFFEF8; border: 1px solid #E1DDCE; border-radius: 14px;
+  padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.admin-shell .sch-type.is-off { opacity: 0.55; }
+.admin-shell .sch-type-top { display: flex; align-items: flex-start; gap: 11px; }
+.admin-shell .sch-type-dot { width: 10px; height: 10px; border-radius: 999px; flex: none; margin-top: 5px; }
+.admin-shell .sch-type-name { flex: 1; min-width: 0; text-decoration: none; display: block; }
+.admin-shell .sch-type-name > span:first-child { display: block; font: 700 0.96rem/1.2 var(--font-ui); color: #18241E; }
+.admin-shell .sch-type-meta { display: block; font: 500 0.8rem/1.3 var(--font-ui); color: #5C6A5E; margin-top: 3px; }
+.admin-shell .sch-type-foot { display: flex; align-items: center; justify-content: space-between;
+  border-top: 1px solid #EFEAE0; padding-top: 12px; }
+.admin-shell .sch-type-up { font: 600 0.82rem/1 var(--font-ui); color: #8A9183; }
+.admin-shell .sch-type-copy { background: none; border: 0; cursor: pointer;
+  font: 600 0.78rem/1 var(--font-ui); color: #7C2F38; }
+.admin-shell .sch-type-off { font: 600 0.78rem/1 var(--font-ui); color: #a99f90; }
+
+.admin-shell .sch-switch { flex: none; width: 38px; height: 22px; border-radius: 999px;
+  background: #d8d0bf; border: 0; padding: 0; position: relative; cursor: pointer; }
+.admin-shell .sch-switch.is-on { background: #2f7d57; }
+.admin-shell .sch-switch.sch-switch-green.is-on { background: #143C2F; }
+.admin-shell .sch-switch span { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+  border-radius: 999px; background: #fff; transition: left 0.2s ease; }
+.admin-shell .sch-switch.is-on span { left: 18px; }
+
+.admin-shell .sch-week { display: flex; flex-direction: column; }
+.admin-shell .sch-day { display: flex; align-items: center; gap: 14px; padding: 11px 0;
+  border-top: 1px solid #EFEAE0; }
+.admin-shell .sch-day-label { font: 600 0.86rem/1 var(--font-ui); color: #18241E; width: 42px; flex: none; }
+.admin-shell .sch-day-hours { font: 500 0.84rem/1 var(--font-ui); color: #18241E; }
+.admin-shell .sch-day.is-off .sch-day-hours { color: #a99f90; }
+
+.admin-shell .sch-rail .sch-card { padding: 20px; }
+.admin-shell .sch-cal-title { font-size: 1.2rem; }
+.admin-shell .sch-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; }
+.admin-shell .sch-dow { font: 700 0.64rem/1 var(--font-ui); color: #8A9183; padding: 4px 0; }
+.admin-shell .sch-cell { font: 600 0.78rem/1 var(--font-ui); color: #5C6A5E;
+  padding: 7px 0 5px; border-radius: 8px; }
+.admin-shell .sch-cell.is-empty { color: transparent; }
+.admin-shell .sch-cell.is-today { background: #7C2F38; color: #F3F0E2; }
+.admin-shell .sch-cell-dot { display: block; width: 5px; height: 5px; border-radius: 999px;
+  background: var(--gold); margin: 1px auto 0; }
+
+.admin-shell .sch-up { display: flex; gap: 13px; padding: 12px 0; border-top: 1px solid #EFEAE0; }
+.admin-shell .sch-up:first-of-type { border-top: 0; padding-top: 0; }
+.admin-shell .sch-up-chip { flex: none; width: 46px; text-align: center; background: #E7ECDD;
+  border-radius: 9px; padding: 6px 0; }
+.admin-shell .sch-up-chip.is-soon { background: #f3e3e5; }
+.admin-shell .sch-up-day { font-family: var(--font-display); font-size: 1.15rem; color: #2f7d57; line-height: 1; }
+.admin-shell .sch-up-chip.is-soon .sch-up-day { color: #7C2F38; }
+.admin-shell .sch-up-mon { font: 600 0.58rem/1 var(--font-ui); letter-spacing: 0.06em;
+  text-transform: uppercase; color: #2f7d57; margin-top: 3px; }
+.admin-shell .sch-up-chip.is-soon .sch-up-mon { color: #7C2F38; }
+.admin-shell .sch-up-body { flex: 1; min-width: 0; }
+.admin-shell .sch-up-client { font: 600 0.88rem/1.2 var(--font-ui); color: #18241E; }
+.admin-shell .sch-up-type { font: 500 0.79rem/1.3 var(--font-ui); color: #5C6A5E; margin-top: 3px; }
+.admin-shell .sch-up-time { font: 600 0.74rem/1 var(--font-ui); color: #5C6A5E; margin-top: 5px; }
+.admin-shell .sch-up-time.is-soon { color: #7C2F38; }
+.admin-shell .sch-up-all { display: inline-block; margin-top: 14px; font: 600 0.78rem/1 var(--font-ui);
+  color: #7C2F38; text-decoration: none; }
+
 /* ── Scheduler: admin console ─────────────────────────────────────────── */
 .linkbtn {
   background: none; color: var(--accent); border: 0; padding: 0; margin: 0;

@@ -5,14 +5,13 @@
   <div class="pgtop-lead">
     <h1>Scheduling</h1>
     <p class="pgtop-sub">
-      <b>{{ events|length }}</b> event type{{ "s" if events|length != 1 }} ·
-      {% if gcal.connected %}<span class="pos">Google Calendar synced</span>{% else %}Google Calendar off{% endif %} ·
-      times in {{ tz }}
+      <b>{{ booked_week }} booked</b> this week
+      {% if next_up %}· next up <b class="neg">{{ next_up }}</b>{% endif %}
     </p>
   </div>
   <div class="pgtop-actions">
-    <a class="pgtop-link" href="/admin/scheduling/bookings">Bookings <span aria-hidden="true">&rarr;</span></a>
-    <a class="pgtop-new" href="#new-event"><span class="qc-plus" aria-hidden="true">+</span> New event type</a>
+    <a class="pgtop-link" href="/book">Preview page</a>
+    <a class="pgtop-new" href="#new-event"><span class="qc-plus" aria-hidden="true">+</span> Session type</a>
   </div>
 </header>
 {% endblock %}
@@ -20,153 +19,129 @@
 <main class="admin-main">
   {% if g_error %}<p class="sched-flash sched-flash-err">{{ g_error }}</p>{% endif %}
 
-  <section class="sched-hero" aria-label="Booking page">
-    <span class="sched-hero-ico" aria-hidden="true">&#9719;</span>
-    <div class="sched-hero-body">
-      <h2>Your booking page is live</h2>
-      <p><code>/book</code> · clients pick a time that fits your weekly hours</p>
-    </div>
-    <button type="button" class="sched-hero-copy" data-copy-path="/book">Copy link</button>
-  </section>
-
-  <section class="sched-card">
-    <div class="sched-card-head">
-      <h2>Google Calendar</h2>
-      {% if gcal.connected %}<span class="sched-pill sched-pill-on">Connected</span>
-      {% elif gcal.configured %}<span class="sched-pill">Not connected</span>
-      {% else %}<span class="sched-pill sched-pill-off">Not provisioned</span>{% endif %}
-    </div>
-    {% if not gcal.configured %}
-    <p class="muted">Add <code>MISE_GOOGLE_CLIENT_ID</code> and
-      <code>MISE_GOOGLE_CLIENT_SECRET</code> to <code>.env</code> to enable two-way
-      sync — booked times hide from your booking page and land on your calendar.</p>
-    {% elif gcal.connected %}
-    <p class="sched-gcal-on">
-      <span class="sched-dot" style="background:#3a7d44"></span>
-      Syncing <code>{{ gcal.calendar_id }}</code>{% if gcal.connected_at %}
-      since {{ gcal.connected_at[:10] }}{% endif %}.
-    </p>
-    <p class="muted">Busy times on this calendar are hidden from your booking page,
-      and each confirmed booking is added as an event (removed on cancel).</p>
-    <form method="post" action="/admin/scheduling/google/disconnect">
-      <button class="linkbtn">Disconnect</button>
-    </form>
-    {% else %}
-    <p class="muted">Connect your Google calendar so Mise never double-books you:
-      busy times are hidden from the booking page and confirmed bookings sync across.</p>
-    <a class="sched-btn" href="/admin/scheduling/google/connect">Connect Google Calendar</a>
-    {% endif %}
-  </section>
-
-  <section class="sched-card">
-    <div class="sched-card-head">
-      <h2>Event types</h2>
-      <p class="muted">Each is its own bookable link — like a Calendly event.</p>
-    </div>
-    {% if events %}
-    <ul class="sched-events">
-      {% for e in events %}
-      <li class="sched-event{% if not e.active %} sched-off{% endif %}">
-        <span class="sched-dot" style="background:{{ e.color }}"></span>
-        <div class="sched-event-body">
-          <strong>{{ e.name }}{% if not e.active %} <em>(off)</em>{% endif %}</strong>
-          <span class="sched-event-meta">{{ e.duration_min }} min · {{ e.upcoming }} upcoming</span>
-          {% if e.active %}<a class="sched-event-link" href="/book/{{ e.slug }}">/book/{{ e.slug }}</a>
-          {% else %}<span class="sched-event-link muted">/book/{{ e.slug }}</span>{% endif %}
-        </div>
-        <div class="sched-event-actions">
-          <a href="/admin/scheduling/event/{{ e.id }}">Edit</a>
-          <form method="post" action="/admin/scheduling/event/{{ e.id }}/toggle">
-            <button class="linkbtn">{{ "Deactivate" if e.active else "Activate" }}</button>
-          </form>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="muted">No event types yet — add your first below.</p>
-    {% endif %}
-
-    <form method="post" action="/admin/scheduling/event" class="sched-newevent" id="new-event">
-      <h3>New event type</h3>
-      <label>Name <input name="name" required placeholder="Discovery Call"></label>
-      <label>URL slug <input name="slug" required placeholder="discovery-call" pattern="[a-z0-9][a-z0-9-]*"></label>
-      <label>Length (min) <input name="duration_min" type="number" value="30" min="5" max="1440"></label>
+  <section id="new-event" class="sch-compose">
+    <form method="post" action="/admin/scheduling/event" class="inline-form">
+      <input type="text" name="name" placeholder="Session type name" required>
+      <input type="text" name="slug" placeholder="discovery-call" pattern="[a-z0-9][a-z0-9-]*" required>
+      <input type="number" name="duration_min" value="30" min="5" max="1440" title="Length (minutes)">
       <button type="submit">Create</button>
+      <a class="sch-compose-cancel" href="#">Cancel</a>
     </form>
   </section>
 
-  <section class="sched-card">
-    <div class="sched-card-head">
-      <h2>Weekly hours</h2>
-      <p class="muted">Your default open hours. Date overrides below handle exceptions.</p>
-    </div>
-    <form method="post" action="/admin/scheduling/availability" class="sched-week">
-      {% for d in week %}
-      <div class="sched-day{% if not d.on %} sched-day-off{% endif %}">
-        <label class="sched-dayname">
-          <input type="checkbox" name="on_{{ d.wd }}" {% if d.on %}checked{% endif %}>
-          <span>{{ d.label }}</span>
-        </label>
-        <div class="sched-day-range">
-          <input type="time" name="start_{{ d.wd }}" value="{{ d.start }}">
-          <span class="sched-dash">–</span>
-          <input type="time" name="end_{{ d.wd }}" value="{{ d.end }}">
+  <div class="sch-grid">
+    <div class="sch-col">
+
+      <section class="sch-hero" aria-label="Booking page">
+        <span class="sch-hero-ico" aria-hidden="true">&#9719;</span>
+        <div class="sch-hero-body">
+          <h2>Your booking page is live</h2>
+          <p><code>/book</code> · clients pick a time that fits your hours</p>
         </div>
-      </div>
-      {% endfor %}
-      <button type="submit">Save hours</button>
-    </form>
-    <p class="muted sched-hint">One window per day here; for split hours on a single
-      date use an override below.</p>
-  </section>
+        <button type="button" class="sch-hero-copy" data-copy-path="/book">Copy link</button>
+      </section>
 
-  <section class="sched-card">
-    <div class="sched-card-head">
-      <h2>Date overrides</h2>
-      <p class="muted">Block a day off, or set special hours for one date.</p>
-    </div>
-    {% if overrides %}
-    <ul class="sched-overrides">
-      {% for o in overrides %}
-      <li>
-        <strong>{{ o.day }}</strong> —
-        {% if o.available %}{{ "%02d:%02d"|format(o.start_min//60, o.start_min%60) }}–{{ "%02d:%02d"|format(o.end_min//60, o.end_min%60) }}{% else %}<span class="sched-blocked">blocked</span>{% endif %}
-        <form method="post" action="/admin/scheduling/override/{{ o.id }}/delete">
-          <button class="linkbtn">remove</button>
+      <section>
+        <h2 class="sch-h2">Session types</h2>
+        {% if types %}
+        <div class="sch-types">
+          {% for t in types %}
+          <div class="sch-type{% if not t.on %} is-off{% endif %}">
+            <div class="sch-type-top">
+              <span class="sch-type-dot" style="background: {{ t.dot }};"></span>
+              <a class="sch-type-name" href="/admin/scheduling/event/{{ t.id }}">
+                <span>{{ t.name }}</span>
+                <span class="sch-type-meta">{{ t.meta }}</span>
+              </a>
+              <form method="post" action="/admin/scheduling/event/{{ t.id }}/toggle">
+                <button type="submit" class="sch-switch{% if t.on %} is-on{% endif %}"
+                        aria-label="{{ 'Turn off' if t.on else 'Turn on' }} {{ t.name }}"
+                        aria-pressed="{{ 'true' if t.on else 'false' }}"><span></span></button>
+              </form>
+            </div>
+            <div class="sch-type-foot">
+              <span class="sch-type-up">{{ t.upcoming_label }}</span>
+              {% if t.on %}<button type="button" class="sch-type-copy" data-copy-path="/book/{{ t.slug }}">Copy link</button>
+              {% else %}<span class="sch-type-off">Off</span>{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">No session types yet — <a href="#new-event">add your first</a>.</p>
+        {% endif %}
+      </section>
+
+      <section class="sch-card">
+        <h2 class="sch-h2">Weekly hours</h2>
+        <p class="sch-sub">When clients can book you</p>
+        <form method="post" action="/admin/scheduling/availability" class="sch-week">
+          {% for d in days %}
+          <div class="sch-day{% if not d.on %} is-off{% endif %}">
+            <button type="submit" name="toggle" value="{{ d.wd }}"
+                    class="sch-switch sch-switch-green{% if d.on %} is-on{% endif %}"
+                    aria-label="{{ 'Disable' if d.on else 'Enable' }} {{ d.label }}"
+                    aria-pressed="{{ 'true' if d.on else 'false' }}"><span></span></button>
+            <span class="sch-day-label">{{ d.label }}</span>
+            <span class="sch-day-hours">{{ d.hours }}</span>
+            <input type="hidden" name="on_{{ d.wd }}" value="{{ 1 if d.on else 0 }}">
+            <input type="hidden" name="start_{{ d.wd }}" value="{{ d.start }}">
+            <input type="hidden" name="end_{{ d.wd }}" value="{{ d.end }}">
+          </div>
+          {% endfor %}
         </form>
-      </li>
-      {% endfor %}
-    </ul>
-    {% endif %}
-    <form method="post" action="/admin/scheduling/override" class="sched-override-add">
-      <label>Date <input type="date" name="day" required></label>
-      <label>Mode
-        <select name="mode">
-          <option value="block">Block the whole day</option>
-          <option value="hours">Special hours</option>
-        </select>
-      </label>
-      <label>From <input type="time" name="start"></label>
-      <label>To <input type="time" name="end"></label>
-      <button type="submit">Add</button>
-    </form>
-  </section>
+      </section>
+    </div>
+
+    <div class="sch-col sch-rail">
+      <section class="sch-card">
+        <h2 class="sch-h2 sch-cal-title">{{ cal_label }}</h2>
+        <div class="sch-cal">
+          {% for d in dow %}<span class="sch-dow">{{ d }}</span>{% endfor %}
+          {% for c in cal %}
+          <span class="sch-cell{% if c.empty %} is-empty{% elif c.today %} is-today{% endif %}">{{ c.day }}{% if c.booked %}<span class="sch-cell-dot"></span>{% endif %}</span>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="sch-card">
+        <h2 class="sch-h2">Upcoming</h2>
+        {% if upcoming %}
+        {% for b in upcoming %}
+        <div class="sch-up">
+          <div class="sch-up-chip{% if b.soon %} is-soon{% endif %}">
+            <div class="sch-up-day">{{ b.day }}</div>
+            <div class="sch-up-mon">{{ b.mon }}</div>
+          </div>
+          <div class="sch-up-body">
+            <div class="sch-up-client">{{ b.client }}</div>
+            <div class="sch-up-type">{{ b.type }}</div>
+            <div class="sch-up-time{% if b.soon %} is-soon{% endif %}">{{ b.time }}</div>
+          </div>
+        </div>
+        {% endfor %}
+        <a class="sch-up-all" href="/admin/scheduling/bookings">All bookings &rarr;</a>
+        {% else %}
+        <p class="muted">No upcoming bookings.</p>
+        {% endif %}
+      </section>
+    </div>
+  </div>
 
   <script>
   (function () {
-    var btn = document.querySelector('.sched-hero-copy');
-    if (!btn) return;
-    btn.addEventListener('click', function () {
-      var url = window.location.origin + (btn.dataset.copyPath || '/book');
-      var done = function () {
+    document.querySelectorAll('[data-copy-path]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var url = window.location.origin + (btn.dataset.copyPath || '/book');
         var was = btn.textContent;
-        btn.textContent = '✓ Copied';
-        setTimeout(function () { btn.textContent = was; }, 1600);
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(done, done);
-      } else { done(); }
+        var done = function () {
+          btn.textContent = '✓ Copied';
+          setTimeout(function () { btn.textContent = was; }, 1600);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(done, done);
+        } else { done(); }
+      });
     });
   })();
   </script>
