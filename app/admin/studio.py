@@ -133,8 +133,12 @@ async def studio_clients(request: Request):
                                        "client_portal_hints": client_portal_hints})
 
 
-@router.get("", response_class=HTMLResponse)
-async def studio_home(request: Request):
+def _studio_context(request: Request) -> dict:
+    """Shared context for the Studio board and its Activity sub-view. Both render
+    from the same pipeline + needs-attention computation: the board template reads
+    the project/stage subset, the activity template the strips + sparklines. Kept
+    as one function so the "X needs action" badge on the board and the strips it
+    links to can never drift out of sync."""
     # Financial semantics: an invoice is overdue when its due_date is past on the
     # OPERATOR'S WALL CLOCK (localtime, the canonical studio clock) — not UTC.
     # Judging on UTC would declare an invoice overdue hours early in the evening
@@ -417,28 +421,39 @@ async def studio_home(request: Request):
                  "holder_name": lic["holder_name"], "company": lic["holder_company"],
                  "usage_tier": lic["usage_tier"], "n": len(hits), "latest": hits[0]})
     press_confirm.sort(key=lambda x: x["n"], reverse=True)
+    return {"projects": projects,
+            "statuses": PROJECT_STATUSES, "counts": counts,
+            "stale_days": STALE_DAYS,
+            "outstanding": outstanding,
+            "inquiries": inquiries,
+            "inquiries_archived": inquiries_archived,
+            "licenses_expiring": licenses_expiring,
+            "retainer_drafts": retainer_drafts,
+            "quota_behind": quota_behind,
+            "content_due": content_due,
+            "press_confirm": press_confirm,
+            "upcoming": upcoming,
+            "proofing_waiting": list(waiting.values()),
+            "conflicts": conflicts,
+            "overdue_by_stage": overdue_by_stage,
+            "sparklines": sparklines,
+            "spark_days": day_strs,
+            "spark_window": spark_days_window,
+            "stage_value": stage_value,
+            "pipeline_value_total": pipeline_value_total,
+            "booked_value": booked_value}
+
+
+@router.get("", response_class=HTMLResponse)
+async def studio_home(request: Request):
     return templates.TemplateResponse(request, "admin/studio.html",
-                                      {"projects": projects,
-                                       "statuses": PROJECT_STATUSES, "counts": counts,
-                                       "stale_days": STALE_DAYS,
-                                       "outstanding": outstanding,
-                                       "inquiries": inquiries,
-                                       "inquiries_archived": inquiries_archived,
-                                       "licenses_expiring": licenses_expiring,
-                                       "retainer_drafts": retainer_drafts,
-                                       "quota_behind": quota_behind,
-                                       "content_due": content_due,
-                                       "press_confirm": press_confirm,
-                                       "upcoming": upcoming,
-                                       "proofing_waiting": list(waiting.values()),
-                                       "conflicts": conflicts,
-                                       "overdue_by_stage": overdue_by_stage,
-                                       "sparklines": sparklines,
-                                       "spark_days": day_strs,
-                                       "spark_window": spark_days_window,
-                                       "stage_value": stage_value,
-                                       "pipeline_value_total": pipeline_value_total,
-                                       "booked_value": booked_value})
+                                      _studio_context(request))
+
+
+@router.get("/activity", response_class=HTMLResponse)
+async def studio_activity(request: Request):
+    return templates.TemplateResponse(request, "admin/studio_activity.html",
+                                      _studio_context(request))
 
 
 @router.post("/clients")
