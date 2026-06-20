@@ -108,6 +108,19 @@ REOPEN_NOTIFY_URL = os.environ.get("MISE_REOPEN_NOTIFY_URL", "")
 REOPEN_NOTIFY_TOKEN = os.environ.get("MISE_REOPEN_NOTIFY_TOKEN", "")
 REOPEN_NOTIFY_TIMEOUT = int(os.environ.get("MISE_REOPEN_NOTIFY_TIMEOUT", "5"))
 
+# Two-way SMS inbox (Quo, formerly OpenPhone). All three empty = feature INERT:
+# sms.configured() is false, no outbound texts are sent, the /webhooks/quo route
+# returns 503, and the Inbox stays email-only. Arming needs Kevin to provision a Quo
+# number + API key into flow's .env. QUO_NUMBER is the E.164 business line Quo sends
+# FROM (and the inbound webhook's "to"); QUO_WEBHOOK_SECRET is Quo's signing secret
+# used to verify inbound webhook HMACs (sms.verify_webhook). API base is overridable
+# in case Quo's host changes post-rebrand. No money/legal state.
+QUO_API_KEY = os.environ.get("MISE_QUO_API_KEY", "")
+QUO_NUMBER = os.environ.get("MISE_QUO_NUMBER", "")
+QUO_WEBHOOK_SECRET = os.environ.get("MISE_QUO_WEBHOOK_SECRET", "")
+QUO_API_BASE = os.environ.get("MISE_QUO_API_BASE", "https://api.openphone.com/v1")
+QUO_TIMEOUT = int(os.environ.get("MISE_QUO_TIMEOUT", "20"))
+
 # Shot-list read API (Domain F / B-Direct integration). Odysseus's preshoot_pack
 # reads Mise's local shot list over GET /api/shots?session=<notion_page_id> with a
 # bearer token. Empty = endpoint DISARMED: every request returns 503 (not 401), so the

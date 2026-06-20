@@ -22,6 +22,7 @@ from .admin import (activity, audit, auth, content, contracts, doc_templates,
 from .admin import scheduling as admin_scheduling
 from .public import docs, downloads, gallery, media, pay, portal, site, workspace
 from .public import forms as public_forms
+from .public import sms_webhook
 from .public import scheduling as public_scheduling
 from .render import ROOT, templates
 
@@ -102,5 +103,5 @@ for r in (auth.router, galleries.router, uploads.router, activity.router,
           gallery.router, media.router,
           downloads.router, docs.router, pay.router, portal.router, workspace.router,
           public_forms.router, public_scheduling.router, site.router,
-          service_api.router):
+          sms_webhook.router, service_api.router):
     app.include_router(r)

@@ -1,9 +1,9 @@
 {% extends "admin/base_admin.html" %}
-{# Inbox — honest 1:1 of the Admin Inbox prototype. The mock is a two-way
-   SMS/email messenger; Mise has no SMS channel and email send is manual-only,
-   so this reads the REAL inquiries table in the prototype's 3-pane layout:
-   thread list · read-only inbound message (reply by email) · contact + the real
-   convert actions that already live in studio.py. No fake composer. #}
+{# Inbox — honest 1:1 of the Admin Inbox prototype's two-way SMS/email messenger
+   over Mise's REAL data. 3-pane layout: thread list · conversation (inbound +
+   outbound bubbles) + a composer that sends by email (Gmail SMTP) or text (Quo,
+   inert until configured) · contact + the real convert actions from studio.py.
+   The thread is the messages table; channels appear only when actually sendable. #}
 {% block topbar %}{% endblock %}
 {% block admin_body %}
 <div class="ib">
@@ -47,9 +47,11 @@
     </div>
   </div>
 
-  {# ── PANE 2: the inbound message (read-only, reply by email) ── #}
+  {# ── PANE 2: the two-way conversation thread + composer ── #}
   <div class="ib-convo">
     {% if active %}
+    {% set email_ok = active.can_email and mail_configured %}
+    {% set sms_ok = active.can_sms and sms_configured %}
     <div class="ib-convo-head">
       <span class="ib-av" style="background: {{ active.av_bg }}; color: {{ active.av_color }};">{{ active.initials }}</span>
       <div class="ib-convo-id">
@@ -63,37 +65,58 @@
     </div>
 
     <div class="ib-convo-body">
-      {% if active.message %}
-      <div class="ib-msg">
-        <div class="ib-bubble">{{ active.message }}</div>
-        <div class="ib-bubble-meta">{{ active.contact_name or active.name }} · {{ active.created_at | localtime }}</div>
+      {% for m in active.messages %}
+      <div class="ib-msg {{ 'ib-msg-out' if m.mine }}">
+        <div class="ib-bubble {{ 'ib-bubble-out' if m.mine }}{{ ' ib-bubble-empty' if not m.body }}">{{ m.body or "(no message body)" }}</div>
+        <div class="ib-bubble-meta">
+          {{ "You" if m.mine else (active.contact_name or active.name) }}
+          · {{ m.channel }} · {{ m.time | localtime }}
+        </div>
       </div>
-      {% else %}
-      <div class="ib-msg">
-        <div class="ib-bubble ib-bubble-empty">No message body — {{ active.ch_label | lower }} submitted with contact details only.</div>
-      </div>
-      {% endif %}
+      {% endfor %}
     </div>
 
     <div class="ib-reply">
-      {% if not active.email %}
-      <span class="ib-reply-note">No email on file — reply isn't available for this inquiry.</span>
-      {% elif not mail_configured %}
-      <a class="ib-reply-btn" href="mailto:{{ active.email }}?subject={{ active.reply_subject|urlencode }}">
-        <span aria-hidden="true">✉</span> Reply by email
-      </a>
-      <span class="ib-reply-note">Mail isn't configured — this opens your mail client instead.</span>
+      {% if not email_ok and not sms_ok %}
+        {% if active.email %}
+        <a class="ib-reply-btn" href="mailto:{{ active.email }}?subject={{ active.reply_subject|urlencode }}">
+          <span aria-hidden="true">✉</span> Reply by email
+        </a>
+        <span class="ib-reply-note">Mail isn't configured — this opens your mail client instead.</span>
+        {% else %}
+        <span class="ib-reply-note">No reachable channel on file — add an email or phone to reply.</span>
+        {% endif %}
       {% else %}
       <form method="post" action="/admin/inbox/{{ active.id }}/reply" class="ib-reply-form">
         <input type="hidden" name="tab" value="{{ tab }}">
         {% if active.is_replied %}<p class="ib-reply-sent">✓ You've replied to this inquiry — send another below.</p>{% endif %}
+        {% if email_ok and sms_ok %}
+        <div class="ib-reply-chans">
+          <label class="ib-reply-chan">
+            <input type="radio" name="channel" value="email" {{ 'checked' if active.default_channel == 'email' }}>
+            <span>✉ Email <b>{{ active.email }}</b></span>
+          </label>
+          <label class="ib-reply-chan">
+            <input type="radio" name="channel" value="sms" {{ 'checked' if active.default_channel == 'sms' }}>
+            <span>✆ Text <b>{{ active.phone }}</b></span>
+          </label>
+        </div>
+        {% elif sms_ok %}
+        <input type="hidden" name="channel" value="sms">
+        <label class="ib-reply-to">Text <b>{{ active.phone }}</b></label>
+        {% else %}
+        <input type="hidden" name="channel" value="email">
         <label class="ib-reply-to">To <b>{{ active.email }}</b></label>
-        <input class="ib-reply-subj" type="text" name="subject" value="{{ active.reply_subject }}" required>
+        {% endif %}
+        {% if email_ok %}
+        <input class="ib-reply-subj" type="text" name="subject" value="{{ active.reply_subject }}"
+               placeholder="Subject (email only)">
+        {% endif %}
         <textarea class="ib-reply-msg" name="message" rows="5" required
-                  placeholder="Write your reply…&#10;&#10;Sends from {{ site_name }} via Gmail — logged in Sent."></textarea>
+                  placeholder="Write your reply…"></textarea>
         <div class="ib-reply-foot">
-          <span class="ib-reply-note">Sends now from your Gmail · logged in Sent</span>
-          <button class="ib-reply-send" type="submit"><span aria-hidden="true">✉</span> Send reply</button>
+          <span class="ib-reply-note">Manual send · logged to the thread</span>
+          <button class="ib-reply-send" type="submit"><span aria-hidden="true">➤</span> Send reply</button>
         </div>
       </form>
       {% endif %}

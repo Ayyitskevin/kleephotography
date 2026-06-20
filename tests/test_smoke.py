@@ -6658,3 +6658,94 @@ def test_dashboard_nudge_dismiss_clears_for_today(admin):
     finally:
         db.run("DELETE FROM dismissed_nudges WHERE nudge_key=?", (key,))
         db.run("DELETE FROM inquiries WHERE id=?", (iid,))
+
+
+def _quo_sig(secret_b64: str, raw: bytes, ts: str = "1700000000") -> str:
+    """Build a valid openphone-signature header for `raw` (mirrors sms.verify_webhook)."""
+    import base64, hashlib, hmac
+    key = base64.b64decode(secret_b64)
+    sig = base64.b64encode(hmac.new(key, ts.encode() + b"." + raw,
+                                    hashlib.sha256).digest()).decode()
+    return f"hmac;1;{ts};{sig}"
+
+
+def test_quo_webhook_inert_without_secret(client, monkeypatch):
+    """Ships inert: with no signing secret the inbound route refuses (503), writing
+    nothing — the same posture as the Stripe webhook."""
+    from app import config
+    monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", "")
+    r = client.post("/webhooks/quo", content=b"{}")
+    assert r.status_code == 503
+
+
+def test_quo_webhook_rejects_bad_signature(client, monkeypatch):
+    """Signature is the gate. A wrong/absent HMAC fails closed (400)."""
+    import base64
+    from app import config
+    monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", base64.b64encode(b"k").decode())
+    r = client.post("/webhooks/quo", content=b'{"type":"message.received"}',
+                    headers={"openphone-signature": "hmac;1;1700000000;deadbeef"})
+    assert r.status_code == 400
+
+
+def test_quo_inbound_creates_sms_inquiry_and_is_idempotent(client, monkeypatch):
+    """A text from an unknown number auto-creates a kind='sms' inquiry and records the
+    message; a retried webhook (same provider id) is a no-op."""
+    import base64, json
+    from app import config
+    secret = base64.b64encode(b"signing-key").decode()
+    monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", secret)
+    phone = "+15557654321"
+    body = {"type": "message.received",
+            "data": {"object": {"id": "QUO_MSG_1", "direction": "incoming",
+                                "from": phone, "to": "+15550001111",
+                                "body": "Hi, do you shoot restaurants?"}}}
+    raw = json.dumps(body).encode()
+    sig = _quo_sig(secret, raw)
+    try:
+        r = client.post("/webhooks/quo", content=raw,
+                        headers={"openphone-signature": sig})
+        assert r.status_code == 200 and r.json()["ok"]
+        inq = db.one("SELECT * FROM inquiries WHERE phone=? AND kind='sms'", (phone,))
+        assert inq is not None and inq["message"].startswith("Hi, do you shoot")
+        msgs = db.all_("SELECT * FROM messages WHERE inquiry_id=?", (inq["id"],))
+        assert len(msgs) == 1 and msgs[0]["direction"] == "in" and msgs[0]["channel"] == "sms"
+
+        # retry with the same provider id → idempotent, no new inquiry/message
+        r2 = client.post("/webhooks/quo", content=raw,
+                         headers={"openphone-signature": sig})
+        assert r2.status_code == 200 and r2.json().get("duplicate")
+        assert db.one("SELECT COUNT(*) n FROM messages WHERE inquiry_id=?", (inq["id"],))["n"] == 1
+        assert db.one("SELECT COUNT(*) n FROM inquiries WHERE phone=?", (phone,))["n"] == 1
+    finally:
+        db.run("DELETE FROM messages WHERE provider_msg_id='QUO_MSG_1'")
+        db.run("DELETE FROM inquiries WHERE phone=?", (phone,))
+
+
+def test_inbox_sms_reply_logs_outbound(admin, monkeypatch):
+    """Replying by text sends via the Quo adapter and logs an outbound bubble to the
+    thread. SMS is gated on sms.configured() — inert until keys exist."""
+    from app import sms
+    phone = "+15553334444"
+    iid = db.run("INSERT INTO inquiries (name, email, message, kind, phone) "
+                 "VALUES (?,?,?,?,?)",
+                 ("Texted Lead", "", "(no text)", "sms", phone))
+    sent = {}
+    monkeypatch.setattr(sms, "configured", lambda: True)
+    monkeypatch.setattr(sms, "send",
+                        lambda to, body: sent.update(to=to, body=body) or "QUO_OUT_1")
+    try:
+        r = admin.post(f"/admin/inbox/{iid}/reply",
+                       data={"channel": "sms", "message": "Yes! Let's talk."},
+                       follow_redirects=False)
+        assert r.status_code == 303
+        assert sent == {"to": phone, "body": "Yes! Let's talk."}
+        out = db.one("SELECT * FROM messages WHERE inquiry_id=? AND direction='out'", (iid,))
+        assert out is not None and out["channel"] == "sms" and out["provider_msg_id"] == "QUO_OUT_1"
+
+        # the conversation now shows both the inbound seed and the outbound reply
+        page = admin.get(f"/admin/inbox?sel={iid}")
+        assert "Yes! Let&#39;s talk." in page.text or "Yes! Let's talk." in page.text
+    finally:
+        db.run("DELETE FROM messages WHERE inquiry_id=?", (iid,))
+        db.run("DELETE FROM inquiries WHERE id=?", (iid,))
