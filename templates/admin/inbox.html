@@ -112,6 +112,11 @@
         <input class="ib-reply-subj" type="text" name="subject" value="{{ active.reply_subject }}"
                placeholder="Subject (email only)">
         {% endif %}
+        <div class="ib-snippets">
+          <button type="button" class="ib-snippet" data-snippet="Thanks for reaching out — I'd love to help!">Thanks for reaching out!</button>
+          <button type="button" class="ib-snippet" data-snippet="Sounds great! What dates work for a shoot?">When works for you?</button>
+          <button type="button" class="ib-snippet" data-snippet="Putting a proposal together now — you'll have it within the hour.">Sending a proposal</button>
+        </div>
         <textarea class="ib-reply-msg" name="message" rows="5" required
                   placeholder="Write your reply…"></textarea>
         <div class="ib-reply-foot">
@@ -187,4 +192,17 @@
   {% endif %}
 
 </div>
+<script>
+(function () {
+  var box = document.querySelector('.ib-reply-msg');
+  if (!box) return;
+  document.querySelectorAll('.ib-snippet').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = b.getAttribute('data-snippet');
+      box.value = box.value.trim() ? box.value.replace(/\s*$/, ' ') + t : t;
+      box.focus();
+    });
+  });
+})();
+</script>
 {% endblock %}
