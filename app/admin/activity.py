@@ -182,7 +182,7 @@ async def home(request: Request):
         next_steps.append({"tone": "warn",
                            "key": f"inq_reply:{r['id']}",
                            "text": f"Reply to {who} — inquiry {r['age_d']}d old",
-                           "url": "/admin/studio#inquiries"})
+                           "url": "/admin/inbox"})
     for r in db.all_(
         """SELECT p.id, p.title, c.name AS client_name, c.company
            FROM projects p JOIN clients c ON c.id=p.client_id

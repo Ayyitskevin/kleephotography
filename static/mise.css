@@ -1073,26 +1073,11 @@ progress { width: 100%; }
 .admin-add { margin: 1.2rem 0; }
 .admin-add summary { cursor: pointer; color: var(--accent); }
 
-/* Studio section tabs (board-first; activity/clients/inquiries behind tabs) */
-.studio-tabs { display: flex; gap: 4px; margin: 0 0 1.2rem;
-  border-bottom: 1px solid var(--line); }
-.studio-tabs button { background: none; border: 0;
-  border-bottom: 2px solid transparent; cursor: pointer; padding: 0.6rem 0.9rem;
-  font: 600 0.86rem var(--font-ui); color: var(--ink-soft); margin-bottom: -1px;
-  display: inline-flex; align-items: center; gap: 0.45rem; }
-.studio-tabs button:hover { color: var(--ink); }
-.studio-tabs button.is-active { color: var(--terra); border-bottom-color: var(--terra); }
-.studio-tab-flag { background: var(--clay); color: #fff; font-size: 0.7rem;
-  font-weight: 700; line-height: 1; padding: 3px 7px; border-radius: 999px;
-  font-variant-numeric: tabular-nums; }
-.studio-tab-panel[hidden] { display: none; }
-
 /* ── Studio board — strict 1:1 of the Admin Studio prototype ──────────────
-   Horizontal-scroll rail of #EFEADF columns with 9px dot headers; clean cards
-   (company + value / project / honest step-pill + age). Drag-to-move + click-
-   to-open are the only working bits kept; the old toolbar/saved-views/per-card
-   <select> were stripped to match the mock. */
-.admin-shell .stu-board-bar { display: flex; justify-content: flex-end; margin: 0 0 0.9rem; }
+   Board-only screen: horizontal-scroll rail of #EFEADF columns with 9px dot
+   headers; clean cards (company + value / project / honest step-pill + age).
+   Drag-to-move + click-to-open are the only working bits; the Board/List pill
+   lives in the topbar. */
 .admin-shell .stu-viewpill { display: inline-flex; background: #F1ECE0;
   border-radius: 999px; padding: 3px; }
 .admin-shell .stu-viewpill button { border: 0; cursor: pointer; padding: 7px 15px;
@@ -1135,6 +1120,27 @@ progress { width: 100%; }
   background: transparent; border: 1px dashed #cdc3ae; border-radius: 10px; padding: 9px;
   color: #8A9183; font: 600 0.78rem/1 var(--font-ui); }
 .admin-shell .stu-add:hover { border-color: #b8ac92; color: var(--ink-soft); }
+/* "+ New project" popover — a create-client form hanging off the topbar pill. */
+.admin-shell .stu-newproj { position: relative; }
+.admin-shell .stu-newproj > summary { list-style: none; cursor: pointer; }
+.admin-shell .stu-newproj > summary::-webkit-details-marker { display: none; }
+.admin-shell .stu-newproj[open] > summary.pgtop-new { background: var(--terra-deep); }
+.admin-shell .stu-newproj-pop {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30;
+  display: flex; flex-direction: column; gap: 8px; width: 260px; margin: 0;
+  background: #FFFEF8; border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px; box-shadow: 0 14px 34px rgba(40, 30, 12, 0.14);
+}
+.admin-shell .stu-newproj-pop input {
+  width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--line);
+  border-radius: 9px; font: 500 0.85rem/1.2 var(--font-ui); background: #fff; color: var(--ink);
+}
+.admin-shell .stu-newproj-pop button {
+  margin-top: 2px; padding: 0.55rem 1.1rem; border: 0; border-radius: 999px;
+  background: var(--terra); color: #F3F0E2; font: 600 0.84rem/1 var(--font-ui); cursor: pointer;
+}
+.admin-shell .stu-newproj-pop button:hover { background: var(--terra-deep); }
+.admin-shell .stu-newproj-hint { margin: 0 0 2px; font: 500 0.74rem/1.35 var(--font-ui); color: var(--ink-soft); }
 
 /* Projects kanban (studio pipeline board) */
 .kanban { display: flex; gap: 16px; overflow-x: auto; padding: 0.4rem 0 1rem;
@@ -1749,7 +1755,7 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .admin-shell .gx-card { text-decoration: none; background: #FFFEF8; border: 1px solid #E1DDCE;
   border-radius: 15px; overflow: hidden; display: flex; flex-direction: column;
   transition: transform 0.35s cubic-bezier(.2,.7,.2,1), box-shadow 0.35s ease, border-color 0.35s ease; }
-.admin-shell .gx-card:hover { transform: translateY(-5px); border-color: rgba(224,164,59,.6);
+.admin-shell .gx-card:hover { transform: translateY(-5px); border-color: rgba(237,178,60,.6);
   box-shadow: 0 26px 48px -28px rgba(40,30,12,0.4); }
 .admin-shell .gx-card-cover { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #e6ddd0; }
 .admin-shell .gx-card-cover img { width: 100%; height: 100%; object-fit: cover; display: block;

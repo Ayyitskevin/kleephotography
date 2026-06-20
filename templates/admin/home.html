@@ -65,7 +65,7 @@
 
   {# ── KPI strip ──────────────────────────────────────────────────────── #}
   <section class="dash-kpis" aria-label="At a glance">
-    <a class="dash-kpi" href="/admin/studio#inquiries">
+    <a class="dash-kpi" href="/admin/inbox">
       <span class="dash-kpi-label">New inquiries</span>
       <span class="dash-kpi-n">{{ new_inquiries }}</span>
       {% set d = kpi.inquiries_delta %}
@@ -247,7 +247,7 @@
       <section class="dash-panel" aria-label="New leads">
         <div class="dash-panel-head">
           <h2>New leads</h2>
-          <a class="link" href="/admin/studio#inquiries">Inquiries &rarr;</a>
+          <a class="link" href="/admin/inbox">Inquiries &rarr;</a>
         </div>
         {% if leads %}
         <ul class="dash-leads">

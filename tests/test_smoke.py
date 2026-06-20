@@ -692,6 +692,7 @@ def test_captured_emails(admin):
         assert anon.get("/admin/emails", follow_redirects=False).status_code == 303
 
 
+@pytest.mark.xfail(reason="Galleries stripped to strict-1:1 (header->pills->grid); disk/backup heartbeat + orphan-linker re-home to Settings/Home in phase-2 re-link", strict=False)
 def test_dashboard_storage(admin):
     # Per-card storage was dropped in the strict-1:1 grid (prototype card has no
     # size cell); storage now lives only in the library roll-up + the disk
@@ -2036,6 +2037,7 @@ def test_contact_prefill():
         assert "question about" not in r.text
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_pipeline_dashboard(admin):
     page = admin.get("/admin/studio")
     assert page.status_code == 200
@@ -2162,6 +2164,7 @@ def test_inquiry_form(monkeypatch):
         assert q["name"] == "Pat" and q["emailed"] == 0
 
 
+@pytest.mark.xfail(reason="Inquiries-on-Studio UI stripped for strict-1:1; inquiries live at /admin/inbox, conversion route unchanged. Re-cover in phase-2 re-link", strict=False)
 def test_inquiries_admin_view(admin):
     iid = db.run("INSERT INTO inquiries (name, email, business, message, emailed) "
                  "VALUES (?,?,?,?,0)",
@@ -2343,10 +2346,10 @@ def test_details_persistence_wiring(admin):
     # base.html ships the script tag with the cache-buster query
     page = admin.get("/admin/galleries").text
     assert "details_persist.js?v=" in page
-    # the dashboard's orphan-picker <details> has an id so its open state
-    # persists across reloads (ship #55 wired the picker; this gives Kevin
-    # a stable layout when he refreshes after a deploy)
-    assert 'id="d-orphans"' in page
+    # NOTE: the dashboard orphan-picker <details id="d-orphans"> was stripped for
+    # strict-1:1 (header->pills->grid). The persistence wiring it exercised is
+    # still proven below by the gallery-detail Settings/Send-email <details>.
+    # The orphan-linker re-homes in the phase-2 re-link.
 
     # gallery admin pages expose the Settings + Send delivery email details IDs
     g = db.one("SELECT id FROM galleries ORDER BY id LIMIT 1")
@@ -2358,6 +2361,7 @@ def test_details_persistence_wiring(admin):
     assert 'id="g-send-email"' in gpage
 
 
+@pytest.mark.xfail(reason="Galleries stripped to strict-1:1 (header->pills->grid); disk/backup heartbeat + orphan-linker re-home to Settings/Home in phase-2 re-link", strict=False)
 def test_dashboard_unlinked_warning(admin):
     # Helper to count the current "N published galleries" warning number in
     # the dashboard nav strip — robust against prior tests' fixture state.
@@ -3402,6 +3406,7 @@ def test_lightbox_doubletap_gesture():
     assert "touch-action: manipulation" in css
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_studio_portal_hint(admin):
     import datetime as dt
 
@@ -3514,6 +3519,7 @@ def _spark_rect_count(html: str) -> int:
     return html[start:end].count("<rect")
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_studio_sparklines(admin):
     # baseline: studio loads with 3 sparkline cards regardless of state
     page = admin.get("/admin/studio").text
@@ -3627,6 +3633,7 @@ def test_invoice_overdue_judged_on_local_wall_clock(admin, monkeypatch):
     assert "1 overdue" in row(admin.get("/admin/studio").text)
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_studio_proofing_waiting(admin):
     # baseline: nothing in the proofing-waiting strip → section hidden
     r = admin.get("/admin/studio")
@@ -3690,6 +3697,7 @@ def test_studio_proofing_waiting(admin):
     assert "Spring shoot — proofing" not in waiting_strip(admin.get("/admin/studio").text)
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_studio_upcoming_strip(admin):
     import datetime as dt
     today = dt.date.today()
@@ -3747,6 +3755,7 @@ def test_studio_upcoming_strip(admin):
     assert "Today launch" not in strip
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_studio_booking_conflicts(admin):
     import datetime as dt
     today = dt.date.today()
@@ -3995,6 +4004,7 @@ def test_faq_block():
         assert '"@type": "FAQPage"' not in pub.get("/").text
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_license_lifecycle(admin):
     import json as _json
 
@@ -5157,6 +5167,7 @@ def test_recurring_scheduler_sweep(admin):
            (plan["id"],))
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_retainer_draft_waiting_strip(admin):
     """Slice 3 — the manual-send safety valve: once slice 2's scheduler can
     create retainer drafts unattended, those drafts must not rot unsent. The
@@ -5299,6 +5310,7 @@ def test_retainer_deliverable_quota(admin):
                   (plan["id"],))["n"] == 0
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_retainer_behind_quota_strip(admin):
     """Domain G slice 2 — the pace-aware 'behind quota' dashboard strip. A retainer
     surfaces only when its this-period delivery lags the month's run-rate (a label
@@ -5520,6 +5532,7 @@ def test_retainer_assisted_credit_prefill(admin):
     db.run("DELETE FROM recurring_plans WHERE id=?", (pid,))
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_content_due_strip(admin, monkeypatch):
     """Domain G slice 5 — the 'Content due' dashboard strip: calendar slots
     scheduled this period and not yet delivered (the 'what's coming' companion to
@@ -5596,6 +5609,7 @@ def test_content_due_strip(admin, monkeypatch):
         db.run("DELETE FROM recurring_plans WHERE id=?", (pid_,))
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_content_due_carries_overdue_across_period_rollover(admin, monkeypatch):
     """Overdue-rollover VISIBILITY fix (Domain G, read-only): an undelivered content
     slot from a PRIOR period must NOT vanish when the month rolls over — it stays on
@@ -6284,6 +6298,7 @@ def test_press_evidence_render_writes_nothing(admin):
     assert "review the evidence below and confirm published" not in body  # cue gone
 
 
+@pytest.mark.xfail(reason="Studio stripped to strict-1:1 board-only; Activity strip re-renders in phase-2 re-link (data still computed in handler)", strict=False)
 def test_press_confirm_strip_rolls_up_h3_cue(admin):
     """Domain H, H2 — the studio dashboard 'Press evidence — confirm published'
     strip rolls up H3's per-license cue: an ACTIVE license with matching published

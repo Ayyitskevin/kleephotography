@@ -6,7 +6,7 @@
     <h1>Galleries</h1>
     <p class="pgtop-sub">
       <b>{{ totals.n }}</b> galler{{ "ies" if totals.n != 1 else "y" }} ·
-      {{ totals.size }} · {{ totals.published }} live · {{ totals.assets }} photos
+      {{ totals.size }} · {{ totals.published }} live links · {{ totals.assets }} photos
       {% if failed_jobs %}· <a class="neg" href="/admin/jobs">{{ failed_jobs }} job{{ "s" if failed_jobs != 1 }} failed</a>{% endif %}
     </p>
   </div>
@@ -25,35 +25,6 @@
       <a class="gal-compose-cancel" href="#">Cancel</a>
     </form>
   </section>
-
-  {% if n_unlinked_pub %}
-  <details id="d-orphans" class="unlinked-warn" open>
-    <summary><span class="warn">&#9888;</span> {{ n_unlinked_pub }} published galler{{ "ies" if n_unlinked_pub != 1 else "y" }} not linked to a studio client</summary>
-    {% if link_clients %}
-    <table class="list">
-      <tr><th>Gallery</th><th>Link to client</th></tr>
-      {% for o in orphans %}
-      <tr>
-        <td><a href="/admin/galleries/{{ o.id }}">{{ o.title }}</a></td>
-        <td>
-          <form method="post" action="/admin/galleries/{{ o.id }}/link-client" class="inline-form">
-            <select name="client_id" required>
-              <option value="">&mdash; pick a client &mdash;</option>
-              {% for c in link_clients %}
-              <option value="{{ c.id }}">{{ c.name }}{% if c.company %} &middot; {{ c.company }}{% endif %}</option>
-              {% endfor %}
-            </select>
-            <button type="submit">Link</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-    {% else %}
-    <p class="muted">No studio clients yet &mdash; create one in <a href="/admin/studio">Studio</a> first, then come back to link.</p>
-    {% endif %}
-  </details>
-  {% endif %}
 
   {% if cards %}
   <div class="gx-filters" role="group" aria-label="Filter by status">
@@ -88,16 +59,6 @@
 
   <p class="studio-empty muted" id="gal-empty" hidden>No galleries match this filter.</p>
   {% else %}<p class="muted">No galleries yet.</p>{% endif %}
-
-  <p class="muted">Disk: {{ "%.1f"|format(free_gb) }} GB free
-    {% if free_gb < min_free_gb %}<span class="warn">— below the {{ min_free_gb }} GB watermark, uploads refused</span>
-    {% elif free_gb < min_free_gb * 2 %}<span class="expiring">— nearing the {{ min_free_gb }} GB upload watermark</span>
-    {% endif %}
-    · Last backup:
-    {% if backup_age_h is none %}<span class="warn">none found — is mise-backup.timer running?</span>
-    {% elif backup_age_h > 48 %}<span class="warn">{{ "%.0f"|format(backup_age_h) }} h ago — check mise-backup.timer</span>
-    {% elif backup_age_h < 1 %}under an hour ago
-    {% else %}{{ "%.0f"|format(backup_age_h) }} h ago{% endif %}</p>
 
   <script>
   (function () {

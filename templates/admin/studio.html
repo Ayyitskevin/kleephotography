@@ -9,45 +9,42 @@
     <p class="pgtop-sub">
       <b>{{ usd(pipeline_value_total) }}</b> in open pipeline ·
       <b class="pos">{{ usd(booked_value) }}</b> booked
-      {% if na_count %}· <a class="neg" href="#" data-go-tab="activity">{{ na_count }} need{{ "s" if na_count == 1 }} action</a>{% endif %}
+      {% if na_count %}· <b class="neg">{{ na_count }} need{{ "s" if na_count == 1 }} action</b>{% endif %}
     </p>
   </div>
   <div class="pgtop-actions">
-    <a class="pgtop-link" href="#" data-go-tab="activity">Pipeline <span aria-hidden="true">&rarr;</span></a>
-    <a class="pgtop-new" href="#" data-go-tab="clients"><span class="qc-plus" aria-hidden="true">+</span> New project</a>
+    <div class="stu-viewpill" role="group" aria-label="View">
+      <button type="button" data-view="board" class="is-active" aria-pressed="true">Board</button>
+      <button type="button" data-view="list" aria-pressed="false">List</button>
+    </div>
+    <details class="stu-newproj" id="clients">
+      <summary class="pgtop-new"><span class="qc-plus" aria-hidden="true">+</span> New project</summary>
+      <form method="post" action="/admin/studio/clients" class="stu-newproj-pop">
+        <p class="stu-newproj-hint">A session starts with the client — add the project on their page.</p>
+        <input type="text" name="name" placeholder="Contact name" required>
+        <input type="text" name="company" placeholder="Company / venue">
+        <input type="email" name="email" placeholder="Email">
+        <input type="text" name="phone" placeholder="Phone">
+        <button type="submit">Add client</button>
+      </form>
+    </details>
   </div>
 </header>
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  {% set na_count = (licenses_expiring or [])|length + (press_confirm or [])|length + (retainer_drafts or [])|length + (quota_behind or [])|length + (content_due or [])|length + (conflicts or [])|length + (proofing_waiting or [])|length %}
   {% set stage_label = {"inquiry_received": "Inquiry Received",
       "consultation_call": "Consultation Call", "proposal_sent": "Proposal Sent",
       "contract_signed": "Contract Signed", "retainer_paid": "Retainer Paid",
       "session_planning": "Session Planning", "project_closed": "Project Closed",
       "archived": "Archived"} %}
 
-  <nav class="studio-tabs" role="tablist" aria-label="Studio sections">
-    <button type="button" class="is-active" data-tab="board" aria-pressed="true">Board</button>
-    <button type="button" data-tab="activity" aria-pressed="false">Activity{% if na_count %} <span class="studio-tab-flag">{{ na_count }}</span>{% endif %}</button>
-    <button type="button" data-tab="clients" aria-pressed="false">Clients</button>
-    <button type="button" data-tab="inquiries" aria-pressed="false">Inquiries{% if inquiries %} <span class="studio-tab-flag">{{ inquiries|length }}</span>{% endif %}</button>
-  </nav>
-
-  <!-- BOARD -->
-  <div class="studio-tab-panel" data-tab-panel="board">
   <section id="projects" aria-label="Sessions pipeline" data-studio-view="board">
     {% if projects %}
     {% set dot = {"inquiry_received": "#5C6A5E", "consultation_call": "#2a5db0",
         "proposal_sent": "#9a7a2c", "contract_signed": "#7C2F38",
         "retainer_paid": "#2f7d57", "session_planning": "#1f6f6b",
         "project_closed": "#143C2F", "archived": "#8A9183"} %}
-    <div class="stu-board-bar">
-      <div class="stu-viewpill" role="group" aria-label="View">
-        <button type="button" data-view="board" class="is-active" aria-pressed="true">Board</button>
-        <button type="button" data-view="list" aria-pressed="false">List</button>
-      </div>
-    </div>
 
     <div class="stu-board" id="studio-board">
       <div class="stu-board-rail">
@@ -65,7 +62,6 @@
           {% set is_stale = not won and p.days_in_stage >= stale_days %}
           <article class="stu-card studio-row" draggable="true"
                    data-pid="{{ p.id }}" data-stage="{{ p.status }}"
-                   data-search="{{ (p.title ~ ' ' ~ p.client_name ~ ' ' ~ (p.company or '')) | lower }}"
                    data-name="{{ p.title | lower }}" data-shoot="{{ p.shoot_date or '' }}"
                    data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
                    data-created="{{ p.created_at or '' }}"
@@ -91,7 +87,7 @@
             </div>
           </article>
           {% endfor %}
-          <a class="stu-add" href="#" data-go-tab="clients">+ Add</a>
+          <a class="stu-add" href="#clients" data-open-new>+ Add</a>
           </div>
         </div>
         {% endfor %}
@@ -107,11 +103,9 @@
       {% set is_stale = p.status != 'project_closed' and p.days_in_stage >= stale_days %}
       <tr class="studio-row{% if p.n_overdue %} studio-row-overdue{% endif %}"
           data-pid="{{ p.id }}" data-stage="{{ p.status }}"
-          data-search="{{ (p.title ~ ' ' ~ p.client_name ~ ' ' ~ (p.company or '')) | lower }}"
           data-name="{{ p.title | lower }}" data-shoot="{{ p.shoot_date or '' }}"
           data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
-          data-created="{{ p.created_at or '' }}"
-          data-flags="{% if p.n_overdue %}overdue {% endif %}{% if is_stale %}stale {% endif %}{% if p.status in ('retainer_paid', 'session_planning', 'project_closed') %}booked {% endif %}">
+          data-created="{{ p.created_at or '' }}">
         <td><a href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
           {% if p.n_overdue %}<span class="warn" title="{{ p.n_overdue }} overdue invoice(s)">&#9888;</span>{% endif %}</td>
         <td>{{ p.client_name }}{% if p.company %}<span class="muted"> · {{ p.company }}</span>{% endif %}</td>
@@ -124,29 +118,38 @@
       </tbody>
     </table>
     {% else %}
-    <p class="muted">No active sessions. Convert an inquiry from the Inquiries tab, or add a session from a client.</p>
+    <p class="muted">No active sessions yet. Add a client with <b>+ New project</b>, or
+      convert an inquiry from the <a href="/admin/inbox">Inbox</a>.</p>
     {% endif %}
   </section>
 
   <script>
   (function () {
-    var sec = document.querySelector('[data-studio-view]');
-    if (!sec) return;
+    // Board / List view pill (in the topbar) — swaps the kanban for the flat table.
     var board = document.getElementById('studio-board');
     var listTable = document.getElementById('studio-list');
-
-    // Board / List pill — swaps the kanban for the flat table.
-    sec.querySelectorAll('.stu-viewpill button').forEach(function (btn) {
+    var sec = document.getElementById('projects');
+    document.querySelectorAll('.stu-viewpill button').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var view = btn.dataset.view;
-        sec.setAttribute('data-studio-view', view);
+        if (sec) sec.setAttribute('data-studio-view', view);
         if (board) board.hidden = view !== 'board';
         if (listTable) listTable.hidden = view !== 'list';
-        sec.querySelectorAll('.stu-viewpill button').forEach(function (b) {
+        document.querySelectorAll('.stu-viewpill button').forEach(function (b) {
           var on = b === btn;
           b.classList.toggle('is-active', on);
           b.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
+      });
+    });
+
+    // "+ Add" on any column opens the topbar New-project form.
+    document.querySelectorAll('[data-open-new]').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        e.preventDefault();
+        var d = document.getElementById('clients');
+        if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          var f = d.querySelector('input'); if (f) f.focus(); }
       });
     });
 
@@ -197,394 +200,6 @@
         });
       });
     });
-  })();
-  </script>
-  </div><!-- /board panel -->
-
-  <!-- ACTIVITY -->
-  <div class="studio-tab-panel" data-tab-panel="activity" hidden>
-
-  {% if na_count %}
-  <details class="needs-attention" id="studio-attention"{% if conflicts %} open{% endif %}>
-    <summary class="needs-attention-sum{% if conflicts %} warn{% endif %}">
-      <span class="na-ico" aria-hidden="true">&#9888;</span>
-      Needs attention <span class="na-count">{{ na_count }}</span>
-      {% if conflicts %}<span class="na-flag">· double-booking</span>{% endif %}
-    </summary>
-    <div class="needs-attention-body">
-
-  {% if licenses_expiring %}
-  <section class="upcoming conflicts" aria-label="Licenses expiring">
-    <h2>&#9888; Licenses expiring / lapsed</h2>
-    <ul class="upcoming-strip">
-      {% for l in licenses_expiring %}
-      <li class="upcoming-chip{% if l.days_left is not none and l.days_left < 0 %} upcoming-overdue{% endif %}">
-        <span class="upcoming-when">
-          {% if l.days_left is not none and l.days_left < 0 %}lapsed {{ -l.days_left }}d
-          {% elif l.days_left == 0 %}today
-          {% else %}{{ l.days_left }}d left{% endif %}</span>
-        <span class="upcoming-date">{{ l.ends_on }}</span>
-        <a href="/admin/studio/licenses/{{ l.id }}">
-          <strong>{{ l.title }}</strong>
-          <span class="muted">{{ l.holder_company or l.holder_name }} · {{ l.usage_tier }}</span>
-        </a>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-  {% if press_confirm %}
-  <section class="upcoming conflicts" aria-label="Press evidence — confirm published">
-    <h2>&#128240; Press evidence — confirm published</h2>
-    <ul class="upcoming-strip">
-      {% for l in press_confirm %}
-      <li class="upcoming-chip">
-        <span class="upcoming-when">{{ l.n }} hit{{ "s" if l.n != 1 }}</span>
-        <span class="upcoming-date">{{ l.latest.outlet }}{% if l.latest.publish_date %} · {{ l.latest.publish_date }}{% endif %}</span>
-        <a href="/admin/studio/licenses/{{ l.id }}" title="Review the press evidence and confirm this license as published">
-          <strong>{{ l.title }}</strong>
-          <span class="muted">{{ l.company or l.holder_name }} · {{ l.usage_tier }}</span>
-        </a>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-  {% if retainer_drafts %}
-  <section class="upcoming conflicts" aria-label="Retainer drafts waiting to send">
-    <h2>&#9888; Retainer drafts waiting to send</h2>
-    <ul class="upcoming-strip">
-      {% for r in retainer_drafts %}
-      <li class="upcoming-chip{% if r.age_days is not none and r.age_days >= 3 %} upcoming-overdue{% endif %}">
-        <span class="upcoming-when">
-          {% if r.age_days is not none and r.age_days > 0 %}sat {{ r.age_days }}d{% else %}new{% endif %}</span>
-        <a href="/admin/studio/invoices/{{ r.id }}" title="Review and Send this auto-generated retainer draft">
-          <strong>{{ r.title }}</strong>
-          <span class="muted">{{ r.company or r.client_name }} · ${{ "%.2f" % (r.total_cents / 100) }} · draft</span>
-        </a>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-  {% if quota_behind %}
-  <section class="upcoming conflicts" aria-label="Retainers behind quota">
-    <h2>&#9888; Retainers behind quota</h2>
-    <ul class="upcoming-strip">
-      {% for q in quota_behind %}
-      <li class="upcoming-chip{% if q.days_left <= 7 %} upcoming-overdue{% endif %}">
-        <span class="upcoming-when">{{ q.days_left }}d left</span>
-        <a href="/admin/studio/recurring/{{ q.id }}" title="Log deliveries against this retainer's quota">
-          <strong>{{ q.title }}</strong>
-          <span class="muted">{{ q.company or q.client_name }} ·
-            {{ q.worst.label }} {{ q.worst.done }}/{{ q.worst.target }} ({{ q.worst.to_go }} to go){% if q.behind|length > 1 %} +{{ q.behind|length - 1 }} more{% endif %}</span>
-        </a>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-  {% if content_due %}
-  <section class="upcoming conflicts" aria-label="Content due">
-    <h2>&#128197; Content due</h2>
-    <ul class="upcoming-strip">
-      {% for q in content_due %}
-      <li class="upcoming-chip{% if q.worst.urgent %} upcoming-overdue{% endif %}">
-        <span class="upcoming-when">{% if q.worst.overdue %}overdue{% else %}{{ q.worst.slot_date[5:] }}{% endif %}</span>
-        <a href="/admin/studio/recurring/{{ q.id }}#calendar" title="Plan and mark this retainer's scheduled content">
-          <strong>{{ q.title }}</strong>
-          <span class="muted">{{ q.company or q.client_name }} ·
-            {{ q.worst.label }}{% if q.worst.title %} ({{ q.worst.title }}){% endif %} {{ q.worst.slot_date }}{% if q.slots|length > 1 %} +{{ q.slots|length - 1 }} more{% endif %}</span>
-        </a>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-  {% if conflicts %}
-  <section class="upcoming conflicts" aria-label="Booking conflicts">
-    <h2>&#9888; Booking conflicts</h2>
-    <ul class="upcoming-strip">
-      {% for c in conflicts %}
-      <li class="upcoming-chip upcoming-overdue">
-        <span class="upcoming-when">{{ c.entries|length }} on one day</span>
-        <span class="upcoming-date">{{ c.shoot_date }}</span>
-        {% for it in c.entries %}
-        {% if it.kind == "project" %}
-        <a href="/admin/studio/projects/{{ it.id }}">
-          <strong>{{ it.title }}</strong>
-          <span class="muted">{{ it.who }}{% if it.company %} · {{ it.company }}{% endif %} · {{ it.status }}</span>
-        </a>
-        {% else %}
-        <a href="#" data-go-tab="inquiries">
-          <strong>{{ it.title }}</strong>
-          <span class="muted">{{ it.who }} · inquiry (not yet converted)</span>
-        </a>
-        {% endif %}
-        {% endfor %}
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-  {% if proofing_waiting %}
-  <section class="upcoming" aria-label="Proofing waiting">
-    <h2>Proofing waiting</h2>
-    <ul class="upcoming-strip">
-      {% for w in proofing_waiting %}
-      <li class="upcoming-chip upcoming-overdue">
-        <a href="/admin/galleries/{{ w.gallery_id }}" title="Open the gallery admin to re-fire the Proofing prompt email">
-          <span class="upcoming-when">&#9829; nudge?</span>
-          <strong>{{ w.project_title }}</strong>
-          <span class="muted">{{ w.client_name }}{% if w.company %} · {{ w.company }}{% endif %}</span>
-          <span class="muted">{{ w.n_chapters }} chapter{{ "s" if w.n_chapters != 1 }}
-            · {{ w.remaining }} pick{{ "s" if w.remaining != 1 }} remaining</span>
-        </a>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-    </div>
-  </details>
-  {% endif %}
-
-  <div class="pipeline">
-    {% for s in statuses if s != 'archived' %}
-    <span class="pipeline-step{% if counts.get(s) %} active{% endif %}">
-      {{ stage_label.get(s, s) }} <strong>{{ counts.get(s, 0) }}</strong>{% if overdue_by_stage.get(s) %}
-      <span class="warn pipeline-overdue">({{ overdue_by_stage[s] }} overdue)</span>{% endif %}{% if stage_value.get(s) %}
-      <span class="pipeline-step-val">{{ usd(stage_value[s]) }}</span>{% endif %}</span>
-    {% if not loop.last %}<span class="muted">→</span>{% endif %}
-    {% endfor %}
-    <span class="pipeline-money">
-      {% if outstanding.n %}${{ "%.2f" % (outstanding.cents / 100) }} outstanding
-      across {{ outstanding.n }} open invoice{{ "s" if outstanding.n != 1 }}
-      {% else %}nothing outstanding{% endif %}
-      {% set n_overdue = projects|sum(attribute="n_overdue") %}
-      {% if n_overdue %}<span class="warn">· {{ n_overdue }} overdue</span>{% endif %}</span>
-  </div>
-
-  {% if pipeline_value_total %}
-  <p class="pipeline-value" aria-label="Pipeline value summary">
-    <span><strong>{{ usd(pipeline_value_total) }}</strong> in pipeline</span>
-    <span class="muted">·</span>
-    <span><strong class="pipeline-value-booked">{{ usd(booked_value) }}</strong> booked
-      <span class="muted">(retainer paid &amp; on)</span></span>
-    <span class="muted pipeline-value-note">contracted invoice totals, or accepted/latest proposal where uninvoiced</span>
-  </p>
-  {% endif %}
-
-  <section class="upcoming" aria-label="Upcoming shoots">
-    <h2>Upcoming shoots</h2>
-    {% if upcoming %}
-    <ul class="upcoming-strip">
-      {% for u in upcoming %}
-      {% set cls = "ok" if u.days_out > 0 else ("today" if u.days_out == 0 else "overdue") %}
-      <li class="upcoming-chip upcoming-{{ cls }}">
-        <a href="/admin/studio/projects/{{ u.id }}">
-          <span class="upcoming-when">
-            {% if u.days_out < 0 %}{{ -u.days_out }}d ago
-            {% elif u.days_out == 0 %}today
-            {% elif u.days_out == 1 %}tomorrow
-            {% else %}in {{ u.days_out }}d{% endif %}
-          </span>
-          <span class="upcoming-date">{{ u.shoot_date }}</span>
-          <strong>{{ u.title }}</strong>
-          <span class="muted">{{ u.client_name }}{% if u.company %} · {{ u.company }}{% endif %}</span>
-          {% if u.days_out < 0 and u.status in ("inquiry_received", "consultation_call", "proposal_sent", "contract_signed", "retainer_paid") %}
-          <span class="warn">· not yet shooting</span>
-          {% endif %}
-        </a>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="muted">Nothing on the calendar between a week ago and two weeks
-      out. Add a shoot date on any project and it'll surface here.</p>
-    {% endif %}
-  </section>
-
-  <nav class="spark-window-picker" aria-label="Sparkline window">
-    {% for w in [7, 30, 90] %}
-    <a href="/admin/studio?days={{ w }}"
-       class="spark-window-btn{% if spark_window == w %} spark-window-active{% endif %}">{{ w }}d</a>
-    {% endfor %}
-  </nav>
-
-  <section class="sparklines" aria-label="Last {{ spark_window }} days activity">
-    {% set bar_w = (100 / spark_window) - 0.2 if spark_window > 7 else (100 / spark_window) - 1 %}
-    {% set bar_step = 100 / spark_window %}
-    {% for s in sparklines %}
-    {% set peak = s.series|max if s.series|max > 0 else 1 %}
-    <div class="spark-card">
-      <p class="spark-head"><strong>{{ s.total }}</strong> {{ s.label }}
-        <span class="muted">· last {{ spark_window }}d</span></p>
-      <svg class="spark-svg" viewBox="0 0 100 20" preserveAspectRatio="none"
-           aria-label="{{ s.label }} per day for the last {{ spark_window }} days">
-        {% for n in s.series %}
-        {% set h = (n / peak * 18)|round(1) if n else 0 %}
-        <rect x="{{ (loop.index0 * bar_step)|round(2) }}" y="{{ 19 - h }}"
-              width="{{ bar_w|round(2) }}" height="{{ h if h > 0 else 0.6 }}"
-              fill="{{ 'var(--accent)' if n else 'var(--line)' }}">
-          <title>{{ spark_days[loop.index0] }}: {{ n }}</title>
-        </rect>
-        {% endfor %}
-      </svg>
-    </div>
-    {% endfor %}
-  </section>
-  </div><!-- /activity panel -->
-
-  <!-- CLIENTS -->
-  <div class="studio-tab-panel" data-tab-panel="clients" hidden>
-  <h2 id="clients">Clients</h2>
-  <form method="post" action="/admin/studio/clients" class="inline-form">
-    <input type="text" name="name" placeholder="Contact name" required>
-    <input type="text" name="company" placeholder="Company / venue">
-    <input type="email" name="email" placeholder="Email">
-    <input type="text" name="phone" placeholder="Phone">
-    <button type="submit">Add client</button>
-  </form>
-  <table class="list">
-    <tr><th>Name</th><th>Company</th><th>Email</th><th>Sessions</th><th>Portal</th></tr>
-    {% for c in clients %}
-    {% set portal = client_portal_hints.get(c.id, ("muted", "—")) %}
-    <tr>
-      <td><a href="/admin/studio/clients/{{ c.id }}">{{ c.name }}</a></td>
-      <td>{{ c.company or "—" }}</td>
-      <td>{{ c.email or "—" }}</td>
-      <td>{{ c.n_projects }}</td>
-      <td><span class="{{ portal[0] }}">{{ portal[1] }}</span></td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% if not clients %}<p class="muted">No clients yet.</p>{% endif %}
-  </div><!-- /clients panel -->
-
-  <!-- INQUIRIES -->
-  <div class="studio-tab-panel" data-tab-panel="inquiries" hidden>
-  {% macro inquiry_row(i) %}
-    <tr class="{% if i.converted_at %}inquiry-converted{% elif i.dismissed_at %}inquiry-dismissed{% endif %}">
-      <td class="muted">{{ i.created_at[:10] }}
-        {% if not i.emailed %}<span class="warn" title="Email send failed — only stored here">⚠</span>{% endif %}</td>
-      <td>{{ i.name }} <span class="muted">&lt;{{ i.email }}&gt;</span></td>
-      <td>{{ i.business or "—" }}</td>
-      <td>{% if i.kind == "booking" %}<span title="Booking request">📅</span>
-            {{ i.service or "shoot" }} · {{ i.shoot_date or "?" }}
-          {% else %}<span class="muted">message</span>{% endif %}</td>
-      <td><details><summary>view</summary><pre class="inquiry-msg">{{ i.message }}</pre></details></td>
-      <td>
-        {% if i.converted_at %}
-          {% if i.converted_project_id %}
-          <a href="/admin/studio/projects/{{ i.converted_project_id }}" class="muted" title="Converted {{ i.converted_at[:10] }}">&#10003; session</a>
-          {% elif i.converted_client_id %}
-          <a href="/admin/studio/clients/{{ i.converted_client_id }}" class="muted" title="Converted {{ i.converted_at[:10] }}">&#10003; client</a>
-          {% else %}<span class="muted">&#10003; converted</span>{% endif %}
-          <form method="post" action="/admin/studio/inquiries/{{ i.id }}/unconvert"
-                class="inline"
-                onsubmit="return confirm('Clear the conversion stamp on this inquiry? The spawned client/project will be left intact.');">
-            <button class="link inquiry-undo" title="Misclick? Clear the conversion stamp">undo</button>
-          </form>
-        {% elif i.dismissed_at %}
-          <span class="muted" title="Archived {{ i.dismissed_at[:10] }}">archived</span>
-          <form method="post" action="/admin/studio/inquiries/{{ i.id }}/undismiss" class="inline">
-            <button class="link inquiry-undo" title="Restore this lead to the pipeline">undo</button></form>
-        {% else %}
-        <form method="post" action="/admin/studio/inquiries/{{ i.id }}/quote" class="inline">
-          <button class="link" title="Spawn a client, project, and draft quote">&rarr; quote</button></form>
-        <form method="post" action="/admin/studio/inquiries/{{ i.id }}/client" class="inline">
-          <button class="link">{% if i.kind == "booking" %}→ project{% else %}add as client{% endif %}</button></form>
-        <form method="post" action="/admin/studio/inquiries/{{ i.id }}/dismiss" class="inline"
-              onsubmit="return confirm('Archive this lead? You can undo it from the Inquiries list.');">
-          <button class="link inquiry-dismiss" title="Archive this lead">dismiss</button></form>
-        {% endif %}
-      </td>
-    </tr>
-  {% endmacro %}
-
-  <div class="admin-bar" id="inquiries">
-    <h2>Inquiries</h2>
-    <div class="studio-view-toggle" role="group" aria-label="Inquiries view" id="inq-toggle">
-      <button type="button" data-inq="active" class="is-active" aria-pressed="true">Active <span class="muted">{{ inquiries|length }}</span></button>
-      <button type="button" data-inq="archived" aria-pressed="false">Archived <span class="muted">{{ inquiries_archived|length }}</span></button>
-    </div>
-  </div>
-
-  <table class="list" id="inq-active" data-inq-view="active">
-    <tr><th>Date</th><th>From</th><th>Business</th><th>Request</th><th>Message</th><th></th></tr>
-    {% for i in inquiries %}{{ inquiry_row(i) }}{% endfor %}
-  </table>
-  {% if not inquiries %}<p class="muted" id="inq-active-empty">No new inquiries — the contact form and
-    booking page on the marketing site land here (and in your inbox).</p>{% endif %}
-
-  <table class="list" id="inq-archived" data-inq-view="archived" hidden>
-    <tr><th>Date</th><th>From</th><th>Business</th><th>Request</th><th>Message</th><th></th></tr>
-    {% for i in inquiries_archived %}{{ inquiry_row(i) }}{% endfor %}
-  </table>
-  {% if not inquiries_archived %}<p class="muted" id="inq-archived-empty" hidden>Nothing archived yet — converted and dismissed leads land here.</p>{% endif %}
-
-  <script>
-  (function () {
-    var toggle = document.getElementById('inq-toggle');
-    if (!toggle) return;
-    var views = {
-      active: { table: document.getElementById('inq-active'), empty: document.getElementById('inq-active-empty') },
-      archived: { table: document.getElementById('inq-archived'), empty: document.getElementById('inq-archived-empty') }
-    };
-    toggle.querySelectorAll('button').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var want = btn.dataset.inq;
-        Object.keys(views).forEach(function (k) {
-          var on = k === want;
-          if (views[k].table) views[k].table.hidden = !on;
-          if (views[k].empty) views[k].empty.hidden = !on;
-        });
-        toggle.querySelectorAll('button').forEach(function (b) {
-          var on = b === btn;
-          b.classList.toggle('is-active', on);
-          b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        });
-      });
-    });
-  })();
-  </script>
-  </div><!-- /inquiries panel -->
-
-  <script>
-  (function () {
-    var tabs = Array.prototype.slice.call(document.querySelectorAll('.studio-tabs button[data-tab]'));
-    if (!tabs.length) return;
-    var panels = Array.prototype.slice.call(document.querySelectorAll('.studio-tab-panel'));
-
-    function activate(name) {
-      tabs.forEach(function (t) {
-        var on = t.dataset.tab === name;
-        t.classList.toggle('is-active', on);
-        t.setAttribute('aria-pressed', on ? 'true' : 'false');
-      });
-      panels.forEach(function (p) { p.hidden = p.dataset.tabPanel !== name; });
-    }
-
-    tabs.forEach(function (t) {
-      t.addEventListener('click', function () { activate(t.dataset.tab); });
-    });
-    // Topbar shortcuts (need-action / pipeline / new project) jump to a tab.
-    document.querySelectorAll('[data-go-tab]').forEach(function (el) {
-      el.addEventListener('click', function (e) {
-        e.preventDefault();
-        activate(el.dataset.goTab);
-        document.querySelector('.admin-main').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    });
-    activate('board');
   })();
   </script>
 </main>
