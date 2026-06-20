@@ -695,14 +695,14 @@ def test_captured_emails(admin):
 def test_dashboard_storage(admin):
     # full-flow gallery above has uploaded media — its row shows a real size
     page = admin.get("/admin/galleries").text
-    assert "<th>Size</th>" in page
-    assert " MB" in page or " KB" in page or " GB</td>" in page
+    assert 'title="storage"' in page
+    assert " MB" in page or " KB" in page or " GB" in page
     # free-space line always renders; the test box is nowhere near the watermark
     assert "GB free" in page
     assert "uploads refused" not in page
-    # an empty gallery shows the dash, not 0 — size cell is the muted td
+    # an empty gallery shows the dash, not 0 — storage cell is the muted span
     admin.post("/admin/galleries", data={"title": "Empty Storage"})
-    assert '<td class="muted">—</td>' in admin.get("/admin/galleries").text
+    assert '<span class="muted" title="storage">—</span>' in admin.get("/admin/galleries").text
     # no snapshots in the fresh test data dir → loud "none found" (silence ≠ evidence)
     assert "none found" in page
     # a fresh snapshot flips the line to a quiet age
@@ -743,7 +743,8 @@ def test_expired_gallery(admin):
     assert f"expires {near}" in admin.get("/admin/galleries").text
     far = (dt.date.today() + dt.timedelta(days=60)).isoformat()
     db.run("UPDATE galleries SET expires_at=? WHERE id=?", (far, g["id"]))
-    assert f"until {far}" in admin.get("/admin/galleries").text
+    # far-future expiry isn't surfaced on the card grid — only soon/expired are;
+    # the full date lives on the gallery detail page (checked below)
 
     # delivery email prefill carries the expiry note (form renders when published)
     db.run("UPDATE galleries SET published=1 WHERE id=?", (g["id"],))
@@ -2364,10 +2365,10 @@ def test_dashboard_unlinked_warning(admin):
     page = admin.get("/admin/galleries").text
     assert "unlinked-warn" in page  # strip is now visible regardless of baseline
     assert f"/admin/galleries/{gid_draft}/link-client" in page
-    # per-row warning glyph in the main galleries table (the orphan picker
+    # per-card warning glyph in the main galleries grid (the orphan picker
     # mentions the gallery first, so anchor on the LAST occurrence).
     row_start = page.rindex("Loose draft")
-    row = page[row_start:page.index("</tr>", row_start)]
+    row = page[row_start:page.index("</article>", row_start)]
     assert "&#9888;" in row
 
     # use the inline picker to link to a client — count drops back, badge clears
@@ -2380,7 +2381,7 @@ def test_dashboard_unlinked_warning(admin):
     assert n_warned() == baseline
     page = admin.get("/admin/galleries").text
     row_start = page.rindex("Loose draft")
-    row = page[row_start:page.index("</tr>", row_start)]
+    row = page[row_start:page.index("</article>", row_start)]
     assert "&#9888;" not in row
     # link-client refuses bogus client_id; the gallery's client_id isn't touched
     r = admin.post(f"/admin/galleries/{gid_draft}/link-client",
@@ -3463,9 +3464,9 @@ def test_dashboard_selects_in_badge(admin):
     r = admin.get("/admin/galleries")
     assert "Loose pickin" in r.text
     # The orphan picker (ship #55) mentions the gallery title once before the
-    # main galleries table, so anchor on the LAST occurrence for badge checks.
+    # main galleries grid, so anchor on the LAST occurrence for badge checks.
     row_start = r.text.rindex("Loose pickin")
-    row_end = r.text.index("</tr>", row_start)
+    row_end = r.text.index("</article>", row_start)
     row = r.text[row_start:row_end]
     assert "selects in" not in row
 
@@ -3475,14 +3476,14 @@ def test_dashboard_selects_in_badge(admin):
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)",
            (vid, aids[0]))
     r = admin.get("/admin/galleries")
-    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</tr>", r.text.rindex("Loose pickin"))]
+    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</article>", r.text.rindex("Loose pickin"))]
     assert "selects in" not in row
 
     # hit the target → badge appears
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)",
            (vid, aids[1]))
     r = admin.get("/admin/galleries")
-    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</tr>", r.text.rindex("Loose pickin"))]
+    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</article>", r.text.rindex("Loose pickin"))]
     assert "selects in" in row
     assert "&#10003;" in row  # ✓ check mark
 
@@ -3494,7 +3495,7 @@ def test_dashboard_selects_in_badge(admin):
            "status) VALUES (?,?,?,?,?,?)",
            (gid, sid2, "photo", "d.jpg", "selbadge99.jpg", "ready"))
     r = admin.get("/admin/galleries")
-    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</tr>", r.text.rindex("Loose pickin"))]
+    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</article>", r.text.rindex("Loose pickin"))]
     assert "selects in" not in row
 
     # zero-target sections don't count (proof_target=0 is the "off" sentinel
@@ -3502,7 +3503,7 @@ def test_dashboard_selects_in_badge(admin):
     db.run("UPDATE sections SET proof_target=0 WHERE id=?", (sid2,))
     # but we left sid at target 2 with 2 picks → badge back
     r = admin.get("/admin/galleries")
-    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</tr>", r.text.rindex("Loose pickin"))]
+    row = r.text[r.text.rindex("Loose pickin"):r.text.index("</article>", r.text.rindex("Loose pickin"))]
     assert "selects in" in row
 
 

@@ -1073,6 +1073,20 @@ progress { width: 100%; }
 .admin-add { margin: 1.2rem 0; }
 .admin-add summary { cursor: pointer; color: var(--accent); }
 
+/* Studio section tabs (board-first; activity/clients/inquiries behind tabs) */
+.studio-tabs { display: flex; gap: 4px; margin: 0 0 1.2rem;
+  border-bottom: 1px solid var(--line); }
+.studio-tabs button { background: none; border: 0;
+  border-bottom: 2px solid transparent; cursor: pointer; padding: 0.6rem 0.9rem;
+  font: 600 0.86rem var(--font-ui); color: var(--ink-soft); margin-bottom: -1px;
+  display: inline-flex; align-items: center; gap: 0.45rem; }
+.studio-tabs button:hover { color: var(--ink); }
+.studio-tabs button.is-active { color: var(--terra); border-bottom-color: var(--terra); }
+.studio-tab-flag { background: var(--clay); color: #fff; font-size: 0.7rem;
+  font-weight: 700; line-height: 1; padding: 3px 7px; border-radius: 999px;
+  font-variant-numeric: tabular-nums; }
+.studio-tab-panel[hidden] { display: none; }
+
 /* Projects kanban (studio pipeline board) */
 .kanban { display: flex; gap: 16px; overflow-x: auto; padding: 0.4rem 0 1rem;
   align-items: flex-start; }
@@ -1543,10 +1557,9 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .studio-empty { padding: 0.6rem 0.2rem; }
 
 /* ── Galleries dashboard: summary + cover grid ───────────────────────── */
-.gal-summary { display: flex; flex-wrap: wrap; align-items: baseline;
-  gap: 0.4rem 1rem; margin: 0.4rem 0 0.9rem; font-size: 0.86rem;
-  font-variant-numeric: tabular-nums; }
-.gal-sum strong { font-size: 1.02rem; }
+.gal-compose { display: none; margin: 0 0 1.2rem; }
+.gal-compose:target { display: block; }
+.gal-compose-cancel { align-self: center; color: var(--ink-soft); font: 500 0.82rem/1 var(--font-ui); }
 
 .gal-filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 0.2rem 0 1.1rem; }
 .gal-pill { border: 1px solid var(--line); background: var(--surface);

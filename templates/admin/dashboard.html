@@ -17,11 +17,14 @@
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <form id="new-gallery" method="post" action="/admin/galleries" class="inline-form">
-    <input type="text" name="title" placeholder="Gallery title" required>
-    <input type="text" name="client_name" placeholder="Client (optional)">
-    <button type="submit">Create gallery</button>
-  </form>
+  <section id="new-gallery" class="gal-compose">
+    <form method="post" action="/admin/galleries" class="inline-form">
+      <input type="text" name="title" placeholder="Gallery title" required>
+      <input type="text" name="client_name" placeholder="Client (optional)">
+      <button type="submit">Create gallery</button>
+      <a class="gal-compose-cancel" href="#">Cancel</a>
+    </form>
+  </section>
 
   {% if n_unlinked_pub %}
   <details id="d-orphans" class="unlinked-warn" open>
@@ -53,41 +56,11 @@
   {% endif %}
 
   {% if galleries %}
-  <div class="gal-summary" aria-label="Library summary">
-    <span class="gal-sum muted">{{ totals.published }} published · {{ totals.draft }} draft{% if totals.expired %} · <span class="warn">{{ totals.expired }} expired</span>{% endif %}</span>
-    <span class="gal-sum"><strong>{{ totals.fav }}</strong> &#9829; favorites</span>
-    <span class="gal-sum"><strong>{{ totals.dl }}</strong> &#8595; downloads</span>
-  </div>
-
   <div class="gal-filters" role="group" aria-label="Filter by status">
     <button type="button" class="gal-pill is-active" data-status="" aria-pressed="true">All <span>{{ totals.n }}</span></button>
     <button type="button" class="gal-pill" data-status="published" aria-pressed="false">Published <span>{{ totals.published }}</span></button>
     <button type="button" class="gal-pill" data-status="draft" aria-pressed="false">Draft <span>{{ totals.draft }}</span></button>
     {% if totals.expired %}<button type="button" class="gal-pill" data-status="expired" aria-pressed="false">Expiring <span>{{ totals.expired }}</span></button>{% endif %}
-  </div>
-
-  <div class="studio-toolbar" role="search">
-    <input type="search" id="gal-search" class="studio-search"
-           placeholder="Search collections — title or client…"
-           aria-label="Search collections" autocomplete="off">
-    {% if client_names %}
-    <select id="gal-client" class="studio-filter" aria-label="Filter by client">
-      <option value="">All clients</option>
-      {% for cn in client_names %}<option value="{{ cn | lower }}">{{ cn }}</option>{% endfor %}
-    </select>
-    {% endif %}
-    <select id="gal-sort" class="studio-filter" aria-label="Sort collections">
-      <option value="created">Sort: Newest</option>
-      <option value="name">Sort: Name (A&rarr;Z)</option>
-      <option value="assets">Sort: Most assets</option>
-      <option value="fav">Sort: Most favorites</option>
-      <option value="size">Sort: Largest</option>
-    </select>
-    <div class="studio-view-toggle" role="group" aria-label="View">
-      <button type="button" data-view="grid" class="is-active" aria-pressed="true">Grid</button>
-      <button type="button" data-view="list" aria-pressed="false">List</button>
-    </div>
-    <span class="studio-match muted" id="gal-match" aria-live="polite"></span>
   </div>
 
   <div class="gal-grid" id="gal-grid">
@@ -128,41 +101,7 @@
     {% endfor %}
   </div>
 
-  <table class="list gal-list" id="gal-list" hidden>
-    <tr><th>Title</th><th>Client</th><th>Assets</th><th>&#9829;</th><th>&#8595;</th><th>Size</th><th>PIN</th><th>Link</th><th>Status</th><th></th></tr>
-    {% for g in galleries %}
-    {% set expired = g.expires_at and g.expires_at < today %}
-    <tr class="gal-item" data-gid="{{ g.id }}"
-        data-search="{{ (g.title ~ ' ' ~ (g.client_name or '')) | lower }}"
-        data-status="{{ 'published' if g.published else 'draft' }}"
-        data-expired="{{ 1 if expired else 0 }}"
-        data-client="{{ (g.client_name or '') | lower }}"
-        data-name="{{ g.title | lower }}" data-size="{{ sizes_b[g.id] }}"
-        data-assets="{{ g.n_assets }}" data-fav="{{ g.n_fav }}"
-        data-created="{{ g.created_at }}">
-      <td><a href="/admin/galleries/{{ g.id }}">{{ g.title }}</a>
-        {% if g.n_proof and not g.n_proof_pending %}
-        <span class="ok" title="Client has hit the target on every proofing section">&#10003; selects in</span>
-        {% endif %}</td>
-      <td>{{ g.client_name or "—" }}{% if not g.client_id and g.published %}
-        <span class="warn" title="Published but not linked to a studio client">&#9888;</span>{% endif %}</td>
-      <td>{{ g.n_assets }}{% if g.n_pending %} <span class="muted">({{ g.n_pending }} processing)</span>{% endif %}</td>
-      <td>{{ g.n_fav }}</td>
-      <td>{{ g.n_dl }}</td>
-      <td class="muted">{{ sizes[g.id] }}</td>
-      <td><code>{{ g.pin }}</code></td>
-      <td><code class="slug">{{ base_url }}/g/{{ g.slug }}</code></td>
-      <td>{{ "published" if g.published else "draft" }}
-        {% if g.expires_at %}
-          {% if g.expires_at < today %}<span class="warn">expired {{ g.expires_at }}</span>
-          {% elif g.expires_at <= soon %}<span class="expiring">expires {{ g.expires_at }}</span>
-          {% else %}<span class="muted">until {{ g.expires_at }}</span>{% endif %}
-        {% endif %}</td>
-      <td><a href="/admin/galleries/{{ g.id }}/activity">activity</a></td>
-    </tr>
-    {% endfor %}
-  </table>
-  <p class="studio-empty muted" id="gal-empty" hidden>No collections match — clear the search or filters.</p>
+  <p class="studio-empty muted" id="gal-empty" hidden>No galleries match this filter.</p>
   {% else %}<p class="muted">No galleries yet.</p>{% endif %}
 
   <p class="muted">Disk: {{ "%.1f"|format(free_gb) }} GB free
@@ -177,81 +116,28 @@
 
   <script>
   (function () {
-    var search = document.getElementById('gal-search');
-    if (!search) return;
-    var statusFilter = '';
     var pills = Array.prototype.slice.call(document.querySelectorAll('.gal-pill'));
-    var clientSel = document.getElementById('gal-client');
-    var sortSel = document.getElementById('gal-sort');
-    var grid = document.getElementById('gal-grid');
-    var list = document.getElementById('gal-list');
-    var listBody = list.tBodies[0];
+    if (!pills.length) return;
     var emptyMsg = document.getElementById('gal-empty');
-    var matchEl = document.getElementById('gal-match');
 
-    function applyFilter() {
-      var q = (search.value || '').trim().toLowerCase();
-      var st = statusFilter;
-      var cl = clientSel ? clientSel.value : '';
+    function applyFilter(st) {
       var shown = 0;
       document.querySelectorAll('#gal-grid .gal-item').forEach(function (el) {
-        var ok = (!q || el.dataset.search.indexOf(q) !== -1) &&
-                 (!cl || el.dataset.client === cl) &&
-                 (!st || (st === 'expired' ? el.dataset.expired === '1' : el.dataset.status === st));
+        var ok = !st || (st === 'expired' ? el.dataset.expired === '1' : el.dataset.status === st);
         el.classList.toggle('studio-hidden', !ok);
         if (ok) shown++;
       });
-      document.querySelectorAll('#gal-list .gal-item').forEach(function (el) {
-        var ok = (!q || el.dataset.search.indexOf(q) !== -1) &&
-                 (!cl || el.dataset.client === cl) &&
-                 (!st || (st === 'expired' ? el.dataset.expired === '1' : el.dataset.status === st));
-        el.classList.toggle('studio-hidden', !ok);
-      });
-      if (matchEl) matchEl.textContent = (q || st || cl) ? (shown + ' match' + (shown === 1 ? '' : 'es')) : '';
       if (emptyMsg) emptyMsg.hidden = shown !== 0;
     }
 
-    function cmp(a, b, mode) {
-      if (mode === 'name') return a.dataset.name < b.dataset.name ? -1 : a.dataset.name > b.dataset.name ? 1 : 0;
-      if (mode === 'assets') return (+b.dataset.assets) - (+a.dataset.assets);
-      if (mode === 'fav') return (+b.dataset.fav) - (+a.dataset.fav);
-      if (mode === 'size') return (+b.dataset.size) - (+a.dataset.size);
-      return a.dataset.created > b.dataset.created ? -1 : a.dataset.created < b.dataset.created ? 1 : 0;
-    }
-    function applySort() {
-      var mode = sortSel.value;
-      var cards = Array.prototype.slice.call(grid.querySelectorAll('.gal-item'));
-      cards.sort(function (a, b) { return cmp(a, b, mode); });
-      cards.forEach(function (c) { grid.appendChild(c); });
-      var rows = Array.prototype.slice.call(listBody.querySelectorAll('.gal-item'));
-      rows.sort(function (a, b) { return cmp(a, b, mode); });
-      rows.forEach(function (r) { listBody.appendChild(r); });
-    }
-
-    search.addEventListener('input', applyFilter);
     pills.forEach(function (pill) {
       pill.addEventListener('click', function () {
-        statusFilter = pill.dataset.status;
         pills.forEach(function (p) {
           var on = p === pill;
           p.classList.toggle('is-active', on);
           p.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
-        applyFilter();
-      });
-    });
-    if (clientSel) clientSel.addEventListener('change', applyFilter);
-    sortSel.addEventListener('change', applySort);
-    document.querySelectorAll('.studio-view-toggle button').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var view = btn.dataset.view;
-        grid.hidden = view !== 'grid';
-        list.hidden = view !== 'list';
-        document.querySelectorAll('.studio-view-toggle button').forEach(function (b) {
-          var on = b === btn;
-          b.classList.toggle('is-active', on);
-          b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        });
+        applyFilter(pill.dataset.status);
       });
     });
   })();
