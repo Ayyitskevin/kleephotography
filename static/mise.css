@@ -1572,6 +1572,46 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   .admin-shell .rep-top-actions { flex-wrap: wrap; }
 }
 
+/* reference — strict 1:1 (playbook timeline + pricing card + shoot-day kit) */
+.admin-shell .rf-grid { display: grid; grid-template-columns: 1fr 320px;
+  gap: 1.6rem; align-items: start; }
+.admin-shell .rf-side { display: flex; flex-direction: column; gap: 1.4rem; min-width: 0; }
+.admin-shell .rf-card { background: #FFFEF8; border: 1px solid var(--line);
+  border-radius: 16px; padding: 22px 24px; }
+.admin-shell .rf-card > h2 { margin: 0 0 1.1rem; }
+
+.admin-shell .rf-stage { border-left: 2px solid #E6DFCF; padding: 2px 0 18px 18px;
+  position: relative; }
+.admin-shell .rf-stage:last-child { padding-bottom: 0; }
+.admin-shell .rf-dot { position: absolute; left: -7px; top: 3px; width: 12px;
+  height: 12px; border-radius: 999px; border: 2px solid #FFFEF8; }
+.admin-shell .rf-stage-name { font: 700 0.92rem/1.2 var(--font-ui); color: var(--ink); }
+.admin-shell .rf-stage-note { margin: 7px 0 0; font: 500 0.85rem/1.55 var(--font-ui);
+  color: var(--ink-soft); }
+.admin-shell .rf-voice { margin: 9px 0 0; font-family: var(--font-display);
+  font-style: italic; font-size: 1rem; color: var(--clay); }
+
+.admin-shell .rf-pricing { background: #143C2F; color: #e6efe7;
+  border-radius: 16px; padding: 20px 22px; }
+.admin-shell .rf-pricing h2 { margin: 0 0 0.9rem; color: #F3F0E2; }
+.admin-shell .rf-price-row { display: flex; justify-content: space-between;
+  gap: 0.8rem; padding: 9px 0; border-top: 1px solid #1C4A3A; }
+.admin-shell .rf-price-item { font: 600 0.84rem/1.2 var(--font-ui); color: #cfe0d4; }
+.admin-shell .rf-price-amt { font: 700 0.84rem/1.2 var(--font-ui); color: var(--gold);
+  white-space: nowrap; }
+.admin-shell .rf-price-empty { color: #b9cdc0; font-size: 0.85rem; margin: 0.6rem 0 0; }
+.admin-shell .rf-price-note { margin: 0.9rem 0 0; font-size: 0.72rem; line-height: 1.45;
+  color: #8fb09f; }
+
+.admin-shell .rf-kit-list { display: flex; flex-direction: column; gap: 9px; }
+.admin-shell .rf-kit-row { display: flex; gap: 10px; align-items: center;
+  font: 500 0.85rem/1.3 var(--font-ui); color: var(--ink); }
+.admin-shell .rf-check { color: #2f7d57; font-weight: 700; }
+
+@media (max-width: 1000px) {
+  .admin-shell .rf-grid { grid-template-columns: 1fr; }
+}
+
 /* pipeline aging — kanban stalled-deal cue (stage_changed_at, migration 032) */
 .kanban-card-stale { border-color: #c79a3e; box-shadow: inset 3px 0 0 #c79a3e; }
 .kanban-card-age { font-variant-numeric: tabular-nums; }

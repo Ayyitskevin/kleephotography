@@ -1,103 +1,56 @@
 {% extends "admin/base_admin.html" %}
-{% block title %}Reference · Mise{% endblock %}
+{% block title %}Playbook &amp; reference · Mise{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
   <div class="pgtop-lead">
-    <h1>Reference</h1>
-    <p class="pgtop-sub">Private shelf — rate card &amp; internal notes, never shown to clients</p>
+    <h1>Playbook &amp; reference</h1>
+    <p class="pgtop-sub">Your booking script, pricing, and shoot-day checklist — one source of truth</p>
   </div>
   <div class="pgtop-actions">
-    <a class="pgtop-link" href="/admin/studio/playbook">Playbook <span aria-hidden="true">&rarr;</span></a>
+    <a class="pgtop-link" href="/admin/studio/playbook">Full booking flow <span aria-hidden="true">&rarr;</span></a>
     <a class="pgtop-link" href="/admin/templates">Templates <span aria-hidden="true">&rarr;</span></a>
   </div>
 </header>
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <p class="muted">Your private shelf — rate card, pricing guides, and internal
-    notes. <strong>For your eyes only:</strong> nothing here is shown to clients,
-    on the portal, or on the public site. Every <span class="tpl-fill">[bracketed]</span>
-    figure is a rate still to set.</p>
+  <div class="rf-grid">
 
-  <section class="ref-head">
-    <div class="ref-brand">
-      <span class="ref-mark">Kevin Lee <b>Photography</b></span>
-      <p class="muted">Food &amp; beverage · commercial · brand &amp; portrait</p>
-    </div>
-    <ul class="ref-contact muted">
-      <li>Kevin Lee</li>
-      <li>+1 689-280-8786</li>
-      <li>kevlee.photographer@gmail.com</li>
-    </ul>
-  </section>
+    <section class="rf-card rf-playbook" aria-label="Booking playbook">
+      <h2>Booking playbook</h2>
+      {% for s in stages %}
+      <div class="rf-stage">
+        <span class="rf-dot" style="background: {{ s.dot }};"></span>
+        <div class="rf-stage-name">{{ s.stage }}</div>
+        <p class="rf-stage-note">{{ s.note }}</p>
+        <p class="rf-voice">“{{ s.voice }}”</p>
+      </div>
+      {% endfor %}
+    </section>
 
-  <section class="tpl-section tpl-ref">
-    <h2>Pricing Guides <span class="tpl-internal">internal reference</span></h2>
-    <p class="muted">Your quoting rate card. The public site stays quoting-first — no
-      flat prices shown — so this is where the numbers live for you to quote from.</p>
-
-    <details class="tpl-guide" open>
-      <summary>Collections at a glance</summary>
-      <div class="tpl-guide-body">
-        <p class="muted">Mirrors your proposal package presets — one price story, no drift.</p>
-        {% for g in proposal_groups %}
-        <h4 class="tpl-grouplabel">{{ g.label }}</h4>
-        <table class="list">
-          <tr><th>Collection</th><th>From</th><th>Headline inclusions</th></tr>
-          {% for c in g.cards %}
-          <tr>
-            <td>{{ c.title }}</td>
-            <td>{% if c.total_cents %}${{ "%.0f" % (c.total_cents / 100) }}{% else %}<span class="tpl-fill">[TBD]</span>{% endif %}</td>
-            <td class="muted">{{ c.lines | join(" · ") }}</td>
-          </tr>
-          {% endfor %}
-        </table>
+    <div class="rf-side">
+      <section class="rf-pricing" aria-label="Pricing reference">
+        <h2>Pricing reference</h2>
+        {% for p in pricing %}
+        <div class="rf-price-row">
+          <span class="rf-price-item">{{ p.item }}</span>
+          <span class="rf-price-amt">{{ p.price }}</span>
+        </div>
+        {% else %}
+        <p class="rf-price-empty">No proposal presets yet.</p>
         {% endfor %}
-      </div>
-    </details>
+        <p class="rf-price-note">Mirrors your proposal presets — quoting-first, so “set rate” means a figure still to fix.</p>
+      </section>
 
-    <details class="tpl-guide">
-      <summary>À la carte &amp; add-ons</summary>
-      <div class="tpl-guide-body">
-        <table class="list">
-          <tr><th>Add-on</th><th>Rate</th></tr>
-          <tr><td>Extra edited image (beyond package)</td><td><span class="tpl-fill">[$XX]</span> / image</td></tr>
-          <tr><td>Additional setup / scene</td><td><span class="tpl-fill">[$XXX]</span></td></tr>
-          <tr><td>Rush turnaround (48 hr)</td><td><span class="tpl-fill">[$XXX or +X%]</span></td></tr>
-          <tr><td>Stylist on set</td><td><span class="tpl-fill">[$XXX]</span> / day</td></tr>
-          <tr><td>Additional location</td><td><span class="tpl-fill">[$XXX]</span></td></tr>
-          <tr><td>Additional shoot day</td><td><span class="tpl-fill">[$X,XXX]</span></td></tr>
-          <tr><td>Extra short-form video clip</td><td><span class="tpl-fill">[$XXX]</span> / clip</td></tr>
-          <tr><td>Raw / unedited footage</td><td><span class="tpl-fill">[$XXX]</span></td></tr>
-          <tr><td>Travel beyond <span class="tpl-fill">[X]</span> miles</td><td><span class="tpl-fill">[$X / mile or flat $XXX]</span></td></tr>
-        </table>
-      </div>
-    </details>
-
-    <details class="tpl-guide">
-      <summary>Usage rights tiers</summary>
-      <div class="tpl-guide-body">
-        <table class="list">
-          <tr><th>Tier</th><th>Covers</th><th>Pricing</th></tr>
-          <tr><td>Standard</td><td class="muted">Organic social, website, in-house marketing. Non-exclusive, perpetual.</td><td>Included</td></tr>
-          <tr><td>Extended</td><td class="muted">Paid digital ads, OOH / print ads, packaging.</td><td><span class="tpl-fill">[+$X or +X%]</span></td></tr>
-          <tr><td>Full buyout / exclusivity</td><td class="muted">Exclusive rights, broad commercial use.</td><td><span class="tpl-fill">[quote per project]</span></td></tr>
-        </table>
-      </div>
-    </details>
-
-    <details class="tpl-guide">
-      <summary>Booking &amp; payment terms (quick-ref)</summary>
-      <div class="tpl-guide-body">
-        <ul class="tpl-inside">
-          <li>Deposit to reserve the date: <span class="tpl-fill">[X%]</span> (non-refundable within <span class="tpl-fill">[7]</span> days of the shoot)</li>
-          <li>Balance due: <span class="tpl-fill">[on delivery / before delivery / shoot day]</span></li>
-          <li>Reschedule: free with <span class="tpl-fill">[7]</span> days' notice</li>
-          <li>Cancellation within <span class="tpl-fill">[7]</span> days forfeits the deposit</li>
-        </ul>
-        <p class="muted">Keep these in step with the Services Agreement before sending anything.</p>
-      </div>
-    </details>
-  </section>
+      <section class="rf-card rf-kit" aria-label="Shoot-day kit">
+        <h2>Shoot-day kit</h2>
+        <div class="rf-kit-list">
+          {% for k in kit %}
+          <div class="rf-kit-row"><span class="rf-check">✓</span> {{ k }}</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </div>
 </main>
 {% endblock %}
