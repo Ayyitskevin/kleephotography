@@ -1074,33 +1074,41 @@ progress { width: 100%; }
 .admin-add summary { cursor: pointer; color: var(--accent); }
 
 /* Projects kanban (studio pipeline board) */
-.kanban { display: flex; gap: 12px; overflow-x: auto; padding: 0.4rem 0 1rem;
+.kanban { display: flex; gap: 16px; overflow-x: auto; padding: 0.4rem 0 1rem;
   align-items: flex-start; }
-.kanban-col { flex: 0 0 258px; background: var(--surface-sunk);
-  border: 1px solid var(--line-strong); border-radius: var(--r-lg); padding: 0.6rem 0.6rem 0.8rem; }
-.kanban-col-head { display: flex; align-items: baseline; gap: 0.4rem;
-  padding: 0.2rem 0.3rem 0.6rem; border-bottom: 2px solid var(--line);
-  margin-bottom: 0.6rem; }
-.kanban-col-name { font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.05em; color: var(--ink); }
-.kanban-col-count { font-size: 0.8rem; color: var(--muted); margin-left: auto; }
-.kanban-col-head .pipeline-overdue { color: var(--clay); }
-/* per-stage accent on the column header rule */
-.status-col-inquiry_received .kanban-col-head { border-bottom-color: #5C6A5E; }
-.status-col-consultation_call .kanban-col-head { border-bottom-color: #2a5db0; }
-.status-col-proposal_sent .kanban-col-head { border-bottom-color: #9a7a2c; }
-.status-col-contract_signed .kanban-col-head { border-bottom-color: #7C2F38; }
-.status-col-retainer_paid .kanban-col-head { border-bottom-color: #2f7d57; }
-.status-col-session_planning .kanban-col-head { border-bottom-color: #1f6f6b; }
-.status-col-project_closed .kanban-col-head { border-bottom-color: #143C2F; }
+.kanban-col { flex: 0 0 286px; background: var(--surface-sunk);
+  border: 1px solid var(--line-strong); border-radius: 14px; padding: 0.75rem; }
+.kanban-col-head { display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.25rem 0.375rem 0.75rem; margin-bottom: 0; }
+.kanban-col-head::before { content: ""; width: 9px; height: 9px; flex: none;
+  border-radius: 999px; background: var(--stage-dot, var(--muted)); }
+.kanban-col-name { font-size: 0.8rem; font-weight: 700; color: var(--ink); }
+.kanban-col-count { font-size: 0.74rem; color: var(--muted); }
+.kanban-col-sum { margin-left: auto; font-size: 0.76rem; font-weight: 600;
+  color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.kanban-col-head .pipeline-overdue { color: var(--clay); margin-left: auto; }
+.kanban-col-head .pipeline-overdue ~ .kanban-col-sum { margin-left: 0.5rem; }
+/* per-stage accent dot on the column header */
+.status-col-inquiry_received { --stage-dot: #5C6A5E; }
+.status-col-consultation_call { --stage-dot: #2a5db0; }
+.status-col-proposal_sent { --stage-dot: #9a7a2c; }
+.status-col-contract_signed { --stage-dot: #7C2F38; }
+.status-col-retainer_paid { --stage-dot: #2f7d57; }
+.status-col-session_planning { --stage-dot: #1f6f6b; }
+.status-col-project_closed { --stage-dot: #143C2F; }
 .kanban-card { background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--r); padding: 0.6rem 0.7rem; margin-bottom: 0.55rem;
+  border-radius: var(--r); padding: 0.8rem 0.875rem; margin-bottom: 0.625rem;
   box-shadow: var(--shadow-sm); }
 .kanban-card:last-child { margin-bottom: 0; }
 .kanban-card-overdue { border-color: var(--clay); }
-.kanban-card-title { display: block; font-weight: 600; font-size: 0.92rem;
-  color: var(--ink); }
+.kanban-card-top { display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 0.5rem; }
+.kanban-card-title { display: block; font-weight: 700; font-size: 0.88rem;
+  line-height: 1.2; color: var(--ink); flex: 1; min-width: 0; }
 .kanban-card-title:hover { color: var(--accent); }
+.kanban-card-val { flex: none; font-weight: 700; font-size: 0.84rem;
+  color: #9a7a2c; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.kanban-card-val-won { color: #2f7d57; }
 .kanban-card-client { margin: 0.25rem 0 0; font-size: 0.82rem; color: var(--ink); }
 .kanban-card-meta { margin: 0.3rem 0 0; font-size: 0.78rem; color: var(--muted); }
 .kanban-card-meta.warn { color: var(--clay); }

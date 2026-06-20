@@ -251,6 +251,7 @@
           <span class="kanban-col-name">{{ stage_label.get(s, s) }}</span>
           <span class="kanban-col-count">{{ counts.get(s, 0) }}</span>
           {% if overdue_by_stage.get(s) %}<span class="warn pipeline-overdue">{{ overdue_by_stage[s] }} overdue</span>{% endif %}
+          {% if stage_value.get(s) %}<span class="kanban-col-sum">{{ usd(stage_value[s]) }}</span>{% endif %}
         </header>
         <div class="kanban-col-body" data-stage="{{ s }}">
         {% for p in projects if p.status == s %}
@@ -262,9 +263,11 @@
                  data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
                  data-created="{{ p.created_at or '' }}"
                  data-flags="{% if p.n_overdue %}overdue {% endif %}{% if is_stale %}stale {% endif %}{% if p.status in ('retainer_paid', 'session_planning', 'project_closed') %}booked {% endif %}">
-          <a class="kanban-card-title" href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
+          <div class="kanban-card-top">
+            <a class="kanban-card-title" href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
+            {% if p.value_cents %}<span class="kanban-card-val{% if p.status == 'project_closed' %} kanban-card-val-won{% endif %}">{{ usd(p.value_cents) }}</span>{% endif %}
+          </div>
           <p class="kanban-card-client">{{ p.client_name }}{% if p.company %}<span class="muted"> · {{ p.company }}</span>{% endif %}</p>
-          {% if p.value_cents %}<p class="kanban-card-meta kanban-card-val">&#128176; {{ usd(p.value_cents) }}</p>{% endif %}
           {% if p.shoot_date %}<p class="kanban-card-meta">&#128247; {{ p.shoot_date }}</p>{% endif %}
           {% if p.status != 'project_closed' %}<p class="kanban-card-meta kanban-card-age{% if is_stale %} warn{% endif %}">&#9203; {{ p.days_in_stage }}d in stage{% if is_stale %} · stalled{% endif %}</p>{% endif %}
           {% if p.n_overdue %}<p class="kanban-card-meta warn">&#9888; {{ p.n_overdue }} overdue invoice{{ "s" if p.n_overdue != 1 }}</p>{% endif %}
