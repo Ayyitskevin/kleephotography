@@ -41,7 +41,6 @@
       "archived": "Archived"} %}
 
   <section id="projects" aria-label="Sessions pipeline" data-studio-view="board">
-    {% if projects %}
     {% set dot = {"inquiry_received": "#5C6A5E", "consultation_call": "#2a5db0",
         "proposal_sent": "#9a7a2c", "contract_signed": "#7C2F38",
         "retainer_paid": "#2f7d57", "session_planning": "#1f6f6b",
@@ -100,6 +99,10 @@
         <tr><th>Session</th><th>Client</th><th>Stage</th><th>Shoot</th><th>In stage</th><th class="num">Value</th></tr>
       </thead>
       <tbody>
+      {% if not projects %}
+      <tr><td colspan="6" class="studio-list-empty muted">No active sessions yet. Add a client
+        with <b>+ New project</b>, or convert an inquiry from the <a href="/admin/inbox">Inbox</a>.</td></tr>
+      {% endif %}
       {% for p in projects %}
       {% set is_stale = p.status != 'project_closed' and p.days_in_stage >= stale_days %}
       <tr class="studio-row{% if p.n_overdue %} studio-row-overdue{% endif %}"
@@ -118,10 +121,6 @@
       {% endfor %}
       </tbody>
     </table>
-    {% else %}
-    <p class="muted">No active sessions yet. Add a client with <b>+ New project</b>, or
-      convert an inquiry from the <a href="/admin/inbox">Inbox</a>.</p>
-    {% endif %}
   </section>
 
   <script>
