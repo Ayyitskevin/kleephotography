@@ -45,6 +45,10 @@ def _usd0(cents: int) -> str:
     return "$" + f"{round(cents / 100):,}"
 
 
+def _cents(usd: str) -> int:
+    return round(float(usd.replace("$", "").replace(",", "")) * 100)
+
+
 def _initials(name: str) -> str:
     parts = [p for p in (name or "").split() if p]
     if not parts:
@@ -175,17 +179,35 @@ async def income(request: Request, range: str = "quarter"):
         "active": "income", "cards": cards, "rows": rows,
         "ranges": ranges, "range": range,
         "range_label": _RANGE_LABELS[range],
+        "row_count": len(rows),
     })
 
 
 @router.get("/income.csv", response_class=PlainTextResponse)
-async def income_csv(range: str = "quarter"):
+async def income_csv(range: str = "quarter", inc_paid: str = "on",
+                     inc_out: str = "", fmt: str = "itemized"):
     """Collected cash + open AR in range — accountant-ready. Real data only;
-    no fabricated tax or processing-fee columns (Mise stores neither)."""
+    no fabricated tax or processing-fee columns (Mise stores neither). The
+    Include checkboxes (Paid / Outstanding) and Format toggle (Itemized /
+    Summary) from the export panel genuinely shape the output."""
     if range not in _RANGE_LABELS:
         range = "quarter"
+    if fmt not in ("itemized", "summary"):
+        fmt = "itemized"
     start, end = _range_bounds(range)
-    rows = _ledger(start, end)
+    rows = [r for r in _ledger(start, end)
+            if (inc_paid and r["st"] == "paid")
+            or (inc_out and r["st"] == "out")]
+
+    if fmt == "summary":
+        paid = sum(1 for r in rows if r["st"] == "paid")
+        out_n = sum(1 for r in rows if r["st"] == "out")
+        paid_c = sum(_cents(r["amount"]) for r in rows if r["st"] == "paid")
+        out_c = sum(_cents(r["amount"]) for r in rows if r["st"] == "out")
+        return ("category,count,amount_usd\n"
+                f"Paid,{paid},{paid_c / 100:.2f}\n"
+                f"Outstanding,{out_n},{out_c / 100:.2f}\n")
+
     out = ["date,client,invoice,service,amount_usd,sales_tax_usd,status"]
     for r in rows:
         amt = r["amount"].replace("$", "").replace(",", "")

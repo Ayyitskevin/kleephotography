@@ -4105,6 +4105,57 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .admin-shell .fin-range-on,
 .admin-shell a.fin-range-on:hover { background: var(--terra-deep); color: #F3F0E2; }
 
+.admin-shell .fin-export-btn { background: var(--clay); border-color: var(--clay); color: #F3F0E2; }
+.admin-shell .fin-grid {
+  display: grid; grid-template-columns: 320px 1fr;
+  gap: clamp(18px, 2vw, 26px); align-items: start;
+}
+.admin-shell .fin-export {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.admin-shell .fin-export-lead {
+  margin: 6px 0 0; font-size: .82rem; font-weight: 500;
+  line-height: 1.5; color: var(--ink-soft);
+}
+.admin-shell .fin-export-form { display: flex; flex-direction: column; gap: 18px; }
+.admin-shell .fin-field { display: flex; flex-direction: column; gap: 9px; }
+.admin-shell .fin-field-label {
+  font-size: .68rem; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.admin-shell .fin-check {
+  display: flex; align-items: center; gap: 11px; cursor: pointer;
+  font-size: .86rem; font-weight: 600; color: var(--ink);
+}
+.admin-shell .fin-check input { width: 18px; height: 18px; accent-color: var(--terra-deep); }
+.admin-shell .fin-seg {
+  display: inline-flex; align-self: flex-start;
+  background: #f1ece0; border-radius: 999px; padding: 3px;
+}
+.admin-shell .fin-seg label { cursor: pointer; }
+.admin-shell .fin-seg input { position: absolute; opacity: 0; pointer-events: none; }
+.admin-shell .fin-seg span {
+  display: inline-block; padding: 6px 14px; border-radius: 999px;
+  font-size: .78rem; font-weight: 600; color: var(--ink-soft); line-height: 1;
+}
+.admin-shell .fin-seg input:checked + span { background: var(--terra-deep); color: #F3F0E2; }
+.admin-shell .fin-dl {
+  width: 100%; display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: .95em; background: var(--terra-deep); color: #F3F0E2;
+  border: 0; border-radius: 12px; font-size: .9rem; font-weight: 600; cursor: pointer;
+}
+.admin-shell .fin-dl-n { opacity: .7; }
+.admin-shell .fin-dl-note {
+  margin: -6px 0 0; font-size: .74rem; font-weight: 500;
+  color: var(--ink-faint); text-align: center;
+}
+.admin-shell .fin-panel-n { font-size: .78rem; font-weight: 600; color: var(--ink-faint); }
+@media (max-width: 1080px) {
+  .admin-shell .fin-grid { grid-template-columns: 1fr; }
+}
+
 .admin-shell .fin-tbl-scroll { overflow-x: auto; }
 .admin-shell .fin-tbl { width: 100%; border-collapse: collapse; }
 .admin-shell .fin-tbl th {

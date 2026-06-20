@@ -1,15 +1,16 @@
 {% extends "admin/base_admin.html" %}
 {# Income — REAL data. Collected cash from the payments table; outstanding from
    open invoices. Mise stores no sales tax and no Stripe processing fee, so
-   those columns read $0.00 / "—" honestly rather than fabricating numbers. #}
+   those columns read $0.00 / "—" honestly rather than fabricating numbers. The
+   export panel's Include/Format controls genuinely shape the CSV. #}
 {% block topbar %}
 <div class="pgtop">
   <div class="pgtop-lead">
     <h1>Financials</h1>
-    <p class="pgtop-sub">Every payment and open invoice — accountant-ready</p>
+    <p class="pgtop-sub">Every transaction, tax, and fee — accountant-ready</p>
   </div>
   <div class="pgtop-actions">
-    <a class="pgtop-link" href="/admin/financials/income.csv?range={{ range }}">Export CSV &darr;</a>
+    <a class="pgtop-new fin-export-btn" href="/admin/financials/income.csv?range={{ range }}">&#10515; Export CSV</a>
   </div>
 </div>
 {% endblock %}
@@ -27,43 +28,83 @@
     {% endfor %}
   </section>
 
-  <section class="fin-panel">
-    <div class="fin-panel-head">
-      <h2 class="fin-h2">Transactions</h2>
-      <div class="fin-range">
-        {% for r in ranges %}
-        <a href="/admin/financials?range={{ r.key }}"
-           class="fin-range-pill{% if r.on %} fin-range-on{% endif %}">{{ r.label }}</a>
-        {% endfor %}
+  <div class="fin-grid">
+    <section class="fin-export">
+      <div>
+        <h2 class="fin-h2">Export for your accountant</h2>
+        <p class="fin-export-lead">Ready for QuickBooks, Xero, or a spreadsheet.</p>
       </div>
-    </div>
-    <div class="fin-tbl-scroll">
-      <table class="fin-tbl">
-        <thead><tr>
-          <th>Date</th><th>Client</th><th>Invoice</th><th>Service</th>
-          <th class="fin-num">Amount</th><th class="fin-num">Tax</th>
-          <th class="fin-num">Fee</th><th class="fin-num">Net</th><th>Status</th>
-        </tr></thead>
-        <tbody>
-          {% for r in rows %}
-          <tr>
-            <td class="fin-muted">{{ r.date }}</td>
-            <td class="fin-strong">{{ r.client }}</td>
-            <td class="fin-muted">{{ r.inv }}</td>
-            <td>{{ r.service }}</td>
-            <td class="fin-num fin-strong">{{ r.amount }}</td>
-            <td class="fin-num fin-soft">{{ r.tax }}</td>
-            <td class="fin-num fin-soft">{{ r.fee }}</td>
-            <td class="fin-num fin-net">{{ r.net }}</td>
-            <td><span class="fin-pill fin-pill-{{ r.st }}">{{ r.status }}</span></td>
-          </tr>
-          {% else %}
-          <tr><td colspan="9" class="fin-empty-row">No transactions in this range.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
+
+      <form class="fin-export-form" method="get" action="/admin/financials/income.csv">
+        <div class="fin-field">
+          <span class="fin-field-label">Date range</span>
+          <div class="fin-range">
+            {% for r in ranges %}
+            <a href="/admin/financials?range={{ r.key }}"
+               class="fin-range-pill{% if r.on %} fin-range-on{% endif %}">{{ r.label }}</a>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="range" value="{{ range }}">
+        </div>
+
+        <div class="fin-field">
+          <span class="fin-field-label">Include</span>
+          <label class="fin-check">
+            <input type="checkbox" name="inc_paid" value="on" checked>
+            <span>Paid payments</span>
+          </label>
+          <label class="fin-check">
+            <input type="checkbox" name="inc_out" value="on">
+            <span>Outstanding invoices</span>
+          </label>
+        </div>
+
+        <div class="fin-field">
+          <span class="fin-field-label">Format</span>
+          <div class="fin-seg">
+            <label><input type="radio" name="fmt" value="itemized" checked><span>Itemized</span></label>
+            <label><input type="radio" name="fmt" value="summary"><span>Summary</span></label>
+          </div>
+        </div>
+
+        <button type="submit" class="fin-dl">&#10515; Download CSV <span class="fin-dl-n">· {{ row_count }} rows</span></button>
+        <p class="fin-dl-note">Includes date, client, invoice, amount, tax, net.</p>
+      </form>
+    </section>
+
+    <section class="fin-panel">
+      <div class="fin-panel-head">
+        <h2 class="fin-h2">Transactions</h2>
+        <span class="fin-panel-n">{{ row_count }} in range</span>
+      </div>
+      <div class="fin-tbl-scroll">
+        <table class="fin-tbl">
+          <thead><tr>
+            <th>Date</th><th>Client</th><th>Invoice</th><th>Service</th>
+            <th class="fin-num">Amount</th><th class="fin-num">Tax</th>
+            <th class="fin-num">Fee</th><th class="fin-num">Net</th><th>Status</th>
+          </tr></thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td class="fin-muted">{{ r.date }}</td>
+              <td class="fin-strong">{{ r.client }}</td>
+              <td class="fin-muted">{{ r.inv }}</td>
+              <td>{{ r.service }}</td>
+              <td class="fin-num fin-strong">{{ r.amount }}</td>
+              <td class="fin-num fin-soft">{{ r.tax }}</td>
+              <td class="fin-num fin-soft">{{ r.fee }}</td>
+              <td class="fin-num fin-net">{{ r.net }}</td>
+              <td><span class="fin-pill fin-pill-{{ r.st }}">{{ r.status }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="fin-empty-row">No transactions in this range.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 
   <p class="fin-note">Collected cash is the truth here — every row in <b>Paid</b> is a
     real Stripe payment event. Mise doesn't store sales tax or processing fees, so those
