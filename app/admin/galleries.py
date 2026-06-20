@@ -326,6 +326,11 @@ async def gallery_detail(request: Request, gallery_id: int):
     client = (db.one("SELECT name, email FROM clients WHERE id=?", (g["client_id"],))
               if g["client_id"] else None)
     portal_favs = _portal_fav_count(gallery_id, g["client_id"])
+    # Honest delivery stats for the gallery header tiles — real rows only.
+    n_views = db.one("SELECT COUNT(*) AS n FROM visitors WHERE gallery_id=?",
+                     (gallery_id,))["n"]
+    n_downloads = db.one("SELECT COUNT(*) AS n FROM downloads WHERE gallery_id=?",
+                         (gallery_id,))["n"]
     # Visible review-comment threads per video asset (flat, nested in the template).
     video_comments = {
         a["id"]: db.all_("""SELECT id, parent_id, timecode, body, author_role, status, created_at
@@ -339,6 +344,7 @@ async def gallery_detail(request: Request, gallery_id: int):
                                        "client": client, "base_url": config.BASE_URL,
                                        "tag_suggestions": PORTFOLIO_TAG_SUGGESTIONS,
                                        "portal_favs": portal_favs,
+                                       "n_views": n_views, "n_downloads": n_downloads,
                                        "video_comments": video_comments})
 
 

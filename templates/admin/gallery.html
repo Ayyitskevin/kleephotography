@@ -1,353 +1,515 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ g.title }} · Mise admin{% endblock %}
 {% import "admin/_copy_link.html" as cp %}
-{% block topbar %}
+{% set is_drop = g.type == 'drop' %}
+{% set show_pin = not is_drop or g.require_pin %}
 {% set n_fav = assets | selectattr("n_fav") | list | length %}
-<header class="admin-topbar pgtop">
+{% set n_photo = assets | selectattr("kind", "equalto", "photo") | list | length %}
+{% set n_video = assets | selectattr("kind", "equalto", "video") | list | length %}
+{% set status_label = 'Transfer' if is_drop else ('Live' if g.published else 'Draft') %}
+{% set status_cls = 'is-live' if (g.published or is_drop) else 'is-draft' %}
+{% set can_email = g.published and not is_drop %}
+{% block topbar %}
+<header class="admin-topbar pgtop gd-topbar">
   <div class="pgtop-lead">
-    <h1>{{ g.title }}</h1>
-    <p class="pgtop-sub">
-      {{ 'Transfer' if g.type == 'drop' else 'Client gallery' }} ·
-      <b>{{ assets | length }}</b> file{{ "s" if assets|length != 1 }}
-      {% if g.published %}· <span class="pos">published</span>{% else %}· draft{% endif %}
-      {% if n_fav %}· <b>{{ n_fav }}</b> favorited{% endif %}
-    </p>
+    <a class="gd-back" href="/admin/galleries" aria-label="Back to galleries">&larr;</a>
+    <div class="gd-lead-text">
+      <p class="gd-eyebrow">Galleries</p>
+      <h1>{{ g.title }}</h1>
+    </div>
+    <span class="gd-status {{ status_cls }}">{{ status_label }}</span>
   </div>
-  <div class="pgtop-actions">
-    <a class="pgtop-link" href="/admin/galleries">&larr; Galleries</a>
-    <a class="pgtop-link" href="/admin/galleries/{{ g.id }}/activity">Activity <span aria-hidden="true">&rarr;</span></a>
+  <div class="pgtop-actions gd-actions">
+    {{ cp.copy_link(base_url ~ "/g/" ~ g.slug, g.pin if show_pin else None) }}
+    <button type="button" class="pgtop-link" data-reveal="g-upload">Upload</button>
+    {% if can_email %}
+    <button type="button" class="pgtop-new" data-reveal="g-send-email">Send to client</button>
+    {% endif %}
   </div>
 </header>
 {% endblock %}
 {% block admin_body %}
-<main class="admin-main">
-  {% set show_pin = g.type != 'drop' or g.require_pin %}
-  <p>{{ 'Transfer' if g.type == 'drop' else 'Client' }} link:
-     <code class="slug">{{ base_url }}/g/{{ g.slug }}</code>
-     {% if show_pin %}&nbsp;PIN: <code>{{ g.pin }}</code>{% endif %}
-     {{ cp.copy_link(base_url ~ "/g/" ~ g.slug, g.pin if show_pin else None) }}</p>
+<main class="admin-main gd-main">
 
-  <details id="g-settings" {% if not g.published %}open{% endif %}>
-    <summary>Settings</summary>
-    <form method="post" action="/admin/galleries/{{ g.id }}/settings" class="stack-form">
-      <label>Title <input type="text" name="title" value="{{ g.title }}" required></label>
-      <label>Client name <input type="text" name="client_name" value="{{ g.client_name or '' }}"></label>
-      <label>Studio client
-        <select name="client_id">
-          <option value="">(none)</option>
-          {% for c in clients %}
-          <option value="{{ c.id }}" {% if g.client_id == c.id %}selected{% endif %}>
-            {{ c.name }}{% if c.company %} · {{ c.company }}{% endif %}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Studio project (publishing writes the gallery URL to its Notion session)
-        <select name="project_id">
-          <option value="">(none)</option>
-          {% for p in projects %}
-          <option value="{{ p.id }}" {% if g.project_id == p.id %}selected{% endif %}>
-            {{ p.title }} · {{ p.client_name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Captions (shown on the client portal)
-        <textarea name="captions" rows="4"
-                  placeholder="Paste caption drafts here — one per line">{{ g.captions or '' }}</textarea>
-      </label>
-      <label>PIN <input type="text" name="pin" value="{{ g.pin }}" pattern="[0-9]{4}" maxlength="4" required></label>
-      <label>Expires <input type="date" name="expires_at" value="{{ g.expires_at or '' }}"></label>
-      {% if g.type == 'drop' %}
-      <input type="hidden" name="published" value="true">
-      {% else %}
-      <label class="row"><input type="checkbox" name="published" value="true"
-             {% if g.published %}checked{% endif %}> Published</label>
-
-      <fieldset class="cs-fieldset">
-        <legend>Case study (marketing site)</legend>
-        <p class="muted" style="margin:0 0 0.6rem">When published, the portfolio-starred photos
-          in this gallery appear at <code>/work/{{ g.slug }}</code> with the brief and credits
-          below. Existing PIN gate is unaffected.</p>
-        <label class="row"><input type="checkbox" name="cs_published" value="true"
-               {% if g.cs_published %}checked{% endif %}> Publish as case study</label>
-        <label>Tagline <input type="text" name="cs_tagline" maxlength="160"
-               value="{{ g.cs_tagline or '' }}"
-               placeholder="One line — e.g. Spring menu for Café Lune"></label>
-        <label>Location <input type="text" name="cs_location" maxlength="80"
-               value="{{ g.cs_location or '' }}"
-               placeholder="City, State — shows in SEO and on the page"></label>
-        <label>Brief <textarea name="cs_brief" rows="4"
-               placeholder="What the shoot was, what the client wanted, how it landed.">{{ g.cs_brief or '' }}</textarea></label>
-        <label>Credits <textarea name="cs_credits" rows="4"
-               placeholder="One per line — Chef: …  · Stylist: …  · Venue: …">{{ g.cs_credits or '' }}</textarea></label>
-      </fieldset>
-      {% endif %}
-
-      <button type="submit">Save</button>
-    </form>
-  </details>
-
-  {% if not g.published or g.type == 'drop' %}
-  {% if portal_favs %}
-    {% set confirm_msg = "WARNING: The linked client has " ~ portal_favs ~ " portal favorite" ~ ("s" if portal_favs != 1 else "") ~ " in this gallery. Deleting will break their social-crops view on the portal. Continue?" %}
-  {% else %}
-    {% set confirm_msg = "Delete " ~ g.title ~ " and all " ~ (assets|length) ~ " assets permanently? This cannot be undone." %}
-  {% endif %}
-  <form method="post" action="/admin/galleries/{{ g.id }}/delete" class="inline"
-        onsubmit="return confirm({{ confirm_msg|tojson }})">
-    {% if portal_favs %}<input type="hidden" name="force" value="1">{% endif %}
-    <button class="link danger">Delete gallery{% if portal_favs %} (with {{ portal_favs }} portal fav{{ "s" if portal_favs != 1 else "" }}){% endif %}</button>
-  </form>
-  {% endif %}
-
-  {% if g.published and g.type != 'drop' %}
-  <details id="g-send-email">
-    <summary>Send delivery email</summary>
-    {% set p = {"client_email": (client.email if client else "") or "",
-                "client_name": (client.name if client else g.client_name) or "there"} %}
-    {% set first = p.client_name.split(' ')[0] %}
-    {% set link = base_url ~ "/g/" ~ g.slug ~ "\nPIN: " ~ g.pin
-       ~ ("\nAvailable until " ~ g.expires_at if g.expires_at else "") %}
-    {% set kinds = {
-      "delivery": {
-        "label": "Initial delivery — full take is up",
-        "subject": "Your photos are ready — " ~ g.title,
-        "body": "Hi " ~ first ~ ",\n\nYour gallery is ready to view and download:\n\n" ~ link ~ "\n\nThank you!\n" ~ site_name
-      },
-      "proofing": {
-        "label": "Proofing prompt — please pick your selects",
-        "subject": "Time to pick your selects — " ~ g.title,
-        "body": "Hi " ~ first ~ ",\n\nThe full take is in — please pick your selects so I can start editing:\n\n" ~ link ~ "\n\nTap the heart on each photo you'd like in the final edit. The section headings show your remaining picks. Reply when you're done and I'll get the edits going.\n\nThank you!\n" ~ site_name
-      },
-      "final": {
-        "label": "Final edits delivered",
-        "subject": "Final edits delivered — " ~ g.title,
-        "body": "Hi " ~ first ~ ",\n\nYour final edits are in and ready to download:\n\n" ~ link ~ "\n\nIncludes full-resolution originals, web-ready edits, and social crops (1:1, 4:5, 9:16) for hero selects. Let me know if you need additional sizing or format tweaks.\n\nThank you!\n" ~ site_name
-      }
-    } %}
-    <label class="row" style="margin-bottom:0.6rem">Template
-      <select id="email-kind">
-        {% for k, v in kinds.items() %}
-        <option value="{{ k }}" data-subject="{{ v.subject }}" data-body="{{ v.body }}">
-          {{ v.label }}
-        </option>
-        {% endfor %}
-      </select>
-    </label>
-    {% set email_action = "/admin/galleries/" ~ g.id ~ "/email" %}
-    {% set email_subject = kinds.delivery.subject %}
-    {% set email_intro = "Your gallery is ready to view and download:" %}
-    {% set email_link = link %}
-    {% include "admin/_email_form.html" %}
-    <script>
-      // Swap subject + body when Kevin picks a different template kind. Also
-      // injects a hidden 'email_kind' field inside the form so the server can
-      // act on the picked template — kind=='final' auto-flips the linked
-      // project status to 'delivered' (see app/admin/galleries.py:email_gallery).
-      (function () {
-        const sel = document.getElementById("email-kind");
-        const form = sel.closest("details").querySelector("form");
-        const subj = form.querySelector('input[name="subject"]');
-        const body = form.querySelector('textarea[name="message"]');
-        const hid = document.createElement("input");
-        hid.type = "hidden"; hid.name = "email_kind"; hid.value = sel.value;
-        form.appendChild(hid);
-        sel.addEventListener("change", () => {
-          const o = sel.options[sel.selectedIndex];
-          subj.value = o.dataset.subject;
-          body.value = o.dataset.body;
-          hid.value = sel.value;
-        });
-      })();
-    </script>
-  </details>
-  {% endif %}
-
-  <h2>Upload</h2>
-  <form id="upform" class="stack-form">
-    {% if g.type != 'drop' %}
-    <select name="section_id">
-      <option value="">(no section)</option>
-      {% for s in sections %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
-    </select>
+  <!-- COVER -->
+  <div class="gd-cover">
+    {% if g.cover_asset_id %}
+    <img src="/admin/thumb/{{ g.id }}/{{ g.cover_asset_id }}" alt="Cover of {{ g.title }}">
     {% endif %}
-    <input type="file" name="files" multiple
-           accept=".jpg,.jpeg,.png,.heic,.heif,.webp,.tif,.tiff,.mp4,.mov,.m4v,.avi,.mkv,.webm">
-    <button type="submit">Upload</button>
-    <progress id="upbar" max="100" value="0" hidden></progress>
-    <p id="upmsg" class="muted"></p>
-  </form>
-
-  {% if g.type != 'drop' %}
-  <h2>Sections</h2>
-  <ul class="sections">
-    {% for s in sections %}
-    {% set picks = section_picks.get(s.id, 0) %}
-    <li>
-      <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/rename"
-            class="inline">
-        <input type="text" name="name" value="{{ s.name }}" required>
-        <button class="link">rename</button>
-      </form>
-      <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/move"
-            class="inline">
-        <button class="link" name="dir" value="up" title="Move up">&uarr;</button>
-        <button class="link" name="dir" value="down" title="Move down">&darr;</button>
-      </form>
-      <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/proof"
-            class="inline" title="Proofing target — clients pick N selects from this section. Blank or 0 = off.">
-        <span class="muted">pick</span>
-        <input type="number" name="proof_target" min="0" max="999"
-               value="{{ s.proof_target or '' }}" placeholder="—"
-               style="width:4.5rem">
-        <button class="link">set</button>
-        {% if s.proof_target %}
-          {% if picks >= s.proof_target %}
-          <span class="ok">&#10003; {{ picks }} / {{ s.proof_target }} ready</span>
-          {% else %}
-          <span class="muted">{{ picks }} / {{ s.proof_target }} picked</span>
-          {% endif %}
-        {% endif %}
-      </form>
-      <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/caption"
-            class="inline" title="Optional short caption shown under the section heading on the client gallery.">
-        <input type="text" name="caption" maxlength="200"
-               value="{{ s.caption or '' }}" placeholder="caption…"
-               style="width:14rem">
-        <button class="link">caption</button>
-      </form>
-      <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/delete"
-            class="inline"><button class="link danger">remove</button></form>
-    </li>
-    {% endfor %}
-  </ul>
-  <form method="post" action="/admin/galleries/{{ g.id }}/sections" class="inline-form">
-    <input type="text" name="name" placeholder="New section" required>
-    <button type="submit">Add section</button>
-  </form>
-  {% endif %}
-
-  {% set n_faved = assets|selectattr("n_fav")|list|length %}
-  <h2>{{ 'Files' if g.type == 'drop' else 'Assets' }} ({{ assets|length }}{% if n_faved %} · &#9829; {{ n_faved }} faved{% endif %})</h2>
-  {% if assets and g.type != 'drop' %}
-  <form id="bulkform" method="post" action="/admin/galleries/{{ g.id }}/assets/bulk-section"
-        class="inline-form">
-    <span class="muted">Move selected to</span>
-    <select name="section_id">
-      <option value="">(no section)</option>
-      {% for s in sections %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
-    </select>
-    <button type="submit">Move</button>
-  </form>
-  {% endif %}
-  <datalist id="tag-suggestions">
-    {% for t in tag_suggestions %}<option value="{{ t }}">{% endfor %}
-  </datalist>
-  {% macro vc_thread(comments, parent, g, a, depth) %}
-    {% for c in comments if (c.parent_id or 0) == parent %}
-    <div class="avc{{ ' avc-resolved' if (c.status or 'open') == 'resolved' else '' }}" style="margin-left:{{ depth }}rem">
-      <span class="avc-tc">{{ '%d:%02d'|format((c.timecode // 60)|int, (c.timecode % 60)|int) }}</span>
-      <span class="avc-role">{{ 'Studio' if c.author_role == 'admin' else 'Client' }}</span>
-      <span class="avc-text">{{ c.body }}</span>
-      {% if depth == 0 %}
-        {% if (c.status or 'open') == 'resolved' %}
-        <form method="post" action="/admin/comments/{{ c.id }}/reopen" class="inline">
-          <button class="link">reopen</button></form>
-        {% else %}
-        <form method="post" action="/admin/comments/{{ c.id }}/resolve" class="inline">
-          <button class="link ok">resolve</button></form>
-        {% endif %}
-      {% endif %}
-      <form method="post" action="/admin/comments/{{ c.id }}/hide" class="inline"
-            onsubmit="return confirm('Hide this comment and any replies?')">
-        <button class="link danger">hide</button>
-      </form>
-      <details class="avc-reply">
-        <summary>reply</summary>
-        <form method="post" action="/admin/galleries/{{ g.id }}/comments/{{ a.id }}">
-          <input type="hidden" name="parent_id" value="{{ c.id }}">
-          <textarea name="body" rows="2" required placeholder="Reply…"></textarea>
-          <button class="link">Reply</button>
-        </form>
-      </details>
-      {{ vc_thread(comments, c.id, g, a, depth + 1) }}
+    <div class="gd-cover-shade"></div>
+    <div class="gd-cover-text">
+      <h2>{{ g.title }}</h2>
+      <p>{{ (g.client_name or (client.name if client else '') or 'No client') }}
+        · {{ n_photo }} photo{{ "s" if n_photo != 1 }}{% if n_video %} · {{ n_video }} reel{{ "s" if n_video != 1 }}{% endif %}
+        · {{ status_label|lower }}{% if g.expires_at %} · expires {{ g.expires_at }}{% endif %}</p>
     </div>
-    {% endfor %}
-  {% endmacro %}
-  <div class="grid admin-grid">
-    {% for a in assets %}
-    <figure class="tile" id="asset-{{ a.id }}">
-      {% if a.status == 'ready' %}
-        <img src="/admin/thumb/{{ g.id }}/{{ a.id }}" loading="lazy" alt="{{ a.filename }}">
-      {% else %}
-        <div class="placeholder">{{ a.status }}</div>
+  </div>
+
+  <div class="gd-grid" data-gal-grid>
+
+    <!-- LEFT: stats + toolbar + masonry -->
+    <div class="gd-left">
+      <div class="gd-stats">
+        <div class="gd-stat"><span class="gd-stat-n" style="color:#18241E">{{ assets|length }}</span><span class="gd-stat-l">Photos</span></div>
+        <div class="gd-stat"><span class="gd-stat-n" style="color:#9a7a2c">{{ n_fav }}</span><span class="gd-stat-l">Favorited</span></div>
+        <div class="gd-stat"><span class="gd-stat-n" style="color:#18241E">{{ n_views }}</span><span class="gd-stat-l">Client views</span></div>
+        <div class="gd-stat"><span class="gd-stat-n" style="color:#2f7d57">{{ n_downloads }}</span><span class="gd-stat-l">Downloads</span></div>
+      </div>
+
+      <div class="gd-toolbar">
+        <div class="gd-pills" role="group" aria-label="Filter by section">
+          <button type="button" class="gd-pill is-active" data-section="" aria-pressed="true">All <span>{{ assets|length }}</span></button>
+          {% if not is_drop %}
+          {% for s in sections %}
+          {% set sn = assets | selectattr("section_id", "equalto", s.id) | list | length %}
+          <button type="button" class="gd-pill" data-section="{{ s.id }}" aria-pressed="false">{{ s.name }} <span>{{ sn }}</span></button>
+          {% endfor %}
+          {% endif %}
+        </div>
+        {% if n_fav %}
+        <button type="button" class="gd-favtoggle" id="gd-favtoggle" aria-pressed="false"><span class="gd-heart">&#9829;</span> Favorites only</button>
+        {% endif %}
+      </div>
+
+      {% if assets %}
+      {% if not is_drop %}
+      <form id="bulkform" method="post" action="/admin/galleries/{{ g.id }}/assets/bulk-section" class="gd-bulk">
+        <span class="muted">Move checked to</span>
+        <select name="section_id">
+          <option value="">(no section)</option>
+          {% for s in sections %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="gd-btn-sm">Move</button>
+      </form>
       {% endif %}
-      <figcaption>
-        <input type="checkbox" name="asset_ids" value="{{ a.id }}" form="bulkform"
-               title="Select for bulk move">
-        #{{ a.id }} {{ a.filename }} <span class="muted">{{ a.kind }}</span>
-        {% if a.n_fav %}<span class="fav" title="{{ a.n_fav }} client favorite{{ '' if a.n_fav == 1 else 's' }}">&#9829;{% if a.n_fav > 1 %} {{ a.n_fav }}{% endif %}</span>{% endif %}
-        {% if g.type != 'drop' %}
-        <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/section" class="inline">
-          <select name="section_id" onchange="this.form.submit()">
+      <datalist id="tag-suggestions">
+        {% for t in tag_suggestions %}<option value="{{ t }}">{% endfor %}
+      </datalist>
+
+      {% macro vc_thread(comments, parent, g, a, depth) %}
+        {% for c in comments if (c.parent_id or 0) == parent %}
+        <div class="avc{{ ' avc-resolved' if (c.status or 'open') == 'resolved' else '' }}" style="margin-left:{{ depth }}rem">
+          <span class="avc-tc">{{ '%d:%02d'|format((c.timecode // 60)|int, (c.timecode % 60)|int) }}</span>
+          <span class="avc-role">{{ 'Studio' if c.author_role == 'admin' else 'Client' }}</span>
+          <span class="avc-text">{{ c.body }}</span>
+          {% if depth == 0 %}
+            {% if (c.status or 'open') == 'resolved' %}
+            <form method="post" action="/admin/comments/{{ c.id }}/reopen" class="inline">
+              <button class="link">reopen</button></form>
+            {% else %}
+            <form method="post" action="/admin/comments/{{ c.id }}/resolve" class="inline">
+              <button class="link ok">resolve</button></form>
+            {% endif %}
+          {% endif %}
+          <form method="post" action="/admin/comments/{{ c.id }}/hide" class="inline"
+                onsubmit="return confirm('Hide this comment and any replies?')">
+            <button class="link danger">hide</button>
+          </form>
+          <details class="avc-reply">
+            <summary>reply</summary>
+            <form method="post" action="/admin/galleries/{{ g.id }}/comments/{{ a.id }}">
+              <input type="hidden" name="parent_id" value="{{ c.id }}">
+              <textarea name="body" rows="2" required placeholder="Reply…"></textarea>
+              <button class="link">Reply</button>
+            </form>
+          </details>
+          {{ vc_thread(comments, c.id, g, a, depth + 1) }}
+        </div>
+        {% endfor %}
+      {% endmacro %}
+
+      <div class="gd-masonry" id="gd-masonry">
+        {% for a in assets %}
+        <figure class="gd-tile" data-section="{{ a.section_id or '' }}" data-fav="{{ 1 if a.n_fav else 0 }}" id="asset-{{ a.id }}">
+          {% if a.status == 'ready' %}
+          <img src="/admin/thumb/{{ g.id }}/{{ a.id }}" loading="lazy" alt="{{ a.filename }}">
+          {% else %}
+          <div class="gd-tile-ph">{{ a.status }}</div>
+          {% endif %}
+          {% if a.n_fav %}<span class="gd-tile-fav" title="{{ a.n_fav }} client favorite{{ '' if a.n_fav == 1 else 's' }}">&#9829;{% if a.n_fav > 1 %} {{ a.n_fav }}{% endif %}</span>{% endif %}
+          {% if a.kind == 'video' %}<span class="gd-tile-vid" title="Video">&#9658;</span>{% endif %}
+          <figcaption class="gd-ov">
+            <span class="gd-ov-name">{{ a.filename }}</span>
+          </figcaption>
+          <details class="gd-manage">
+            <summary class="gd-gear" title="Manage this file">&#9881;</summary>
+            <div class="gd-manage-body">
+              <p class="gd-manage-head">#{{ a.id }} · {{ a.kind }}{% if a.n_fav %} · &#9829; {{ a.n_fav }}{% endif %}</p>
+              {% if not is_drop %}
+              <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/section" class="gd-mrow">
+                <span class="muted">Section</span>
+                <select name="section_id" onchange="this.form.submit()">
+                  <option value="">(none)</option>
+                  {% for s in sections %}
+                  <option value="{{ s.id }}" {% if a.section_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+              {% endif %}
+              <div class="gd-mrow">
+                <input type="checkbox" name="asset_ids" value="{{ a.id }}" form="bulkform" title="Select for bulk move"> <span class="muted">bulk-select</span>
+                <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/move" class="inline">
+                  <button class="link" name="dir" value="left" title="Move earlier">&larr;</button>
+                  <button class="link" name="dir" value="right" title="Move later">&rarr;</button>
+                </form>
+              </div>
+              {% if a.kind == 'photo' and not is_drop %}
+              <div class="gd-mrow">
+                <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/cover" class="inline">
+                  <button class="link" title="Toggle cover photo">{% if g.cover_asset_id == a.id %}&#10022; cover{% else %}&#10023; cover{% endif %}</button>
+                </form>
+                <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/portfolio" class="inline">
+                  <button class="link" title="Toggle portfolio">{% if a.portfolio %}&#9733; portfolio{% else %}&#9734; portfolio{% endif %}</button>
+                </form>
+              </div>
+              {% if a.portfolio %}
+              <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/tag" class="gd-mrow"
+                    title="Portfolio filter tag (visible on /portfolio)">
+                <input type="text" name="portfolio_tag" list="tag-suggestions" value="{{ a.portfolio_tag or '' }}" placeholder="tag…" style="width:8rem">
+                <button class="link">tag</button>
+              </form>
+              {% endif %}
+              {% endif %}
+              <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/delete" class="gd-mrow"
+                    onsubmit="return confirm('Delete {{ a.filename }}?')">
+                <button class="link danger">Delete file</button>
+              </form>
+              {% if a.kind == 'video' %}
+              {% set thread = video_comments.get(a.id, []) %}
+              <details class="avc-panel">
+                <summary>Notes ({{ thread|length }})</summary>
+                {{ vc_thread(thread, 0, g, a, 0) }}
+                <form method="post" action="/admin/galleries/{{ g.id }}/comments/{{ a.id }}" class="avc-new">
+                  <input type="text" name="timecode" value="0" size="4" title="Timecode in seconds (0 = general note)">
+                  <textarea name="body" rows="2" required placeholder="Add a studio note…"></textarea>
+                  <button class="link">Post note</button>
+                </form>
+              </details>
+              {% endif %}
+            </div>
+          </details>
+        </figure>
+        {% endfor %}
+      </div>
+      <p class="gd-empty muted" id="gd-empty" hidden>No files match this filter.</p>
+      {% else %}
+      <p class="muted">No files yet — use <b>Upload</b> above to add {{ 'files' if is_drop else 'photos and videos' }}.</p>
+      {% endif %}
+    </div>
+
+    <!-- RIGHT: delivery rail -->
+    <div class="gd-rail" data-gal-rail>
+
+      <section class="gd-live">
+        <div class="gd-live-head">
+          <span class="gd-live-dot"></span>
+          <h3>{{ 'Live & shared' if (g.published or is_drop) else 'Not yet shared' }}</h3>
+        </div>
+        <span class="gd-live-label">{{ 'Transfer' if is_drop else 'Gallery' }} link</span>
+        <div class="gd-live-link">
+          <span class="gd-live-url">{{ base_url }}/g/{{ g.slug }}</span>
+          <button type="button" class="gd-copy copy-link" data-copy="{{ base_url }}/g/{{ g.slug }}{% if show_pin %}&#10;PIN: {{ g.pin }}{% endif %}">Copy</button>
+          <span class="copy-feedback muted" hidden>Copied!</span>
+        </div>
+        <div class="gd-live-tiles">
+          {% if show_pin %}
+          <div class="gd-live-tile"><div class="gd-live-k">PIN</div><div class="gd-live-v gd-pin">{{ g.pin }}</div></div>
+          {% endif %}
+          <div class="gd-live-tile"><div class="gd-live-k">Expires</div><div class="gd-live-v">{{ g.expires_at or 'Never' }}</div></div>
+        </div>
+      </section>
+
+      <section class="gd-deliver">
+        <h3>Deliver &amp; manage</h3>
+        <a class="gd-deliver-row" href="{{ base_url }}/g/{{ g.slug }}" target="_blank" rel="noopener">
+          <span class="gd-deliver-ic" style="background:#e1f2e9;color:#2f7d57">&#8599;</span>
+          <span class="gd-deliver-txt"><span class="gd-deliver-l">View as client</span><span class="gd-deliver-m">Open the live {{ 'transfer' if is_drop else 'gallery' }}</span></span>
+          <span class="gd-deliver-arr">&rarr;</span>
+        </a>
+        {% if can_email %}
+        <button type="button" class="gd-deliver-row" data-reveal="g-send-email">
+          <span class="gd-deliver-ic" style="background:#f7ecd2;color:#9a7a2c">&#9993;</span>
+          <span class="gd-deliver-txt"><span class="gd-deliver-l">Send delivery email</span><span class="gd-deliver-m">Delivery · proofing · final templates</span></span>
+          <span class="gd-deliver-arr">&rarr;</span>
+        </button>
+        {% endif %}
+        <button type="button" class="gd-deliver-row" data-reveal="g-settings">
+          <span class="gd-deliver-ic" style="background:#f3e3e5;color:#7C2F38">&#9881;</span>
+          <span class="gd-deliver-txt"><span class="gd-deliver-l">{{ 'Transfer' if is_drop else 'Gallery' }} settings</span><span class="gd-deliver-m">PIN, expiry, captions{{ '' if is_drop else ', case study' }}</span></span>
+          <span class="gd-deliver-arr">&rarr;</span>
+        </button>
+        <a class="gd-deliver-row" href="/admin/galleries/{{ g.id }}/activity">
+          <span class="gd-deliver-ic" style="background:#ddeef0;color:#2f6d8a">&#9636;</span>
+          <span class="gd-deliver-txt"><span class="gd-deliver-l">Activity &amp; downloads</span><span class="gd-deliver-m">{{ n_views }} view{{ "s" if n_views != 1 }} · {{ n_downloads }} download{{ "s" if n_downloads != 1 }}</span></span>
+          <span class="gd-deliver-arr">&rarr;</span>
+        </a>
+      </section>
+
+      {% if not is_drop and assets %}
+      {% set pct = (n_fav * 100 // (assets|length)) if assets else 0 %}
+      <section class="gd-proof">
+        <div class="gd-proof-head">
+          <h3>Proofing</h3>
+          <span class="gd-proof-n">{{ n_fav }} favorited</span>
+        </div>
+        <div class="gd-proof-bar"><div class="gd-proof-fill" style="width:{{ pct }}%"></div></div>
+        <p class="gd-proof-note">{{ (client.name if client else g.client_name) or 'The client' }} favorited
+          <b>{{ n_fav }}</b> of {{ assets|length }}.
+          {% if sections %}Section proof targets show their picks above.{% endif %}</p>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- MANAGEMENT PANELS -->
+  <section class="gd-panels">
+    <details id="g-settings" class="gd-panel"{% if not g.published %} open{% endif %}>
+      <summary>{{ 'Transfer' if is_drop else 'Gallery' }} settings</summary>
+      <form method="post" action="/admin/galleries/{{ g.id }}/settings" class="stack-form">
+        <label>Title <input type="text" name="title" value="{{ g.title }}" required></label>
+        <label>Client name <input type="text" name="client_name" value="{{ g.client_name or '' }}"></label>
+        <label>Studio client
+          <select name="client_id">
             <option value="">(none)</option>
-            {% for s in sections %}
-            <option value="{{ s.id }}" {% if a.section_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+            {% for c in clients %}
+            <option value="{{ c.id }}" {% if g.client_id == c.id %}selected{% endif %}>
+              {{ c.name }}{% if c.company %} · {{ c.company }}{% endif %}</option>
             {% endfor %}
           </select>
-        </form>
+        </label>
+        <label>Studio project (publishing writes the gallery URL to its Notion session)
+          <select name="project_id">
+            <option value="">(none)</option>
+            {% for p in projects %}
+            <option value="{{ p.id }}" {% if g.project_id == p.id %}selected{% endif %}>
+              {{ p.title }} · {{ p.client_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Captions (shown on the client portal)
+          <textarea name="captions" rows="4"
+                    placeholder="Paste caption drafts here — one per line">{{ g.captions or '' }}</textarea>
+        </label>
+        <label>PIN <input type="text" name="pin" value="{{ g.pin }}" pattern="[0-9]{4}" maxlength="4" required></label>
+        <label>Expires <input type="date" name="expires_at" value="{{ g.expires_at or '' }}"></label>
+        {% if is_drop %}
+        <input type="hidden" name="published" value="true">
+        {% else %}
+        <label class="row"><input type="checkbox" name="published" value="true"
+               {% if g.published %}checked{% endif %}> Published</label>
+
+        <fieldset class="cs-fieldset">
+          <legend>Case study (marketing site)</legend>
+          <p class="muted" style="margin:0 0 0.6rem">When published, the portfolio-starred photos
+            in this gallery appear at <code>/work/{{ g.slug }}</code> with the brief and credits
+            below. Existing PIN gate is unaffected.</p>
+          <label class="row"><input type="checkbox" name="cs_published" value="true"
+                 {% if g.cs_published %}checked{% endif %}> Publish as case study</label>
+          <label>Tagline <input type="text" name="cs_tagline" maxlength="160"
+                 value="{{ g.cs_tagline or '' }}"
+                 placeholder="One line — e.g. Spring menu for Café Lune"></label>
+          <label>Location <input type="text" name="cs_location" maxlength="80"
+                 value="{{ g.cs_location or '' }}"
+                 placeholder="City, State — shows in SEO and on the page"></label>
+          <label>Brief <textarea name="cs_brief" rows="4"
+                 placeholder="What the shoot was, what the client wanted, how it landed.">{{ g.cs_brief or '' }}</textarea></label>
+          <label>Credits <textarea name="cs_credits" rows="4"
+                 placeholder="One per line — Chef: …  · Stylist: …  · Venue: …">{{ g.cs_credits or '' }}</textarea></label>
+        </fieldset>
         {% endif %}
-        <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/move"
-              class="inline">
-          <button class="link" name="dir" value="left" title="Move earlier">&larr;</button>
-          <button class="link" name="dir" value="right" title="Move later">&rarr;</button>
-        </form>
-        {% if a.kind == 'photo' and g.type != 'drop' %}
-        <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/cover"
-              class="inline">
-          <button class="link" title="Toggle cover photo">
-            {% if g.cover_asset_id == a.id %}&#10022; cover{% else %}&#10023; cover{% endif %}
-          </button>
-        </form>
-        <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/portfolio"
-              class="inline">
-          <button class="link" title="Toggle portfolio">
-            {% if a.portfolio %}&#9733; portfolio{% else %}&#9734; portfolio{% endif %}
-          </button>
-        </form>
-        {% if a.portfolio %}
-        <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/tag"
-              class="inline" title="Portfolio filter tag (visible on /portfolio)">
-          <input type="text" name="portfolio_tag" list="tag-suggestions"
-                 value="{{ a.portfolio_tag or '' }}" placeholder="tag…"
-                 style="width:8rem;font-size:0.78rem">
-          <button class="link">tag</button>
-        </form>
+
+        <button type="submit">Save</button>
+      </form>
+
+      {% if not g.published or is_drop %}
+      {% if portal_favs %}
+        {% set confirm_msg = "WARNING: The linked client has " ~ portal_favs ~ " portal favorite" ~ ("s" if portal_favs != 1 else "") ~ " in this gallery. Deleting will break their social-crops view on the portal. Continue?" %}
+      {% else %}
+        {% set confirm_msg = "Delete " ~ g.title ~ " and all " ~ (assets|length) ~ " assets permanently? This cannot be undone." %}
+      {% endif %}
+      <form method="post" action="/admin/galleries/{{ g.id }}/delete" class="inline gd-delete"
+            onsubmit="return confirm({{ confirm_msg|tojson }})">
+        {% if portal_favs %}<input type="hidden" name="force" value="1">{% endif %}
+        <button class="link danger">Delete {{ 'transfer' if is_drop else 'gallery' }}{% if portal_favs %} (with {{ portal_favs }} portal fav{{ "s" if portal_favs != 1 else "" }}){% endif %}</button>
+      </form>
+      {% endif %}
+    </details>
+
+    {% if can_email %}
+    <details id="g-send-email" class="gd-panel">
+      <summary>Send delivery email</summary>
+      {% set p = {"client_email": (client.email if client else "") or "",
+                  "client_name": (client.name if client else g.client_name) or "there"} %}
+      {% set first = p.client_name.split(' ')[0] %}
+      {% set link = base_url ~ "/g/" ~ g.slug ~ "\nPIN: " ~ g.pin
+         ~ ("\nAvailable until " ~ g.expires_at if g.expires_at else "") %}
+      {% set kinds = {
+        "delivery": {
+          "label": "Initial delivery — full take is up",
+          "subject": "Your photos are ready — " ~ g.title,
+          "body": "Hi " ~ first ~ ",\n\nYour gallery is ready to view and download:\n\n" ~ link ~ "\n\nThank you!\n" ~ site_name
+        },
+        "proofing": {
+          "label": "Proofing prompt — please pick your selects",
+          "subject": "Time to pick your selects — " ~ g.title,
+          "body": "Hi " ~ first ~ ",\n\nThe full take is in — please pick your selects so I can start editing:\n\n" ~ link ~ "\n\nTap the heart on each photo you'd like in the final edit. The section headings show your remaining picks. Reply when you're done and I'll get the edits going.\n\nThank you!\n" ~ site_name
+        },
+        "final": {
+          "label": "Final edits delivered",
+          "subject": "Final edits delivered — " ~ g.title,
+          "body": "Hi " ~ first ~ ",\n\nYour final edits are in and ready to download:\n\n" ~ link ~ "\n\nIncludes full-resolution originals, web-ready edits, and social crops (1:1, 4:5, 9:16) for hero selects. Let me know if you need additional sizing or format tweaks.\n\nThank you!\n" ~ site_name
+        }
+      } %}
+      <label class="row" style="margin-bottom:0.6rem">Template
+        <select id="email-kind">
+          {% for k, v in kinds.items() %}
+          <option value="{{ k }}" data-subject="{{ v.subject }}" data-body="{{ v.body }}">
+            {{ v.label }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      {% set email_action = "/admin/galleries/" ~ g.id ~ "/email" %}
+      {% set email_subject = kinds.delivery.subject %}
+      {% set email_intro = "Your gallery is ready to view and download:" %}
+      {% set email_link = link %}
+      {% include "admin/_email_form.html" %}
+      <script>
+        (function () {
+          const sel = document.getElementById("email-kind");
+          const form = sel.closest("details").querySelector("form");
+          const subj = form.querySelector('input[name="subject"]');
+          const body = form.querySelector('textarea[name="message"]');
+          const hid = document.createElement("input");
+          hid.type = "hidden"; hid.name = "email_kind"; hid.value = sel.value;
+          form.appendChild(hid);
+          sel.addEventListener("change", () => {
+            const o = sel.options[sel.selectedIndex];
+            subj.value = o.dataset.subject;
+            body.value = o.dataset.body;
+            hid.value = sel.value;
+          });
+        })();
+      </script>
+    </details>
+    {% endif %}
+
+    <details id="g-upload" class="gd-panel">
+      <summary>Upload {{ 'files' if is_drop else 'photos &amp; videos' }}</summary>
+      <form id="upform" class="stack-form">
+        {% if not is_drop %}
+        <select name="section_id">
+          <option value="">(no section)</option>
+          {% for s in sections %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+        </select>
         {% endif %}
-        {% endif %}
-        <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/delete"
-              class="inline" onsubmit="return confirm('Delete {{ a.filename }}?')">
-          <button class="link danger">delete</button>
-        </form>
-        {% if a.kind == 'video' %}
-        {% set thread = video_comments.get(a.id, []) %}
-        <details class="avc-panel">
-          <summary>Notes ({{ thread|length }})</summary>
-          {{ vc_thread(thread, 0, g, a, 0) }}
-          <form method="post" action="/admin/galleries/{{ g.id }}/comments/{{ a.id }}"
-                class="avc-new">
-            <input type="text" name="timecode" value="0" size="4"
-                   title="Timecode in seconds (0 = general note)">
-            <textarea name="body" rows="2" required placeholder="Add a studio note…"></textarea>
-            <button class="link">Post note</button>
+        <input type="file" name="files" multiple
+               accept=".jpg,.jpeg,.png,.heic,.heif,.webp,.tif,.tiff,.mp4,.mov,.m4v,.avi,.mkv,.webm">
+        <button type="submit">Upload</button>
+        <progress id="upbar" max="100" value="0" hidden></progress>
+        <p id="upmsg" class="muted"></p>
+      </form>
+    </details>
+
+    {% if not is_drop %}
+    <details id="g-sections" class="gd-panel">
+      <summary>Manage sections ({{ sections|length }})</summary>
+      <ul class="sections">
+        {% for s in sections %}
+        {% set picks = section_picks.get(s.id, 0) %}
+        <li>
+          <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/rename" class="inline">
+            <input type="text" name="name" value="{{ s.name }}" required>
+            <button class="link">rename</button>
           </form>
-        </details>
-        {% endif %}
-      </figcaption>
-    </figure>
-    {% endfor %}
-  </div>
+          <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/move" class="inline">
+            <button class="link" name="dir" value="up" title="Move up">&uarr;</button>
+            <button class="link" name="dir" value="down" title="Move down">&darr;</button>
+          </form>
+          <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/proof"
+                class="inline" title="Proofing target — clients pick N selects from this section. Blank or 0 = off.">
+            <span class="muted">pick</span>
+            <input type="number" name="proof_target" min="0" max="999"
+                   value="{{ s.proof_target or '' }}" placeholder="—" style="width:4.5rem">
+            <button class="link">set</button>
+            {% if s.proof_target %}
+              {% if picks >= s.proof_target %}
+              <span class="ok">&#10003; {{ picks }} / {{ s.proof_target }} ready</span>
+              {% else %}
+              <span class="muted">{{ picks }} / {{ s.proof_target }} picked</span>
+              {% endif %}
+            {% endif %}
+          </form>
+          <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/caption"
+                class="inline" title="Optional short caption shown under the section heading on the client gallery.">
+            <input type="text" name="caption" maxlength="200"
+                   value="{{ s.caption or '' }}" placeholder="caption…" style="width:14rem">
+            <button class="link">caption</button>
+          </form>
+          <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/delete"
+                class="inline"><button class="link danger">remove</button></form>
+        </li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="/admin/galleries/{{ g.id }}/sections" class="inline-form">
+        <input type="text" name="name" placeholder="New section" required>
+        <button type="submit">Add section</button>
+      </form>
+    </details>
+    {% endif %}
+  </section>
 </main>
+
 <script>
+(function () {
+  // Reveal-and-scroll: topbar / rail buttons open the matching <details> panel.
+  document.querySelectorAll('[data-reveal]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var d = document.getElementById(btn.dataset.reveal);
+      if (!d) return;
+      d.open = true;
+      d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  // Section pills + favorites toggle filter the masonry together.
+  var masonry = document.getElementById('gd-masonry');
+  var empty = document.getElementById('gd-empty');
+  var favBtn = document.getElementById('gd-favtoggle');
+  var section = '', favOnly = false;
+
+  function apply() {
+    var shown = 0;
+    if (masonry) masonry.querySelectorAll('.gd-tile').forEach(function (t) {
+      var okSec = !section || t.dataset.section === section;
+      var okFav = !favOnly || t.dataset.fav === '1';
+      var ok = okSec && okFav;
+      t.classList.toggle('gd-hidden', !ok);
+      if (ok) shown++;
+    });
+    if (empty) empty.hidden = shown !== 0;
+  }
+
+  document.querySelectorAll('.gd-pill').forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      document.querySelectorAll('.gd-pill').forEach(function (p) {
+        var on = p === pill;
+        p.classList.toggle('is-active', on);
+        p.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      section = pill.dataset.section;
+      apply();
+    });
+  });
+
+  if (favBtn) favBtn.addEventListener('click', function () {
+    favOnly = !favOnly;
+    favBtn.classList.toggle('is-active', favOnly);
+    favBtn.setAttribute('aria-pressed', favOnly ? 'true' : 'false');
+    apply();
+  });
+})();
+
 document.getElementById("upform").addEventListener("submit", function (e) {
   e.preventDefault();
   const files = this.querySelector('input[type=file]').files;

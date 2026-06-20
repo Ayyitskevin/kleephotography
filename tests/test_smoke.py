@@ -238,9 +238,9 @@ def test_full_gallery_flow(admin):
         # re-fav so downstream assertions (admin ♥ badge, crops) still hold
         pub.post(f"/g/{g['slug']}/fav/{a['id']}")
 
-    # the client favorite surfaces on the admin grid (♥ badge + heading count)
+    # the client favorite surfaces on the admin grid (♥ tile badge + proofing count)
     page = admin.get(f"/admin/galleries/{g['id']}").text
-    assert "&#9829;" in page and "1 faved" in page
+    assert "&#9829;" in page and "1 favorited" in page
 
     # second click toggles the cover off
     admin.post(f"/admin/galleries/{g['id']}/assets/{a['id']}/cover")
