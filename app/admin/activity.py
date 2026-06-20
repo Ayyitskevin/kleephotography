@@ -23,6 +23,7 @@ PIPELINE_STAGES = [
     ("retainer_paid", "Retainer"),
     ("session_planning", "Planning"),
     ("project_closed", "Closed"),
+    ("archived", "Archived"),
 ]
 
 
@@ -145,11 +146,10 @@ async def home(request: Request):
            WHERE e.created_at >= datetime('now', '-24 hours')
          ORDER BY ts DESC LIMIT 8""")
 
-    # --- Pipeline board (read-only; active stages, archived excluded) ---
+    # --- Pipeline board (read-only; all stages incl. archived) ---
     proj_rows = db.all_(
         """SELECT p.id, p.title, p.status, c.name AS client_name, c.company
            FROM projects p JOIN clients c ON c.id=p.client_id
-           WHERE p.status != 'archived'
            ORDER BY p.stage_changed_at DESC, p.id DESC""")
     by_stage: dict[str, list] = {k: [] for k, _ in PIPELINE_STAGES}
     for r in proj_rows:

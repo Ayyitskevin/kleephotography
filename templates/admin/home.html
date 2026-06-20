@@ -169,14 +169,14 @@
           <a class="link" href="/admin/studio">Studio &rarr;</a>
         </div>
         {% set stage_colors = {
-          'Inquiry':           'var(--dash-inquiry)',
-          'Consultation Call': 'var(--dash-consult)',
-          'Proposal Sent':     'var(--dash-proposal)',
-          'Contract Signed':   'var(--dash-contract)',
-          'Retainer Paid':     'var(--dash-retainer)',
-          'Session Planning':  'var(--dash-planning)',
-          'Project Closed':    'var(--dash-closed)',
-          'Archived':          'var(--dash-archived)'
+          'Inquiry':   'var(--dash-inquiry)',
+          'Consult':   'var(--dash-consult)',
+          'Proposal':  'var(--dash-proposal)',
+          'Contract':  'var(--dash-contract)',
+          'Retainer':  'var(--dash-retainer)',
+          'Planning':  'var(--dash-planning)',
+          'Closed':    'var(--dash-closed)',
+          'Archived':  'var(--dash-archived)'
         } %}
         <div class="dash-stages">
           {% for s in pipeline %}
