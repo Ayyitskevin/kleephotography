@@ -566,11 +566,19 @@ async def task_delete(task_id: int):
 
 # ---- Calendar (month grid: shoots + task due dates + invoice due dates) -----
 
+# Three-bucket palette matching the prototype legend (Shoot / Call·delivery / Money).
+_CAL_BUCKET = {
+    "shoot":   ("#7C2F38", "#f3e3e5"),
+    "call":    ("#2f7d57", "#e1f2e9"),
+    "money":   ("#9a7a2c", "#f7ecd2"),
+}
+
+
 @router.get("/calendar", response_class=HTMLResponse)
 async def calendar_view(request: Request, year: int = 0, month: int = 0):
-    """Month grid overlaying three date sources: project shoot dates, open-task
-    due dates, and open-invoice due dates. Read-only — each cell entry links to
-    the project/task/invoice it represents."""
+    """Month grid overlaying three real date sources, bucketed to the prototype's
+    legend: shoots (clay), confirmed consults (green), invoices due (gold).
+    Read-only — each cell entry links to the project/booking/invoice it represents."""
     today = dt.date.today()
     if not (1 <= month <= 12) or year < 1970:
         year, month = today.year, today.month
@@ -579,24 +587,15 @@ async def calendar_view(request: Request, year: int = 0, month: int = 0):
     lo, hi = first.isoformat(), last.isoformat()
 
     events: dict[int, list[dict]] = {}
-    # Agenda (chronological list) mirrors the grid; each entry carries its full
-    # ISO day so the template can sort + group. summary rolls up per-kind counts
-    # plus the dollar total of invoices due this month. All read-only.
-    agenda: list[dict] = []
-    summary = {"shoot": 0, "booking": 0, "task": 0, "invoice": 0, "expiry": 0,
-               "invoice_due_cents": 0}
 
-    def add(day_iso: str, kind: str, label: str, url: str, *, sort_key: str = ""):
+    def add(day_iso: str, bucket: str, label: str, url: str):
         try:
             day_d = dt.date.fromisoformat(day_iso[:10])
         except (ValueError, TypeError):
             return
-        entry = {"kind": kind, "label": label, "url": url}
-        events.setdefault(day_d.day, []).append(entry)
-        agenda.append({**entry, "day": day_d.isoformat(),
-                       "sort": sort_key or day_d.isoformat()})
-        if kind in summary:
-            summary[kind] += 1
+        color, bg = _CAL_BUCKET[bucket]
+        events.setdefault(day_d.day, []).append(
+            {"label": label, "url": url, "color": color, "bg": bg})
 
     for r in db.all_(
         """SELECT p.id, p.title, p.shoot_date, c.name AS client_name, c.company
@@ -608,21 +607,15 @@ async def calendar_view(request: Request, year: int = 0, month: int = 0):
             f"{r['title']} · {who}" if who else r["title"],
             f"/admin/studio/projects/{r['id']}")
     for r in db.all_(
-        """SELECT id, title, due_date FROM tasks
-           WHERE done=0 AND due_date IS NOT NULL
-             AND due_date BETWEEN ? AND ?""", (lo, hi)):
-        add(r["due_date"], "task", r["title"], "/admin/tasks")
-    for r in db.all_(
-        """SELECT i.id, i.title, i.due_date, i.total_cents, c.name AS client_name, c.company
+        """SELECT i.id, i.title, i.due_date, c.name AS client_name, c.company
            FROM invoices i JOIN projects p ON p.id=i.project_id
            JOIN clients c ON c.id=p.client_id
            WHERE i.status IN ('sent','viewed','deposit_paid')
              AND i.due_date IS NOT NULL AND i.due_date BETWEEN ? AND ?""", (lo, hi)):
         who = r["company"] or r["client_name"]
-        add(r["due_date"], "invoice",
+        add(r["due_date"], "money",
             f"{r['title']} · {who}" if who else r["title"],
             f"/admin/studio/invoices/{r['id']}")
-        summary["invoice_due_cents"] += r["total_cents"] or 0
     # Confirmed consultations/bookings — start_utc is UTC; show on Kevin's local
     # day. zoneinfo handles DST. Bookings link to the bookings console.
     tz = ZoneInfo(config.TIMEZONE)
@@ -637,25 +630,32 @@ async def calendar_view(request: Request, year: int = 0, month: int = 0):
             continue
         if not (lo <= local.date().isoformat() <= hi):
             continue
-        add(local.date().isoformat(), "booking",
+        add(local.date().isoformat(), "call",
             f"{local:%H:%M} {r['event_name']} · {r['name']}",
-            "/admin/scheduling/bookings", sort_key=local.isoformat())
-    # Gallery expiry dates — clients lose access on these days.
-    for r in db.all_(
-        """SELECT id, title, expires_at FROM galleries
-           WHERE expires_at IS NOT NULL AND expires_at BETWEEN ? AND ?""", (lo, hi)):
-        add(r["expires_at"], "expiry", f"{r['title']} expires",
-            f"/admin/galleries/{r['id']}")
+            "/admin/scheduling/bookings")
 
-    agenda.sort(key=lambda e: e["sort"])
+    # Sunday-first month grid of cells (prototype layout): leading/trailing blanks
+    # so the grid is a whole number of weeks.
     weeks = cal.Calendar(firstweekday=6).monthdayscalendar(year, month)
+    cells: list[dict] = []
+    for week in weeks:
+        for day in week:
+            if day == 0:
+                cells.append({"empty": True, "day": "", "today": False, "events": []})
+            else:
+                cells.append({
+                    "empty": False, "day": day,
+                    "today": (day == today.day and month == today.month
+                              and year == today.year),
+                    "events": events.get(day, []),
+                })
+
     prev_m = (first - dt.timedelta(days=1))
     next_m = (last + dt.timedelta(days=1))
     return templates.TemplateResponse(request, "admin/calendar.html",
                                       {"year": year, "month": month,
                                        "month_name": first.strftime("%B"),
-                                       "weeks": weeks, "events": events,
-                                       "today": today, "agenda": agenda,
-                                       "summary": summary,
+                                       "cells": cells, "today": today,
+                                       "dow": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
                                        "prev_year": prev_m.year, "prev_month": prev_m.month,
                                        "next_year": next_m.year, "next_month": next_m.month})

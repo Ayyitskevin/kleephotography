@@ -1,114 +1,39 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ month_name }} {{ year }} · Calendar · Mise{% endblock %}
 {% block topbar %}
-<header class="admin-topbar pgtop">
-  <div class="pgtop-lead cal-lead">
+<header class="admin-topbar pgtop cal-top">
+  <div class="cal-lead">
     <h1>{{ month_name }} {{ year }}</h1>
     <span class="cal-monthnav">
       <a href="/admin/calendar?year={{ prev_year }}&month={{ prev_month }}" aria-label="Previous month">&lsaquo;</a>
-      <a href="/admin/calendar" class="cal-today-btn">Today</a>
       <a href="/admin/calendar?year={{ next_year }}&month={{ next_month }}" aria-label="Next month">&rsaquo;</a>
     </span>
   </div>
-  <div class="pgtop-actions">
-    <a class="pgtop-new" href="/admin/scheduling"><span class="qc-plus" aria-hidden="true">+</span> Event</a>
+  <div class="cal-legend">
+    <span class="cal-leg"><span class="cal-leg-dot" style="background:#7C2F38;"></span> Shoot</span>
+    <span class="cal-leg"><span class="cal-leg-dot" style="background:#2f7d57;"></span> Call / delivery</span>
+    <span class="cal-leg"><span class="cal-leg-dot" style="background:#EDB23C;"></span> Money</span>
+    <a class="pgtop-new cal-add" href="/admin/scheduling"><span class="qc-plus" aria-hidden="true">+</span> Event</a>
   </div>
 </header>
 {% endblock %}
 {% block admin_body %}
-<main class="admin-main">
-  <div class="cal-nav">
-    <div class="studio-view-toggle cal-viewtoggle" role="group" aria-label="View">
-      <button type="button" data-view="month" class="is-active" aria-pressed="true">Month</button>
-      <button type="button" data-view="agenda" aria-pressed="false">Agenda</button>
+<main class="admin-main cal-main">
+  <div class="cal-dow">
+    {% for d in dow %}<span>{{ d }}</span>{% endfor %}
+  </div>
+  <div class="cal-grid">
+    {% for c in cells %}
+    <div class="cal-cell{% if c.empty %} is-empty{% endif %}{% if c.today %} is-today{% endif %}">
+      <div class="cal-cell-num"><span>{{ c.day }}</span></div>
+      <div class="cal-cell-events">
+        {% for e in c.events %}
+        <a class="cal-event" style="color: {{ e.color }}; background: {{ e.bg }};"
+           href="{{ e.url }}" title="{{ e.label }}">{{ e.label }}</a>
+        {% endfor %}
+      </div>
     </div>
-  </div>
-
-  <div class="cal-summary" aria-label="Month summary">
-    <span class="cal-sum"><strong>{{ summary.shoot }}</strong> shoot{{ "s" if summary.shoot != 1 }}</span>
-    <span class="cal-sum"><strong>{{ summary.booking }}</strong> consult{{ "s" if summary.booking != 1 }}</span>
-    <span class="cal-sum"><strong>{{ summary.task }}</strong> task{{ "s" if summary.task != 1 }} due</span>
-    <span class="cal-sum"><strong>{{ summary.invoice }}</strong> invoice{{ "s" if summary.invoice != 1 }} due
-      {% if summary.invoice_due_cents %}<span class="muted">(${{ "{:,.0f}".format(summary.invoice_due_cents / 100) }})</span>{% endif %}</span>
-    <span class="cal-sum"><strong>{{ summary.expiry }}</strong> expir{{ "ies" if summary.expiry != 1 else "y" }}</span>
-  </div>
-
-  <div class="cal-legend" id="cal-legend" role="group" aria-label="Filter event types">
-    {% for kind, label in [("shoot","Shoot"),("booking","Consult"),("task","Task due"),("invoice","Invoice due"),("expiry","Expiry")] %}
-    <button type="button" class="cal-tag cal-{{ kind }} is-on" data-kind="{{ kind }}" aria-pressed="true">{{ label }}</button>
     {% endfor %}
   </div>
-
-  <div id="cal-root">
-    <table class="cal-grid" id="cal-month">
-      <thead>
-        <tr>
-          <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for week in weeks %}
-        <tr>
-          {% for day in week %}
-          {% if day == 0 %}
-          <td class="cal-cell cal-empty"></td>
-          {% else %}
-          <td class="cal-cell{% if day == today.day and month == today.month and year == today.year %} cal-today{% endif %}">
-            <span class="cal-daynum">{{ day }}</span>
-            {% for e in events.get(day, []) %}
-            <a class="cal-event cal-{{ e.kind }}" data-kind="{{ e.kind }}" href="{{ e.url }}" title="{{ e.label }}">{{ e.label }}</a>
-            {% endfor %}
-          </td>
-          {% endif %}
-          {% endfor %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-
-    <div class="cal-agenda" id="cal-agenda" hidden>
-      {% if agenda %}
-      {% set ns = namespace(cur="") %}
-      {% for e in agenda %}
-        {% if e.day != ns.cur %}
-        {% set ns.cur = e.day %}
-        <p class="cal-agenda-day">{{ e.day }}</p>
-        {% endif %}
-        <a class="cal-agenda-row cal-event cal-{{ e.kind }}" data-kind="{{ e.kind }}" href="{{ e.url }}">
-          <span class="cal-agenda-dot cal-{{ e.kind }}"></span>{{ e.label }}
-        </a>
-      {% endfor %}
-      {% else %}
-      <p class="muted">Nothing scheduled this month.</p>
-      {% endif %}
-    </div>
-  </div>
-
-  <script>
-  (function () {
-    var root = document.getElementById('cal-root');
-    if (!root) return;
-    document.querySelectorAll('#cal-legend [data-kind]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var kind = btn.dataset.kind;
-        var on = btn.classList.toggle('is-on');
-        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-        root.classList.toggle('cal-hide-' + kind, !on);
-      });
-    });
-    document.querySelectorAll('.cal-viewtoggle button').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var view = btn.dataset.view;
-        document.getElementById('cal-month').hidden = view !== 'month';
-        document.getElementById('cal-agenda').hidden = view !== 'agenda';
-        document.querySelectorAll('.cal-viewtoggle button').forEach(function (b) {
-          var sel = b === btn;
-          b.classList.toggle('is-active', sel);
-          b.setAttribute('aria-pressed', sel ? 'true' : 'false');
-        });
-      });
-    });
-  })();
-  </script>
 </main>
 {% endblock %}
