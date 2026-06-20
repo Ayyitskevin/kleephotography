@@ -207,6 +207,53 @@ async def create_gallery(title: str = Form(...), client_name: str = Form("")):
 # the whole upload/derivative/ZIP/download stack; only the list + create live
 # here. Created published=1 so the link works the moment files finish, with a
 # PIN stored but enforced only when require_pin=1.
+
+# Strict 1:1 with the Admin Transfers prototype: one derived status per card
+# (Active / Expiring / Downloaded / Expired) with its own icon + colour pair,
+# all honest projections of real columns (expiry, download count, asset count).
+_TRANSFER_STYLE = {
+    "Active":     ("#2f7d57", "#e1f2e9", "↑"),
+    "Expiring":   ("#9a7a2c", "#f7ecd2", "↑"),
+    "Downloaded": ("#2f6d8a", "#ddeef0", "✓"),
+    "Expired":    ("#8A9183", "#ecefe6", "⤓"),
+}
+
+
+def _transfer_card(g, size: str, today_iso: str, soon_iso: str) -> dict:
+    exp = g["expires_at"]
+    expired = bool(exp and exp < today_iso)
+    expiring = bool(exp and not expired and exp <= soon_iso)
+    if expired:
+        status = "Expired"
+    elif expiring:
+        status = "Expiring"
+    elif g["n_dl"]:
+        status = "Downloaded"
+    else:
+        status = "Active"
+    color, bg, icon = _TRANSFER_STYLE[status]
+
+    if expired:
+        when = f"link expired {_short_date(exp)}"
+    elif exp:
+        days = (dt.date.fromisoformat(exp) - dt.date.fromisoformat(today_iso)).days
+        when = f"expires in {days} day{'s' if days != 1 else ''}"
+    else:
+        when = "no expiry"
+    n = g["n_assets"]
+    files = f"{n} file{'s' if n != 1 else ''}"
+    if g["n_pending"]:
+        files += f" ({g['n_pending']} processing)"
+
+    return {"id": g["id"], "slug": g["slug"], "title": g["title"],
+            "require_pin": g["require_pin"], "pin": g["pin"],
+            "status": status, "status_lc": status.lower(),
+            "status_color": color, "status_bg": bg, "icon": icon,
+            "meta": f"{files} · {when}",
+            "size": size, "n_assets": n,
+            "downloads": f"{g['n_dl']} download{'s' if g['n_dl'] != 1 else ''}"}
+
+
 @router.get("/transfers", response_class=HTMLResponse)
 async def transfers(request: Request):
     ds = db.all_("""SELECT g.*,
@@ -216,28 +263,45 @@ async def transfers(request: Request):
                     (SELECT COUNT(*) FROM downloads d WHERE d.gallery_id=g.id) AS n_dl
                     FROM galleries g WHERE g.type='drop'
                     ORDER BY g.created_at DESC""")
-    today_iso = dt.date.today().isoformat()
-    sizes = {g["id"]: _fmt_size(_dir_size(config.MEDIA_DIR / str(g["id"]))) for g in ds}
+    today = dt.date.today()
+    today_iso = today.isoformat()
+    soon_iso = (today + dt.timedelta(days=3)).isoformat()
+    sizes_b = {g["id"]: _dir_size(config.MEDIA_DIR / str(g["id"])) for g in ds}
+    cards = [_transfer_card(g, _fmt_size(sizes_b[g["id"]]), today_iso, soon_iso)
+             for g in ds]
+    month_start = today.replace(day=1).isoformat()
+    dl_month = db.one("""SELECT COUNT(*) AS n FROM downloads d
+                         JOIN galleries g ON g.id=d.gallery_id
+                         WHERE g.type='drop' AND d.created_at >= ?""",
+                      (month_start,))["n"]
     totals = {
         "n": len(ds),
+        "active": sum(1 for c in cards if c["status"] in ("Active", "Downloaded")),
         "live": sum(1 for g in ds
                     if not (g["expires_at"] and g["expires_at"] < today_iso)),
-        "expired": sum(1 for g in ds if g["expires_at"] and g["expires_at"] < today_iso),
-        "dl": sum(g["n_dl"] for g in ds),
+        "expired": sum(1 for c in cards if c["status"] == "Expired"),
+        "stored": _fmt_size(sum(sizes_b.values())),
+        "dl_month": dl_month,
     }
     return templates.TemplateResponse(request, "admin/transfers.html",
-                                      {"transfers": ds, "base_url": config.BASE_URL,
-                                       "today": today_iso, "sizes": sizes,
+                                      {"transfers": cards, "base_url": config.BASE_URL,
                                        "totals": totals})
 
 
 @router.post("/transfers")
-async def create_transfer(title: str = Form(...), expires_at: str = Form(""),
+async def create_transfer(title: str = Form(...), expires_days: str = Form(""),
                           require_pin: bool = Form(False)):
+    expires_at = None
+    raw = (expires_days or "").strip()
+    if raw and raw != "0":
+        try:
+            expires_at = (dt.date.today() + dt.timedelta(days=int(raw))).isoformat()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="bad expiry")
     gid = db.run("""INSERT INTO galleries (slug, title, pin, type, require_pin,
                     published, expires_at) VALUES (?,?,?,'drop',?,1,?)""",
                  (security.new_slug(), title.strip(), security.new_pin(),
-                  1 if require_pin else 0, expires_at.strip() or None))
+                  1 if require_pin else 0, expires_at))
     log.info("transfer %s created", gid)
     return RedirectResponse(f"/admin/galleries/{gid}", status_code=303)
 

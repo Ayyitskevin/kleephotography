@@ -7,14 +7,11 @@
     <h1>Transfers</h1>
     <p class="pgtop-sub">
       {% if transfers %}
-      <b>{{ totals.n }}</b> transfer{{ '' if totals.n == 1 else 's' }} ·
-      {{ totals.live }} live · <b>{{ totals.dl }}</b> download{{ '' if totals.dl == 1 else 's' }}
+      <b class="pos">{{ totals.active }} active</b> · {{ totals.stored }} stored ·
+      {{ totals.dl_month }} download{{ '' if totals.dl_month == 1 else 's' }} this month
       {% if totals.expired %}· <span class="neg">{{ totals.expired }} expired</span>{% endif %}
       {% else %}Quick file sends — your own WeTransfer{% endif %}
     </p>
-  </div>
-  <div class="pgtop-actions">
-    <a class="pgtop-new" href="#new-transfer"><span class="qc-plus" aria-hidden="true">+</span> New transfer</a>
   </div>
 </header>
 {% endblock %}
@@ -24,59 +21,60 @@
 
     <section class="tr-compose" id="new-transfer">
       <h2>New transfer</h2>
-      <form method="post" action="/admin/transfers" class="stack-form">
-        <label>Title <input type="text" name="title" required
-               placeholder="e.g. Café Lune — final reels"></label>
-        <label>Expires (optional — blank never expires)
-          <input type="date" name="expires_at"></label>
-        <label class="row"><input type="checkbox" name="require_pin" value="true">
-          Require a PIN (off = anyone with the link can open it)</label>
-        <button type="submit">Create &amp; add files</button>
+      <form method="post" action="/admin/transfers" class="tr-form">
+        <div class="tr-drop" aria-hidden="true">
+          <span class="tr-drop-ico">&#10514;</span>
+          <div class="tr-drop-lead">Name it, then drop files</div>
+          <div class="tr-drop-sub">files are added on the next screen</div>
+        </div>
+
+        <label class="tr-field">
+          <span class="tr-field-lbl">Transfer name</span>
+          <input type="text" name="title" required placeholder="Cúrate — Summer menu finals">
+        </label>
+
+        <div class="tr-opt">
+          <span class="tr-opt-lbl">Expires in</span>
+          <div class="tr-seg">
+            <label><input type="radio" name="expires_days" value="7"><span>7d</span></label>
+            <label><input type="radio" name="expires_days" value="14" checked><span>14d</span></label>
+            <label><input type="radio" name="expires_days" value="30"><span>30d</span></label>
+            <label><input type="radio" name="expires_days" value="0"><span>Never</span></label>
+          </div>
+        </div>
+
+        <label class="tr-opt tr-opt-row">
+          <span class="tr-opt-lbl">Password protect</span>
+          <input type="checkbox" name="require_pin" value="true" class="tr-toggle">
+        </label>
+
+        <button type="submit" class="tr-send">Create &amp; add files</button>
       </form>
-      <p class="tr-compose-note muted">Create the transfer, then drop final videos
-        or reels in on the next screen. Share the link — clients just tap and
-        download, no PIN unless you want one.</p>
     </section>
 
     <section class="tr-sent">
       <div class="tr-sent-head">
         <h2>Sent transfers</h2>
-        {% if transfers %}<span class="muted">{{ totals.live }} live</span>{% endif %}
+        <span class="muted">Last 30 days</span>
       </div>
       {% if transfers %}
       <ul class="tr-cards">
         {% for t in transfers %}
-        {% set expired = t.expires_at and t.expires_at < today %}
-        {% set status = 'expired' if expired else 'active' %}
         <li class="tr-card">
-          <span class="tr-card-ico tr-ico-{{ status }}" aria-hidden="true">{{ '⤓' if expired else '↑' }}</span>
+          <span class="tr-card-ico" style="color: {{ t.status_color }}; background: {{ t.status_bg }};" aria-hidden="true">{{ t.icon }}</span>
           <div class="tr-card-body">
             <div class="tr-card-top">
               <a href="/admin/galleries/{{ t.id }}">{{ t.title }}</a>
-              <span class="tr-badge tr-badge-{{ status }}">{{ 'Expired' if expired else 'Active' }}</span>
-              {% if t.require_pin %}<span class="pill" title="PIN required">&#128274; PIN</span>
-              {% else %}<span class="pill muted" title="Link only">link only</span>{% endif %}
+              <span class="tr-badge" style="color: {{ t.status_color }}; background: {{ t.status_bg }};">{{ t.status }}</span>
             </div>
-            <div class="tr-card-meta muted">
-              {{ t.n_assets }} file{{ '' if t.n_assets == 1 else 's' }}
-              {%- if t.n_pending %} ({{ t.n_pending }} processing){% endif %} ·
-              {% if expired %}link expired {{ t.expires_at }}
-              {% elif t.expires_at %}expires {{ t.expires_at }}
-              {% else %}no expiry{% endif %} ·
-              created {{ t.created_at[:10] }}
-            </div>
+            <div class="tr-card-meta muted">{{ t.meta }}</div>
           </div>
           <div class="tr-card-size">
-            <div class="tr-card-bytes">{{ sizes[t.id] }}</div>
-            <div class="muted">{{ t.n_dl }} download{{ '' if t.n_dl == 1 else 's' }}</div>
+            <div class="tr-card-bytes">{{ t.size }}</div>
+            <div class="muted">{{ t.downloads }}</div>
           </div>
           <div class="tr-card-act">
             {{ cp.copy_link(base_url ~ "/g/" ~ t.slug, t.pin if t.require_pin else None) }}
-            <a class="link" href="/admin/galleries/{{ t.id }}">Manage</a>
-            <form method="post" action="/admin/galleries/{{ t.id }}/delete" class="inline"
-                  onsubmit="return confirm({{ ('Delete “' ~ t.title ~ '” and its ' ~ t.n_assets ~ ' file' ~ ('' if t.n_assets == 1 else 's') ~ ' permanently? This cannot be undone.')|tojson }})">
-              <button class="link danger">Delete</button>
-            </form>
           </div>
         </li>
         {% endfor %}
