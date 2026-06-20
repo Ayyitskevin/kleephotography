@@ -1536,6 +1536,15 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   font-variant-numeric: tabular-nums; }
 .gal-sum strong { font-size: 1.02rem; }
 
+.gal-filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 0.2rem 0 1.1rem; }
+.gal-pill { border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink-soft); cursor: pointer; padding: 7px 15px; border-radius: 999px;
+  font: 600 0.78rem/1 var(--font-ui); display: inline-flex; align-items: center; gap: 6px; }
+.gal-pill span { opacity: 0.55; font-variant-numeric: tabular-nums; }
+.gal-pill:hover { border-color: var(--line-strong); }
+.gal-pill.is-active { background: var(--terra-deep); color: #F3F0E2; border-color: var(--terra-deep); }
+.gal-pill.is-active span { opacity: 0.7; }
+
 .gal-grid { display: grid; gap: 18px; margin: 0.2rem 0 1.2rem;
   grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); }
 .gal-card { background: var(--surface); border: 1px solid var(--line);

@@ -59,16 +59,17 @@
     <span class="gal-sum"><strong>{{ totals.dl }}</strong> &#8595; downloads</span>
   </div>
 
+  <div class="gal-filters" role="group" aria-label="Filter by status">
+    <button type="button" class="gal-pill is-active" data-status="" aria-pressed="true">All <span>{{ totals.n }}</span></button>
+    <button type="button" class="gal-pill" data-status="published" aria-pressed="false">Published <span>{{ totals.published }}</span></button>
+    <button type="button" class="gal-pill" data-status="draft" aria-pressed="false">Draft <span>{{ totals.draft }}</span></button>
+    {% if totals.expired %}<button type="button" class="gal-pill" data-status="expired" aria-pressed="false">Expiring <span>{{ totals.expired }}</span></button>{% endif %}
+  </div>
+
   <div class="studio-toolbar" role="search">
     <input type="search" id="gal-search" class="studio-search"
            placeholder="Search collections — title or client…"
            aria-label="Search collections" autocomplete="off">
-    <select id="gal-status" class="studio-filter" aria-label="Filter by status">
-      <option value="">All statuses</option>
-      <option value="published">Published</option>
-      <option value="draft">Draft</option>
-      <option value="expired">Expired</option>
-    </select>
     {% if client_names %}
     <select id="gal-client" class="studio-filter" aria-label="Filter by client">
       <option value="">All clients</option>
@@ -178,7 +179,8 @@
   (function () {
     var search = document.getElementById('gal-search');
     if (!search) return;
-    var statusSel = document.getElementById('gal-status');
+    var statusFilter = '';
+    var pills = Array.prototype.slice.call(document.querySelectorAll('.gal-pill'));
     var clientSel = document.getElementById('gal-client');
     var sortSel = document.getElementById('gal-sort');
     var grid = document.getElementById('gal-grid');
@@ -189,7 +191,7 @@
 
     function applyFilter() {
       var q = (search.value || '').trim().toLowerCase();
-      var st = statusSel.value;
+      var st = statusFilter;
       var cl = clientSel ? clientSel.value : '';
       var shown = 0;
       document.querySelectorAll('#gal-grid .gal-item').forEach(function (el) {
@@ -227,7 +229,17 @@
     }
 
     search.addEventListener('input', applyFilter);
-    statusSel.addEventListener('change', applyFilter);
+    pills.forEach(function (pill) {
+      pill.addEventListener('click', function () {
+        statusFilter = pill.dataset.status;
+        pills.forEach(function (p) {
+          var on = p === pill;
+          p.classList.toggle('is-active', on);
+          p.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        applyFilter();
+      });
+    });
     if (clientSel) clientSel.addEventListener('change', applyFilter);
     sortSel.addEventListener('change', applySort);
     document.querySelectorAll('.studio-view-toggle button').forEach(function (btn) {
