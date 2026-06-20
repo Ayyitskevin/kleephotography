@@ -4152,6 +4152,8 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
   color: var(--ink-faint); text-align: center;
 }
 .admin-shell .fin-panel-n { font-size: .78rem; font-weight: 600; color: var(--ink-faint); }
+.admin-shell .rc-filter { align-self: flex-start; }
+.admin-shell .rc-filter-n { opacity: .55; }
 @media (max-width: 1080px) {
   .admin-shell .fin-grid { grid-template-columns: 1fr; }
 }

@@ -37,6 +37,15 @@
     </form>
   </section>
 
+  {% if cards[0].value != '0' %}
+  <div class="fin-range rc-filter">
+    {% for p in pills %}
+    <a href="/admin/financials/receipts?filter={{ p.key }}"
+       class="fin-range-pill{% if p.on %} fin-range-on{% endif %}">{{ p.label }} <span class="rc-filter-n">{{ p.n }}</span></a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <section class="rc-grid">
     {% for r in rows %}
     <div class="rc-card">

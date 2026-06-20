@@ -296,17 +296,21 @@ def _ded(amount_cents: int, pct: int) -> int:
 
 
 @router.get("/expenses", response_class=HTMLResponse)
-async def expenses(request: Request):
-    rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
+async def expenses(request: Request, cat: str = "all"):
+    all_rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
+    if cat not in _EXP_CAT_COLOR:
+        cat = "all"
+    rows = all_rows if cat == "all" else [r for r in all_rows if r["category"] == cat]
     with_receipt = {r["expense_id"] for r in
                     db.all_("SELECT expense_id FROM receipts WHERE expense_id IS NOT NULL")}
 
-    total = sum(r["amount_cents"] for r in rows)
-    deductible = sum(_ded(r["amount_cents"], r["deductible_pct"]) for r in rows)
-    n_receipts = sum(1 for r in rows if r["id"] in with_receipt)
+    # Summary totals reflect the whole ledger, not the active category filter.
+    total = sum(r["amount_cents"] for r in all_rows)
+    deductible = sum(_ded(r["amount_cents"], r["deductible_pct"]) for r in all_rows)
+    n_receipts = sum(1 for r in all_rows if r["id"] in with_receipt)
 
     cat_tot: dict[str, int] = {}
-    for r in rows:
+    for r in all_rows:
         cat_tot[r["category"]] = cat_tot.get(r["category"], 0) + _ded(
             r["amount_cents"], r["deductible_pct"])
     max_cat = max(cat_tot.values(), default=0)
@@ -317,14 +321,14 @@ async def expenses(request: Request):
 
     cards = [
         {"label": "Total expenses", "value": _usd(total), "tone": "muted",
-         "sub": f"{len(rows)} logged"},
+         "sub": f"{len(all_rows)} logged"},
         {"label": "Deductible", "value": _usd(deductible), "tone": "ok",
          "sub": "after per-item %"},
-        {"label": "Receipts on file", "value": f"{n_receipts} / {len(rows)}",
-         "tone": "warn", "sub": f"{len(rows) - n_receipts} missing"
-         if rows else "none yet"},
-        {"label": "Categories", "value": str(len(cat_tot)), "tone": "dark",
-         "sub": "in use"},
+        {"label": "Est. tax saved", "value": _usd(round(deductible * 0.3)),
+         "tone": "warn", "sub": "~30% bracket estimate"},
+        {"label": "Receipts on file", "value": f"{n_receipts} / {len(all_rows)}",
+         "tone": "dark", "sub": f"{len(all_rows) - n_receipts} missing"
+         if all_rows else "none yet"},
     ]
     table = [{
         "id": r["id"], "date": (r["spent_on"] or "")[5:10],
@@ -336,9 +340,15 @@ async def expenses(request: Request):
         "has_receipt": r["id"] in with_receipt,
     } for r in rows]
 
+    # Ledger category filter pills — All + the categories actually in use.
+    used = [c for c, _ in _EXP_CATS if c in cat_tot]
+    pills = [{"key": "all", "label": "All", "on": cat == "all"}] + [
+        {"key": c, "label": c, "on": cat == c} for c in used]
+
     return templates.TemplateResponse(request, "admin/financials_expenses.html", {
         "active": "expenses", "cards": cards, "rows": table, "by_cat": by_cat,
         "cats": [c for c, _ in _EXP_CATS], "today": dt.date.today().isoformat(),
+        "pills": pills, "cat": cat,
     })
 
 
@@ -386,18 +396,33 @@ async def expenses_csv():
 
 
 @router.get("/receipts", response_class=HTMLResponse)
-async def receipts(request: Request):
-    rows = db.all_("""SELECT rc.*, e.vendor AS exp_vendor, e.spent_on AS exp_date
-                      FROM receipts rc LEFT JOIN expenses e ON e.id = rc.expense_id
-                      ORDER BY rc.created_at DESC, rc.id DESC""")
-    linked = sum(1 for r in rows if r["expense_id"])
+async def receipts(request: Request, filter: str = "all"):
+    if filter not in ("all", "linked", "unlinked"):
+        filter = "all"
+    all_rows = db.all_(
+        """SELECT rc.*, e.vendor AS exp_vendor, e.spent_on AS exp_date
+           FROM receipts rc LEFT JOIN expenses e ON e.id = rc.expense_id
+           ORDER BY rc.created_at DESC, rc.id DESC""")
+    linked = sum(1 for r in all_rows if r["expense_id"])
+    if filter == "linked":
+        rows = [r for r in all_rows if r["expense_id"]]
+    elif filter == "unlinked":
+        rows = [r for r in all_rows if not r["expense_id"]]
+    else:
+        rows = all_rows
     cards = [
-        {"label": "Captured", "value": str(len(rows)), "tone": "muted",
+        {"label": "Captured", "value": str(len(all_rows)), "tone": "muted",
          "sub": "receipt scans"},
         {"label": "Linked", "value": str(linked), "tone": "dark",
          "sub": "matched to an expense"},
-        {"label": "Unlinked", "value": str(len(rows) - linked), "tone": "warn",
+        {"label": "Unlinked", "value": str(len(all_rows) - linked), "tone": "warn",
          "sub": "attach to an expense"},
+    ]
+    pills = [
+        {"key": "all", "label": "All", "n": len(all_rows), "on": filter == "all"},
+        {"key": "linked", "label": "Linked", "n": linked, "on": filter == "linked"},
+        {"key": "unlinked", "label": "Unlinked", "n": len(all_rows) - linked,
+         "on": filter == "unlinked"},
     ]
     cells = [{
         "id": r["id"], "filename": r["filename"],
@@ -416,6 +441,7 @@ async def receipts(request: Request):
                     "ORDER BY spent_on DESC, id DESC LIMIT 200")]
     return templates.TemplateResponse(request, "admin/financials_receipts.html", {
         "active": "receipts", "cards": cards, "rows": cells, "expenses": exp_opts,
+        "pills": pills, "filter": filter,
     })
 
 
@@ -476,8 +502,8 @@ async def mileage(request: Request):
          "sub": f"at {config.MILEAGE_RATE_CENTS}¢/mi"},
         {"label": "Trips logged", "value": str(len(rows)), "tone": "ok",
          "sub": "all confirmed" if rows else "none yet"},
-        {"label": "Current rate", "value": f"{config.MILEAGE_RATE_CENTS}¢",
-         "tone": "warn", "sub": "per mile · 2026 IRS"},
+        {"label": "Est. tax saved", "value": _usd(round(deduction * 0.3)),
+         "tone": "warn", "sub": "~30% bracket estimate"},
     ]
     table = [{
         "id": r["id"], "date": (r["drove_on"] or "")[5:10],

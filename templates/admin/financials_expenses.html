@@ -28,7 +28,17 @@
 
   <div class="fin-cols">
     <section class="fin-panel">
-      <div class="fin-panel-head"><h2 class="fin-h2">Expense log</h2></div>
+      <div class="fin-panel-head">
+        <h2 class="fin-h2">Expense log</h2>
+        {% if pills|length > 1 %}
+        <div class="fin-range">
+          {% for p in pills %}
+          <a href="/admin/financials/expenses?cat={{ p.key }}"
+             class="fin-range-pill{% if p.on %} fin-range-on{% endif %}">{{ p.label }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
       <div class="fin-tbl-scroll">
         <table class="fin-tbl">
           <thead><tr>
