@@ -11,6 +11,9 @@ with Google Calendar linking to its real OAuth connect flow) and a read-only
 writes; the .env is the single source of truth.
 """
 
+import datetime as dt
+import shutil
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
@@ -96,9 +99,31 @@ def _operations() -> list[dict]:
     ]
 
 
+def _storage() -> dict:
+    """Live disk + backup heartbeat (re-homed here from the galleries dashboard in
+    the strict-1:1 rebuild — an operational safety signal, not a gallery stat).
+    Silence is not evidence: a missing snapshot reads 'none found', loudly."""
+    free_gb = shutil.disk_usage(config.DATA_DIR).free / 1e9
+    bdir = config.DATA_DIR / "backups"
+    snaps = sorted(bdir.glob("*.db.gz")) if bdir.exists() else []
+    if snaps:
+        age_h = (dt.datetime.now().timestamp() - snaps[-1].stat().st_mtime) / 3600
+        if age_h < 1:
+            backup = "under an hour ago"
+        elif age_h < 24:
+            backup = f"{int(age_h)}h ago"
+        else:
+            backup = f"{int(age_h // 24)}d ago"
+    else:
+        backup = "none found"
+    return {"free_gb": free_gb, "min_free_gb": config.MIN_FREE_GB,
+            "low": free_gb < config.MIN_FREE_GB, "backup": backup}
+
+
 @router.get("", response_class=HTMLResponse)
 async def settings(request: Request):
     return templates.TemplateResponse(request, "admin/settings.html", {
         "integrations": _integrations(),
         "operations": _operations(),
+        "storage": _storage(),
     })

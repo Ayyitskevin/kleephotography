@@ -95,6 +95,32 @@
     </a>
   </section>
 
+  {# Orphan galleries — published with no studio client (re-homed from the
+     galleries dashboard in the strict-1:1 rebuild). One-click re-link picker. #}
+  {% if orphans %}
+  <section class="unlinked-warn" aria-label="Published galleries with no client">
+    <p class="unlinked-warn-head">
+      <strong>{{ orphans|length }} published galler{{ "ies" if orphans|length != 1 else "y" }}
+      {{ "have" if orphans|length != 1 else "has" }} no client linked</strong> — re-link so the booking, proposal and invoice context isn&rsquo;t lost.
+    </p>
+    <ul class="unlinked-warn-list">
+      {% for o in orphans %}
+      <li class="unlinked-warn-row">
+        <span class="unlinked-warn-title">{{ o.title }}</span>
+        <form method="post" action="/admin/galleries/{{ o.id }}/link-client" class="unlinked-warn-pick">
+          <select name="client_id" aria-label="Link {{ o.title }} to a client">
+            {% for c in link_clients %}
+            <option value="{{ c.id }}">{{ c.company or c.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Link</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
   <div class="dash-grid">
 
     {# ── LEFT column: run the day ─────────────────────────────────────── #}

@@ -47,6 +47,26 @@
     {% endfor %}
   </section>
 
+  <section class="set-ops">
+    <h2 class="set-h2">System health</h2>
+    <div class="set-op-row">
+      <div class="set-op-body">
+        <div class="set-op-label">Disk space</div>
+        <div class="set-op-desc">
+          {% if storage.low %}Below the {{ storage.min_free_gb }} GB floor — uploads refused until cleared{% else %}Headroom above the {{ storage.min_free_gb }} GB upload floor{% endif %}
+        </div>
+      </div>
+      <span class="set-op-value"{% if storage.low %} style="color: var(--clay);"{% endif %}>{{ "%.0f"|format(storage.free_gb) }} GB free</span>
+    </div>
+    <div class="set-op-row">
+      <div class="set-op-body">
+        <div class="set-op-label">Last database backup</div>
+        <div class="set-op-desc">Nightly snapshot of the studio database — silence is not safety.</div>
+      </div>
+      <span class="set-op-value">{{ storage.backup }}</span>
+    </div>
+  </section>
+
   <p class="set-note">Money &amp; media truth live here on your own node. Integrations push
     status outward only — nothing external can overwrite what Stripe charged or what you
     delivered. These are provisioned in <code>.env</code> on the server; this page reads

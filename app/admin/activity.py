@@ -38,6 +38,17 @@ async def home(request: Request):
                 else "Good afternoon" if hour < 18 else "Good evening")
     today_str = dt.date.today().strftime("%A, %B %-d")
 
+    # Published galleries with no studio client — orphans, usually from a client
+    # force-delete or a manual unlink. A live link means Kevin's lost the
+    # inquiry/proposal/invoice context, so surface them with a one-click re-link
+    # picker. Re-homed here from the galleries dashboard in the strict-1:1 rebuild
+    # (the grid card has no warn glyph). Drafts (unpublished) are fine — not nagged.
+    orphans = db.all_("""SELECT id, slug, title FROM galleries
+                         WHERE type='gallery' AND published=1 AND client_id IS NULL
+                         ORDER BY created_at DESC""")
+    link_clients = (db.all_("SELECT id, name, company FROM clients ORDER BY name")
+                    if orphans else [])
+
     new_inquiries = db.one(
         "SELECT COUNT(*) AS n FROM inquiries "
         "WHERE converted_at IS NULL AND dismissed_at IS NULL")["n"]
@@ -300,6 +311,8 @@ async def home(request: Request):
                                        "docs_in_flight": docs_in_flight,
                                        "revenue": revenue,
                                        "mini_cal": mini_cal,
+                                       "orphans": orphans,
+                                       "link_clients": link_clients,
                                        "base_url": config.BASE_URL})
 
 

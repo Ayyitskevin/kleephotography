@@ -692,13 +692,12 @@ def test_captured_emails(admin):
         assert anon.get("/admin/emails", follow_redirects=False).status_code == 303
 
 
-@pytest.mark.xfail(reason="Galleries stripped to strict-1:1 (header->pills->grid); disk/backup heartbeat + orphan-linker re-home to Settings/Home in phase-2 re-link", strict=False)
 def test_dashboard_storage(admin):
-    # Per-card storage was dropped in the strict-1:1 grid (prototype card has no
-    # size cell); storage now lives only in the library roll-up + the disk
-    # free-space footer. That footer + backup heartbeat are operational safety
-    # signals and must keep rendering loudly.
-    page = admin.get("/admin/galleries").text
+    # The disk/backup heartbeat was stripped from the strict-1:1 galleries grid
+    # (prototype card has no size cell) and re-homed to Settings → "System health",
+    # alongside the other operational settings. It's an operational safety signal
+    # and must keep rendering loudly.
+    page = admin.get("/admin/settings").text
     # free-space line always renders; the test box is nowhere near the watermark
     assert "GB free" in page
     assert "uploads refused" not in page
@@ -710,7 +709,7 @@ def test_dashboard_storage(admin):
     bdir.mkdir(exist_ok=True)
     snap = bdir / "mise-2026-06-12-0230.db.gz"
     snap.write_bytes(b"x")
-    fresh = admin.get("/admin/galleries").text
+    fresh = admin.get("/admin/settings").text
     assert "under an hour ago" in fresh and "none found" not in fresh
     snap.unlink()
 
@@ -2363,13 +2362,14 @@ def test_details_persistence_wiring(admin):
     assert 'id="g-send-email"' in gpage
 
 
-@pytest.mark.xfail(reason="Galleries stripped to strict-1:1 (header->pills->grid); disk/backup heartbeat + orphan-linker re-home to Settings/Home in phase-2 re-link", strict=False)
 def test_dashboard_unlinked_warning(admin):
-    # Helper to count the current "N published galleries" warning number in
-    # the dashboard nav strip — robust against prior tests' fixture state.
+    # The orphan-gallery warning (published galleries with no studio client) was
+    # stripped from the strict-1:1 galleries grid (prototype card has no warn
+    # glyph) and re-homed to the Home dashboard, where the studio's other
+    # needs-attention nudges live. Same inline one-click link-client picker.
     import re
     def n_warned():
-        m = re.search(r"(\d+) published galler", admin.get("/admin/galleries").text)
+        m = re.search(r"(\d+) published galler", admin.get("/admin/home").text)
         return int(m.group(1)) if m else 0
     baseline = n_warned()
 
@@ -2382,7 +2382,7 @@ def test_dashboard_unlinked_warning(admin):
     # publish it → count bumps by 1, inline picker now offers this gallery
     db.run("UPDATE galleries SET published=1 WHERE id=?", (gid_draft,))
     assert n_warned() == baseline + 1
-    page = admin.get("/admin/galleries").text
+    page = admin.get("/admin/home").text
     assert "unlinked-warn" in page  # strip is now visible regardless of baseline
     # the orphan picker strip is the single place orphans surface now — the
     # per-card warning glyph was dropped in the strict-1:1 grid (prototype card
@@ -2397,7 +2397,7 @@ def test_dashboard_unlinked_warning(admin):
     assert db.one("SELECT client_id FROM galleries WHERE id=?",
                   (gid_draft,))["client_id"] == cid
     assert n_warned() == baseline
-    page = admin.get("/admin/galleries").text
+    page = admin.get("/admin/home").text
     assert f"/admin/galleries/{gid_draft}/link-client" not in page
     # link-client refuses bogus client_id; the gallery's client_id isn't touched
     r = admin.post(f"/admin/galleries/{gid_draft}/link-client",
@@ -3408,13 +3408,16 @@ def test_lightbox_doubletap_gesture():
     assert "touch-action: manipulation" in css
 
 
-@pytest.mark.xfail(reason="Portal-hint clients table was stripped in the strict-1:1 rewrite and re-homed nowhere (only client.html carries a single 'never visited' hint). Needs a re-built clients listing — feature work, not a route re-point", strict=False)
 def test_studio_portal_hint(admin):
+    # The per-client portal-engagement hint ("👁 2h ago" / "never visited" / "no
+    # portal") moved with the clients table to the Studio clients sub-view
+    # (/admin/studio/clients) in the board-first strict-1:1 rewrite; the board
+    # tab itself is now pipeline-only.
     import datetime as dt
 
     # client with no portal → "no portal"
     cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Portal Hint Cafe",))
-    r = admin.get("/admin/studio")
+    r = admin.get("/admin/studio/clients")
     assert r.status_code == 200
     # slice the clients table row so we only check this client's hint
     row_start = r.text.index("Portal Hint Cafe")
@@ -3425,7 +3428,7 @@ def test_studio_portal_hint(admin):
     db.run("INSERT INTO portals (client_id, slug, pin) VALUES (?,?,?)",
            (cid, "portal-hint-aaaa", "1234"))
     row = (lambda t: t[t.index("Portal Hint Cafe"):
-                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio").text)
+                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio/clients").text)
     assert "never visited" in row
 
     # set last_visit to 2 hours ago → "👁 2h ago"
@@ -3433,28 +3436,28 @@ def test_studio_portal_hint(admin):
     db.run("UPDATE portals SET visits=5, last_visit=? WHERE client_id=?",
            (two_hours, cid))
     row = (lambda t: t[t.index("Portal Hint Cafe"):
-                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio").text)
+                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio/clients").text)
     assert "👁" in row and "2h ago" in row
 
     # 5 minutes ago → "Xm ago"
     five_min = (dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(minutes=5)).isoformat()
     db.run("UPDATE portals SET last_visit=? WHERE client_id=?", (five_min, cid))
     row = (lambda t: t[t.index("Portal Hint Cafe"):
-                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio").text)
+                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio/clients").text)
     assert "5m ago" in row or "4m ago" in row  # tolerant to second-edge
 
     # 3 days ago → "3d ago"
     three_days = (dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=3)).isoformat()
     db.run("UPDATE portals SET last_visit=? WHERE client_id=?", (three_days, cid))
     row = (lambda t: t[t.index("Portal Hint Cafe"):
-                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio").text)
+                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio/clients").text)
     assert "3d ago" in row
 
     # 45 days ago → falls back to ISO date
     long_ago = (dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=45)).isoformat()
     db.run("UPDATE portals SET last_visit=? WHERE client_id=?", (long_ago, cid))
     row = (lambda t: t[t.index("Portal Hint Cafe"):
-                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio").text)
+                       t.index("</tr>", t.index("Portal Hint Cafe"))])(admin.get("/admin/studio/clients").text)
     # ISO date (YYYY-MM-DD) appears in the hint
     iso = (dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=45)).date().isoformat()
     assert iso in row
