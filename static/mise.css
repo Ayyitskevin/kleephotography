@@ -4900,7 +4900,7 @@ html[data-theme="dark"] .admin-shell {
   --ink-ghost:     #66645f;
 
   --terra:         #23b487;
-  --terra-deep:    #0e8f66;
+  --terra-deep:    #0c7c58;
   --terra-tint:    #14271f;
   --terra-tint-2:  #1c3a2d;
   --gold:          #E0A43B;
@@ -5108,3 +5108,27 @@ html[data-theme="dark"] .admin-shell .rc-thumb {
   background: linear-gradient(160deg, #1a1a1a, #141414);
 }
 html[data-theme="dark"] .admin-shell .rc-line { background: var(--line-strong); }
+
+/* ── 11. Filled buttons: --terra is the BRIGHT text accent and washes out as
+   a fill under light text; redirect every solid green button to the deep jade
+   --terra-deep so the label keeps contrast (fixes inbox + header CTAs). ───── */
+html[data-theme="dark"] .admin-shell .stu-newproj-pop button,
+html[data-theme="dark"] .admin-shell .qc-btn,
+html[data-theme="dark"] .admin-shell button.primary,
+html[data-theme="dark"] .admin-shell button[type="submit"].primary,
+html[data-theme="dark"] .admin-shell .dash-new,
+html[data-theme="dark"] .admin-shell .pgtop-new,
+html[data-theme="dark"] .admin-shell .dash-horizon button.is-active,
+html[data-theme="dark"] .admin-shell .ib-act-primary,
+html[data-theme="dark"] .admin-shell .set-badge-ready,
+html[data-theme="dark"] .admin-shell .cal-cell.is-today .cal-cell-num span {
+  background: var(--terra-deep); border-color: var(--terra-deep);
+}
+
+/* Solid clay buttons wash the same way (--clay is a light danger accent in
+   dark); give them a saturated terracotta fill so light labels read. */
+html[data-theme="dark"] .admin-shell .fin-export-btn,
+html[data-theme="dark"] .admin-shell .tk-add-form button,
+html[data-theme="dark"] .admin-shell .tr-send {
+  background: #a8472f; border-color: #a8472f; color: #F3F0E2;
+}
