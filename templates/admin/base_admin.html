@@ -10,6 +10,16 @@
 <link rel="preload" href="/static/fonts/archivo-latin.woff2?v={{ static_rev }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/static/fonts/newsreader-latin.woff2?v={{ static_rev }}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
+{# Set the saved theme on <html> before first paint so dark mode never flashes
+   light on load. Only the .admin-shell surface reacts to data-theme. #}
+<script>
+  (function () {
+    try {
+      if (localStorage.getItem("mise-theme") === "dark")
+        document.documentElement.setAttribute("data-theme", "dark");
+    } catch (e) {}
+  })();
+</script>
 {% block admin_head %}{% endblock %}
 {% endblock %}
 {% block content %}

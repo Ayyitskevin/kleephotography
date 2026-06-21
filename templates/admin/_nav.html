@@ -34,7 +34,13 @@
     <a href="/admin/tasks" title="Tasks"{% if _p.startswith('/admin/tasks') %} class="is-active"{% endif %}><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m8 12 3 3 5-6"/></svg></span><span class="lbl">Tasks</span></a>
     <a href="/admin/forms" title="Forms"{% if _p.startswith('/admin/forms') %} class="is-active"{% endif %}><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v2H9z"/><path d="M9 11h6M9 15h4"/></svg></span><span class="lbl">Forms</span></a>
   </nav>
-  <div class="admin-nav-foot ns-foot"><span class="ns-pulse" aria-hidden="true"></span> <span class="lbl">Self-hosted · synced</span></div>
+  <div class="admin-nav-foot ns-foot">
+    <span class="ns-pulse" aria-hidden="true"></span> <span class="lbl">Self-hosted · synced</span>
+    <button type="button" class="theme-toggle" id="theme-toggle"
+            aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
+      <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+    </button>
+  </div>
 </aside>
 
 {# ── Command palette (⌘K) — overlay, lives once per page ──────────────────── #}
@@ -202,6 +208,29 @@
     nav.addEventListener("mouseleave", function () { place(activeEl()); });
     requestAnimationFrame(function () { place(activeEl()); });
     window.addEventListener("resize", function () { place(activeEl()); });
+  }
+
+  /* Dark-mode toggle: flips data-theme on <html>, persists to localStorage.
+     The pre-paint script in base_admin.html applies the saved choice on load. */
+  var tbtn = document.getElementById("theme-toggle");
+  if (tbtn) {
+    var syncTheme = function () {
+      var dark = document.documentElement.getAttribute("data-theme") === "dark";
+      tbtn.setAttribute("aria-pressed", dark ? "true" : "false");
+      tbtn.querySelector(".theme-toggle-icon").textContent = dark ? "☀" : "☾";
+    };
+    syncTheme();
+    tbtn.addEventListener("click", function () {
+      var dark = document.documentElement.getAttribute("data-theme") === "dark";
+      if (dark) {
+        document.documentElement.removeAttribute("data-theme");
+        try { localStorage.setItem("mise-theme", "light"); } catch (e) {}
+      } else {
+        document.documentElement.setAttribute("data-theme", "dark");
+        try { localStorage.setItem("mise-theme", "dark"); } catch (e) {}
+      }
+      syncTheme();
+    });
   }
 })();
 </script>
