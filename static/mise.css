@@ -4988,6 +4988,33 @@ html[data-theme="dark"] .admin-shell .gd-status.is-draft {
   background: var(--neutral-bg); color: var(--neutral); border-color: var(--neutral-line);
 }
 
+/* ── 2d. Same dark-on-dark fix for the remaining gallery-detail headings, the
+        whole Scheduling page (sch-*), and the global quick-create palette
+        (ns-pal-*) — all hardcode near-black ink (#18241E/#283A30/#3B5A48) on
+        surfaces that flip dark. Headings/values → --ink, meta → --ink-soft,
+        faint labels → --ink-faint, cream dividers → --line. ─────────────────── */
+html[data-theme="dark"] .admin-shell .gd-deliver h3,
+html[data-theme="dark"] .admin-shell .gd-proof-head h3,
+html[data-theme="dark"] .admin-shell .gd-panel > summary,
+html[data-theme="dark"] .admin-shell .gd-favtoggle,
+html[data-theme="dark"] .admin-shell .sch-h2,
+html[data-theme="dark"] .admin-shell .sch-type-name > span:first-child,
+html[data-theme="dark"] .admin-shell .sch-day-label,
+html[data-theme="dark"] .admin-shell .sch-day-hours,
+html[data-theme="dark"] .admin-shell .sch-up-client,
+html[data-theme="dark"] .admin-shell .ns-pal-input,
+html[data-theme="dark"] .admin-shell .ns-pal-row,
+html[data-theme="dark"] .admin-shell .ns-pal-ic { color: var(--ink); }
+html[data-theme="dark"] .admin-shell .sch-type-meta,
+html[data-theme="dark"] .admin-shell .sch-cell:not(.is-today):not(.is-empty),
+html[data-theme="dark"] .admin-shell .sch-up-type,
+html[data-theme="dark"] .admin-shell .sch-up-time { color: var(--ink-soft); }
+html[data-theme="dark"] .admin-shell .sch-type-up,
+html[data-theme="dark"] .admin-shell .sch-dow { color: var(--ink-faint); }
+html[data-theme="dark"] .admin-shell .sch-type-foot,
+html[data-theme="dark"] .admin-shell .sch-day,
+html[data-theme="dark"] .admin-shell .sch-up { border-color: var(--line); }
+
 /* ── 3. Studio board details with hardcoded greys/golds ─────────────────── */
 html[data-theme="dark"] .admin-shell .stu-col-count,
 html[data-theme="dark"] .admin-shell .kpi-trend-flat,
