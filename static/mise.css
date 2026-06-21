@@ -4887,16 +4887,16 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 html[data-theme="dark"] .admin-shell {
   color-scheme: dark;
 
-  --bg:            #15120d;
-  --bg-glow:       #1b1710;
-  --surface:       #211c15;
-  --surface-sunk:  #18140e;
-  --surface-rail:  #1a1610;
+  --bg:            #131313;
+  --bg-glow:       #1a1a1a;
+  --surface:       #1c1c1c;
+  --surface-sunk:  #161616;
+  --surface-rail:  #181818;
 
-  --ink:           #ece4d4;
-  --ink-soft:      #c4b9a4;
-  --ink-faint:     #938975;
-  --ink-ghost:     #6b6253;
+  --ink:           #e8e6e2;
+  --ink-soft:      #bdbab4;
+  --ink-faint:     #8c8a85;
+  --ink-ghost:     #66645f;
 
   --terra:         #6dba9b;
   --terra-deep:    #8fcfb1;
@@ -4906,12 +4906,12 @@ html[data-theme="dark"] .admin-shell {
 
   --ok:      #9cc178;  --ok-bg:  #20271a;  --ok-line:  #354028;
   --honey:   #d8a857;  --honey-bg:#2b2413; --honey-line:#473a1f;
-  --neutral: #b3a892;  --neutral-bg:#241f18;--neutral-line:#39332a;
+  --neutral: #aba9a3;  --neutral-bg:#242424;--neutral-line:#353535;
   --clay:    #d98a78;  --clay-bg:#2e1a18;  --clay-line:#4a2c28;
 
-  --line:        #322b21;
-  --line-strong: #423a2c;
-  --line-faint:  #221d16;
+  --line:        #2c2c2c;
+  --line-strong: #3a3a3a;
+  --line-faint:  #1e1e1e;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
   --shadow:    0 1px 2px rgba(0,0,0,.4), 0 10px 26px -14px rgba(0,0,0,.6);
@@ -4921,14 +4921,14 @@ html[data-theme="dark"] .admin-shell {
 /* page background — the light rule paints warm-cream radial glows; repaint dark */
 html[data-theme="dark"] .admin-shell {
   background:
-    radial-gradient(1100px 520px at 78% -8%, #1d1810 0%, rgba(0,0,0,0) 70%),
-    radial-gradient(900px 480px at -6% 4%, #1a1610 0%, rgba(0,0,0,0) 60%),
+    radial-gradient(1100px 520px at 78% -8%, #1c1c1c 0%, rgba(0,0,0,0) 70%),
+    radial-gradient(900px 480px at -6% 4%, #181818 0%, rgba(0,0,0,0) 60%),
     var(--bg);
 }
 
 /* sticky top bar — light rule uses a translucent cream; go translucent dark */
 html[data-theme="dark"] .admin-shell .admin-topbar {
-  background: rgba(21, 18, 13, 0.9);
+  background: rgba(19, 19, 19, 0.9);
 }
 
 /* ── 2. Hardcoded card surfaces (#FFFEF8 / near-white) → var(--surface).
@@ -4958,7 +4958,7 @@ html[data-theme="dark"] .admin-shell .kpi-trend-up,
 html[data-theme="dark"] .admin-shell .stu-card-val.is-won { color: #5fbf93; }
 html[data-theme="dark"] .admin-shell .stu-viewpill { background: var(--surface-sunk); }
 html[data-theme="dark"] .admin-shell .stu-viewpill button.is-active {
-  background: var(--terra-deep); color: #15120d;
+  background: var(--terra-deep); color: #131313;
 }
 html[data-theme="dark"] .admin-shell .stu-step.tone-warn { background: var(--honey-bg); }
 
