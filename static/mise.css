@@ -5176,7 +5176,7 @@ html[data-theme="dark"] .admin-shell .ns-crm {
    ships both SVGs; CSS picks one per theme. ─────────────────────────────────── */
 .admin-shell .ns-crest-sly { display: none; }
 html[data-theme="dark"] .admin-shell .ns-crest {
-  background: linear-gradient(150deg, #1a472a 0%, #0a1f14 100%);
+  background: linear-gradient(150deg, #14181a 0%, #05090a 100%);
   box-shadow: inset 0 0 0 1.5px rgba(200, 206, 211, .35);
 }
 html[data-theme="dark"] .admin-shell .ns-crest-badger { display: none; }
