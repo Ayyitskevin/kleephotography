@@ -4971,6 +4971,23 @@ html[data-theme="dark"] .admin-shell .gd-back {
   background: var(--surface); border-color: var(--line); color: var(--ink-soft);
 }
 
+/* ── 2c. Gallery card + detail text hardcodes near-black forest ink (#18241E)
+        and muted greens (#5C6A5E / #8A9183) that read dark-on-dark here. The
+        card surfaces already flip dark, so lift the text: titles → --ink,
+        meta/notes → softer ink, and map the cream foot border + draft pill. ── */
+html[data-theme="dark"] .admin-shell .gx-card-title,
+html[data-theme="dark"] .admin-shell .gd-deliver-l { color: var(--ink); }
+html[data-theme="dark"] .admin-shell .gx-card-client,
+html[data-theme="dark"] .admin-shell .gx-card-photos,
+html[data-theme="dark"] .admin-shell .gd-deliver-m,
+html[data-theme="dark"] .admin-shell .gd-proof-note { color: var(--ink-soft); }
+html[data-theme="dark"] .admin-shell .gd-deliver-arr,
+html[data-theme="dark"] .admin-shell .gd-panel > summary::before { color: var(--ink-faint); }
+html[data-theme="dark"] .admin-shell .gx-card-foot { border-color: var(--line); }
+html[data-theme="dark"] .admin-shell .gd-status.is-draft {
+  background: var(--neutral-bg); color: var(--neutral); border-color: var(--neutral-line);
+}
+
 /* ── 3. Studio board details with hardcoded greys/golds ─────────────────── */
 html[data-theme="dark"] .admin-shell .stu-col-count,
 html[data-theme="dark"] .admin-shell .kpi-trend-flat,
