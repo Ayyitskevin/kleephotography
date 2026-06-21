@@ -153,7 +153,7 @@
       <span class="ib-ctx-label">Move it forward</span>
       {% if active.is_converted %}
         <a class="ib-act ib-act-primary"
-           href="{% if active.converted_project_id %}/admin/studio/projects/{{ active.converted_project_id }}{% elif active.converted_client_id %}/admin/studio/clients/{{ active.converted_client_id }}{% else %}/admin/studio{% endif %}">
+           href="{% if active.converted_proposal_id %}/admin/studio/proposals/{{ active.converted_proposal_id }}{% elif active.converted_project_id %}/admin/studio/projects/{{ active.converted_project_id }}{% elif active.converted_client_id %}/admin/studio/clients/{{ active.converted_client_id }}{% else %}/admin/studio{% endif %}">
           <span aria-hidden="true">✦</span><span class="ib-act-t">Open converted record</span><span>→</span></a>
         <form method="post" action="/admin/studio/inquiries/{{ active.id }}/unconvert">
           <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">

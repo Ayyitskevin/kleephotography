@@ -116,12 +116,22 @@ def _thread(inq) -> list[dict]:
 def _active_ctx(inq) -> dict:
     av = _AVATARS[inq["id"] % len(_AVATARS)]
     phone_first = inq["kind"] in ("sms", "call")
+    # The quote flow converts a lead straight into a draft proposal — deep-link
+    # the "Open converted record" button to it so Kevin lands on the quote he just
+    # made, not the parent project. Falls back to project/client for the other
+    # convert paths, which spawn no proposal.
+    proposal_id = None
+    if inq["converted_project_id"]:
+        row = db.one("SELECT id FROM proposals WHERE project_id=? ORDER BY id DESC LIMIT 1",
+                     (inq["converted_project_id"],))
+        proposal_id = row["id"] if row else None
     return {
         "id": inq["id"], "name": inq["business"] or inq["name"] or "Unknown",
         "contact_name": inq["name"], "initials": _initials(inq["business"] or inq["name"]),
         "av_bg": av[0], "av_color": av[1], "email": inq["email"], "phone": inq["phone"],
         "message": inq["message"], "created_at": inq["created_at"],
         "messages": _thread(inq),
+        "converted_proposal_id": proposal_id,
         "converted_project_id": inq["converted_project_id"],
         "converted_client_id": inq["converted_client_id"],
         "is_converted": bool(inq["converted_at"]),
