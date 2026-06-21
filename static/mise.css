@@ -5119,7 +5119,6 @@ html[data-theme="dark"] .admin-shell button[type="submit"].primary,
 html[data-theme="dark"] .admin-shell .dash-new,
 html[data-theme="dark"] .admin-shell .pgtop-new,
 html[data-theme="dark"] .admin-shell .dash-horizon button.is-active,
-html[data-theme="dark"] .admin-shell .ib-act-primary,
 html[data-theme="dark"] .admin-shell .set-badge-ready,
 html[data-theme="dark"] .admin-shell .cal-cell.is-today .cal-cell-num span {
   background: var(--terra-deep); border-color: var(--terra-deep);
@@ -5131,4 +5130,25 @@ html[data-theme="dark"] .admin-shell .fin-export-btn,
 html[data-theme="dark"] .admin-shell .tk-add-form button,
 html[data-theme="dark"] .admin-shell .tr-send {
   background: #a8472f; border-color: #a8472f; color: #F3F0E2;
+}
+
+/* ── 12. Page-top header bar: its translucent cream wash (rgba(245,243,235))
+   has no dark mapping, so it reads as a faded-white strip over the charcoal
+   shell on Financials/Expenses/etc. Match it to the dark bg. ─────────────── */
+html[data-theme="dark"] .admin-shell .pgtop {
+  background: rgba(19, 19, 19, .82);
+}
+
+/* ── 13. Inbox email buttons (Reply / Send via Gmail SMTP / primary action):
+   the deep --terra-deep fill reads muddy-green here. Use the bright jade with
+   dark ink so the email CTAs clearly read as jade green and stay legible. ── */
+html[data-theme="dark"] .admin-shell .ib-reply-btn,
+html[data-theme="dark"] .admin-shell .ib-reply-send,
+html[data-theme="dark"] .admin-shell .ib-act-primary {
+  background: var(--terra); border-color: var(--terra); color: #06231a;
+}
+html[data-theme="dark"] .admin-shell .ib-reply-btn:hover,
+html[data-theme="dark"] .admin-shell .ib-reply-send:hover,
+html[data-theme="dark"] .admin-shell .ib-act-primary:hover {
+  background: #2ec698; border-color: #2ec698;
 }
