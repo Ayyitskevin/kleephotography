@@ -318,10 +318,10 @@
   <script>
     (function () {
       var grp = document.querySelector(".dash-horizon");
+      if (!grp) return;
       var list = document.getElementById("dash-schedule");
-      if (!grp || !list) return;
       var empty = document.getElementById("dash-schedule-empty");
-      var rows = list.querySelectorAll("li");
+      var rows = list ? list.querySelectorAll("li") : [];
       grp.addEventListener("click", function (e) {
         var btn = e.target.closest("button[data-h]");
         if (!btn) return;
