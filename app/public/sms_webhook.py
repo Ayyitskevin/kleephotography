@@ -44,7 +44,7 @@ def _match_inquiry(phone: str):
     if not digits:
         return None
     return db.one(
-        "SELECT id FROM inquiries WHERE phone!='' AND "
+        "SELECT id, dismissed_at FROM inquiries WHERE phone!='' AND "
         "substr(replace(replace(replace(replace(replace(phone,'+',''),'-',''),' ',''),'(',''),')','') , -10) = ? "
         "ORDER BY id DESC LIMIT 1", (digits,))
 
@@ -54,6 +54,11 @@ def _ensure_inquiry(phone: str, first_body: str, kind: str) -> int:
     placeholders (email is NOT NULL); the convert flow fills real details."""
     inq = _match_inquiry(phone)
     if inq:
+        # Fresh inbound activity resurfaces a thread the user had dismissed —
+        # otherwise the new text/call lands silently in the archive.
+        if inq["dismissed_at"]:
+            db.run("UPDATE inquiries SET dismissed_at=NULL WHERE id=?", (inq["id"],))
+            log.info("inbound %s reopened dismissed inquiry %s", kind, inq["id"])
         return inq["id"]
     iid = db.run(
         """INSERT INTO inquiries (name, email, business, message, kind, phone, emailed)

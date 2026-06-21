@@ -6850,6 +6850,34 @@ def test_quo_inbound_call_creates_call_inquiry_and_is_idempotent(client, monkeyp
         db.run("DELETE FROM inquiries WHERE phone=?", (phone,))
 
 
+def test_quo_inbound_reopens_dismissed_thread(client, monkeypatch):
+    """A fresh inbound text on a thread the user had dismissed clears dismissed_at
+    so it resurfaces in the active inbox instead of vanishing into the archive."""
+    import base64, json
+    from app import config
+    secret = base64.b64encode(b"reopen-key").decode()
+    monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", secret)
+    phone = "+15552223333"
+    iid = db.run("INSERT INTO inquiries (name, email, message, kind, phone, dismissed_at) "
+                 "VALUES (?,?,?,?,?, datetime('now'))",
+                 ("Texted Lead", "", "old text", "sms", phone))
+    body = {"type": "message.received",
+            "data": {"object": {"id": "QUO_REOPEN_1", "direction": "incoming",
+                                "from": phone, "body": "Actually, are you free Friday?"}}}
+    raw = json.dumps(body).encode()
+    try:
+        assert db.one("SELECT dismissed_at FROM inquiries WHERE id=?", (iid,))["dismissed_at"]
+        r = client.post("/webhooks/quo", content=raw,
+                        headers={"openphone-signature": _quo_sig(secret, raw)})
+        assert r.status_code == 200
+        # same thread (no fork), now un-dismissed
+        assert db.one("SELECT COUNT(*) n FROM inquiries WHERE phone=?", (phone,))["n"] == 1
+        assert db.one("SELECT dismissed_at FROM inquiries WHERE id=?", (iid,))["dismissed_at"] is None
+    finally:
+        db.run("DELETE FROM messages WHERE provider_msg_id='QUO_REOPEN_1'")
+        db.run("DELETE FROM inquiries WHERE id=?", (iid,))
+
+
 def test_quo_missed_call_and_transcript_enrichment(client, monkeypatch):
     """A missed call reads as 'Missed call'; a later transcript event appends to the
     same call row rather than creating a new one, matched by call id."""
