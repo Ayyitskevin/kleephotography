@@ -130,6 +130,22 @@
 
   <script>
   (function () {
+    var compose = document.getElementById('new-event');
+    var opener = document.querySelector('.pgtop-new[href="#new-event"]');
+    if (compose && opener) {
+      opener.addEventListener('click', function (e) {
+        e.preventDefault();
+        compose.classList.add('is-open');
+        compose.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var first = compose.querySelector('input, button');
+        if (first) first.focus();
+      });
+      var cancel = compose.querySelector('.sch-compose-cancel');
+      if (cancel) cancel.addEventListener('click', function (e) {
+        e.preventDefault();
+        compose.classList.remove('is-open');
+      });
+    }
     document.querySelectorAll('[data-copy-path]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var url = window.location.origin + (btn.dataset.copyPath || '/book');

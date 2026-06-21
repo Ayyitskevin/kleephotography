@@ -1954,7 +1954,8 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 
 /* ── Scheduling home — strict 1:1 with the Admin Scheduling prototype ──── */
 .admin-shell .sch-compose { display: none; margin: 0 0 1.2rem; }
-.admin-shell .sch-compose:target { display: block; }
+.admin-shell .sch-compose:target,
+.admin-shell .sch-compose.is-open { display: block; }
 .admin-shell .sch-compose-cancel { align-self: center; color: var(--ink-soft);
   font: 500 0.82rem/1 var(--font-ui); }
 
