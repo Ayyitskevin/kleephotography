@@ -5012,3 +5012,93 @@ html[data-theme="dark"] .admin-shell .project-head {
 html[data-theme="dark"] .admin-shell .unlinked-warn-pick select {
   background: var(--surface); color: var(--ink); border-color: var(--line-strong);
 }
+
+/* ── 6. Neutral raised surfaces (pale-cream panels → raised surface) ─────── */
+html[data-theme="dark"] .admin-shell .rc-paper,
+html[data-theme="dark"] .admin-shell .unlinked-warn-row {
+  background: var(--surface); border-color: var(--line);
+}
+
+/* ── 7. Neutral recessed surfaces (tracks, columns, panes, key chips) ───── */
+html[data-theme="dark"] .admin-shell .inquiry-msg,
+html[data-theme="dark"] .admin-shell .stu-col,
+html[data-theme="dark"] .admin-shell .stu-portal-ok,
+html[data-theme="dark"] .admin-shell .tk-col,
+html[data-theme="dark"] .admin-shell .tk-chip,
+html[data-theme="dark"] .admin-shell .rep-seg,
+html[data-theme="dark"] .admin-shell .ws-admin code,
+html[data-theme="dark"] .admin-shell .tr-drop,
+html[data-theme="dark"] .admin-shell .tr-seg,
+html[data-theme="dark"] .admin-shell .ns-pal-box,
+html[data-theme="dark"] .admin-shell .ns-pal-esc,
+html[data-theme="dark"] .admin-shell .ns-pal-ic,
+html[data-theme="dark"] .admin-shell .ib-threads,
+html[data-theme="dark"] .admin-shell .ib-tab,
+html[data-theme="dark"] .admin-shell .ib-context,
+html[data-theme="dark"] .admin-shell .set-op-value,
+html[data-theme="dark"] .admin-shell .fin-range,
+html[data-theme="dark"] .admin-shell .fin-seg,
+html[data-theme="dark"] .admin-shell .pnl-bar,
+html[data-theme="dark"] .admin-shell .fin-bycat-bar,
+html[data-theme="dark"] .admin-shell .pt-link,
+html[data-theme="dark"] .admin-shell .gd-proof-bar {
+  background: var(--surface-sunk); border-color: var(--line);
+}
+
+/* ── 8. Generic form controls (any hardcoded white input → dark) ────────── */
+html[data-theme="dark"] .admin-shell input,
+html[data-theme="dark"] .admin-shell textarea,
+html[data-theme="dark"] .admin-shell select,
+html[data-theme="dark"] .admin-shell .stu-newproj-pop input,
+html[data-theme="dark"] .admin-shell .tk-add-form input,
+html[data-theme="dark"] .admin-shell .tk-add-form select,
+html[data-theme="dark"] .admin-shell .sch-switch span,
+html[data-theme="dark"] .admin-shell .tr-field input,
+html[data-theme="dark"] .admin-shell .fin-upload-form select,
+html[data-theme="dark"] .admin-shell .rc-del {
+  background: var(--surface-sunk); color: var(--ink); border-color: var(--line);
+}
+html[data-theme="dark"] .admin-shell input:focus,
+html[data-theme="dark"] .admin-shell textarea:focus,
+html[data-theme="dark"] .admin-shell select:focus {
+  background: var(--surface); border-color: var(--line-strong);
+}
+html[data-theme="dark"] .admin-shell input::placeholder,
+html[data-theme="dark"] .admin-shell textarea::placeholder {
+  color: var(--ink-ghost);
+}
+
+/* ── 9. Semantic status tints (keep meaning, map to dark status bg) ─────── */
+html[data-theme="dark"] .admin-shell .stu-step.tone-urgent,
+html[data-theme="dark"] .admin-shell .gal-badge-expired,
+html[data-theme="dark"] .admin-shell .sch-up-chip.is-soon,
+html[data-theme="dark"] .admin-shell .book-off,
+html[data-theme="dark"] .admin-shell .sched-flash-err {
+  background: var(--clay-bg); color: var(--clay); border-color: var(--clay-line);
+}
+html[data-theme="dark"] .admin-shell .fin-del:hover {
+  background: var(--clay-bg); color: var(--clay);
+}
+html[data-theme="dark"] .admin-shell .stu-step.tone-ready,
+html[data-theme="dark"] .admin-shell .gal-status-published,
+html[data-theme="dark"] .admin-shell .gd-status.is-live,
+html[data-theme="dark"] .admin-shell .tr-ico-active,
+html[data-theme="dark"] .admin-shell .tr-badge-active,
+html[data-theme="dark"] .admin-shell .book-manage-badge.book-ok,
+html[data-theme="dark"] .admin-shell .sched-pill-on {
+  background: var(--ok-bg); color: var(--ok); border-color: var(--ok-line);
+}
+html[data-theme="dark"] .admin-shell .stu-step.tone-calm,
+html[data-theme="dark"] .admin-shell .gal-status-draft,
+html[data-theme="dark"] .admin-shell .gd-status.is-draft,
+html[data-theme="dark"] .admin-shell .tr-ico-expired,
+html[data-theme="dark"] .admin-shell .tr-badge-expired,
+html[data-theme="dark"] .admin-shell .sched-pill-off,
+html[data-theme="dark"] .admin-shell .kind-email,
+html[data-theme="dark"] .admin-shell .kind-contract,
+html[data-theme="dark"] .admin-shell .ct-pill-ai,
+html[data-theme="dark"] .admin-shell .ct-preset-ovl,
+html[data-theme="dark"] .admin-shell .pt-pin,
+html[data-theme="dark"] .admin-shell .sch-up-chip {
+  background: var(--neutral-bg); color: var(--neutral); border-color: var(--neutral-line);
+}
