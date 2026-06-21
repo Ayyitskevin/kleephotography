@@ -5117,7 +5117,6 @@ html[data-theme="dark"] .admin-shell .qc-btn,
 html[data-theme="dark"] .admin-shell button.primary,
 html[data-theme="dark"] .admin-shell button[type="submit"].primary,
 html[data-theme="dark"] .admin-shell .dash-new,
-html[data-theme="dark"] .admin-shell .pgtop-new,
 html[data-theme="dark"] .admin-shell .dash-horizon button.is-active,
 html[data-theme="dark"] .admin-shell .set-badge-ready,
 html[data-theme="dark"] .admin-shell .cal-cell.is-today .cal-cell-num span {
@@ -5152,3 +5151,44 @@ html[data-theme="dark"] .admin-shell .ib-reply-send:hover,
 html[data-theme="dark"] .admin-shell .ib-act:hover {
   background: #2ec698; border-color: #2ec698; color: #06231a;
 }
+
+/* ── 14. Gallery header CTA ("Send to client"): the coral --terra fill (terracotta
+   in light) maps to muddy --terra-deep here. Match the inbox CTAs — bright jade
+   fill, dark ink — so it reads as vibrant jade green. ───────────────────────── */
+html[data-theme="dark"] .admin-shell .pgtop-new {
+  background: var(--terra); border-color: var(--terra); color: #06231a;
+}
+html[data-theme="dark"] .admin-shell .pgtop-new:hover {
+  background: #2ec698; border-color: #2ec698; color: #06231a;
+}
+
+/* ── 15. Brand lockup in dark mode: the gold "Lee" wordmark + "CRM" badge go
+   silver (the metallic the dark shell wears). Light mode keeps the locked
+   honey-badger gold. ─────────────────────────────────────────────────────── */
+html[data-theme="dark"] .admin-shell .admin-brand .mark b { color: #c8ced3; }
+html[data-theme="dark"] .admin-shell .ns-crm {
+  color: #c8ced3; border-color: rgba(200, 206, 211, .42);
+}
+
+/* ── 16. Slytherin insignia (dark mode only): the crest square becomes an
+   emerald→black field with a silver serpent. The light honey-badger crest is
+   the locked identity, so this swap is additive and dark-scoped. The template
+   ships both SVGs; CSS picks one per theme. ─────────────────────────────────── */
+.admin-shell .ns-crest-sly { display: none; }
+html[data-theme="dark"] .admin-shell .ns-crest {
+  background: linear-gradient(150deg, #1a472a 0%, #0a1f14 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(200, 206, 211, .35);
+}
+html[data-theme="dark"] .admin-shell .ns-crest-badger { display: none; }
+html[data-theme="dark"] .admin-shell .ns-crest-sly { display: block; }
+
+/* ── 17. Home orphan-gallery warning ("…has no client linked"): its cream
+   #f7ecd2 strip has no dark mapping and reads as an off-white blob. Make it a
+   silver-grey surface with a silver left rule; lift the head text off the dark. */
+html[data-theme="dark"] .admin-shell .unlinked-warn {
+  background: linear-gradient(150deg, #34373a 0%, #25272a 100%);
+  border-color: rgba(200, 206, 211, .26);
+  border-left-color: #aab0b6;
+}
+html[data-theme="dark"] .admin-shell .unlinked-warn-head { color: var(--ink-soft); }
+html[data-theme="dark"] .admin-shell .unlinked-warn-head strong { color: var(--ink); }
