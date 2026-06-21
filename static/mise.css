@@ -5156,6 +5156,15 @@ html[data-theme="dark"] .admin-shell .ib-act:hover {
   background: #2ec698; border-color: #2ec698; color: #06231a;
 }
 
+/* quick-reply snippet chips: the var-flipped card/ink reads as a faded near-white
+   ghost here. Fill with deep jade + white text so they're clearly tappable. */
+html[data-theme="dark"] .admin-shell .ib-snippet {
+  background: var(--terra-deep); border-color: var(--terra-deep); color: #F3F0E2;
+}
+html[data-theme="dark"] .admin-shell .ib-snippet:hover {
+  background: var(--terra); border-color: var(--terra); color: #F3F0E2;
+}
+
 /* ── 14. Gallery header CTA ("Send to client"): the coral --terra fill (terracotta
    in light) maps to muddy --terra-deep here. Match the inbox CTAs — bright jade
    fill, dark ink — so it reads as vibrant jade green. ───────────────────────── */
