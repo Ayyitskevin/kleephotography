@@ -1697,7 +1697,8 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 
 /* ── Galleries dashboard: summary + cover grid ───────────────────────── */
 .gal-compose { display: none; margin: 0 0 1.2rem; }
-.gal-compose:target { display: block; }
+.gal-compose:target,
+.gal-compose.is-open { display: block; }
 .gal-compose-cancel { align-self: center; color: var(--ink-soft); font: 500 0.82rem/1 var(--font-ui); }
 
 .gal-filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 0.2rem 0 1.1rem; }

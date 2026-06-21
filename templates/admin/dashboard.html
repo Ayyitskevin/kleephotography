@@ -62,6 +62,24 @@
 
   <script>
   (function () {
+    var compose = document.getElementById('new-gallery');
+    var opener = document.querySelector('.pgtop-new[href="#new-gallery"]');
+    if (compose && opener) {
+      opener.addEventListener('click', function (e) {
+        e.preventDefault();
+        compose.classList.add('is-open');
+        compose.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var first = compose.querySelector('input, button');
+        if (first) first.focus();
+      });
+      var cancel = compose.querySelector('.gal-compose-cancel');
+      if (cancel) cancel.addEventListener('click', function (e) {
+        e.preventDefault();
+        compose.classList.remove('is-open');
+      });
+    }
+  })();
+  (function () {
     var pills = Array.prototype.slice.call(document.querySelectorAll('.gx-pill'));
     if (!pills.length) return;
     var emptyMsg = document.getElementById('gal-empty');
