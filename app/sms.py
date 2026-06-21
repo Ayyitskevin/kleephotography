@@ -8,12 +8,11 @@ Ships INERT: with no Quo keys in .env, configured() is false — outbound send i
 no-op-by-refusal (raises SmsError, the route greys the SMS toggle) and the inbound
 /webhooks/quo route returns 503. Email keeps flowing through mailer.py unchanged.
 
-Verified against live Quo docs (quo.com/docs, 2026-06): the send endpoint + auth
-header still follow OpenPhone's v1 API (POST api.openphone.com/v1/messages,
-`Authorization: <key>` with NO Bearer prefix), but the inbound webhook signing was
-modernized in the rebrand to the Standard-Webhooks (Svix-compatible) scheme — three
-headers + a whsec_ secret (see verify_webhook). verify_webhook fails CLOSED, so a
-scheme mismatch rejects inbound (safe) rather than trusting it.
+IMPORTANT — verify against live Quo docs before arming. Quo rebranded from
+OpenPhone in late 2025; the send endpoint, auth header, and webhook-signature
+scheme below follow OpenPhone's public v1 API. When Kevin provisions real keys,
+confirm each against Quo's current docs and adjust ONLY this file. verify_webhook
+fails CLOSED, so a scheme mismatch rejects inbound (safe) rather than trusting it.
 """
 
 import base64
@@ -21,7 +20,6 @@ import hashlib
 import hmac
 import json
 import logging
-import time
 import urllib.error
 import urllib.request
 
@@ -78,36 +76,24 @@ def send(to: str, body: str) -> str:
     return msg_id
 
 
-def verify_webhook(raw: bytes, wh_id: str, wh_timestamp: str, wh_signature: str) -> bool:
-    """Verify an inbound Quo webhook signature. Fails CLOSED (returns False) on any
-    missing header/secret, stale timestamp, or malformed value — never trust an
-    unverifiable payload.
+def verify_webhook(raw: bytes, signature_header: str) -> bool:
+    """Verify an inbound Quo webhook HMAC. Fails CLOSED (returns False) on any
+    malformed/absent header or secret — never trust an unverifiable payload.
 
-    Scheme (Quo / Standard Webhooks / Svix, verified vs quo.com docs 2026-06):
-    three headers `webhook-id`, `webhook-timestamp`, `webhook-signature`. The signing
-    secret is `whsec_<base64>`; the HMAC key is base64-decode(secret minus the whsec_
-    prefix). Signed content is "<id>.<timestamp>.<rawbody>"; signature =
-    base64(HMAC-SHA256(key, content)). `webhook-signature` is a space-separated list
-    of "v1,<base64sig>" entries — a timing-safe match on ANY entry passes. The
-    timestamp must be within 5 minutes (replay guard)."""
+    Scheme (OpenPhone v1): header `openphone-signature: hmac;1;<ts>;<base64 sig>`,
+    where sig = HMAC-SHA256(key=base64-decode(signing secret), msg="<ts>.<rawbody>")
+    base64-encoded. CONFIRM against Quo's current docs before arming."""
     secret = config.QUO_WEBHOOK_SECRET
-    if not (secret and wh_id and wh_timestamp and wh_signature):
+    if not secret or not signature_header:
         return False
-    try:
-        if abs(time.time() - int(wh_timestamp)) > 300:
-            return False
-    except (ValueError, TypeError):
+    parts = signature_header.split(";")
+    if len(parts) != 4 or parts[0] != "hmac":
         return False
-    if secret.startswith("whsec_"):
-        secret = secret[len("whsec_"):]
+    _, _version, timestamp, provided = parts
     try:
         key = base64.b64decode(secret)
     except (ValueError, TypeError):
         return False
-    signed = f"{wh_id}.{wh_timestamp}.".encode() + raw
+    signed = timestamp.encode() + b"." + raw
     expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
-    for entry in wh_signature.split():
-        version, _, provided = entry.partition(",")
-        if version == "v1" and hmac.compare_digest(expected, provided):
-            return True
-    return False
+    return hmac.compare_digest(expected, provided)

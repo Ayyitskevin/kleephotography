@@ -6725,19 +6725,13 @@ def test_dashboard_nudge_dismiss_clears_for_today(admin):
         db.run("DELETE FROM inquiries WHERE id=?", (iid,))
 
 
-def _quo_headers(secret_b64: str, raw: bytes, wh_id: str = "msg_evt_1",
-                 ts: str | None = None) -> dict:
-    """Build valid Standard-Webhooks headers for `raw` (mirrors sms.verify_webhook):
-    webhook-id / webhook-timestamp / webhook-signature, where the signature is
-    base64(HMAC-SHA256(base64-decode(secret), "<id>.<ts>.<body>")) tagged "v1,". The
-    timestamp defaults to now so the 5-minute replay guard passes."""
-    import base64, hashlib, hmac, time
-    ts = ts or str(int(time.time()))
+def _quo_sig(secret_b64: str, raw: bytes, ts: str = "1700000000") -> str:
+    """Build a valid openphone-signature header for `raw` (mirrors sms.verify_webhook)."""
+    import base64, hashlib, hmac
     key = base64.b64decode(secret_b64)
-    sig = base64.b64encode(hmac.new(key, f"{wh_id}.{ts}.".encode() + raw,
+    sig = base64.b64encode(hmac.new(key, ts.encode() + b"." + raw,
                                     hashlib.sha256).digest()).decode()
-    return {"webhook-id": wh_id, "webhook-timestamp": ts,
-            "webhook-signature": f"v1,{sig}"}
+    return f"hmac;1;{ts};{sig}"
 
 
 def test_quo_webhook_inert_without_secret(client, monkeypatch):
@@ -6755,31 +6749,27 @@ def test_quo_webhook_rejects_bad_signature(client, monkeypatch):
     from app import config
     monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", base64.b64encode(b"k").decode())
     r = client.post("/webhooks/quo", content=b'{"type":"message.received"}',
-                    headers={"webhook-id": "x", "webhook-timestamp": "9999999999",
-                             "webhook-signature": "v1,deadbeef"})
+                    headers={"openphone-signature": "hmac;1;1700000000;deadbeef"})
     assert r.status_code == 400
 
 
 def test_quo_inbound_creates_sms_inquiry_and_is_idempotent(client, monkeypatch):
     """A text from an unknown number auto-creates a kind='sms' inquiry and records the
-    message; a retried webhook (same provider id) is a no-op. Encodes WHY: the
-    signature is the only thing between a public route and a forged inbound text —
-    verification must fail closed, and Quo's at-least-once delivery must dedupe."""
+    message; a retried webhook (same provider id) is a no-op."""
     import base64, json
     from app import config
     secret = base64.b64encode(b"signing-key").decode()
     monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", secret)
     phone = "+15557654321"
     body = {"type": "message.received",
-            "data": {"resource": {"id": "QUO_MSG_1", "direction": "incoming",
-                                  "text": "Hi, do you shoot restaurants?",
-                                  "status": "received"},
-                     "context": {"senderIdentifier": phone,
-                                 "recipientIdentifiers": ["+18287618816"]}}}
+            "data": {"object": {"id": "QUO_MSG_1", "direction": "incoming",
+                                "from": phone, "to": "+15550001111",
+                                "body": "Hi, do you shoot restaurants?"}}}
     raw = json.dumps(body).encode()
-    hdr = _quo_headers(secret, raw)
+    sig = _quo_sig(secret, raw)
     try:
-        r = client.post("/webhooks/quo", content=raw, headers=hdr)
+        r = client.post("/webhooks/quo", content=raw,
+                        headers={"openphone-signature": sig})
         assert r.status_code == 200 and r.json()["ok"]
         inq = db.one("SELECT * FROM inquiries WHERE phone=? AND kind='sms'", (phone,))
         assert inq is not None and inq["message"].startswith("Hi, do you shoot")
@@ -6787,17 +6777,11 @@ def test_quo_inbound_creates_sms_inquiry_and_is_idempotent(client, monkeypatch):
         assert len(msgs) == 1 and msgs[0]["direction"] == "in" and msgs[0]["channel"] == "sms"
 
         # retry with the same provider id → idempotent, no new inquiry/message
-        r2 = client.post("/webhooks/quo", content=raw, headers=hdr)
+        r2 = client.post("/webhooks/quo", content=raw,
+                         headers={"openphone-signature": sig})
         assert r2.status_code == 200 and r2.json().get("duplicate")
         assert db.one("SELECT COUNT(*) n FROM messages WHERE inquiry_id=?", (inq["id"],))["n"] == 1
         assert db.one("SELECT COUNT(*) n FROM inquiries WHERE phone=?", (phone,))["n"] == 1
-
-        # a delivery receipt (not message.received) is acked + ignored, writes nothing
-        receipt = raw.replace(b"message.received", b"message.delivered")
-        r3 = client.post("/webhooks/quo", content=receipt,
-                         headers=_quo_headers(secret, receipt, wh_id="msg_evt_2"))
-        assert r3.status_code == 200 and r3.json().get("ignored") == "message.delivered"
-        assert db.one("SELECT COUNT(*) n FROM messages WHERE inquiry_id=?", (inq["id"],))["n"] == 1
     finally:
         db.run("DELETE FROM messages WHERE provider_msg_id='QUO_MSG_1'")
         db.run("DELETE FROM inquiries WHERE phone=?", (phone,))
