@@ -103,13 +103,6 @@ def _call_enrichment(etype: str, obj: dict) -> str:
 
 
 def _handle_call(etype: str, obj: dict) -> dict:
-    # TEMP diagnostic — keys + non-PII fields only (no phone numbers, no
-    # transcript text) to verify Quo's call wire format against a real call.
-    # Remove once the live call confirms the field names.
-    log.info("call webhook: type=%s objkeys=%s dir=%s status=%s dur=%s",
-             etype, sorted(obj.keys()), obj.get("direction"),
-             obj.get("status"), obj.get("duration"))
-
     # Enrichment events append to the existing call row; they never create one.
     if etype != "call.completed":
         call_id = (obj.get("callId") or obj.get("id") or "").strip()
