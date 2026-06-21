@@ -47,6 +47,8 @@ def _channel(inq) -> dict:
         return {"ch_label": "Booking", "ch_color": "#9a7a2c", "ch_bg": "#f7ecd2"}
     if inq["kind"] == "sms":
         return {"ch_label": "Text", "ch_color": "#2f7d57", "ch_bg": "#e1f2e9"}
+    if inq["kind"] == "call":
+        return {"ch_label": "Call", "ch_color": "#7C2F38", "ch_bg": "#f3e3e5"}
     return {"ch_label": "Inquiry", "ch_color": "#2f6d8a", "ch_bg": "#ddeef0"}
 
 
@@ -87,7 +89,8 @@ def _detail_rows(inq) -> list[dict]:
         rows.append({"k": "Phone", "v": inq["phone"]})
     if inq["business"]:
         rows.append({"k": "Business", "v": inq["business"]})
-    rows.append({"k": "Source", "v": {"booking": "Booking form", "sms": "Text message"}
+    rows.append({"k": "Source", "v": {"booking": "Booking form", "sms": "Text message",
+                                      "call": "Phone call"}
                  .get(inq["kind"], "Inquiry form")})
     if inq["service"]:
         rows.append({"k": "Interested in", "v": inq["service"]})
@@ -105,13 +108,14 @@ def _thread(inq) -> list[dict]:
     if rows:
         return [{"mine": r["direction"] == "out", "channel": r["channel"],
                  "body": r["body"], "time": r["created_at"]} for r in rows]
-    return [{"mine": False, "channel": "sms" if inq["kind"] == "sms" else "email",
+    return [{"mine": False,
+             "channel": inq["kind"] if inq["kind"] in ("sms", "call") else "email",
              "body": inq["message"], "time": inq["created_at"]}]
 
 
 def _active_ctx(inq) -> dict:
     av = _AVATARS[inq["id"] % len(_AVATARS)]
-    is_sms = inq["kind"] == "sms"
+    phone_first = inq["kind"] in ("sms", "call")
     return {
         "id": inq["id"], "name": inq["business"] or inq["name"] or "Unknown",
         "contact_name": inq["name"], "initials": _initials(inq["business"] or inq["name"]),
@@ -126,7 +130,8 @@ def _active_ctx(inq) -> dict:
         "reply_subject": _reply_subject(inq),
         # Composer defaults to whichever channel the lead arrived on, and only
         # offers a channel the contact can actually receive on.
-        "default_channel": "sms" if is_sms and inq["phone"] else "email",
+        "default_channel": "sms" if (inq["phone"] and (phone_first or not inq["email"]))
+                           else "email",
         "can_email": bool(inq["email"]),
         "can_sms": bool(inq["phone"]),
         "sub": (inq["email"] or inq["phone"] or "")

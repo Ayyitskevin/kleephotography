@@ -6814,3 +6814,76 @@ def test_inbox_sms_reply_logs_outbound(admin, monkeypatch):
     finally:
         db.run("DELETE FROM messages WHERE inquiry_id=?", (iid,))
         db.run("DELETE FROM inquiries WHERE id=?", (iid,))
+
+
+def test_quo_inbound_call_creates_call_inquiry_and_is_idempotent(client, monkeypatch):
+    """A completed inbound call from an unknown number auto-creates a kind='call'
+    inquiry and records a channel='call' bubble; a Quo retry (same call id) is a no-op."""
+    import base64, json
+    from app import config
+    secret = base64.b64encode(b"call-key").decode()
+    monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", secret)
+    phone = "+15558889999"
+    body = {"type": "call.completed",
+            "data": {"object": {"id": "QUO_CALL_1", "direction": "incoming",
+                                "from": phone, "to": "+15550001111",
+                                "status": "completed", "duration": 134}}}
+    raw = json.dumps(body).encode()
+    sig = _quo_sig(secret, raw)
+    try:
+        r = client.post("/webhooks/quo", content=raw,
+                        headers={"openphone-signature": sig})
+        assert r.status_code == 200 and r.json()["ok"]
+        inq = db.one("SELECT * FROM inquiries WHERE phone=? AND kind='call'", (phone,))
+        assert inq is not None
+        msg = db.one("SELECT * FROM messages WHERE inquiry_id=? AND channel='call'", (inq["id"],))
+        assert msg is not None and msg["direction"] == "in"
+        assert "Incoming call" in msg["body"] and "2m14s" in msg["body"]
+
+        # retry with the same call id → idempotent, no second row
+        r2 = client.post("/webhooks/quo", content=raw,
+                         headers={"openphone-signature": sig})
+        assert r2.status_code == 200 and r2.json().get("duplicate")
+        assert db.one("SELECT COUNT(*) n FROM messages WHERE inquiry_id=?", (inq["id"],))["n"] == 1
+    finally:
+        db.run("DELETE FROM messages WHERE provider_msg_id='QUO_CALL_1'")
+        db.run("DELETE FROM inquiries WHERE phone=?", (phone,))
+
+
+def test_quo_missed_call_and_transcript_enrichment(client, monkeypatch):
+    """A missed call reads as 'Missed call'; a later transcript event appends to the
+    same call row rather than creating a new one, matched by call id."""
+    import base64, json
+    from app import config
+    secret = base64.b64encode(b"call-key-2").decode()
+    monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", secret)
+    phone = "+15557778888"
+    call = {"type": "call.completed",
+            "data": {"object": {"id": "QUO_CALL_2", "direction": "incoming",
+                                "from": phone, "to": "+15550001111",
+                                "status": "missed"}}}
+    raw = json.dumps(call).encode()
+    try:
+        r = client.post("/webhooks/quo", content=raw,
+                        headers={"openphone-signature": _quo_sig(secret, raw)})
+        assert r.status_code == 200
+        inq = db.one("SELECT * FROM inquiries WHERE phone=? AND kind='call'", (phone,))
+        msg = db.one("SELECT * FROM messages WHERE inquiry_id=? AND channel='call'", (inq["id"],))
+        assert msg["body"] == "Missed call"
+
+        # transcript event for the same call appends, not a new row
+        tr = {"type": "call.transcript.completed",
+              "data": {"object": {"callId": "QUO_CALL_2",
+                                  "dialogue": [{"content": "Hi, leaving a voicemail"},
+                                               {"content": "call me back please"}]}}}
+        traw = json.dumps(tr).encode()
+        r2 = client.post("/webhooks/quo", content=traw,
+                         headers={"openphone-signature": _quo_sig(secret, traw)})
+        assert r2.status_code == 200 and r2.json().get("enriched")
+        assert db.one("SELECT COUNT(*) n FROM messages WHERE inquiry_id=?", (inq["id"],))["n"] == 1
+        updated = db.one("SELECT body FROM messages WHERE id=?", (msg["id"],))
+        assert "Missed call" in updated["body"] and "Transcript:" in updated["body"]
+        assert "voicemail" in updated["body"]
+    finally:
+        db.run("DELETE FROM messages WHERE provider_msg_id='QUO_CALL_2'")
+        db.run("DELETE FROM inquiries WHERE phone=?", (phone,))
