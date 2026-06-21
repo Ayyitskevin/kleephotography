@@ -5006,6 +5006,9 @@ html[data-theme="dark"] .admin-shell .ct-pill-off {
 
 /* ── 5. Misc hardcoded light panels ─────────────────────────────────────── */
 html[data-theme="dark"] .admin-shell .ib-convo { background: var(--surface-sunk); }
+/* inbound bubble hardcodes dark forest ink (#2a342c) on var(--surface) — dark
+   on dark in dark mode. Lift the text to light ink and remap the cream border. */
+html[data-theme="dark"] .admin-shell .ib-bubble { color: var(--ink); border-color: var(--line); }
 html[data-theme="dark"] .admin-shell .fin-tbl tbody tr:hover { background: var(--surface-sunk); }
 html[data-theme="dark"] .admin-shell .project-head {
   background: linear-gradient(170deg, #1f2822 0%, #19211c 100%);
