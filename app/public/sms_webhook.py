@@ -33,9 +33,16 @@ async def quo_webhook(request: Request):
         raise HTTPException(status_code=503, detail="sms webhook not configured")
     raw = await request.body()
     h = request.headers
-    if not sms.verify_webhook(raw, h.get("webhook-id", ""),
-                              h.get("webhook-timestamp", ""),
-                              h.get("webhook-signature", "")):
+    # Standard Webhooks ships the three headers as either webhook-* (spec) or
+    # svix-* (the reference implementation Quo is built on). Accept both.
+    wh_id = h.get("webhook-id") or h.get("svix-id") or ""
+    wh_ts = h.get("webhook-timestamp") or h.get("svix-timestamp") or ""
+    wh_sig = h.get("webhook-signature") or h.get("svix-signature") or ""
+    if not sms.verify_webhook(raw, wh_id, wh_ts, wh_sig):
+        log.warning("quo webhook sig fail: sighdrs=%s present id/ts/sig=%s/%s/%s",
+                    [k for k in h.keys()
+                     if any(t in k.lower() for t in ("webhook", "svix", "signature"))],
+                    bool(wh_id), bool(wh_ts), bool(wh_sig))
         raise HTTPException(status_code=400, detail="bad signature")
     try:
         event = json.loads(raw.decode())
