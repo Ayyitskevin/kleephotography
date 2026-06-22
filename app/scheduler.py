@@ -18,7 +18,7 @@ import logging
 import threading
 
 from . import (booking_reminders, config, contract_reminders, gallery_reminders,
-               ops_monitor)
+               ops_monitor, postshoot_reminders)
 from .admin import recurring
 
 log = logging.getLogger("mise.scheduler")
@@ -49,6 +49,10 @@ def _loop() -> None:
             ops_monitor.sweep()
         except Exception:
             log.exception("ops monitor sweep failed")
+        try:
+            postshoot_reminders.sweep()
+        except Exception:
+            log.exception("post-shoot reminder sweep failed")
 
 
 def start() -> None:

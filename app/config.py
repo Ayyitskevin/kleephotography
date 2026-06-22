@@ -160,6 +160,18 @@ CONTRACT_NUDGE_DAYS = int(os.environ.get("MISE_CONTRACT_NUDGE_DAYS", "3"))
 # grace past the normal 24h gap before it reads as stale/missing.
 BACKUP_STALE_HOURS = int(os.environ.get("MISE_BACKUP_STALE_HOURS", "26"))
 
+# Event-driven reminder net (hermes_arm): at a Mise event instant, fire-and-forget
+# an "arm a deferred owner reminder" push to Hermes (flow :7020), which owns the
+# persistent late-safe precise-time engine. One-way (R-doctrine): Mise never reads
+# back, and the whole path is dormant unless MISE_HERMES_ARM_URL is set. Two arms:
+# a gallery delivered → +N day "did the review land?" check, and a shoot finished →
+# +N day "pull/cull/back-up the cards" ops nudge. Hermes dedups by key, so a job
+# retry or a re-scan can't double-arm.
+HERMES_ARM_URL = os.environ.get("MISE_HERMES_ARM_URL", "")
+HERMES_ARM_TOKEN = os.environ.get("MISE_HERMES_ARM_TOKEN", "")
+REVIEW_CHECK_DAYS = int(os.environ.get("MISE_REVIEW_CHECK_DAYS", "7"))
+POSTSHOOT_CULL_DAYS = int(os.environ.get("MISE_POSTSHOOT_CULL_DAYS", "1"))
+
 PIN_MAX_FAILS = int(os.environ.get("MISE_PIN_MAX_FAILS", "5"))
 PIN_LOCKOUT_MIN = int(os.environ.get("MISE_PIN_LOCKOUT_MIN", "15"))
 
