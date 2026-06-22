@@ -137,6 +137,70 @@ def test_csrf_same_origin_enforced(client):
     security.pin_clear("testclient", 0)  # drop the failed-login bookkeeping
 
 
+def test_error_alert_throttle(monkeypatch):
+    # error_alert collapses a crash storm to one alert per signature per window,
+    # counting the rest — so one bug can't flood Telegram (R14: observable, not noisy).
+    from app import alerts
+
+    sent: list[str] = []
+
+    class _InlineThread:  # run the send synchronously so the test can assert on it
+        def __init__(self, target, args=(), **kw):
+            self._target, self._args = target, args
+
+        def start(self):
+            self._target(*self._args)
+
+    monkeypatch.setattr(alerts, "_send", lambda text: sent.append(text))
+    monkeypatch.setattr(alerts.threading, "Thread", _InlineThread)
+    monkeypatch.setattr(alerts.config, "TELEGRAM_TOKEN", "t")
+    monkeypatch.setattr(alerts.config, "TELEGRAM_CHAT_ID", "c")
+    alerts._error_last.clear()
+    alerts._error_suppressed.clear()
+
+    sig = "GET /boom|KeyError"
+    alerts.error_alert(sig, "first")
+    alerts.error_alert(sig, "second")  # within window -> suppressed
+    alerts.error_alert(sig, "third")   # within window -> suppressed
+    assert len(sent) == 1 and "first" in sent[0]
+    assert alerts._error_suppressed[sig] == 2
+
+    # once the window passes, the next alert sends AND reports the swallowed count
+    alerts._error_last[sig] = 0.0
+    alerts.error_alert(sig, "later")
+    assert len(sent) == 2 and "+2 more" in sent[1]
+
+
+def test_unhandled_exception_alerts_and_500(monkeypatch):
+    # an uncaught exception returns a clean 500 (branded HTML / plain JSON, no leak)
+    # AND fires a crash alert — the whole point of in-app monitoring.
+    from app import alerts
+
+    fired: list[tuple[str, str]] = []
+    monkeypatch.setattr(alerts, "error_alert",
+                        lambda sig, text: fired.append((sig, text)))
+
+    async def _boom(request):
+        raise RuntimeError("kaboom-secret-detail")
+
+    app.add_route("/__test_boom", _boom)
+    # no `with` (no lifespan): the raising route touches neither db nor the job
+    # pool, and entering lifespan here would stop the module-shared pool for later
+    # tests. raise_server_exceptions=False so the handler's 500 is returned, not re-raised.
+    c = TestClient(app, raise_server_exceptions=False)
+    try:
+        r = c.get("/__test_boom", headers={"accept": "text/html"})
+        assert r.status_code == 500
+        assert "Something went wrong" in r.text
+        assert "kaboom-secret-detail" not in r.text  # detail never leaks to client
+        r = c.get("/__test_boom", headers={"accept": "application/json"})
+        assert r.status_code == 500 and r.json()["detail"] == "internal server error"
+    finally:
+        app.router.routes = [rt for rt in app.router.routes
+                             if getattr(rt, "path", None) != "/__test_boom"]
+    assert fired and "RuntimeError" in fired[0][0]
+
+
 def test_branded_error_pages(client):
     # clients clicking bad links in a browser get a branded page, not raw JSON
     r = client.get("/g/nope12345678", headers={"accept": "text/html"})

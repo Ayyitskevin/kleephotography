@@ -8,12 +8,13 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import config, csrf, db, jobs, ratelimit, scheduler, service_api
+from . import alerts, config, csrf, db, jobs, ratelimit, scheduler, service_api
 from .admin import (activity, audit, auth, content, contracts, doc_templates,
                     email_templates, emails, financials, forms, galleries,
                     inbox, invoices, licenses, portals, presets, press, proposals,
@@ -115,6 +116,26 @@ async def branded_errors(request: Request, exc: StarletteHTTPException):
             {"message": _ERROR_MESSAGES[exc.status_code]},
             status_code=exc.status_code)
     return await http_exception_handler(request, exc)
+
+
+@app.exception_handler(Exception)
+async def unhandled_errors(request: Request, exc: Exception):
+    # An uncaught exception means a 500 the user already hit — make it loud.
+    # Log the full traceback for debugging, fire ONE throttled Telegram alert so
+    # Kevin hears about the bug while the app is still up, then return a branded
+    # 500 (HTML) / plain 500 (API) without leaking the exception detail.
+    log.exception("unhandled error: %s %s", request.method, request.url.path)
+    alerts.error_alert(
+        f"{request.method} {request.url.path}|{type(exc).__name__}",
+        f"{type(exc).__name__} on {request.method} {request.url.path}: "
+        f"{str(exc)[:300]}")
+    if "text/html" in request.headers.get("accept", ""):
+        return templates.TemplateResponse(
+            request, "public/error.html",
+            {"message": "Something went wrong on our end. "
+                        "Try again in a moment, or get in touch if it persists."},
+            status_code=500)
+    return JSONResponse({"detail": "internal server error"}, status_code=500)
 
 
 @app.get("/healthz")
