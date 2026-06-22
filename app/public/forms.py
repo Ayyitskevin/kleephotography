@@ -26,8 +26,9 @@ def _load_form(slug: str) -> "db.sqlite3.Row":
 
 def _fields(form_id: int) -> list[dict]:
     out = []
-    for fld in db.all_("SELECT * FROM form_fields WHERE form_id=? "
-                       "ORDER BY sort_order, id", (form_id,)):
+    for fld in db.all_(
+        "SELECT * FROM form_fields WHERE form_id=? ORDER BY sort_order, id", (form_id,)
+    ):
         d = dict(fld)
         d["opts"] = json.loads(fld["options"]) if fld["options"] else []
         out.append(d)
@@ -37,9 +38,11 @@ def _fields(form_id: int) -> list[dict]:
 @router.get("/forms/{slug}", response_class=HTMLResponse)
 async def show_form(request: Request, slug: str):
     f = _load_form(slug)
-    return templates.TemplateResponse(request, "site/form.html",
-                                      {"f": f, "fields": _fields(f["id"]),
-                                       "sent": False, "error": None, "values": {}})
+    return templates.TemplateResponse(
+        request,
+        "site/form.html",
+        {"f": f, "fields": _fields(f["id"]), "sent": False, "error": None, "values": {}},
+    )
 
 
 @router.post("/forms/{slug}", response_class=HTMLResponse)
@@ -50,18 +53,28 @@ async def submit_form(request: Request, slug: str):
 
     # Honeypot: real visitors never see the "website" field — bots fill it.
     if (posted.get("website") or "").strip():
-        return templates.TemplateResponse(request, "site/form.html",
-                                          {"f": f, "fields": fields,
-                                           "sent": True, "error": None, "values": {}})
+        return templates.TemplateResponse(
+            request,
+            "site/form.html",
+            {"f": f, "fields": fields, "sent": True, "error": None, "values": {}},
+        )
 
     ip = security.client_ip(request)
     if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_FORM):
         log.warning("form %s throttled for ip=%s", f["id"], ip)
         return templates.TemplateResponse(
-            request, "site/form.html",
-            {"f": f, "fields": fields, "sent": False,
-             "error": "You've submitted a few times recently — give me a moment "
-                      "before sending another.", "values": {}}, status_code=429)
+            request,
+            "site/form.html",
+            {
+                "f": f,
+                "fields": fields,
+                "sent": False,
+                "error": "You've submitted a few times recently — give me a moment "
+                "before sending another.",
+                "values": {},
+            },
+            status_code=429,
+        )
 
     name = (posted.get("name") or "").strip()
     email = (posted.get("email") or "").strip()
@@ -69,8 +82,7 @@ async def submit_form(request: Request, slug: str):
     for fld in fields:
         key = str(fld["id"])
         if fld["ftype"] == "checkbox":
-            values[key] = [v.strip() for v in posted.getlist(f"field_{fld['id']}")
-                           if v.strip()]
+            values[key] = [v.strip() for v in posted.getlist(f"field_{fld['id']}") if v.strip()]
         else:
             values[key] = (posted.get(f"field_{fld['id']}") or "").strip()
 
@@ -83,16 +95,21 @@ async def submit_form(request: Request, slug: str):
         val = values[str(fld["id"])]
         if fld["required"] and not val:
             errors.append(fld["label"])
-        elif val and fld["ftype"] == "email" and \
-                not ("@" in val and "." in val.rsplit("@", 1)[-1]):
-            errors.append(f"a valid email for \"{fld['label']}\"")
+        elif val and fld["ftype"] == "email" and not ("@" in val and "." in val.rsplit("@", 1)[-1]):
+            errors.append(f'a valid email for "{fld["label"]}"')
     if errors:
         return templates.TemplateResponse(
-            request, "site/form.html",
-            {"f": f, "fields": fields, "sent": False,
-             "error": "Please fill in: " + ", ".join(errors) + ".",
-             "values": {"name": name, "email": email, **values}},
-            status_code=400)
+            request,
+            "site/form.html",
+            {
+                "f": f,
+                "fields": fields,
+                "sent": False,
+                "error": "Please fill in: " + ", ".join(errors) + ".",
+                "values": {"name": name, "email": email, **values},
+            },
+            status_code=400,
+        )
 
     security.inquiry_record(ip, security.INQUIRY_BUCKET_FORM)
 
@@ -102,34 +119,40 @@ async def submit_form(request: Request, slug: str):
         if isinstance(v, list):
             return ", ".join(v) if v else "—"
         return v or "—"
+
     answer_lines = "\n".join(f"{label_by_id[k]}: {_fmt(values[k])}" for k in values)
 
     inquiry_id = None
     if f["kind"] == "lead":
-        message = (f"Lead form: {f['title']}\n\n{answer_lines}"
-                   if answer_lines else f"Lead form: {f['title']}")
+        message = (
+            f"Lead form: {f['title']}\n\n{answer_lines}"
+            if answer_lines
+            else f"Lead form: {f['title']}"
+        )
         inquiry_id = db.run(
-            "INSERT INTO inquiries (name, email, message) VALUES (?,?,?)",
-            (name, email, message))
+            "INSERT INTO inquiries (name, email, message) VALUES (?,?,?)", (name, email, message)
+        )
         if mailer.configured():
-            body = (f"New lead via form \"{f['title']}\" on kleephotography.com\n\n"
-                    f"Name: {name}\nEmail: {email}\n\n{answer_lines}\n")
+            body = (
+                f'New lead via form "{f["title"]}" on kleephotography.com\n\n'
+                f"Name: {name}\nEmail: {email}\n\n{answer_lines}\n"
+            )
             try:
-                mailer.send(config.GMAIL_USER, f"New lead — {name}", body,
-                            reply_to=email)
+                mailer.send(config.GMAIL_USER, f"New lead — {name}", body, reply_to=email)
                 db.run("UPDATE inquiries SET emailed=1 WHERE id=?", (inquiry_id,))
-            except Exception as e:
-                log.error("lead %s stored but email failed: %s", inquiry_id, e)
+            except Exception:
+                log.exception("lead %s stored but email failed", inquiry_id)
         else:
             log.error("lead %s stored — mailer not configured, no email", inquiry_id)
 
     sid = db.run(
-        "INSERT INTO form_submissions (form_id, name, email, data, inquiry_id) "
-        "VALUES (?,?,?,?,?)",
-        (f["id"], name, email, json.dumps(values), inquiry_id))
-    log.info("form %s submission %s (kind=%s, inquiry=%s)",
-             f["id"], sid, f["kind"], inquiry_id)
+        "INSERT INTO form_submissions (form_id, name, email, data, inquiry_id) VALUES (?,?,?,?,?)",
+        (f["id"], name, email, json.dumps(values), inquiry_id),
+    )
+    log.info("form %s submission %s (kind=%s, inquiry=%s)", f["id"], sid, f["kind"], inquiry_id)
 
-    return templates.TemplateResponse(request, "site/form.html",
-                                      {"f": f, "fields": fields,
-                                       "sent": True, "error": None, "values": {}})
+    return templates.TemplateResponse(
+        request,
+        "site/form.html",
+        {"f": f, "fields": fields, "sent": True, "error": None, "values": {}},
+    )

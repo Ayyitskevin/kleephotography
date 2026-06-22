@@ -23,14 +23,19 @@ from fastapi.responses import HTMLResponse
 from .. import caption_ai, db, presets, security
 from ..render import templates
 
-router = APIRouter(prefix="/admin/content",
-                   dependencies=[Depends(security.require_admin)])
+router = APIRouter(prefix="/admin/content", dependencies=[Depends(security.require_admin)])
 
 # 9-grid position codes -> human labels (matches brand_kits.position)
 _POS_LABELS = {
-    "tl": "Top left", "tc": "Top centre", "tr": "Top right",
-    "ml": "Mid left", "c": "Centre", "mr": "Mid right",
-    "bl": "Bottom left", "bc": "Bottom centre", "br": "Bottom right",
+    "tl": "Top left",
+    "tc": "Top centre",
+    "tr": "Top right",
+    "ml": "Mid left",
+    "c": "Centre",
+    "mr": "Mid right",
+    "bl": "Bottom left",
+    "bc": "Bottom centre",
+    "br": "Bottom right",
 }
 
 
@@ -56,7 +61,8 @@ def _clients_with_content() -> list[dict]:
                              FROM recurring_plans rp
                              JOIN projects pr ON pr.id = rp.project_id
                              JOIN retainer_captions rc ON rc.plan_id = rp.id)
-            ORDER BY c.name""")
+            ORDER BY c.name"""
+    )
 
 
 @router.get("", response_class=HTMLResponse)
@@ -76,16 +82,23 @@ async def content(request: Request):
               FROM brand_kits k JOIN clients c ON c.id = k.client_id
               {where}
              ORDER BY c.name, k.active DESC, k.id DESC""",
-        (sel,) if sel else ())
-    kits = [{
-        "id": k["id"], "client_id": k["client_id"],
-        "client": k["client_company"] or k["client_name"],
-        "label": k["label"] or "Logo",
-        "active": bool(k["active"]),
-        "position": _POS_LABELS.get(k["position"], k["position"]),
-        "opacity": k["opacity"], "scale": k["scale_pct"],
-        "margin": k["margin_pct"], "bytes": _kb(k["bytes"]),
-    } for k in kit_rows]
+        (sel,) if sel else (),
+    )
+    kits = [
+        {
+            "id": k["id"],
+            "client_id": k["client_id"],
+            "client": k["client_company"] or k["client_name"],
+            "label": k["label"] or "Logo",
+            "active": bool(k["active"]),
+            "position": _POS_LABELS.get(k["position"], k["position"]),
+            "opacity": k["opacity"],
+            "scale": k["scale_pct"],
+            "margin": k["margin_pct"],
+            "bytes": _kb(k["bytes"]),
+        }
+        for k in kit_rows
+    ]
 
     awhere = "WHERE b.client_id = ?" if sel else ""
     asset_rows = db.all_(
@@ -94,13 +107,19 @@ async def content(request: Request):
               FROM brand_assets b JOIN clients c ON c.id = b.client_id
               {awhere}
              ORDER BY b.created_at DESC""",
-        (sel,) if sel else ())
-    assets = [{
-        "id": a["id"], "client_id": a["client_id"],
-        "client": a["client_company"] or a["client_name"],
-        "filename": a["filename"], "bytes": _kb(a["bytes"]),
-        "date": (a["created_at"] or "")[:10],
-    } for a in asset_rows]
+        (sel,) if sel else (),
+    )
+    assets = [
+        {
+            "id": a["id"],
+            "client_id": a["client_id"],
+            "client": a["client_company"] or a["client_name"],
+            "filename": a["filename"],
+            "bytes": _kb(a["bytes"]),
+            "date": (a["created_at"] or "")[:10],
+        }
+        for a in asset_rows
+    ]
 
     cwhere = "WHERE pr.client_id = ?" if sel else ""
     cap_rows = db.all_(
@@ -115,45 +134,85 @@ async def content(request: Request):
               {cwhere}
              ORDER BY rc.period DESC, rc.created_at DESC, rc.id DESC
              LIMIT 60""",
-        (sel,) if sel else ())
-    body_clip = lambda b: (b[:180] + "…") if b and len(b) > 180 else (b or "")
-    captions = [{
-        "id": r["id"], "plan_id": r["plan_id"],
-        "client": r["client_company"] or r["client_name"],
-        "plan": r["plan_title"], "period": r["period"], "label": r["label"],
-        "body": body_clip(r["body"]),
-        "approved": r["status"] == "approved",
-        "ai": bool(r["ai_drafted"]), "model": r["ai_model"] or "",
-    } for r in cap_rows]
+        (sel,) if sel else (),
+    )
+
+    def body_clip(b):
+        return (b[:180] + "…") if b and len(b) > 180 else (b or "")
+
+    captions = [
+        {
+            "id": r["id"],
+            "plan_id": r["plan_id"],
+            "client": r["client_company"] or r["client_name"],
+            "plan": r["plan_title"],
+            "period": r["period"],
+            "label": r["label"],
+            "body": body_clip(r["body"]),
+            "approved": r["status"] == "approved",
+            "ai": bool(r["ai_drafted"]),
+            "model": r["ai_model"] or "",
+        }
+        for r in cap_rows
+    ]
 
     presets_rows = presets.active()
-    preset_cards = [{
-        "name": p["name"], "ratio": p["ratio_label"],
-        "dims": f'{p["width"]}×{p["height"]}',
-        "channel": (p["target_channel"] or "").replace("_", " ") or "—",
-        "overlay": bool(p["brand_overlay"]),
-    } for p in presets_rows]
+    preset_cards = [
+        {
+            "name": p["name"],
+            "ratio": p["ratio_label"],
+            "dims": f"{p['width']}×{p['height']}",
+            "channel": (p["target_channel"] or "").replace("_", " ") or "—",
+            "overlay": bool(p["brand_overlay"]),
+        }
+        for p in presets_rows
+    ]
 
     n_appr = sum(1 for c in captions if c["approved"])
     cards = [
-        {"label": "Brand kits", "value": str(len(kits)), "tone": "dark",
-         "sub": "overlay logos with placement"},
-        {"label": "Brand assets", "value": str(len(assets)), "tone": "plain",
-         "sub": "files clients shared"},
-        {"label": "Caption packs", "value": str(len(captions)), "tone": "ok",
-         "sub": f"{n_appr} approved · {len(captions) - n_appr} draft"},
-        {"label": "Export presets", "value": str(len(preset_cards)), "tone": "warn",
-         "sub": "active crop ratios"},
+        {
+            "label": "Brand kits",
+            "value": str(len(kits)),
+            "tone": "dark",
+            "sub": "overlay logos with placement",
+        },
+        {
+            "label": "Brand assets",
+            "value": str(len(assets)),
+            "tone": "plain",
+            "sub": "files clients shared",
+        },
+        {
+            "label": "Caption packs",
+            "value": str(len(captions)),
+            "tone": "ok",
+            "sub": f"{n_appr} approved · {len(captions) - n_appr} draft",
+        },
+        {
+            "label": "Export presets",
+            "value": str(len(preset_cards)),
+            "tone": "warn",
+            "sub": "active crop ratios",
+        },
     ]
 
     sel_client = next((c for c in roster if c["id"] == sel), None) if sel else None
     switch = [{"id": None, "label": "All clients", "on": sel is None}] + [
-        {"id": c["id"], "label": c["company"] or c["name"], "on": c["id"] == sel}
-        for c in roster]
+        {"id": c["id"], "label": c["company"] or c["name"], "on": c["id"] == sel} for c in roster
+    ]
 
-    return templates.TemplateResponse(request, "admin/content.html", {
-        "cards": cards, "kits": kits, "assets": assets, "captions": captions,
-        "presets": preset_cards, "switch": switch, "sel": sel,
-        "sel_client": sel_client,
-        "ai_enabled": caption_ai.is_enabled(),
-    })
+    return templates.TemplateResponse(
+        request,
+        "admin/content.html",
+        {
+            "cards": cards,
+            "kits": kits,
+            "assets": assets,
+            "captions": captions,
+            "presets": preset_cards,
+            "switch": switch,
+            "sel": sel,
+            "sel_client": sel_client,
+            "ai_enabled": caption_ai.is_enabled(),
+        },
+    )

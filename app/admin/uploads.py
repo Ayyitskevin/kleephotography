@@ -20,8 +20,7 @@ def _free_gb() -> float:
 
 
 @router.post("/galleries/{gallery_id}/upload")
-async def upload(gallery_id: int, files: list[UploadFile],
-                 section_id: int | None = None):
+async def upload(gallery_id: int, files: list[UploadFile], section_id: int | None = None):
     g = db.one("SELECT id FROM galleries WHERE id=?", (gallery_id,))
     if not g:
         raise HTTPException(status_code=404)
@@ -31,7 +30,8 @@ async def upload(gallery_id: int, files: list[UploadFile],
     if section_id is None:
         first = db.one(
             "SELECT id FROM sections WHERE gallery_id=? ORDER BY position, id LIMIT 1",
-            (gallery_id,))
+            (gallery_id,),
+        )
         if first:
             section_id = first["id"]
     if _free_gb() < config.MIN_FREE_GB:
@@ -61,9 +61,12 @@ async def upload(gallery_id: int, files: list[UploadFile],
                 size += len(chunk)
         asset_id = db.run(
             "INSERT INTO assets (gallery_id, section_id, kind, filename, stored, bytes) "
-            "VALUES (?,?,?,?,?,?)", (gallery_id, section_id, kind, name, stored, size))
-        jobs.enqueue("image_derivatives" if kind == "photo" else "video_transcode",
-                     {"asset_id": asset_id})
+            "VALUES (?,?,?,?,?,?)",
+            (gallery_id, section_id, kind, name, stored, size),
+        )
+        jobs.enqueue(
+            "image_derivatives" if kind == "photo" else "video_transcode", {"asset_id": asset_id}
+        )
         accepted.append(asset_id)
 
     if accepted:

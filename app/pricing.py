@@ -9,6 +9,7 @@ per 2026 regional research); Charlotte and Raleigh bases get added to
 MARKET_BASE_CENTS when he expands — same multipliers, zero other change.
 Full doctrine + market research: ORACLE mise.md, Notion KLP CRM pricing page.
 """
+
 import json
 import math
 
@@ -46,8 +47,12 @@ MARKETS = ("asheville", "raleigh", "charlotte")
 
 # Scope of distribution. Take the MAX over selected territories.
 TERRITORY_MULT = {
-    "local_metro": 1.0, "US": 1.4, "UK": 1.4, "EU": 1.4,
-    "north_america": 1.8, "worldwide": 2.5,
+    "local_metro": 1.0,
+    "US": 1.4,
+    "UK": 1.4,
+    "EU": 1.4,
+    "north_america": 1.8,
+    "worldwide": 2.5,
 }
 # `website` is included in the base; every other selected channel adds an uplift.
 # Split because a billboard is not an email: paid/print/broadcast/OOH/delivery
@@ -58,7 +63,7 @@ LIGHT_UPLIFT = 0.08
 HEAVY_UPLIFT = 0.20
 
 PERPETUAL_MULT = 2.0
-EXTRA_YEAR_UPLIFT = 0.25      # base covers year 1; each additional year adds this
+EXTRA_YEAR_UPLIFT = 0.25  # base covers year 1; each additional year adds this
 EXCLUSIVE_MULT = 1.8
 
 
@@ -90,6 +95,7 @@ def _term_mult(row) -> float:
 
 def _date(s):
     from datetime import date
+
     return date.fromisoformat(s[:10])
 
 
@@ -108,11 +114,15 @@ def suggest_license_fee(row, market: str = DEFAULT_MARKET) -> dict:
     term_mult = _term_mult(row)
     # The 'exclusive' tier already prices category lockout, so the exclusivity
     # flag does not additionally stack on it (avoids sticker-shock double-count).
-    excl_mult = (EXCLUSIVE_MULT
-                 if row["exclusivity"] == "exclusive" and tier != "exclusive"
-                 else 1.0)
+    excl_mult = EXCLUSIVE_MULT if row["exclusivity"] == "exclusive" and tier != "exclusive" else 1.0
 
     total = round(base * t_mult * c_mult * term_mult * excl_mult)
-    return {"market": market, "base_cents": base, "territory_mult": t_mult,
-            "channel_mult": c_mult, "term_mult": term_mult, "excl_mult": excl_mult,
-            "total_cents": total}
+    return {
+        "market": market,
+        "base_cents": base,
+        "territory_mult": t_mult,
+        "channel_mult": c_mult,
+        "term_mult": term_mult,
+        "excl_mult": excl_mult,
+        "total_cents": total,
+    }

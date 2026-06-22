@@ -16,6 +16,11 @@ def log(con, entity_type, entity_id, action, *, diff=None, actor="admin"):
     con.execute(
         "INSERT INTO audit_log (entity_type, entity_id, action, actor, diff_json) "
         "VALUES (?,?,?,?,?)",
-        (entity_type, entity_id, action, actor,
-         json.dumps(diff, default=str) if diff is not None else None),
+        (
+            entity_type,
+            entity_id,
+            action,
+            actor,
+            json.dumps(diff, default=str) if diff is not None else None,
+        ),
     )

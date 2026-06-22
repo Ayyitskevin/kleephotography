@@ -33,7 +33,8 @@ def at_9am(days_ahead: int) -> str:
     civil hour for an owner nudge instead of whatever instant the event fired at."""
     tz = ZoneInfo(config.TIMEZONE)
     target = (dt.datetime.now(tz) + dt.timedelta(days=days_ahead)).replace(
-        hour=9, minute=0, second=0, microsecond=0)
+        hour=9, minute=0, second=0, microsecond=0
+    )
     return target.isoformat()
 
 
@@ -46,8 +47,7 @@ def arm(key: str, text: str, when: str) -> bool:
     headers = {"Content-Type": "application/json"}
     if config.HERMES_ARM_TOKEN:
         headers["Authorization"] = f"Bearer {config.HERMES_ARM_TOKEN}"
-    req = urllib.request.Request(config.HERMES_ARM_URL, data=body,
-                                 headers=headers, method="POST")
+    req = urllib.request.Request(config.HERMES_ARM_URL, data=body, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             resp.read()

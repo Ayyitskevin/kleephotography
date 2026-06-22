@@ -47,8 +47,7 @@ def _store_zip(gallery_id: int, assets, out: Path) -> None:
     tmp.rename(out)
 
 
-def _target(slug: str, asset_id: int | None, fav: int | None,
-            section: int | None) -> str:
+def _target(slug: str, asset_id: int | None, fav: int | None, section: int | None) -> str:
     if fav:
         return f"/g/{slug}/download/favorites"
     if section is not None:
@@ -59,29 +58,47 @@ def _target(slug: str, asset_id: int | None, fav: int | None,
 
 
 @router.get("/{slug}/download", response_class=HTMLResponse)
-async def download_page(request: Request, slug: str, asset_id: int | None = None,
-                        fav: int | None = None, section: int | None = None):
+async def download_page(
+    request: Request,
+    slug: str,
+    asset_id: int | None = None,
+    fav: int | None = None,
+    section: int | None = None,
+):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
-        return templates.TemplateResponse(request, "public/email_gate.html",
-                                          {"g": g, "asset_id": asset_id, "fav": fav,
-                                           "section": section, "error": None})
+        return templates.TemplateResponse(
+            request,
+            "public/email_gate.html",
+            {"g": g, "asset_id": asset_id, "fav": fav, "section": section, "error": None},
+        )
     return RedirectResponse(_target(slug, asset_id, fav, section), status_code=303)
 
 
 @router.post("/{slug}/email", response_class=HTMLResponse)
-async def capture_email(request: Request, slug: str, email: str = Form(...),
-                        asset_id: int | None = Form(None),
-                        fav: int | None = Form(None),
-                        section: int | None = Form(None)):
+async def capture_email(
+    request: Request,
+    slug: str,
+    email: str = Form(...),
+    asset_id: int | None = Form(None),
+    fav: int | None = Form(None),
+    section: int | None = Form(None),
+):
     g, visitor = _gate(request, slug)
     email = email.strip().lower()
     if not _EMAIL.match(email):
-        return templates.TemplateResponse(request, "public/email_gate.html",
-                                          {"g": g, "asset_id": asset_id, "fav": fav,
-                                           "section": section,
-                                           "error": "That doesn't look like an email."},
-                                          status_code=400)
+        return templates.TemplateResponse(
+            request,
+            "public/email_gate.html",
+            {
+                "g": g,
+                "asset_id": asset_id,
+                "fav": fav,
+                "section": section,
+                "error": "That doesn't look like an email.",
+            },
+            status_code=400,
+        )
     db.run("UPDATE visitors SET email=? WHERE id=?", (email, visitor["id"]))
     log.info("email captured for gallery %s visitor %s", g["id"], visitor["id"])
     return RedirectResponse(_target(slug, asset_id, fav, section), status_code=303)
@@ -92,17 +109,19 @@ async def download_asset(request: Request, slug: str, asset_id: int):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download?asset_id={asset_id}", status_code=303)
-    a = db.one("SELECT * FROM assets WHERE id=? AND gallery_id=? AND status='ready'",
-               (asset_id, g["id"]))
+    a = db.one(
+        "SELECT * FROM assets WHERE id=? AND gallery_id=? AND status='ready'", (asset_id, g["id"])
+    )
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(g["id"]) / "original" / a["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
-    db.run("INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,?)",
-           (g["id"], visitor["id"], asset_id))
-    return FileResponse(path, filename=a["filename"],
-                        media_type="application/octet-stream")
+    db.run(
+        "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,?)",
+        (g["id"], visitor["id"], asset_id),
+    )
+    return FileResponse(path, filename=a["filename"], media_type="application/octet-stream")
 
 
 @router.get("/{slug}/download/favorites")
@@ -110,9 +129,12 @@ async def download_favorites(request: Request, slug: str):
     g, visitor = _gate(request, slug)
     if not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download?fav=1", status_code=303)
-    assets = db.all_("""SELECT a.* FROM favorites f JOIN assets a ON a.id=f.asset_id
+    assets = db.all_(
+        """SELECT a.* FROM favorites f JOIN assets a ON a.id=f.asset_id
                         WHERE f.visitor_id=? AND a.gallery_id=? AND a.status='ready'
-                        ORDER BY a.id""", (visitor["id"], g["id"]))
+                        ORDER BY a.id""",
+        (visitor["id"], g["id"]),
+    )
     if not assets:
         raise HTTPException(status_code=404, detail="no favorites yet")
     # small subset of originals — built synchronously, content-keyed per visitor
@@ -123,26 +145,27 @@ async def download_favorites(request: Request, slug: str):
         for old in config.ZIP_DIR.glob(f"g{g['id']}-v{visitor['id']}-*.zip"):
             if old != out:
                 old.unlink(missing_ok=True)
-    db.run("INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
-           (g["id"], visitor["id"]))
+    db.run(
+        "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
+        (g["id"], visitor["id"]),
+    )
     base = re.sub(r"[^A-Za-z0-9 _-]", "", g["title"]) or "gallery"
-    return FileResponse(out, filename=f"{base}-favorites.zip",
-                        media_type="application/zip")
+    return FileResponse(out, filename=f"{base}-favorites.zip", media_type="application/zip")
 
 
 @router.get("/{slug}/download/section/{section_id}")
 async def download_section(request: Request, slug: str, section_id: int):
     g, visitor = _gate(request, slug)
     if not visitor["email"]:
-        return RedirectResponse(f"/g/{slug}/download?section={section_id}",
-                                status_code=303)
-    s = db.one("SELECT * FROM sections WHERE id=? AND gallery_id=?",
-               (section_id, g["id"]))
+        return RedirectResponse(f"/g/{slug}/download?section={section_id}", status_code=303)
+    s = db.one("SELECT * FROM sections WHERE id=? AND gallery_id=?", (section_id, g["id"]))
     if not s:
         raise HTTPException(status_code=404)
-    assets = db.all_("""SELECT * FROM assets WHERE gallery_id=? AND section_id=?
+    assets = db.all_(
+        """SELECT * FROM assets WHERE gallery_id=? AND section_id=?
                         AND status='ready' ORDER BY position, id""",
-                     (g["id"], section_id))
+        (g["id"], section_id),
+    )
     if not assets:
         raise HTTPException(status_code=404, detail="section is empty")
     key = hashlib.sha256(",".join(str(a["id"]) for a in assets).encode()).hexdigest()[:8]
@@ -152,8 +175,10 @@ async def download_section(request: Request, slug: str, section_id: int):
         for old in config.ZIP_DIR.glob(f"g{g['id']}-s{section_id}-*.zip"):
             if old != out:
                 old.unlink(missing_ok=True)
-    db.run("INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
-           (g["id"], visitor["id"]))
+    db.run(
+        "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
+        (g["id"], visitor["id"]),
+    )
     base = re.sub(r"[^A-Za-z0-9 _-]", "", f"{g['title']} {s['name']}") or "section"
     return FileResponse(out, filename=f"{base}.zip", media_type="application/zip")
 
@@ -165,15 +190,19 @@ async def download_zip(request: Request, slug: str):
         return RedirectResponse(f"/g/{slug}/download", status_code=303)
     path = jobs.zip_path(g["id"], g["content_rev"])
     if path.is_file():
-        db.run("INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
-               (g["id"], visitor["id"]))
+        db.run(
+            "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
+            (g["id"], visitor["id"]),
+        )
         fname = f"{re.sub(r'[^A-Za-z0-9 _-]', '', g['title']) or 'gallery'}.zip"
         return FileResponse(path, filename=fname, media_type="application/zip")
-    pending = db.one("""SELECT 1 AS x FROM jobs WHERE kind='zip_build'
+    pending = db.one(
+        """SELECT 1 AS x FROM jobs WHERE kind='zip_build'
                         AND status IN ('queued','running')
                         AND json_extract(payload,'$.gallery_id')=?
                         AND json_extract(payload,'$.rev')=?""",
-                     (g["id"], g["content_rev"]))
+        (g["id"], g["content_rev"]),
+    )
     if not pending:
         jobs.enqueue("zip_build", {"gallery_id": g["id"], "rev": g["content_rev"]})
     return templates.TemplateResponse(request, "public/zip_wait.html", {"g": g})

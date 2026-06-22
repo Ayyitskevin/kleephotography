@@ -10,8 +10,7 @@ def configured() -> bool:
     return bool(config.GMAIL_USER and config.GMAIL_APP_PASSWORD)
 
 
-def send(to: str, subject: str, body: str, reply_to: str = "",
-         ics: dict | None = None) -> None:
+def send(to: str, subject: str, body: str, reply_to: str = "", ics: dict | None = None) -> None:
     """Send a plain-text email, optionally with a calendar invite attached.
 
     `ics` = {"filename", "content", "method"} — content is the VCALENDAR text from
@@ -26,9 +25,12 @@ def send(to: str, subject: str, body: str, reply_to: str = "",
     msg.set_content(body)
     if ics:
         msg.add_attachment(
-            ics["content"].encode(), maintype="text", subtype="calendar",
+            ics["content"].encode(),
+            maintype="text",
+            subtype="calendar",
             filename=ics["filename"],
-            params={"method": ics.get("method", "REQUEST"), "charset": "UTF-8"})
+            params={"method": ics.get("method", "REQUEST"), "charset": "UTF-8"},
+        )
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as s:
         s.login(config.GMAIL_USER, config.GMAIL_APP_PASSWORD)
         s.send_message(msg)

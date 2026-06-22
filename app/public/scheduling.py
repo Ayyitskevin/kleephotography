@@ -23,7 +23,7 @@ router = APIRouter()
 
 
 def _today_local() -> dt.date:
-    return dt.datetime.now(dt.timezone.utc).astimezone(ZoneInfo(config.TIMEZONE)).date()
+    return dt.datetime.now(dt.UTC).astimezone(ZoneInfo(config.TIMEZONE)).date()
 
 
 def _valid_email(e: str) -> bool:
@@ -40,13 +40,19 @@ def _month_ctx(et, year: int, month: int, today: dt.date, visitor_tz: str) -> di
     prev_m = dt.date(year, month, 1) - dt.timedelta(days=1)
     next_m = dt.date(year, month, 1) + dt.timedelta(days=32)
     return {
-        "weeks": weeks, "avail": avail, "year": year, "month": month,
-        "month_name": calendar.month_name[month], "today": today,
+        "weeks": weeks,
+        "avail": avail,
+        "year": year,
+        "month": month,
+        "month_name": calendar.month_name[month],
+        "today": today,
         "has_prev": dt.date(year, month, 1) > dt.date(today.year, today.month, 1),
         "has_next": dt.date(next_m.year, next_m.month, 1)
-                    <= dt.date(max_day.year, max_day.month, 1),
-        "prev_year": prev_m.year, "prev_month": prev_m.month,
-        "next_year": next_m.year, "next_month": next_m.month,
+        <= dt.date(max_day.year, max_day.month, 1),
+        "prev_year": prev_m.year,
+        "prev_month": prev_m.month,
+        "next_year": next_m.year,
+        "next_month": next_m.month,
         "visitor_tz": visitor_tz or config.TIMEZONE,
     }
 
@@ -63,8 +69,15 @@ def _picker_ctx(et, request: Request, *, is_reschedule=False, token=""):
     except ValueError:
         year, month = today.year, today.month
     visitor_tz = (q.get("tz") or "").strip()
-    ctx = {"e": et, "is_reschedule": is_reschedule, "token": token,
-           "error": None, "slots": None, "sel_day": None, "sel_start": None}
+    ctx = {
+        "e": et,
+        "is_reschedule": is_reschedule,
+        "token": token,
+        "error": None,
+        "slots": None,
+        "sel_day": None,
+        "sel_start": None,
+    }
     ctx.update(_month_ctx(et, year, month, today, visitor_tz))
 
     sel_day = (q.get("day") or "").strip()
@@ -81,11 +94,11 @@ def _picker_ctx(et, request: Request, *, is_reschedule=False, token=""):
 
 # ── booking funnel ───────────────────────────────────────────────────────────
 
+
 @router.get("/book", response_class=HTMLResponse)
 async def book_index(request: Request):
     events = scheduling.active_event_types()
-    return templates.TemplateResponse(request, "public/book_index.html",
-                                      {"events": events})
+    return templates.TemplateResponse(request, "public/book_index.html", {"events": events})
 
 
 @router.get("/book/{slug}", response_class=HTMLResponse)
@@ -99,13 +112,22 @@ async def book_event(request: Request, slug: str):
 
 
 @router.post("/book/{slug}", response_class=HTMLResponse)
-async def confirm_booking(request: Request, slug: str, name: str = Form(...),
-                          email: str = Form(...), phone: str = Form(""),
-                          notes: str = Form(""), start: str = Form(...),
-                          tz: str = Form(""), website: str = Form(""),
-                          venue_address: str = Form(""), dish_count: str = Form(""),
-                          parking_notes: str = Form(""), style_refs: str = Form(""),
-                          onsite_contact: str = Form("")):
+async def confirm_booking(
+    request: Request,
+    slug: str,
+    name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(""),
+    notes: str = Form(""),
+    start: str = Form(...),
+    tz: str = Form(""),
+    website: str = Form(""),
+    venue_address: str = Form(""),
+    dish_count: str = Form(""),
+    parking_notes: str = Form(""),
+    style_refs: str = Form(""),
+    onsite_contact: str = Form(""),
+):
     et = scheduling.event_by_slug(slug)
     if not et:
         raise HTTPException(status_code=404)
@@ -119,12 +141,12 @@ async def confirm_booking(request: Request, slug: str, name: str = Form(...),
         ctx = _picker_ctx(et, request)
         ctx["form_action"] = f"/book/{slug}"
         ctx["error"] = msg
-        return templates.TemplateResponse(request, "public/book_event.html", ctx,
-                                          status_code=code)
+        return templates.TemplateResponse(request, "public/book_event.html", ctx, status_code=code)
 
     if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_BOOK):
-        return repicker("You've booked a few times recently — give me a moment "
-                        "before booking another.", 429)
+        return repicker(
+            "You've booked a few times recently — give me a moment before booking another.", 429
+        )
     if not (name and _valid_email(email)):
         return repicker("Please enter your name and a valid email.")
     try:
@@ -134,11 +156,18 @@ async def confirm_booking(request: Request, slug: str, name: str = Form(...),
     # Persist the F&B intake (shoot event types only) before side-effects fire, so the
     # auto-created project + Notion Session pick it up.
     if et["creates_notion_session"]:
-        db.run("""UPDATE bookings SET venue_address=?, dish_count=?, parking_notes=?,
+        db.run(
+            """UPDATE bookings SET venue_address=?, dish_count=?, parking_notes=?,
                   style_refs=?, onsite_contact=? WHERE id=?""",
-               (venue_address.strip()[:300], dish_count.strip()[:60],
-                parking_notes.strip()[:500], style_refs.strip()[:1000],
-                onsite_contact.strip()[:120], bid))
+            (
+                venue_address.strip()[:300],
+                dish_count.strip()[:60],
+                parking_notes.strip()[:500],
+                style_refs.strip()[:1000],
+                onsite_contact.strip()[:120],
+                bid,
+            ),
+        )
     security.inquiry_record(ip, security.INQUIRY_BUCKET_BOOK)
     booking_notify.confirm(bid)
     log.info("booking %s confirmed (%s)", bid, slug)
@@ -146,6 +175,7 @@ async def confirm_booking(request: Request, slug: str, name: str = Form(...),
 
 
 # ── manage: confirmation page, cancel, reschedule, invite download ───────────
+
 
 @router.get("/booking/{token}", response_class=HTMLResponse)
 async def manage(request: Request, token: str):
@@ -155,12 +185,16 @@ async def manage(request: Request, token: str):
     gcal = ""
     if b["status"] == "confirmed":
         summary = f"{b['event_name']} · {config.SITE_NAME}"
-        gcal = ics.google_link(summary=summary, details=b["notes"] or "",
-                               location=b["location"] or "",
-                               start_utc=b["start_utc"], end_utc=b["end_utc"])
-    return templates.TemplateResponse(request, "public/booking_manage.html",
-                                      {"b": b, "gcal": gcal,
-                                       "tz_name": config.TIMEZONE})
+        gcal = ics.google_link(
+            summary=summary,
+            details=b["notes"] or "",
+            location=b["location"] or "",
+            start_utc=b["start_utc"],
+            end_utc=b["end_utc"],
+        )
+    return templates.TemplateResponse(
+        request, "public/booking_manage.html", {"b": b, "gcal": gcal, "tz_name": config.TIMEZONE}
+    )
 
 
 @router.get("/booking/{token}/invite.ics")
@@ -171,14 +205,20 @@ async def invite(token: str):
     content = ics.build(
         uid=ics.uid_for(b["id"]),
         summary=f"{b['event_name']} · {config.SITE_NAME}",
-        description=b["notes"] or "", location=b["location"] or "",
-        start_utc=b["start_utc"], end_utc=b["end_utc"],
+        description=b["notes"] or "",
+        location=b["location"] or "",
+        start_utc=b["start_utc"],
+        end_utc=b["end_utc"],
         organizer_email=config.GMAIL_USER or "noreply@kleephotography.com",
         attendee_email=b["email"],
         cancelled=(b["status"] != "confirmed"),
-        sequence=0 if b["status"] == "confirmed" else 1)
-    return Response(content, media_type="text/calendar",
-                    headers={"Content-Disposition": 'attachment; filename="invite.ics"'})
+        sequence=0 if b["status"] == "confirmed" else 1,
+    )
+    return Response(
+        content,
+        media_type="text/calendar",
+        headers={"Content-Disposition": 'attachment; filename="invite.ics"'},
+    )
 
 
 @router.post("/booking/{token}/cancel")
@@ -206,8 +246,7 @@ async def reschedule_form(request: Request, token: str):
 
 
 @router.post("/booking/{token}/reschedule")
-async def do_reschedule(request: Request, token: str, start: str = Form(...),
-                        tz: str = Form("")):
+async def do_reschedule(request: Request, token: str, start: str = Form(...), tz: str = Form("")):
     b = scheduling.booking_by_token(token)
     if not b or b["status"] != "confirmed":
         raise HTTPException(status_code=404)
@@ -216,15 +255,21 @@ async def do_reschedule(request: Request, token: str, start: str = Form(...),
         raise HTTPException(status_code=404)
     try:
         new_id, new_token = scheduling.book(
-            et, start, b["name"], b["email"], b["phone"], b["notes"],
-            tz or b["tz"], exclude_id=b["id"])
+            et,
+            start,
+            b["name"],
+            b["email"],
+            b["phone"],
+            b["notes"],
+            tz or b["tz"],
+            exclude_id=b["id"],
+        )
     except scheduling.SlotTaken:
         ctx = _picker_ctx(et, request, is_reschedule=True, token=token)
         ctx["form_action"] = f"/booking/{token}/reschedule"
         ctx["old_when"] = b["start_utc"]
         ctx["error"] = "Sorry — that time was just taken. Please pick another."
-        return templates.TemplateResponse(request, "public/book_event.html", ctx,
-                                          status_code=409)
+        return templates.TemplateResponse(request, "public/book_event.html", ctx, status_code=409)
     # New slot held; release the old one and email the fresh invite.
     scheduling.cancel(token, "Rescheduled")
     booking_notify.confirm(new_id)

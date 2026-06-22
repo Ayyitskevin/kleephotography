@@ -26,8 +26,16 @@ log = logging.getLogger("mise.public.sms_webhook")
 router = APIRouter()
 
 # Call statuses that mean nobody connected — rendered as a "Missed call".
-_MISSED = {"missed", "no-answer", "no_answer", "unanswered", "rejected", "busy",
-           "declined", "voicemail"}
+_MISSED = {
+    "missed",
+    "no-answer",
+    "no_answer",
+    "unanswered",
+    "rejected",
+    "busy",
+    "declined",
+    "voicemail",
+}
 
 
 def _digits(phone: str) -> str:
@@ -46,7 +54,9 @@ def _match_inquiry(phone: str):
     return db.one(
         "SELECT id, dismissed_at FROM inquiries WHERE phone!='' AND "
         "substr(replace(replace(replace(replace(replace(phone,'+',''),'-',''),' ',''),'(',''),')','') , -10) = ? "
-        "ORDER BY id DESC LIMIT 1", (digits,))
+        "ORDER BY id DESC LIMIT 1",
+        (digits,),
+    )
 
 
 def _ensure_inquiry(phone: str, first_body: str, kind: str) -> int:
@@ -63,7 +73,8 @@ def _ensure_inquiry(phone: str, first_body: str, kind: str) -> int:
     iid = db.run(
         """INSERT INTO inquiries (name, email, business, message, kind, phone, emailed)
            VALUES (?,?,?,?,?,?,0)""",
-        (phone, "", None, first_body or "(no text)", kind, phone))
+        (phone, "", None, first_body or "(no text)", kind, phone),
+    )
     log.info("inbound %s from new number created inquiry %s", kind, iid)
     return iid
 
@@ -89,8 +100,11 @@ def _call_enrichment(etype: str, obj: dict) -> str:
     if etype == "call.transcript.completed":
         dlg = obj.get("dialogue") or obj.get("transcript") or obj.get("segments")
         if isinstance(dlg, list):
-            parts = [(s.get("content") or s.get("text") or "").strip()
-                     for s in dlg if isinstance(s, dict)]
+            parts = [
+                (s.get("content") or s.get("text") or "").strip()
+                for s in dlg
+                if isinstance(s, dict)
+            ]
             joined = " ".join(p for p in parts if p)
             return f"Transcript: {joined}" if joined else ""
         if isinstance(dlg, str) and dlg.strip():
@@ -113,11 +127,14 @@ def _handle_call(etype: str, obj: dict) -> dict:
         call_id = (obj.get("callId") or obj.get("id") or "").strip()
         text = _call_enrichment(etype, obj)
         if call_id and text:
-            row = db.one("SELECT id, body FROM messages "
-                         "WHERE provider_msg_id=? AND channel='call'", (call_id,))
+            row = db.one(
+                "SELECT id, body FROM messages WHERE provider_msg_id=? AND channel='call'",
+                (call_id,),
+            )
             if row:
-                db.run("UPDATE messages SET body=? WHERE id=?",
-                       (f"{row['body']}\n{text}", row["id"]))
+                db.run(
+                    "UPDATE messages SET body=? WHERE id=?", (f"{row['body']}\n{text}", row["id"])
+                )
                 return {"ok": True, "enriched": etype}
         return {"ok": True, "ignored": etype}
 
@@ -126,8 +143,7 @@ def _handle_call(etype: str, obj: dict) -> dict:
     # Other party: the caller for inbound, the callee for outbound. `to` may be a
     # string or a list depending on payload shape.
     to = obj.get("to")
-    to_one = (to[0] if isinstance(to, list) and to
-              else to if isinstance(to, str) else "")
+    to_one = to[0] if isinstance(to, list) and to else to if isinstance(to, str) else ""
     other = ((obj.get("from") if direction == "in" else to_one) or "").strip()
     if not other:
         return {"ok": True, "ignored": "no call number"}
@@ -138,9 +154,11 @@ def _handle_call(etype: str, obj: dict) -> dict:
 
     inquiry_id = _ensure_inquiry(other, body, "call")
     try:
-        db.run("""INSERT INTO messages (inquiry_id, direction, channel, body, provider_msg_id)
+        db.run(
+            """INSERT INTO messages (inquiry_id, direction, channel, body, provider_msg_id)
                   VALUES (?, ?, 'call', ?, ?)""",
-               (inquiry_id, direction, body, call_id))
+            (inquiry_id, direction, body, call_id),
+        )
     except db.sqlite3.IntegrityError:
         return {"ok": True, "duplicate": True}  # Quo retries — idempotent by call id
     log.info("call recorded on inquiry %s (%s, %s)", inquiry_id, direction, status or "?")
@@ -180,9 +198,11 @@ async def quo_webhook(request: Request):
 
     inquiry_id = _ensure_inquiry(from_phone, body, "sms")
     try:
-        db.run("""INSERT INTO messages (inquiry_id, direction, channel, body, provider_msg_id)
+        db.run(
+            """INSERT INTO messages (inquiry_id, direction, channel, body, provider_msg_id)
                   VALUES (?, 'in', 'sms', ?, ?)""",
-               (inquiry_id, body, provider_msg_id))
+            (inquiry_id, body, provider_msg_id),
+        )
     except db.sqlite3.IntegrityError:
         return {"ok": True, "duplicate": True}  # Quo retries — idempotent by msg id
     log.info("inbound sms recorded on inquiry %s (%d chars)", inquiry_id, len(body))

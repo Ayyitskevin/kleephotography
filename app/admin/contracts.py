@@ -55,6 +55,7 @@ def resolve_merge(body: str, p: "db.sqlite3.Row") -> str:
         body = body.replace("{" + k + "}", str(v))
     return body
 
+
 # Merge fields resolve at creation — the stored body is a self-contained snapshot,
 # so later edits to this template never change an existing contract.
 DEFAULT_TEMPLATE = """\
@@ -79,23 +80,26 @@ This agreement is between {site_name} ("Photographer") and {client_name}{company
 
 
 def get_contract(contract_id: int) -> "db.sqlite3.Row":
-    d = db.one("SELECT * FROM contracts WHERE id=?", (contract_id,))
-    if not d:
-        raise HTTPException(status_code=404)
-    return d
+    return db.get_or_404("SELECT * FROM contracts WHERE id=?", (contract_id,))
 
 
 def render_template(p: "db.sqlite3.Row") -> str:
-    accepted = db.one("""SELECT total_cents FROM proposals
+    accepted = db.one(
+        """SELECT total_cents FROM proposals
                          WHERE project_id=? AND status='accepted'
-                         ORDER BY accepted_at DESC LIMIT 1""", (p["id"],))
-    total_clause = (" for a total of $%.2f" % (accepted["total_cents"] / 100)
-                    if accepted else "")
+                         ORDER BY accepted_at DESC LIMIT 1""",
+        (p["id"],),
+    )
+    total_clause = " for a total of $%.2f" % (accepted["total_cents"] / 100) if accepted else ""
     company_clause = f" of {p['company']}" if p["company"] else ""
     return DEFAULT_TEMPLATE.format(
-        site_name=config.SITE_NAME, client_name=p["client_name"],
-        company_clause=company_clause, date=date.today().isoformat(),
-        project_title=p["title"], total_clause=total_clause)
+        site_name=config.SITE_NAME,
+        client_name=p["client_name"],
+        company_clause=company_clause,
+        date=date.today().isoformat(),
+        project_title=p["title"],
+        total_clause=total_clause,
+    )
 
 
 @router.post("/projects/{project_id}/contracts")
@@ -107,11 +111,12 @@ async def create_contract(project_id: int, template_key: str = Form("standard"))
     else:
         body = render_template(p)
         title = f"Services Agreement — {p['title']}"
-    did = db.run("""INSERT INTO contracts (project_id, slug, title, body)
+    did = db.run(
+        """INSERT INTO contracts (project_id, slug, title, body)
                     VALUES (?,?,?,?)""",
-                 (project_id, security.new_slug(), title, body))
-    log.info("contract %s created for project %s (template=%s)",
-             did, project_id, template_key)
+        (project_id, security.new_slug(), title, body),
+    )
+    log.info("contract %s created for project %s (template=%s)", did, project_id, template_key)
     return RedirectResponse(f"/admin/studio/contracts/{did}", status_code=303)
 
 
@@ -119,8 +124,9 @@ async def create_contract(project_id: int, template_key: str = Form("standard"))
 async def contract_detail(request: Request, contract_id: int):
     d = get_contract(contract_id)
     p = get_project(d["project_id"])
-    return templates.TemplateResponse(request, "admin/contract.html",
-                                      {"d": d, "p": p, "base_url": config.BASE_URL})
+    return templates.TemplateResponse(
+        request, "admin/contract.html", {"d": d, "p": p, "base_url": config.BASE_URL}
+    )
 
 
 @router.post("/contracts/{contract_id}")
@@ -130,8 +136,10 @@ async def update_contract(contract_id: int, title: str = Form(...), body: str = 
         raise HTTPException(status_code=400, detail="sent contracts are locked")
     if not body.strip():
         raise HTTPException(status_code=400, detail="body required")
-    db.run("UPDATE contracts SET title=?, body=? WHERE id=?",
-           (title.strip() or d["title"], body, contract_id))
+    db.run(
+        "UPDATE contracts SET title=?, body=? WHERE id=?",
+        (title.strip() or d["title"], body, contract_id),
+    )
     return RedirectResponse(f"/admin/studio/contracts/{contract_id}", status_code=303)
 
 
@@ -142,28 +150,36 @@ async def duplicate_contract(contract_id: int):
     no hash or signature until it is sent and signed in its own right. The original
     is untouched."""
     d = get_contract(contract_id)
-    did = db.run("INSERT INTO contracts (project_id, slug, title, body) VALUES (?,?,?,?)",
-                 (d["project_id"], security.new_slug(), d["title"], d["body"]))
+    did = db.run(
+        "INSERT INTO contracts (project_id, slug, title, body) VALUES (?,?,?,?)",
+        (d["project_id"], security.new_slug(), d["title"], d["body"]),
+    )
     log.info("contract %s duplicated → %s (new draft)", contract_id, did)
     return RedirectResponse(f"/admin/studio/contracts/{did}", status_code=303)
 
 
 @router.post("/contracts/{contract_id}/countersign")
-async def countersign_contract(request: Request,
-                               contract_id: int, countersigner_name: str = Form(...)):
+async def countersign_contract(
+    request: Request, contract_id: int, countersigner_name: str = Form(...)
+):
     """Studio-side typed-name signature, recorded after the client signs, completing
     the bilateral record. Same ESIGN basis as the client signature (name + timestamp).
     Only a client-signed contract can be countersigned, and only once."""
     d = get_contract(contract_id)
     if d["status"] != "signed":
-        raise HTTPException(status_code=400, detail="only a client-signed contract can be countersigned")
+        raise HTTPException(
+            status_code=400, detail="only a client-signed contract can be countersigned"
+        )
     if d["countersigned_at"]:
         raise HTTPException(status_code=400, detail="already countersigned")
     name = countersigner_name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="typed name required")
-    db.run("""UPDATE contracts SET countersigner_name=?, countersigned_at=datetime('now')
-              WHERE id=?""", (name, contract_id))
+    db.run(
+        """UPDATE contracts SET countersigner_name=?, countersigned_at=datetime('now')
+              WHERE id=?""",
+        (name, contract_id),
+    )
     log.info("contract %s COUNTERSIGNED by %s", contract_id, name)
     return RedirectResponse(f"/admin/studio/contracts/{contract_id}", status_code=303)
 
@@ -174,7 +190,10 @@ async def mark_contract_sent(contract_id: int):
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="already sent")
     sha = hashlib.sha256(d["body"].encode()).hexdigest()
-    db.run("""UPDATE contracts SET status='sent', body_sha256=?, sent_at=datetime('now')
-              WHERE id=?""", (sha, contract_id))
+    db.run(
+        """UPDATE contracts SET status='sent', body_sha256=?, sent_at=datetime('now')
+              WHERE id=?""",
+        (sha, contract_id),
+    )
     log.info("contract %s marked sent (sha256=%s)", contract_id, sha[:12])
     return RedirectResponse(f"/admin/studio/contracts/{contract_id}", status_code=303)

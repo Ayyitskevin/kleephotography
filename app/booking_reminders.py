@@ -17,7 +17,7 @@ from . import config, db, mailer
 from .booking_notify import _manage_url, _when
 
 log = logging.getLogger("mise.reminders")
-_UTC = dt.timezone.utc
+_UTC = dt.UTC
 _REMINDER_COLS = frozenset({"reminded_48h", "reminded_24h"})
 
 
@@ -26,11 +26,13 @@ def _due(now: dt.datetime):
     now due and unsent. kind is '48h' or '24h'."""
     now_s = now.strftime("%Y-%m-%d %H:%M:%S")
     horizon = (now + dt.timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
-    rows = db.all_("""SELECT b.*, e.name AS event_name, e.location
+    rows = db.all_(
+        """SELECT b.*, e.name AS event_name, e.location
                       FROM bookings b JOIN event_types e ON e.id=b.event_type_id
                       WHERE b.status='confirmed'
                         AND b.start_utc > ? AND b.start_utc <= ?""",
-                   (now_s, horizon))
+        (now_s, horizon),
+    )
     out = []
     for b in rows:
         start = dt.datetime.strptime(b["start_utc"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=_UTC)
@@ -53,16 +55,18 @@ def sweep() -> None:
         lead = "in about two days" if kind == "48h" else "tomorrow"
         cli_when = _when(b["start_utc"], b["tz"])
         loc = b["location"] or "Details to follow"
-        body = (f"Hi {b['name']},\n\n"
-                f"A quick reminder — your booking is {lead}:\n\n"
-                f"  {b['event_name']}\n  {cli_when}\n  {loc}\n\n"
-                f"Need to change or cancel? {_manage_url(b['token'])}\n\n"
-                f"— {config.SITE_NAME}\n")
+        body = (
+            f"Hi {b['name']},\n\n"
+            f"A quick reminder — your booking is {lead}:\n\n"
+            f"  {b['event_name']}\n  {cli_when}\n  {loc}\n\n"
+            f"Need to change or cancel? {_manage_url(b['token'])}\n\n"
+            f"— {config.SITE_NAME}\n"
+        )
         try:
-            mailer.send(b["email"], f"Reminder — {b['event_name']} {lead}",
-                        body, reply_to=config.GMAIL_USER)
-            db.run(f"UPDATE bookings SET {db.ident(col, _REMINDER_COLS)}=1 WHERE id=?",
-                   (b["id"],))
+            mailer.send(
+                b["email"], f"Reminder — {b['event_name']} {lead}", body, reply_to=config.GMAIL_USER
+            )
+            db.run(f"UPDATE bookings SET {db.ident(col, _REMINDER_COLS)}=1 WHERE id=?", (b["id"],))
             log.info("booking %s %s reminder sent", b["id"], kind)
-        except Exception as e:
-            log.error("booking %s %s reminder failed: %s", b["id"], kind, e)
+        except Exception:
+            log.exception("booking %s %s reminder failed", b["id"], kind)

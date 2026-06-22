@@ -34,113 +34,207 @@ OUR_STORY_INTRO = (
 
 PRESETS = {
     "blank": {"title": "Proposal", "items": []},
-
     # ── Photography ─────────────────────────────────────────────────────────
-    "photo_starter": {"title": "Photography — Starter", "items": [
-        {"label": "Half-day photography session (up to 4 hrs)", "qty": 1, "unit_cents": 90000},
-        {"label": "Up to 20 edited, web-ready images", "qty": 1, "unit_cents": 0},
-        {"label": "Online gallery delivery + standard usage rights", "qty": 1, "unit_cents": 0},
-    ]},
-    "photo_standard": {"title": "Photography — Standard", "items": [
-        {"label": "Full-day photography session (up to 8 hrs)", "qty": 1, "unit_cents": 180000},
-        {"label": "Up to 50 edited, web-ready images", "qty": 1, "unit_cents": 0},
-        {"label": "Social crops (1:1, 4:5, 9:16) for hero selects", "qty": 1, "unit_cents": 0},
-        {"label": "Online gallery delivery + standard usage rights", "qty": 1, "unit_cents": 0},
-    ]},
-    "photo_premium": {"title": "Photography — Premium", "items": [
-        {"label": "Extended-day photography session (up to 10 hrs)", "qty": 1, "unit_cents": 320000},
-        {"label": "Up to 75 edited, web-ready images", "qty": 1, "unit_cents": 0},
-        {"label": "Social crops (1:1, 4:5, 9:16) for every select", "qty": 1, "unit_cents": 0},
-        {"label": "Rush turnaround (5 business days)", "qty": 1, "unit_cents": 0},
-        {"label": "Online gallery delivery + extended usage rights", "qty": 1, "unit_cents": 0},
-    ]},
-
+    "photo_starter": {
+        "title": "Photography — Starter",
+        "items": [
+            {"label": "Half-day photography session (up to 4 hrs)", "qty": 1, "unit_cents": 90000},
+            {"label": "Up to 20 edited, web-ready images", "qty": 1, "unit_cents": 0},
+            {"label": "Online gallery delivery + standard usage rights", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "photo_standard": {
+        "title": "Photography — Standard",
+        "items": [
+            {"label": "Full-day photography session (up to 8 hrs)", "qty": 1, "unit_cents": 180000},
+            {"label": "Up to 50 edited images", "qty": 1, "unit_cents": 0},
+            {"label": "Social crops (1:1, 4:5, 9:16) for hero selects", "qty": 1, "unit_cents": 0},
+            {"label": "Online gallery delivery + standard usage rights", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "photo_premium": {
+        "title": "Photography — Premium",
+        "items": [
+            {
+                "label": "Extended-day photography session (up to 10 hrs)",
+                "qty": 1,
+                "unit_cents": 320000,
+            },
+            {"label": "Up to 75 edited images", "qty": 1, "unit_cents": 0},
+            {"label": "Social crops (1:1, 4:5, 9:16) for every select", "qty": 1, "unit_cents": 0},
+            {"label": "Rush turnaround (5 business days)", "qty": 1, "unit_cents": 0},
+            {"label": "Online gallery delivery + extended usage rights", "qty": 1, "unit_cents": 0},
+        ],
+    },
     # ── Videography ─────────────────────────────────────────────────────────
-    "video_starter": {"title": "Videography — Starter", "items": [
-        {"label": "Half-day video shoot (up to 4 hrs)", "qty": 1, "unit_cents": 180000},
-        {"label": "3 short-form vertical reels (15–30s each, edited)", "qty": 1, "unit_cents": 0},
-        {"label": "Licensed music + color grade", "qty": 1, "unit_cents": 0},
-        {"label": "Delivery via gallery + standard usage rights", "qty": 1, "unit_cents": 0},
-    ]},
-    "video_standard": {"title": "Videography — Standard", "items": [
-        {"label": "Full-day video shoot (up to 8 hrs)", "qty": 1, "unit_cents": 320000},
-        {"label": "6 short-form vertical reels (15–60s each, edited)", "qty": 1, "unit_cents": 0},
-        {"label": "B-roll package + licensed music + color grade", "qty": 1, "unit_cents": 0},
-        {"label": "Delivery via gallery + standard usage rights", "qty": 1, "unit_cents": 0},
-    ]},
-    "video_premium": {"title": "Videography — Premium", "items": [
-        {"label": "Two video shoot days (up to 16 hrs total)", "qty": 1, "unit_cents": 580000},
-        {"label": "10 short-form reels + 1 hero brand video (60–90s)", "qty": 1, "unit_cents": 0},
-        {"label": "B-roll package, color grade, licensed music", "qty": 1, "unit_cents": 0},
-        {"label": "Rush turnaround available", "qty": 1, "unit_cents": 0},
-        {"label": "Delivery via gallery + extended usage rights", "qty": 1, "unit_cents": 0},
-    ]},
-
+    "video_starter": {
+        "title": "Videography — Starter",
+        "items": [
+            {"label": "Half-day video shoot (up to 4 hrs)", "qty": 1, "unit_cents": 180000},
+            {
+                "label": "3 short-form vertical reels (15–30s each, edited)",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+            {"label": "Licensed music + color grade", "qty": 1, "unit_cents": 0},
+            {"label": "Delivery via gallery + standard usage rights", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "video_standard": {
+        "title": "Videography — Standard",
+        "items": [
+            {"label": "Full-day video shoot (up to 8 hrs)", "qty": 1, "unit_cents": 320000},
+            {
+                "label": "6 short-form vertical reels (15–60s each, edited)",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+            {"label": "B-roll package + licensed music + color grade", "qty": 1, "unit_cents": 0},
+            {"label": "Delivery via gallery + standard usage rights", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "video_premium": {
+        "title": "Videography — Premium",
+        "items": [
+            {"label": "Two video shoot days (up to 16 hrs total)", "qty": 1, "unit_cents": 580000},
+            {
+                "label": "10 short-form reels + 1 hero brand video (60–90s)",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+            {"label": "B-roll package, color grade, licensed music", "qty": 1, "unit_cents": 0},
+            {"label": "Rush turnaround available", "qty": 1, "unit_cents": 0},
+            {"label": "Delivery via gallery + extended usage rights", "qty": 1, "unit_cents": 0},
+        ],
+    },
     # ── Brand Partner (Monthly Retainer) ────────────────────────────────────
-    "retainer_starter": {"title": "Brand Partner — Starter (Monthly)", "items": [
-        {"label": "Monthly photo content day (~20 edited images)", "qty": 1, "unit_cents": 140000},
-        {"label": "Social crop pack (1:1, 4:5, 9:16) for hero selects", "qty": 1, "unit_cents": 0},
-        {"label": "Standing client portal", "qty": 1, "unit_cents": 0},
-        {"label": "Priority scheduling (24-hr response)", "qty": 1, "unit_cents": 0},
-    ]},
-    "retainer_standard": {"title": "Brand Partner — Standard (Monthly)", "items": [
-        {"label": "Monthly photo + short-form video content day", "qty": 1, "unit_cents": 220000},
-        {"label": "~30 edited images + 3 short-form reels", "qty": 1, "unit_cents": 0},
-        {"label": "Social crop pack (1:1, 4:5, 9:16) for every select", "qty": 1, "unit_cents": 0},
-        {"label": "Standing portal + priority scheduling", "qty": 1, "unit_cents": 0},
-    ]},
-    "retainer_premium": {"title": "Brand Partner — Premium (Monthly)", "items": [
-        {"label": "Two content days/month (photo + video)", "qty": 1, "unit_cents": 380000},
-        {"label": "~50 edited images + 6 short-form reels", "qty": 1, "unit_cents": 0},
-        {"label": "Quarterly hero brand video (60–90s)", "qty": 1, "unit_cents": 0},
-        {"label": "Full social crop pack + extended usage rights", "qty": 1, "unit_cents": 0},
-        {"label": "Standing portal + concierge scheduling", "qty": 1, "unit_cents": 0},
-    ]},
-
+    "retainer_starter": {
+        "title": "Brand Partner — Starter (Monthly)",
+        "items": [
+            {
+                "label": "Monthly photo content day (~20 edited images)",
+                "qty": 1,
+                "unit_cents": 140000,
+            },
+            {
+                "label": "Social crop pack (1:1, 4:5, 9:16) for hero selects",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+            {"label": "Standing client portal", "qty": 1, "unit_cents": 0},
+            {"label": "Priority scheduling (24-hr response)", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "retainer_standard": {
+        "title": "Brand Partner — Standard (Monthly)",
+        "items": [
+            {
+                "label": "Monthly photo + short-form video content day",
+                "qty": 1,
+                "unit_cents": 220000,
+            },
+            {"label": "~30 edited images + 3 short-form reels", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Social crop pack (1:1, 4:5, 9:16) for every select",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+            {"label": "Standing portal + priority scheduling", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "retainer_premium": {
+        "title": "Brand Partner — Premium (Monthly)",
+        "items": [
+            {"label": "Two content days/month (photo + video)", "qty": 1, "unit_cents": 380000},
+            {"label": "~50 edited images + 6 short-form reels", "qty": 1, "unit_cents": 0},
+            {"label": "Quarterly hero brand video (60–90s)", "qty": 1, "unit_cents": 0},
+            {"label": "Full social crop pack + extended usage rights", "qty": 1, "unit_cents": 0},
+            {"label": "Standing portal + concierge scheduling", "qty": 1, "unit_cents": 0},
+        ],
+    },
     # ── Portrait Sessions ───────────────────────────────────────────────────
-    "portrait_starter": {"title": "Portrait Session — Tier I", "items": [
-        {"label": "Portrait session (~1 hr, one look)", "qty": 1, "unit_cents": 35000},
-        {"label": "Up to 10 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
-        {"label": "Online gallery delivery + personal-use rights", "qty": 1, "unit_cents": 0},
-    ]},
-    "portrait_standard": {"title": "Portrait Session — Tier II", "items": [
-        {"label": "Portrait session (~2 hrs, two looks)", "qty": 1, "unit_cents": 60000},
-        {"label": "Up to 25 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
-        {"label": "Wardrobe change + location guidance", "qty": 1, "unit_cents": 0},
-        {"label": "Online gallery delivery + personal-use rights", "qty": 1, "unit_cents": 0},
-    ]},
-    "portrait_premium": {"title": "Portrait Session — Tier III", "items": [
-        {"label": "Extended portrait session (~3 hrs, multiple looks)", "qty": 1, "unit_cents": 85000},
-        {"label": "Up to 40 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
-        {"label": "Multiple looks + on-location options", "qty": 1, "unit_cents": 0},
-        {"label": "Rush turnaround available", "qty": 1, "unit_cents": 0},
-        {"label": "Online gallery delivery + extended personal-use rights", "qty": 1, "unit_cents": 0},
-    ]},
-
+    "portrait_starter": {
+        "title": "Portrait Session — Tier I",
+        "items": [
+            {"label": "Portrait session (~1 hr, one look)", "qty": 1, "unit_cents": 35000},
+            {"label": "Up to 10 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
+            {"label": "Online gallery delivery + personal-use rights", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "portrait_standard": {
+        "title": "Portrait Session — Tier II",
+        "items": [
+            {"label": "Portrait session (~2 hrs, two looks)", "qty": 1, "unit_cents": 60000},
+            {"label": "Up to 25 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
+            {"label": "Wardrobe change + location guidance", "qty": 1, "unit_cents": 0},
+            {"label": "Online gallery delivery + personal-use rights", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "portrait_premium": {
+        "title": "Portrait Session — Tier III",
+        "items": [
+            {
+                "label": "Extended portrait session (~3 hrs, multiple looks)",
+                "qty": 1,
+                "unit_cents": 85000,
+            },
+            {"label": "Up to 40 edited, web-ready portraits", "qty": 1, "unit_cents": 0},
+            {"label": "Multiple looks + on-location options", "qty": 1, "unit_cents": 0},
+            {"label": "Rush turnaround available", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Online gallery delivery + extended personal-use rights",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+        ],
+    },
     # ── Brand Sessions ──────────────────────────────────────────────────────
-    "brand_halfday": {"title": "Brand Session — Half-Day", "items": [
-        {"label": "Half-day brand session (up to 4 hrs)", "qty": 1, "unit_cents": 85000},
-        {"label": "Personal-brand + headshot mix (~25 edited images)", "qty": 1, "unit_cents": 0},
-        {"label": "Social crops (1:1, 4:5, 9:16) for hero selects", "qty": 1, "unit_cents": 0},
-        {"label": "Online gallery delivery + commercial usage rights", "qty": 1, "unit_cents": 0},
-    ]},
-    "brand_full": {"title": "Brand Session — Full Package", "items": [
-        {"label": "Full-day brand session (up to 8 hrs)", "qty": 1, "unit_cents": 150000},
-        {"label": "Headshots, lifestyle, product & workspace (~50 edited images)", "qty": 1, "unit_cents": 0},
-        {"label": "Full social crop pack (1:1, 4:5, 9:16) for every select", "qty": 1, "unit_cents": 0},
-        {"label": "Brand-story direction + shot planning", "qty": 1, "unit_cents": 0},
-        {"label": "Online gallery delivery + extended commercial usage rights", "qty": 1, "unit_cents": 0},
-    ]},
+    "brand_halfday": {
+        "title": "Brand Session — Half-Day",
+        "items": [
+            {"label": "Half-day brand session (up to 4 hrs)", "qty": 1, "unit_cents": 85000},
+            {
+                "label": "Personal-brand + headshot mix (~25 edited images)",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+            {"label": "Social crops (1:1, 4:5, 9:16) for hero selects", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Online gallery delivery + commercial usage rights",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+        ],
+    },
+    "brand_full": {
+        "title": "Brand Session — Full Package",
+        "items": [
+            {"label": "Full-day brand session (up to 8 hrs)", "qty": 1, "unit_cents": 150000},
+            {
+                "label": "Headshots, lifestyle, product & workspace (~50 edited images)",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+            {
+                "label": "Full social crop pack (1:1, 4:5, 9:16) for every select",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+            {"label": "Brand-story direction + shot planning", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Online gallery delivery + extended commercial usage rights",
+                "qty": 1,
+                "unit_cents": 0,
+            },
+        ],
+    },
 }
 
 MAX_ITEM_ROWS = 12
 
 
 def get_proposal(proposal_id: int) -> "db.sqlite3.Row":
-    d = db.one("SELECT * FROM proposals WHERE id=?", (proposal_id,))
-    if not d:
-        raise HTTPException(status_code=404)
-    return d
+    return db.get_or_404("SELECT * FROM proposals WHERE id=?", (proposal_id,))
 
 
 def parse_items(form) -> tuple[str, int]:
@@ -165,12 +259,18 @@ async def create_proposal(project_id: int, preset: str = Form("blank")):
     p = get_project(project_id)
     tpl = PRESETS.get(preset, PRESETS["blank"])
     intro = None if preset == "blank" else OUR_STORY_INTRO
-    did = db.run("""INSERT INTO proposals (project_id, slug, title, intro, line_items, total_cents)
+    did = db.run(
+        """INSERT INTO proposals (project_id, slug, title, intro, line_items, total_cents)
                     VALUES (?,?,?,?,?,?)""",
-                 (project_id, security.new_slug(), f"{tpl['title']} — {p['title']}",
-                  intro,
-                  json.dumps(tpl["items"]),
-                  sum(i["qty"] * i["unit_cents"] for i in tpl["items"])))
+        (
+            project_id,
+            security.new_slug(),
+            f"{tpl['title']} — {p['title']}",
+            intro,
+            json.dumps(tpl["items"]),
+            sum(i["qty"] * i["unit_cents"] for i in tpl["items"]),
+        ),
+    )
     log.info("proposal %s created for project %s (preset=%s)", did, project_id, preset)
     return RedirectResponse(f"/admin/studio/proposals/{did}", status_code=303)
 
@@ -181,9 +281,9 @@ async def proposal_detail(request: Request, proposal_id: int):
     p = get_project(d["project_id"])
     items = json.loads(d["line_items"])
     rows = items + [{} for _ in range(max(0, MAX_ITEM_ROWS - len(items)))]
-    return templates.TemplateResponse(request, "admin/proposal.html",
-                                      {"d": d, "p": p, "rows": rows,
-                                       "base_url": config.BASE_URL})
+    return templates.TemplateResponse(
+        request, "admin/proposal.html", {"d": d, "p": p, "rows": rows, "base_url": config.BASE_URL}
+    )
 
 
 @router.post("/proposals/{proposal_id}")
@@ -193,9 +293,16 @@ async def update_proposal(request: Request, proposal_id: int):
         raise HTTPException(status_code=400, detail="sent proposals are locked")
     form = await request.form()
     items_json, total = parse_items(form)
-    db.run("UPDATE proposals SET title=?, intro=?, line_items=?, total_cents=? WHERE id=?",
-           ((form.get("title") or "").strip() or d["title"],
-            (form.get("intro") or "").strip() or None, items_json, total, proposal_id))
+    db.run(
+        "UPDATE proposals SET title=?, intro=?, line_items=?, total_cents=? WHERE id=?",
+        (
+            (form.get("title") or "").strip() or d["title"],
+            (form.get("intro") or "").strip() or None,
+            items_json,
+            total,
+            proposal_id,
+        ),
+    )
     return RedirectResponse(f"/admin/studio/proposals/{proposal_id}", status_code=303)
 
 
@@ -208,16 +315,23 @@ async def convert_proposal(proposal_id: int):
     body snapshot with the accepted total merged in (same logic as create_contract)."""
     d = get_proposal(proposal_id)
     if d["status"] != "accepted":
-        raise HTTPException(status_code=400,
-                            detail="only an accepted proposal can be converted")
+        raise HTTPException(status_code=400, detail="only an accepted proposal can be converted")
     p = get_project(d["project_id"])
-    cid = db.run("INSERT INTO contracts (project_id, slug, title, body) VALUES (?,?,?,?)",
-                 (p["id"], security.new_slug(),
-                  f"Services Agreement — {p['title']}", render_template(p)))
-    iid = db.run("""INSERT INTO invoices (project_id, slug, title, line_items, total_cents)
+    cid = db.run(
+        "INSERT INTO contracts (project_id, slug, title, body) VALUES (?,?,?,?)",
+        (p["id"], security.new_slug(), f"Services Agreement — {p['title']}", render_template(p)),
+    )
+    iid = db.run(
+        """INSERT INTO invoices (project_id, slug, title, line_items, total_cents)
                     VALUES (?,?,?,?,?)""",
-                 (p["id"], security.new_slug(), f"Invoice — {p['title']}",
-                  d["line_items"], d["total_cents"]))
+        (
+            p["id"],
+            security.new_slug(),
+            f"Invoice — {p['title']}",
+            d["line_items"],
+            d["total_cents"],
+        ),
+    )
     log.info("proposal %s converted → contract %s + invoice %s", proposal_id, cid, iid)
     return RedirectResponse(f"/admin/studio/projects/{p['id']}", status_code=303)
 
@@ -229,10 +343,18 @@ async def duplicate_proposal(proposal_id: int):
     into a new proposal with its own slug; the original is untouched. Useful when
     a client declines and wants changes, or to reuse a package for someone new."""
     d = get_proposal(proposal_id)
-    did = db.run("""INSERT INTO proposals (project_id, slug, title, intro, line_items,
+    did = db.run(
+        """INSERT INTO proposals (project_id, slug, title, intro, line_items,
                     total_cents) VALUES (?,?,?,?,?,?)""",
-                 (d["project_id"], security.new_slug(), d["title"], d["intro"],
-                  d["line_items"], d["total_cents"]))
+        (
+            d["project_id"],
+            security.new_slug(),
+            d["title"],
+            d["intro"],
+            d["line_items"],
+            d["total_cents"],
+        ),
+    )
     log.info("proposal %s duplicated → %s (new draft)", proposal_id, did)
     return RedirectResponse(f"/admin/studio/proposals/{did}", status_code=303)
 
@@ -242,11 +364,12 @@ async def mark_proposal_sent(proposal_id: int):
     d = get_proposal(proposal_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="already sent")
-    db.run("UPDATE proposals SET status='sent', sent_at=datetime('now') WHERE id=?",
-           (proposal_id,))
-    db.run("UPDATE projects SET status='proposal_sent', "
-           "stage_changed_at=datetime('now') WHERE id=? "
-           "AND status IN ('inquiry_received','consultation_call')",
-           (d["project_id"],))
+    db.run("UPDATE proposals SET status='sent', sent_at=datetime('now') WHERE id=?", (proposal_id,))
+    db.run(
+        "UPDATE projects SET status='proposal_sent', "
+        "stage_changed_at=datetime('now') WHERE id=? "
+        "AND status IN ('inquiry_received','consultation_call')",
+        (d["project_id"],),
+    )
     log.info("proposal %s marked sent", proposal_id)
     return RedirectResponse(f"/admin/studio/proposals/{proposal_id}", status_code=303)

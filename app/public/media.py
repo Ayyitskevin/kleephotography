@@ -21,8 +21,9 @@ def _resolve(slug: str, variant: str, asset_id: int, request: Request):
     if is_expired(g):
         raise HTTPException(status_code=410)
     security.require_visitor(request, g["id"])
-    a = db.one("SELECT * FROM assets WHERE id=? AND gallery_id=? AND status='ready'",
-               (asset_id, g["id"]))
+    a = db.one(
+        "SELECT * FROM assets WHERE id=? AND gallery_id=? AND status='ready'", (asset_id, g["id"])
+    )
     if not a:
         raise HTTPException(status_code=404)
     base = config.MEDIA_DIR / str(g["id"])
@@ -44,21 +45,24 @@ def _resolve(slug: str, variant: str, asset_id: int, request: Request):
 async def poster(request: Request, slug: str, asset_id: int):
     g = get_live_gallery(slug)
     security.require_visitor(request, g["id"])
-    a = db.one("SELECT * FROM assets WHERE id=? AND gallery_id=? AND kind='video'",
-               (asset_id, g["id"]))
+    a = db.one(
+        "SELECT * FROM assets WHERE id=? AND gallery_id=? AND kind='video'", (asset_id, g["id"])
+    )
     if not a:
         raise HTTPException(status_code=404)
     stem = Path(a["stored"]).stem
     path = config.MEDIA_DIR / str(g["id"]) / "web" / f"{stem}_poster.jpg"
     if not path.is_file():
         raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="image/jpeg",
-                        headers={"Cache-Control": "private, max-age=86400"})
+    return FileResponse(
+        path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"}
+    )
 
 
 @router.get("/{slug}/{variant}/{asset_id}")
 async def serve(request: Request, slug: str, variant: str, asset_id: int):
     a, path = _resolve(slug, variant, asset_id, request)
     media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
-    return FileResponse(path, media_type=media_type,
-                        headers={"Cache-Control": "private, max-age=86400"})
+    return FileResponse(
+        path, media_type=media_type, headers={"Cache-Control": "private, max-age=86400"}
+    )

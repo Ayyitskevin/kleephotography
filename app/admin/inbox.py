@@ -19,27 +19,32 @@ from .. import config, db, mailer, security, sms
 from ..render import templates
 
 log = logging.getLogger("mise.admin.inbox")
-router = APIRouter(prefix="/admin/inbox",
-                   dependencies=[Depends(security.require_admin)])
+router = APIRouter(prefix="/admin/inbox", dependencies=[Depends(security.require_admin)])
 
 _TABS = ["all", "bookings", "archived"]
 
 # tab → (WHERE, ORDER BY). Fixed SQL fragments keyed by an allowlisted tab; the
 # dict lookup IS the gate — an unknown tab can't reach the query (falls to "all").
 _INBOX_FILTERS = {
-    "all": ("converted_at IS NULL AND dismissed_at IS NULL",
-            "ORDER BY created_at DESC"),
-    "bookings": ("converted_at IS NULL AND dismissed_at IS NULL AND kind='booking'",
-                 "ORDER BY created_at DESC"),
-    "archived": ("converted_at IS NOT NULL OR dismissed_at IS NOT NULL",
-                 "ORDER BY COALESCE(dismissed_at, converted_at) DESC"),
+    "all": ("converted_at IS NULL AND dismissed_at IS NULL", "ORDER BY created_at DESC"),
+    "bookings": (
+        "converted_at IS NULL AND dismissed_at IS NULL AND kind='booking'",
+        "ORDER BY created_at DESC",
+    ),
+    "archived": (
+        "converted_at IS NOT NULL OR dismissed_at IS NOT NULL",
+        "ORDER BY COALESCE(dismissed_at, converted_at) DESC",
+    ),
 }
 
 # Deterministic avatar tints by inquiry id — same forest/clay/teal family the
 # prototype hand-picked, cycled so each thread reads as a distinct contact.
 _AVATARS = [
-    ("#7C2F38", "#F3F0E2"), ("#2f6d8a", "#FFFFFF"),
-    ("#2f7d57", "#FFFFFF"), ("#9a7a2c", "#FFFFFF"), ("#143C2F", "#F3F0E2"),
+    ("#7C2F38", "#F3F0E2"),
+    ("#2f6d8a", "#FFFFFF"),
+    ("#2f7d57", "#FFFFFF"),
+    ("#9a7a2c", "#FFFFFF"),
+    ("#143C2F", "#F3F0E2"),
 ]
 
 
@@ -77,10 +82,13 @@ def _thread_row(inq, active_id):
     av = _AVATARS[inq["id"] % len(_AVATARS)]
     msg = (inq["message"] or "").strip().replace("\n", " ")
     return {
-        "id": inq["id"], "name": inq["business"] or inq["name"] or "Unknown",
+        "id": inq["id"],
+        "name": inq["business"] or inq["name"] or "Unknown",
         "initials": _initials(inq["business"] or inq["name"]),
-        "av_bg": av[0], "av_color": av[1],
-        "time": inq["created_at"], "preview": msg or "(no message)",
+        "av_bg": av[0],
+        "av_color": av[1],
+        "time": inq["created_at"],
+        "preview": msg or "(no message)",
         "active": inq["id"] == active_id,
         "unread": not inq["emailed"] and not inq["converted_at"] and not inq["dismissed_at"],
         **_channel(inq),
@@ -100,9 +108,14 @@ def _detail_rows(inq) -> list[dict]:
         rows.append({"k": "Phone", "v": inq["phone"]})
     if inq["business"]:
         rows.append({"k": "Business", "v": inq["business"]})
-    rows.append({"k": "Source", "v": {"booking": "Booking form", "sms": "Text message",
-                                      "call": "Phone call"}
-                 .get(inq["kind"], "Inquiry form")})
+    rows.append(
+        {
+            "k": "Source",
+            "v": {"booking": "Booking form", "sms": "Text message", "call": "Phone call"}.get(
+                inq["kind"], "Inquiry form"
+            ),
+        }
+    )
     if inq["service"]:
         rows.append({"k": "Interested in", "v": inq["service"]})
     if inq["shoot_date"]:
@@ -114,14 +127,29 @@ def _thread(inq) -> list[dict]:
     """Chronological conversation bubbles. The `messages` table is the source of
     truth; an inquiry with no rows yet (every legacy web-form lead) synthesizes a
     single inbound bubble from its first message so it still reads as a thread."""
-    rows = db.all_("""SELECT direction, channel, body, created_at FROM messages
-                      WHERE inquiry_id=? ORDER BY created_at, id""", (inq["id"],))
+    rows = db.all_(
+        """SELECT direction, channel, body, created_at FROM messages
+                      WHERE inquiry_id=? ORDER BY created_at, id""",
+        (inq["id"],),
+    )
     if rows:
-        return [{"mine": r["direction"] == "out", "channel": r["channel"],
-                 "body": r["body"], "time": r["created_at"]} for r in rows]
-    return [{"mine": False,
-             "channel": inq["kind"] if inq["kind"] in ("sms", "call") else "email",
-             "body": inq["message"], "time": inq["created_at"]}]
+        return [
+            {
+                "mine": r["direction"] == "out",
+                "channel": r["channel"],
+                "body": r["body"],
+                "time": r["created_at"],
+            }
+            for r in rows
+        ]
+    return [
+        {
+            "mine": False,
+            "channel": inq["kind"] if inq["kind"] in ("sms", "call") else "email",
+            "body": inq["message"],
+            "time": inq["created_at"],
+        }
+    ]
 
 
 def _active_ctx(inq) -> dict:
@@ -133,14 +161,22 @@ def _active_ctx(inq) -> dict:
     # convert paths, which spawn no proposal.
     proposal_id = None
     if inq["converted_project_id"]:
-        row = db.one("SELECT id FROM proposals WHERE project_id=? ORDER BY id DESC LIMIT 1",
-                     (inq["converted_project_id"],))
+        row = db.one(
+            "SELECT id FROM proposals WHERE project_id=? ORDER BY id DESC LIMIT 1",
+            (inq["converted_project_id"],),
+        )
         proposal_id = row["id"] if row else None
     return {
-        "id": inq["id"], "name": inq["business"] or inq["name"] or "Unknown",
-        "contact_name": inq["name"], "initials": _initials(inq["business"] or inq["name"]),
-        "av_bg": av[0], "av_color": av[1], "email": inq["email"], "phone": inq["phone"],
-        "message": inq["message"], "created_at": inq["created_at"],
+        "id": inq["id"],
+        "name": inq["business"] or inq["name"] or "Unknown",
+        "contact_name": inq["name"],
+        "initials": _initials(inq["business"] or inq["name"]),
+        "av_bg": av[0],
+        "av_color": av[1],
+        "email": inq["email"],
+        "phone": inq["phone"],
+        "message": inq["message"],
+        "created_at": inq["created_at"],
         "messages": _thread(inq),
         "converted_proposal_id": proposal_id,
         "converted_project_id": inq["converted_project_id"],
@@ -151,14 +187,16 @@ def _active_ctx(inq) -> dict:
         "reply_subject": _reply_subject(inq),
         # Composer defaults to whichever channel the lead arrived on, and only
         # offers a channel the contact can actually receive on.
-        "default_channel": "sms" if (inq["phone"] and (phone_first or not inq["email"]))
-                           else "email",
+        "default_channel": "sms"
+        if (inq["phone"] and (phone_first or not inq["email"]))
+        else "email",
         "can_email": bool(inq["email"]),
         "can_sms": bool(inq["phone"]),
         "sub": (inq["email"] or inq["phone"] or "")
-               + (" · booking request" if inq["kind"] == "booking" else ""),
+        + (" · booking request" if inq["kind"] == "booking" else ""),
         "details": _detail_rows(inq),
-        **_channel(inq), **_stage(inq),
+        **_channel(inq),
+        **_stage(inq),
     }
 
 
@@ -170,12 +208,17 @@ async def inbox(request: Request, tab: str = "all", sel: int | None = None):
     rows = db.all_(f"SELECT * FROM inquiries WHERE {where} {order} LIMIT 100")
 
     counts = {
-        "all": db.one("SELECT COUNT(*) n FROM inquiries "
-                      "WHERE converted_at IS NULL AND dismissed_at IS NULL")["n"],
-        "bookings": db.one("SELECT COUNT(*) n FROM inquiries WHERE converted_at IS NULL "
-                           "AND dismissed_at IS NULL AND kind='booking'")["n"],
-        "archived": db.one("SELECT COUNT(*) n FROM inquiries "
-                           "WHERE converted_at IS NOT NULL OR dismissed_at IS NOT NULL")["n"],
+        "all": db.one(
+            "SELECT COUNT(*) n FROM inquiries WHERE converted_at IS NULL AND dismissed_at IS NULL"
+        )["n"],
+        "bookings": db.one(
+            "SELECT COUNT(*) n FROM inquiries WHERE converted_at IS NULL "
+            "AND dismissed_at IS NULL AND kind='booking'"
+        )["n"],
+        "archived": db.one(
+            "SELECT COUNT(*) n FROM inquiries "
+            "WHERE converted_at IS NOT NULL OR dismissed_at IS NOT NULL"
+        )["n"],
     }
 
     active = None
@@ -183,18 +226,28 @@ async def inbox(request: Request, tab: str = "all", sel: int | None = None):
         chosen = next((r for r in rows if r["id"] == sel), rows[0])
         active = _active_ctx(chosen)
 
-    return templates.TemplateResponse(request, "admin/inbox.html", {
-        "tab": tab, "counts": counts,
-        "threads": [_thread_row(r, active["id"] if active else None) for r in rows],
-        "active": active,
-        "mail_configured": mailer.configured(),
-        "sms_configured": sms.configured(),
-    })
+    return templates.TemplateResponse(
+        request,
+        "admin/inbox.html",
+        {
+            "tab": tab,
+            "counts": counts,
+            "threads": [_thread_row(r, active["id"] if active else None) for r in rows],
+            "active": active,
+            "mail_configured": mailer.configured(),
+            "sms_configured": sms.configured(),
+        },
+    )
 
 
 @router.post("/{inquiry_id}/reply")
-async def reply(inquiry_id: int, tab: str = Form("all"), channel: str = Form("email"),
-                subject: str = Form(""), message: str = Form(...)):
+async def reply(
+    inquiry_id: int,
+    tab: str = Form("all"),
+    channel: str = Form("email"),
+    subject: str = Form(""),
+    message: str = Form(...),
+):
     """Reply to an inquiry from inside Mise — manual send, logged as an outbound
     bubble. Email goes via Gmail SMTP (subject required, recorded in emails_log);
     text goes via the Quo adapter (subject ignored). Nothing auto-sends — Kevin
@@ -218,8 +271,11 @@ async def reply(inquiry_id: int, tab: str = Form("all"), channel: str = Form("em
         except sms.SmsError as e:
             log.warning("inbox sms reply failed for inquiry %s: %s", inquiry_id, e)
             raise HTTPException(status_code=502, detail=f"SMS send failed: {e}")
-        db.run("""INSERT INTO messages (inquiry_id, direction, channel, body, provider_msg_id)
-                  VALUES (?, 'out', 'sms', ?, ?)""", (inquiry_id, message, msg_id or None))
+        db.run(
+            """INSERT INTO messages (inquiry_id, direction, channel, body, provider_msg_id)
+                  VALUES (?, 'out', 'sms', ?, ?)""",
+            (inquiry_id, message, msg_id or None),
+        )
         log.info("inbox sms reply sent for inquiry %s", inquiry_id)
     else:
         if not inq["email"]:
@@ -234,11 +290,16 @@ async def reply(inquiry_id: int, tab: str = Form("all"), channel: str = Form("em
         except Exception:
             log.exception("inbox reply send failed for inquiry %s", inquiry_id)
             raise HTTPException(status_code=502, detail="SMTP send failed — check logs")
-        db.run("""INSERT INTO emails_log (project_id, doc_kind, doc_id, to_email, subject)
+        db.run(
+            """INSERT INTO emails_log (project_id, doc_kind, doc_id, to_email, subject)
                   VALUES (?, 'other', ?, ?, ?)""",
-               (inq["converted_project_id"], inquiry_id, inq["email"], subject))
-        db.run("""INSERT INTO messages (inquiry_id, direction, channel, body)
-                  VALUES (?, 'out', 'email', ?)""", (inquiry_id, message))
+            (inq["converted_project_id"], inquiry_id, inq["email"], subject),
+        )
+        db.run(
+            """INSERT INTO messages (inquiry_id, direction, channel, body)
+                  VALUES (?, 'out', 'email', ?)""",
+            (inquiry_id, message),
+        )
         db.run("UPDATE inquiries SET emailed=1 WHERE id=?", (inquiry_id,))
         log.info("inbox reply sent for inquiry %s", inquiry_id)
 

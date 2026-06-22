@@ -12,6 +12,7 @@ from PIL import Image, ImageCms, ImageFilter, ImageOps
 
 try:
     import pillow_heif
+
     pillow_heif.register_heif_opener()
 except ImportError:  # pragma: no cover
     pass
@@ -30,7 +31,7 @@ def _to_srgb(img: Image.Image) -> Image.Image:
         try:
             src = ImageCms.ImageCmsProfile(io.BytesIO(icc))
             img = ImageCms.profileToProfile(img, src, _SRGB, outputMode="RGB")
-        except Exception as e:
+        except (ImageCms.PyCMSError, Exception) as e:  # pragma: no cover
             log.warning("ICC convert failed (%s) — assuming sRGB", e)
             img = img.convert("RGB")
     elif img.mode != "RGB":
@@ -39,9 +40,15 @@ def _to_srgb(img: Image.Image) -> Image.Image:
 
 
 _ANCHORS = {  # 9-grid → (x, y) fractions of the *free* space after the logo + margin
-    "tl": (0.0, 0.0), "tc": (0.5, 0.0), "tr": (1.0, 0.0),
-    "ml": (0.0, 0.5), "c": (0.5, 0.5), "mr": (1.0, 0.5),
-    "bl": (0.0, 1.0), "bc": (0.5, 1.0), "br": (1.0, 1.0),
+    "tl": (0.0, 0.0),
+    "tc": (0.5, 0.0),
+    "tr": (1.0, 0.0),
+    "ml": (0.0, 0.5),
+    "c": (0.5, 0.5),
+    "mr": (1.0, 0.5),
+    "bl": (0.0, 1.0),
+    "bc": (0.5, 1.0),
+    "br": (1.0, 1.0),
 }
 
 
@@ -86,8 +93,9 @@ def _apply_overlay(crop: Image.Image, overlay: dict) -> Image.Image:
     return base.convert("RGB")
 
 
-def make_crops(src_path: str, out_dir, stem: str, quality: int,
-               presets, overlay: dict | None = None) -> list[str]:
+def make_crops(
+    src_path: str, out_dir, stem: str, quality: int, presets, overlay: dict | None = None
+) -> list[str]:
     """Center-crop the original to each preset. ONE generic render path: every
     preset row is rendered the same way — a new format is a new row, not new
     code. `presets` is a list of crop_presets rows (see app/presets.py); this
@@ -102,8 +110,12 @@ def make_crops(src_path: str, out_dir, stem: str, quality: int,
         im = ImageOps.exif_transpose(im)
         im = _to_srgb(im)
         for ps in presets:
-            crop = ImageOps.fit(im, (ps["width"], ps["height"]), Image.LANCZOS,
-                                centering=(ps["centering_x"], ps["centering_y"]))
+            crop = ImageOps.fit(
+                im,
+                (ps["width"], ps["height"]),
+                Image.LANCZOS,
+                centering=(ps["centering_x"], ps["centering_y"]),
+            )
             if ps["brand_overlay"] and overlay:
                 crop = _apply_overlay(crop, overlay)
             out = out_dir / f"{stem}_{ps['slug']}.jpg"
@@ -112,8 +124,9 @@ def make_crops(src_path: str, out_dir, stem: str, quality: int,
     return written
 
 
-def make_derivatives(src_path: str, web_path: str, thumb_path: str,
-                     web_max: int, thumb_max: int, quality: int) -> tuple[int, int]:
+def make_derivatives(
+    src_path: str, web_path: str, thumb_path: str, web_max: int, thumb_max: int, quality: int
+) -> tuple[int, int]:
     """Returns original (width, height) after orientation bake."""
     with Image.open(src_path) as im:
         im = ImageOps.exif_transpose(im)

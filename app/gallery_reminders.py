@@ -43,7 +43,8 @@ def _due_expiry(today: dt.date) -> list[tuple["db.sqlite3.Row", int]]:
            FROM galleries g JOIN clients c ON c.id = g.client_id
            WHERE g.type='gallery' AND g.published=1
              AND g.reminded_expiry=0 AND g.expires_at IS NOT NULL
-             AND c.email IS NOT NULL AND c.email <> ''""")
+             AND c.email IS NOT NULL AND c.email <> ''"""
+    )
     out = []
     for g in rows:
         try:
@@ -75,30 +76,43 @@ def _due_proofing(today: dt.date) -> list["db.sqlite3.Row"]:
                  AND (SELECT COUNT(DISTINCT f.asset_id) FROM favorites f
                       JOIN assets a ON a.id=f.asset_id
                       WHERE a.section_id=s.id) < s.proof_target)""",
-        (cutoff,))
+        (cutoff,),
+    )
 
 
 def _send_expiry(g, days: int) -> None:
     url = f"{config.BASE_URL}/g/{g['slug']}"
     when = _days_phrase(days)
-    body = (f"Hi {g['client_name']},\n\n"
-            f"A quick heads-up — your gallery \"{g['title']}\" comes down {when}. "
-            f"Make sure you've saved everything you'd like to keep before then:\n\n"
-            f"  {url}\n\n"
-            f"— {config.SITE_NAME}\n")
-    mailer.send(g["client_email"], f"Your gallery \"{g['title']}\" expires {when}",
-                body, reply_to=config.GMAIL_USER)
+    body = (
+        f"Hi {g['client_name']},\n\n"
+        f'A quick heads-up — your gallery "{g["title"]}" comes down {when}. '
+        f"Make sure you've saved everything you'd like to keep before then:\n\n"
+        f"  {url}\n\n"
+        f"— {config.SITE_NAME}\n"
+    )
+    mailer.send(
+        g["client_email"],
+        f'Your gallery "{g["title"]}" expires {when}',
+        body,
+        reply_to=config.GMAIL_USER,
+    )
 
 
 def _send_proofing(g) -> None:
     url = f"{config.BASE_URL}/g/{g['slug']}"
-    body = (f"Hi {g['client_name']},\n\n"
-            f"Just a nudge — your gallery \"{g['title']}\" is ready and a few sections "
-            f"still need your picks. Tap the heart on the ones you'd like, here:\n\n"
-            f"  {url}\n\n"
-            f"— {config.SITE_NAME}\n")
-    mailer.send(g["client_email"], f"A reminder to pick your favorites — \"{g['title']}\"",
-                body, reply_to=config.GMAIL_USER)
+    body = (
+        f"Hi {g['client_name']},\n\n"
+        f'Just a nudge — your gallery "{g["title"]}" is ready and a few sections '
+        f"still need your picks. Tap the heart on the ones you'd like, here:\n\n"
+        f"  {url}\n\n"
+        f"— {config.SITE_NAME}\n"
+    )
+    mailer.send(
+        g["client_email"],
+        f'A reminder to pick your favorites — "{g["title"]}"',
+        body,
+        reply_to=config.GMAIL_USER,
+    )
 
 
 def sweep() -> None:

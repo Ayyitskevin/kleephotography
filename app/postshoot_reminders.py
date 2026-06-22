@@ -22,7 +22,7 @@ from . import config, db, hermes_arm
 
 log = logging.getLogger("mise.postshoot")
 
-_UTC = dt.timezone.utc
+_UTC = dt.UTC
 # Only shoots that ended within this window are eligible. Wide enough to survive a
 # few missed sweeps / a short restart, narrow enough that the back-filled flag
 # default never reaches back into old bookings on first deploy.
@@ -32,11 +32,14 @@ _LOOKBACK_HOURS = 12
 def _due(now: dt.datetime):
     floor = (now - dt.timedelta(hours=_LOOKBACK_HOURS)).strftime("%Y-%m-%d %H:%M:%S")
     now_s = now.strftime("%Y-%m-%d %H:%M:%S")
-    return db.all_("""SELECT b.id, b.name, e.name AS event_name
+    return db.all_(
+        """SELECT b.id, b.name, e.name AS event_name
                       FROM bookings b JOIN event_types e ON e.id=b.event_type_id
                       WHERE b.status='confirmed' AND b.armed_postshoot=0
                         AND b.end_utc <= ? AND b.end_utc > ?
-                      ORDER BY b.end_utc ASC""", (now_s, floor))
+                      ORDER BY b.end_utc ASC""",
+        (now_s, floor),
+    )
 
 
 def sweep() -> None:
@@ -49,9 +52,12 @@ def sweep() -> None:
     for b in _due(now):
         ok = hermes_arm.arm(
             key=f"postshoot:{b['id']}",
-            text=(f"Shoot wrapped for {b['name']} ({b['event_name']}) — pull, cull, "
-                  f"and back up the cards before anything else lands on them."),
-            when=hermes_arm.at_9am(config.POSTSHOOT_CULL_DAYS))
+            text=(
+                f"Shoot wrapped for {b['name']} ({b['event_name']}) — pull, cull, "
+                f"and back up the cards before anything else lands on them."
+            ),
+            when=hermes_arm.at_9am(config.POSTSHOOT_CULL_DAYS),
+        )
         if ok:
             db.run("UPDATE bookings SET armed_postshoot=1 WHERE id=?", (b["id"],))
             log.info("booking %s post-shoot reminder armed", b["id"])

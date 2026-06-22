@@ -35,19 +35,33 @@ STATUSES = ["draft", "active", "expired", "renewed", "terminated"]
 TERRITORIES = ["worldwide", "US", "north_america", "EU", "UK", "local_metro"]
 
 # Columns the diff/audit machinery tracks. Order = form/display order.
-_FIELDS = ["title", "scope", "coverage_scope", "usage_tier", "exclusivity",
-           "territory", "channels", "published", "fee_cents", "starts_on",
-           "ends_on", "perpetual", "notes", "project_id", "gallery_id"]
+_FIELDS = [
+    "title",
+    "scope",
+    "coverage_scope",
+    "usage_tier",
+    "exclusivity",
+    "territory",
+    "channels",
+    "published",
+    "fee_cents",
+    "starts_on",
+    "ends_on",
+    "perpetual",
+    "notes",
+    "project_id",
+    "gallery_id",
+]
 
 
 def get_license(license_id: int) -> "db.sqlite3.Row":
-    d = db.one("""SELECT l.*, c.name AS holder_name, c.company AS holder_company,
+    return db.get_or_404(
+        """SELECT l.*, c.name AS holder_name, c.company AS holder_company,
                   CAST(julianday(l.ends_on) - julianday(date('now', 'localtime')) AS INTEGER) AS days_left
                   FROM licenses l JOIN clients c ON c.id=l.holder_client_id
-                  WHERE l.id=? AND l.deleted_at IS NULL""", (license_id,))
-    if not d:
-        raise HTTPException(status_code=404)
-    return d
+                  WHERE l.id=? AND l.deleted_at IS NULL""",
+        (license_id,),
+    )
 
 
 def expiry_cue(row) -> dict | None:
@@ -76,9 +90,13 @@ def effective_coverage(row) -> list[int]:
     if row["coverage_scope"] == "holder_and_descendants":
         return [holder] + clients.descendant_ids(holder)
     if row["coverage_scope"] == "specific":
-        extra = [r["client_id"] for r in db.all_(
-            "SELECT client_id FROM license_clients WHERE license_id=? ORDER BY client_id",
-            (row["id"],))]
+        extra = [
+            r["client_id"]
+            for r in db.all_(
+                "SELECT client_id FROM license_clients WHERE license_id=? ORDER BY client_id",
+                (row["id"],),
+            )
+        ]
         return [holder] + [c for c in extra if c != holder]
     return [holder]
 
@@ -103,7 +121,9 @@ def licenses_covering(client_id: int) -> list[dict]:
             "  FROM licenses l JOIN clients h ON h.id=l.holder_client_id"
             " WHERE l.coverage_scope='holder_and_descendants'"
             f"   AND l.holder_client_id IN ({ph}) AND l.deleted_at IS NULL"
-            " ORDER BY l.status, l.title", tuple(ancestors))
+            " ORDER BY l.status, l.title",
+            tuple(ancestors),
+        )
         out += [{**{k: r[k] for k in r.keys()}, "rel": "group"} for r in rows]
     rows = db.all_(
         "SELECT l.id, l.title, l.usage_tier, l.exclusivity, l.status, l.published,"
@@ -112,7 +132,9 @@ def licenses_covering(client_id: int) -> list[dict]:
         "       JOIN clients h ON h.id=l.holder_client_id"
         " WHERE lc.client_id=? AND l.coverage_scope='specific'"
         "   AND l.holder_client_id<>? AND l.deleted_at IS NULL"
-        " ORDER BY l.status, l.title", (client_id, client_id))
+        " ORDER BY l.status, l.title",
+        (client_id, client_id),
+    )
     out += [{**{k: r[k] for k in r.keys()}, "rel": "specific"} for r in rows]
     return out
 
@@ -120,6 +142,7 @@ def licenses_covering(client_id: int) -> list[dict]:
 def _parse_form(form) -> dict:
     """Pull license fields out of a submitted form into a normalized dict.
     Multi-value territory/channels arrive as repeated checkboxes → JSON arrays."""
+
     def cents(key: str) -> int:
         try:
             return round(float(form.get(key) or "0") * 100)
@@ -169,10 +192,16 @@ async def create_license(client_id: int, title: str = Form(...)):
     with db.tx() as con:
         cur = con.execute(
             "INSERT INTO licenses (holder_client_id, title) VALUES (?,?)",
-            (client_id, title.strip()))
+            (client_id, title.strip()),
+        )
         lid = cur.lastrowid
-        audit.log(con, "license", lid, "create",
-                  diff={"holder_client_id": client_id, "title": title.strip()})
+        audit.log(
+            con,
+            "license",
+            lid,
+            "create",
+            diff={"holder_client_id": client_id, "title": title.strip()},
+        )
     log.info("license %s created (holder client %s)", lid, client_id)
     return RedirectResponse(f"/admin/studio/licenses/{lid}", status_code=303)
 
@@ -189,12 +218,14 @@ async def licenses_list(request: Request):
            WHERE l.deleted_at IS NULL
            ORDER BY CASE l.status WHEN 'active' THEN 0 WHEN 'draft' THEN 1
                                   WHEN 'renewed' THEN 2 ELSE 3 END,
-                    l.ends_on IS NULL, l.ends_on""")
+                    l.ends_on IS NULL, l.ends_on"""
+    )
     # Expiring/expired surfacing via the shared cue: active, dated, not perpetual,
     # within the threshold (or already past). Silent when empty.
     expiring = [r for r in rows if expiry_cue(r)]
-    return templates.TemplateResponse(request, "admin/licenses.html",
-                                      {"licenses": rows, "expiring": expiring})
+    return templates.TemplateResponse(
+        request, "admin/licenses.html", {"licenses": rows, "expiring": expiring}
+    )
 
 
 @router.get("/licenses/{license_id}", response_class=HTMLResponse)
@@ -203,12 +234,15 @@ async def license_detail(request: Request, license_id: int):
     # effective_coverage from this module at load time, so this module can't
     # import press at the top. By request time both are fully loaded.
     from .press import press_for_license
+
     d = get_license(license_id)
     covered = db.all_(
         """SELECT c.id, c.name, c.company FROM license_clients lc
            JOIN clients c ON c.id=lc.client_id WHERE lc.license_id=?
-           ORDER BY c.name""", (license_id,))
-    all_clients = db.all_("SELECT id, name, company FROM clients ORDER BY name")
+           ORDER BY c.name""",
+        (license_id,),
+    )
+    all_clients = db.clients_for_select()
     # Effective coverage resolved through the Domain A tree (holder first), so a
     # holder_and_descendants grant's real reach is visible, not just the
     # 'specific' license_clients list.
@@ -216,33 +250,50 @@ async def license_detail(request: Request, license_id: int):
     coverage = [_by_id[i] for i in effective_coverage(d) if i in _by_id]
     projects = db.all_(
         """SELECT id, title FROM projects WHERE client_id=? ORDER BY created_at DESC""",
-        (d["holder_client_id"],))
+        (d["holder_client_id"],),
+    )
     galleries = db.all_(
         """SELECT id, title FROM galleries WHERE client_id=? ORDER BY created_at DESC""",
-        (d["holder_client_id"],))
+        (d["holder_client_id"],),
+    )
     trail = db.all_(
         """SELECT action, actor, diff_json, created_at FROM audit_log
            WHERE entity_type='license' AND entity_id=?
-           ORDER BY id DESC LIMIT 50""", (license_id,))
+           ORDER BY id DESC LIMIT 50""",
+        (license_id,),
+    )
     # Price the suggestion in the holder client's home market (Domain B). The
     # multipliers are market-independent; only the base rate card changes.
     holder = db.one("SELECT market FROM clients WHERE id=?", (d["holder_client_id"],))
     return templates.TemplateResponse(
-        request, "admin/license.html",
-        {"d": d, "cue": expiry_cue(d),
-         "press": press_for_license(d),
-         "covered": covered, "covered_ids": {c["id"] for c in covered},
-         "coverage": coverage,
-         "suggested": pricing.suggest_license_fee(d, market=holder["market"]),
-         "all_clients": all_clients, "projects": projects, "galleries": galleries,
-         "trail": [{**dict(t), "diff": json.loads(t["diff_json"]) if t["diff_json"] else None}
-                   for t in trail],
-         "usage_tiers": USAGE_TIERS, "exclusivity_opts": EXCLUSIVITY,
-         "coverage_scopes": COVERAGE_SCOPES, "statuses": STATUSES,
-         "channels_vocab": CHANNELS, "territories_vocab": TERRITORIES,
-         "sel_territory": set(json.loads(d["territory"] or "[]")),
-         "sel_channels": set(json.loads(d["channels"] or "[]")),
-         "base_url": config.BASE_URL})
+        request,
+        "admin/license.html",
+        {
+            "d": d,
+            "cue": expiry_cue(d),
+            "press": press_for_license(d),
+            "covered": covered,
+            "covered_ids": {c["id"] for c in covered},
+            "coverage": coverage,
+            "suggested": pricing.suggest_license_fee(d, market=holder["market"]),
+            "all_clients": all_clients,
+            "projects": projects,
+            "galleries": galleries,
+            "trail": [
+                {**dict(t), "diff": json.loads(t["diff_json"]) if t["diff_json"] else None}
+                for t in trail
+            ],
+            "usage_tiers": USAGE_TIERS,
+            "exclusivity_opts": EXCLUSIVITY,
+            "coverage_scopes": COVERAGE_SCOPES,
+            "statuses": STATUSES,
+            "channels_vocab": CHANNELS,
+            "territories_vocab": TERRITORIES,
+            "sel_territory": set(json.loads(d["territory"] or "[]")),
+            "sel_channels": set(json.loads(d["channels"] or "[]")),
+            "base_url": config.BASE_URL,
+        },
+    )
 
 
 @router.post("/licenses/{license_id}")
@@ -254,10 +305,15 @@ async def update_license(request: Request, license_id: int):
         raise HTTPException(status_code=400, detail="title required")
     diff = {f: [d[f], new[f]] for f in _FIELDS if (d[f] or None) != (new[f] or None)}
     # Covered clients only meaningful for 'specific'; otherwise we clear the set.
-    want_cover = ({int(x) for x in form.getlist("cover_client_ids") if x.isdigit()}
-                  if new["coverage_scope"] == "specific" else set())
-    have_cover = {r["client_id"] for r in db.all_(
-        "SELECT client_id FROM license_clients WHERE license_id=?", (license_id,))}
+    want_cover = (
+        {int(x) for x in form.getlist("cover_client_ids") if x.isdigit()}
+        if new["coverage_scope"] == "specific"
+        else set()
+    )
+    have_cover = {
+        r["client_id"]
+        for r in db.all_("SELECT client_id FROM license_clients WHERE license_id=?", (license_id,))
+    }
     if not diff and want_cover == have_cover:
         return RedirectResponse(f"/admin/studio/licenses/{license_id}", status_code=303)
     with db.tx() as con:
@@ -266,16 +322,32 @@ async def update_license(request: Request, license_id: int):
                exclusivity=?, territory=?, channels=?, published=?, fee_cents=?,
                starts_on=?, ends_on=?, perpetual=?, notes=?, project_id=?, gallery_id=?,
                updated_at=datetime('now') WHERE id=?""",
-            (new["title"], new["scope"], new["coverage_scope"], new["usage_tier"],
-             new["exclusivity"], new["territory"], new["channels"], new["published"],
-             new["fee_cents"], new["starts_on"], new["ends_on"], new["perpetual"],
-             new["notes"], new["project_id"], new["gallery_id"], license_id))
+            (
+                new["title"],
+                new["scope"],
+                new["coverage_scope"],
+                new["usage_tier"],
+                new["exclusivity"],
+                new["territory"],
+                new["channels"],
+                new["published"],
+                new["fee_cents"],
+                new["starts_on"],
+                new["ends_on"],
+                new["perpetual"],
+                new["notes"],
+                new["project_id"],
+                new["gallery_id"],
+                license_id,
+            ),
+        )
         if want_cover != have_cover:
             con.execute("DELETE FROM license_clients WHERE license_id=?", (license_id,))
             for cid in want_cover:
                 con.execute(
                     "INSERT INTO license_clients (license_id, client_id) VALUES (?,?)",
-                    (license_id, cid))
+                    (license_id, cid),
+                )
             diff["covered_clients"] = [sorted(have_cover), sorted(want_cover)]
         audit.log(con, "license", license_id, "update", diff=diff)
     log.info("license %s updated (%d fields)", license_id, len(diff))
@@ -290,10 +362,13 @@ async def change_status(license_id: int, status: str = Form(...)):
     if status == d["status"]:
         return RedirectResponse(f"/admin/studio/licenses/{license_id}", status_code=303)
     with db.tx() as con:
-        con.execute("UPDATE licenses SET status=?, updated_at=datetime('now') WHERE id=?",
-                    (status, license_id))
-        audit.log(con, "license", license_id, "status_change",
-                  diff={"status": [d["status"], status]})
+        con.execute(
+            "UPDATE licenses SET status=?, updated_at=datetime('now') WHERE id=?",
+            (status, license_id),
+        )
+        audit.log(
+            con, "license", license_id, "status_change", diff={"status": [d["status"], status]}
+        )
     log.info("license %s status %s -> %s", license_id, d["status"], status)
     return RedirectResponse(f"/admin/studio/licenses/{license_id}", status_code=303)
 
@@ -302,10 +377,13 @@ async def change_status(license_id: int, status: str = Form(...)):
 async def delete_license(license_id: int):
     d = get_license(license_id)
     with db.tx() as con:
-        con.execute("UPDATE licenses SET deleted_at=datetime('now') WHERE id=?",
-                    (license_id,))
-        audit.log(con, "license", license_id, "soft_delete",
-                  diff={"title": d["title"], "holder_client_id": d["holder_client_id"]})
+        con.execute("UPDATE licenses SET deleted_at=datetime('now') WHERE id=?", (license_id,))
+        audit.log(
+            con,
+            "license",
+            license_id,
+            "soft_delete",
+            diff={"title": d["title"], "holder_client_id": d["holder_client_id"]},
+        )
     log.info("license %s soft-deleted", license_id)
-    return RedirectResponse(f"/admin/studio/clients/{d['holder_client_id']}",
-                            status_code=303)
+    return RedirectResponse(f"/admin/studio/clients/{d['holder_client_id']}", status_code=303)

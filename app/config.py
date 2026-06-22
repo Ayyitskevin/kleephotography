@@ -26,8 +26,10 @@ def _load_env_file(path: str) -> None:
 
 _load_env_file(_ENV_FILE)
 
+
 def _b(name: str, default: str = "false") -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
+
 
 HOST = os.environ.get("MISE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("MISE_PORT", "8400"))
@@ -41,7 +43,7 @@ TMP_DIR = DATA_DIR / "tmp"
 BRAND_DIR = DATA_DIR / "brand"
 RECEIPTS_DIR = DATA_DIR / "receipts"  # uploaded expense-receipt scans (photo/PDF)
 
-SECRET_KEY = os.environ.get("MISE_SECRET_KEY", "")        # required in prod
+SECRET_KEY = os.environ.get("MISE_SECRET_KEY", "")  # required in prod
 ADMIN_PASSWORD = os.environ.get("MISE_ADMIN_PASSWORD", "")  # required in prod
 
 SITE_NAME = os.environ.get("MISE_SITE_NAME", "Kevin Lee Photography")
@@ -86,7 +88,8 @@ NOTION_SESSIONS_DB = os.environ.get("MISE_NOTION_SESSIONS_DB", "")
 GOOGLE_CLIENT_ID = os.environ.get("MISE_GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("MISE_GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.environ.get(
-    "MISE_GOOGLE_REDIRECT_URI", f"{BASE_URL}/admin/scheduling/google/callback")
+    "MISE_GOOGLE_REDIRECT_URI", f"{BASE_URL}/admin/scheduling/google/callback"
+)
 GOOGLE_CALENDAR_ID = os.environ.get("MISE_GOOGLE_CALENDAR_ID", "primary")
 
 # Odysseus caption-drafting endpoint (Domain G slices 6b/6c). BOTH url+token must be

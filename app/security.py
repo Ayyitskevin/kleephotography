@@ -8,7 +8,7 @@ import time
 from fastapi import HTTPException, Request
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from . import alerts, config, db
+from . import alerts, config, db, features
 
 log = logging.getLogger("mise.security")
 
@@ -50,28 +50,36 @@ def client_ip(request: Request) -> str:
 
 # ── PIN lockout ────────────────────────────────────────────────────────────
 
+
 def pin_locked(ip: str, gallery_id: int) -> bool:
     cutoff = time.time() - config.PIN_LOCKOUT_MIN * 60
-    row = db.one("SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
-                 (ip, gallery_id, cutoff))
+    row = db.one(
+        "SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
+        (ip, gallery_id, cutoff),
+    )
     return row["n"] >= config.PIN_MAX_FAILS
 
 
 def pin_fail(ip: str, gallery_id: int) -> None:
-    db.run("INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
-           (ip, gallery_id, time.time()))
+    db.run(
+        "INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
+        (ip, gallery_id, time.time()),
+    )
     db.run("DELETE FROM pin_attempts WHERE ts < ?", (time.time() - 86400,))
     log.warning("bad PIN for gallery %s from %s", gallery_id, ip)
     # Anomaly-only alert: fire the instant the lockout threshold is crossed (not on
     # every typo, not on Kevin's normal login). gallery_id 0 = admin login bucket.
     cutoff = time.time() - config.PIN_LOCKOUT_MIN * 60
-    n = db.one("SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
-               (ip, gallery_id, cutoff))["n"]
+    n = db.one(
+        "SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
+        (ip, gallery_id, cutoff),
+    )["n"]
     if n == config.PIN_MAX_FAILS:
         what = "admin login" if gallery_id == 0 else f"gallery {gallery_id}"
         alerts.security_alert(
             f"{config.PIN_MAX_FAILS} failed {what} attempts from {ip} — "
-            f"locked out {config.PIN_LOCKOUT_MIN}m")
+            f"locked out {config.PIN_LOCKOUT_MIN}m"
+        )
 
 
 def pin_clear(ip: str, gallery_id: int) -> None:
@@ -92,19 +100,22 @@ INQUIRY_MAX_PER_WINDOW = 3
 
 def inquiry_throttled(ip: str, bucket: int) -> bool:
     cutoff = time.time() - INQUIRY_WINDOW_SEC
-    row = db.one("SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
-                 (ip, bucket, cutoff))
+    row = db.one(
+        "SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
+        (ip, bucket, cutoff),
+    )
     return row["n"] >= INQUIRY_MAX_PER_WINDOW
 
 
 def inquiry_record(ip: str, bucket: int) -> None:
-    db.run("INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
-           (ip, bucket, time.time()))
-    db.run("DELETE FROM pin_attempts WHERE ts < ?",
-           (time.time() - max(86400, INQUIRY_WINDOW_SEC),))
+    db.run(
+        "INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)", (ip, bucket, time.time())
+    )
+    db.run("DELETE FROM pin_attempts WHERE ts < ?", (time.time() - max(86400, INQUIRY_WINDOW_SEC),))
 
 
 # ── Visitor cookies (per gallery) ──────────────────────────────────────────
+
 
 def visitor_cookie_name(gallery_id: int) -> str:
     return f"mise_g{gallery_id}"
@@ -165,7 +176,7 @@ def require_shots_token(request: Request) -> None:
     deliberate dormant state on flow until Kevin provisions MISE_SHOTS_TOKEN, and it
     reads differently from a real auth failure (401) for an arming caller.
     """
-    if not config.SHOTS_TOKEN:
+    if not features.shots_api_enabled():
         raise HTTPException(status_code=503, detail="shots api disarmed")
     header = request.headers.get("Authorization", "")
     expected = f"Bearer {config.SHOTS_TOKEN}"

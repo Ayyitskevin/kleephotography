@@ -75,14 +75,24 @@ async def create_shot(request: Request, project_id: int):
             """INSERT INTO shot_list (project_id, title, category, priority,
                                       sort_order, note)
                VALUES (?,?,?,?,?,?)""",
-            (project_id, new["title"], new["category"], new["priority"],
-             new["sort_order"], new["note"]))
+            (
+                project_id,
+                new["title"],
+                new["category"],
+                new["priority"],
+                new["sort_order"],
+                new["note"],
+            ),
+        )
         sid = cur.lastrowid
-        audit.log(con, "shot_list", sid, "create",
-                  diff={**{k: new[k] for k in _FIELDS if new[k] is not None},
-                        "project_id": project_id})
-    log.info("shot %s created on project %s (priority=%s)", sid, project_id,
-             new["priority"])
+        audit.log(
+            con,
+            "shot_list",
+            sid,
+            "create",
+            diff={**{k: new[k] for k in _FIELDS if new[k] is not None}, "project_id": project_id},
+        )
+    log.info("shot %s created on project %s (priority=%s)", sid, project_id, new["priority"])
     return RedirectResponse(f"/admin/studio/projects/{project_id}", status_code=303)
 
 
@@ -92,28 +102,36 @@ async def update_shot(request: Request, shot_id: int):
     new = _parse_form(await request.form())
     diff = {f: [d[f], new[f]] for f in _FIELDS if (d[f] or None) != (new[f] or None)}
     if not diff:
-        return RedirectResponse(f"/admin/studio/projects/{d['project_id']}",
-                                status_code=303)
+        return RedirectResponse(f"/admin/studio/projects/{d['project_id']}", status_code=303)
     with db.tx() as con:
         con.execute(
             """UPDATE shot_list SET title=?, category=?, priority=?, sort_order=?,
                note=?, updated_at=datetime('now') WHERE id=?""",
-            (new["title"], new["category"], new["priority"], new["sort_order"],
-             new["note"], shot_id))
+            (
+                new["title"],
+                new["category"],
+                new["priority"],
+                new["sort_order"],
+                new["note"],
+                shot_id,
+            ),
+        )
         audit.log(con, "shot_list", shot_id, "update", diff=diff)
     log.info("shot %s updated (%d fields)", shot_id, len(diff))
-    return RedirectResponse(f"/admin/studio/projects/{d['project_id']}",
-                            status_code=303)
+    return RedirectResponse(f"/admin/studio/projects/{d['project_id']}", status_code=303)
 
 
 @router.post("/shots/{shot_id}/delete")
 async def delete_shot(shot_id: int):
     d = _get_shot(shot_id)
     with db.tx() as con:
-        con.execute("UPDATE shot_list SET deleted_at=datetime('now') WHERE id=?",
-                    (shot_id,))
-        audit.log(con, "shot_list", shot_id, "soft_delete",
-                  diff={"title": d["title"], "priority": d["priority"]})
+        con.execute("UPDATE shot_list SET deleted_at=datetime('now') WHERE id=?", (shot_id,))
+        audit.log(
+            con,
+            "shot_list",
+            shot_id,
+            "soft_delete",
+            diff={"title": d["title"], "priority": d["priority"]},
+        )
     log.info("shot %s soft-deleted", shot_id)
-    return RedirectResponse(f"/admin/studio/projects/{d['project_id']}",
-                            status_code=303)
+    return RedirectResponse(f"/admin/studio/projects/{d['project_id']}", status_code=303)

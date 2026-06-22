@@ -9,5 +9,4 @@ from . import db
 
 def active() -> list[dict]:
     """Active crop presets, render order. The only reader of crop_presets state."""
-    return db.all_(
-        "SELECT * FROM crop_presets WHERE active=1 ORDER BY sort, id")
+    return db.all_("SELECT * FROM crop_presets WHERE active=1 ORDER BY sort, id")

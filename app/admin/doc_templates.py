@@ -22,8 +22,7 @@ from .invoices import create_invoice
 from .proposals import PRESETS, create_proposal
 
 log = logging.getLogger("mise.admin.doc_templates")
-router = APIRouter(prefix="/admin/templates",
-                   dependencies=[Depends(security.require_admin)])
+router = APIRouter(prefix="/admin/templates", dependencies=[Depends(security.require_admin)])
 
 # Curated gallery layout. Keys reference template definitions the create routes
 # already understand (proposals.PRESETS / contracts.CONTRACT_LIBRARY); only the
@@ -32,22 +31,28 @@ router = APIRouter(prefix="/admin/templates",
 PROPOSAL_GROUPS = [
     ("Photography", ["photo_starter", "photo_standard", "photo_premium"]),
     ("Videography", ["video_starter", "video_standard", "video_premium"]),
-    ("Brand Partner — Monthly", ["retainer_starter", "retainer_standard",
-                                 "retainer_premium"]),
-    ("Portrait Sessions", ["portrait_starter", "portrait_standard",
-                           "portrait_premium"]),
+    ("Brand Partner — Monthly", ["retainer_starter", "retainer_standard", "retainer_premium"]),
+    ("Portrait Sessions", ["portrait_starter", "portrait_standard", "portrait_premium"]),
     ("Brand Sessions", ["brand_halfday", "brand_full"]),
 ]
 
-CONTRACT_ORDER = ["photography_services", "photography_agreement",
-                  "videography_services", "general_service",
-                  "model_release", "styled_shoot", "independent_contractor",
-                  "event", "liability_waiver", "nda"]
+CONTRACT_ORDER = [
+    "photography_services",
+    "photography_agreement",
+    "videography_services",
+    "general_service",
+    "model_release",
+    "styled_shoot",
+    "independent_contractor",
+    "event",
+    "liability_waiver",
+    "nda",
+]
 CONTRACT_BLURBS = {
     "photography_services": "Master services agreement — scope, usage rights, "
-                            "payment, reschedule & cancellation.",
+    "payment, reschedule & cancellation.",
     "photography_agreement": "Plain-language alternative — same protections, "
-                             "client-friendly wording. Draft, attorney review advised.",
+    "client-friendly wording. Draft, attorney review advised.",
     "videography_services": "For video shoots — deliverables, licensing, and usage terms.",
     "general_service": "All-purpose client service agreement for non-shoot work.",
     "model_release": "Permission to use a subject's likeness in delivered images.",
@@ -67,21 +72,25 @@ def _proposal_groups() -> list[dict]:
             tpl = PRESETS.get(k)
             if not tpl:
                 continue
-            cards.append({
-                "key": k,
-                "title": tpl["title"],
-                "lines": [i["label"] for i in tpl["items"]],
-                "total_cents": sum(i["qty"] * i["unit_cents"] for i in tpl["items"]),
-            })
+            cards.append(
+                {
+                    "key": k,
+                    "title": tpl["title"],
+                    "lines": [i["label"] for i in tpl["items"]],
+                    "total_cents": sum(i["qty"] * i["unit_cents"] for i in tpl["items"]),
+                }
+            )
         if cards:
             groups.append({"label": label, "cards": cards})
     return groups
 
 
 def _contract_cards() -> list[dict]:
-    return [{"key": k, "title": CONTRACT_LIBRARY[k],
-             "blurb": CONTRACT_BLURBS.get(k, "")}
-            for k in CONTRACT_ORDER if k in CONTRACT_LIBRARY]
+    return [
+        {"key": k, "title": CONTRACT_LIBRARY[k], "blurb": CONTRACT_BLURBS.get(k, "")}
+        for k in CONTRACT_ORDER
+        if k in CONTRACT_LIBRARY
+    ]
 
 
 @router.get("", response_class=HTMLResponse)
@@ -90,17 +99,21 @@ async def gallery(request: Request):
         """SELECT p.id, p.title, c.name AS client_name
            FROM projects p JOIN clients c ON c.id=p.client_id
            WHERE p.status != 'archived'
-           ORDER BY p.created_at DESC""")
+           ORDER BY p.created_at DESC"""
+    )
     return templates.TemplateResponse(
-        request, "admin/templates_gallery.html",
-        {"proposal_groups": _proposal_groups(),
-         "contracts": _contract_cards(),
-         "projects": projects})
+        request,
+        "admin/templates_gallery.html",
+        {
+            "proposal_groups": _proposal_groups(),
+            "contracts": _contract_cards(),
+            "projects": projects,
+        },
+    )
 
 
 @router.post("/use")
-async def use_template(project_id: int = Form(...), doc_type: str = Form(...),
-                       key: str = Form("")):
+async def use_template(project_id: int = Form(...), doc_type: str = Form(...), key: str = Form("")):
     """Dispatch to the existing per-project create handler for the chosen doc
     type. Each handler validates the project (404s if missing), creates the
     populated draft, and returns a 303 to its own editor — so the gallery never

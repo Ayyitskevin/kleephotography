@@ -11,13 +11,31 @@ from here now — its behavior is unchanged.
 """
 
 # F&B-relevant usage channels — the menu Kevin negotiates against.
-CHANNELS = ["website", "social_organic", "social_paid", "ooh_billboard",
-            "print", "pr_editorial", "delivery_apps", "menu", "email", "broadcast"]
+CHANNELS = [
+    "website",
+    "social_organic",
+    "social_paid",
+    "ooh_billboard",
+    "print",
+    "pr_editorial",
+    "delivery_apps",
+    "menu",
+    "email",
+    "broadcast",
+]
 
 # Domain F shoot-production vocab. SHOT_CATEGORIES groups a project's shot list
 # the way Kevin frames an F&B shoot; SHOT_PRIORITIES is the must/want/if-time
 # triage he works down on the day. Both are validated app-side in
 # app/admin/shotlist.py (no SQL CHECK), so the lists can evolve in one place.
-SHOT_CATEGORIES = ["Hero Dish", "Detail", "Process", "Drinks", "Ingredients",
-                   "Interior", "Team", "Ambiance"]
+SHOT_CATEGORIES = [
+    "Hero Dish",
+    "Detail",
+    "Process",
+    "Drinks",
+    "Ingredients",
+    "Interior",
+    "Team",
+    "Ambiance",
+]
 SHOT_PRIORITIES = ["must", "want", "if-time"]

@@ -71,10 +71,16 @@ async def create_plan(project_id: int, title: str = Form(...)):
     with db.tx() as con:
         cur = con.execute(
             "INSERT INTO recurring_plans (project_id, title) VALUES (?,?)",
-            (project_id, title.strip()))
+            (project_id, title.strip()),
+        )
         pid = cur.lastrowid
-        audit.log(con, "recurring_plan", pid, "create",
-                  diff={"project_id": project_id, "title": title.strip()})
+        audit.log(
+            con,
+            "recurring_plan",
+            pid,
+            "create",
+            diff={"project_id": project_id, "title": title.strip()},
+        )
     log.info("recurring plan %s created for project %s", pid, project_id)
     return RedirectResponse(f"/admin/studio/recurring/{pid}", status_code=303)
 
@@ -90,59 +96,83 @@ async def plan_detail(request: Request, plan_id: int):
     period = _period()
     deliveries = db.all_(
         "SELECT id, label, qty, note, created_at FROM retainer_deliveries "
-        "WHERE plan_id=? AND period=? ORDER BY created_at", (plan_id, period))
+        "WHERE plan_id=? AND period=? ORDER BY created_at",
+        (plan_id, period),
+    )
     # Sum what's been logged this period per label, then line it up against each
     # quota target. Deliveries whose label doesn't match a quota line still count
     # in the log but show as "extra" (un-targeted) — the quota is a plan, not a cap.
     delivered = {}
     for r in deliveries:
         delivered[r["label"]] = delivered.get(r["label"], 0) + r["qty"]
-    progress = [{"label": q["label"], "target": q["target"],
-                 "done": delivered.get(q["label"], 0)} for q in quota]
-    extra = [{"label": lbl, "done": n} for lbl, n in delivered.items()
-             if lbl not in {q["label"] for q in quota}]
+    progress = [
+        {"label": q["label"], "target": q["target"], "done": delivered.get(q["label"], 0)}
+        for q in quota
+    ]
+    extra = [
+        {"label": lbl, "done": n}
+        for lbl, n in delivered.items()
+        if lbl not in {q["label"] for q in quota}
+    ]
     # Content calendar: this period's planned slots, soonest first. Forward-looking
     # planning layer — decoupled from the delivery log above (marking a slot
     # 'delivered' never auto-credits the quota count; that stays a manual log).
     calendar = db.all_(
         "SELECT id, slot_date, label, title, status, note FROM content_calendar "
         "WHERE plan_id=? AND substr(slot_date,1,7)=? ORDER BY slot_date, id",
-        (plan_id, period))
+        (plan_id, period),
+    )
     # Caption packs: this period's caption deliverables (manual text in 6a). Like
     # the calendar, DECOUPLED from the delivery log — marking a caption 'approved'
     # never auto-credits the quota count; it only assisted-credit pre-fills the log.
     captions = db.all_(
         "SELECT id, slot_id, period, label, body, status, note, "
         "ai_drafted, ai_model, ai_drafted_at, ai_draft_original FROM retainer_captions "
-        "WHERE plan_id=? AND period=? ORDER BY created_at, id", (plan_id, period))
+        "WHERE plan_id=? AND period=? ORDER BY created_at, id",
+        (plan_id, period),
+    )
     invoices = db.all_(
         "SELECT id, title, total_cents, status, created_at FROM invoices "
-        "WHERE recurring_plan_id=? ORDER BY created_at DESC", (plan_id,))
+        "WHERE recurring_plan_id=? ORDER BY created_at DESC",
+        (plan_id,),
+    )
     # Assisted-credit pre-fill: when a calendar slot was just flipped to
     # 'delivered', set_calendar_status redirects here with credit_* query params.
     # They seed the delivery-log form's defaults so the human commits in one click
     # — they are display defaults ONLY, never a write (the manual log stays the
     # count's single source of truth; the slice-3 decoupling guarantee holds).
-    credit = {"label": request.query_params.get("credit_label", ""),
-              "qty": request.query_params.get("credit_qty", ""),
-              "period": request.query_params.get("credit_period", "")}
+    credit = {
+        "label": request.query_params.get("credit_label", ""),
+        "qty": request.query_params.get("credit_qty", ""),
+        "period": request.query_params.get("credit_period", ""),
+    }
     # A failed/blocked "Draft with AI" redirects here with a message to surface
     # (mesh failure, not configured, or no-clobber refusal) — nothing was written.
     caption_error = request.query_params.get("caption_error", "")
-    return templates.TemplateResponse(request, "admin/recurring.html",
-                                      {"d": d, "p": p, "rows": rows,
-                                       "quota_rows": quota_rows, "progress": progress,
-                                       "extra": extra, "deliveries": deliveries,
-                                       "calendar": calendar,
-                                       "calendar_statuses": CALENDAR_STATUSES,
-                                       "captions": captions,
-                                       "caption_statuses": CAPTION_STATUSES,
-                                       "caption_error": caption_error,
-                                       "ai_caption_enabled": caption_ai.is_enabled(),
-                                       "quota_labels": [q["label"] for q in quota],
-                                       "invoices": invoices, "period": period,
-                                       "credit": credit,
-                                       "base_url": config.BASE_URL})
+    return templates.TemplateResponse(
+        request,
+        "admin/recurring.html",
+        {
+            "d": d,
+            "p": p,
+            "rows": rows,
+            "quota_rows": quota_rows,
+            "progress": progress,
+            "extra": extra,
+            "deliveries": deliveries,
+            "calendar": calendar,
+            "calendar_statuses": CALENDAR_STATUSES,
+            "captions": captions,
+            "caption_statuses": CAPTION_STATUSES,
+            "caption_error": caption_error,
+            "ai_caption_enabled": caption_ai.is_enabled(),
+            "quota_labels": [q["label"] for q in quota],
+            "invoices": invoices,
+            "period": period,
+            "credit": credit,
+            "base_url": config.BASE_URL,
+        },
+    )
 
 
 @router.post("/recurring/{plan_id}")
@@ -164,19 +194,30 @@ async def update_plan(request: Request, plan_id: int):
         con.execute(
             "UPDATE recurring_plans SET title=?, line_items=?, total_cents=?, "
             "anchor_day=?, active=?, notes=?, quota=? WHERE id=?",
-            (title, items_json, total, anchor, active, notes, quota_json, plan_id))
-        audit.log(con, "recurring_plan", plan_id, "update",
-                  diff={"total_cents": total, "anchor_day": anchor, "active": active})
+            (title, items_json, total, anchor, active, notes, quota_json, plan_id),
+        )
+        audit.log(
+            con,
+            "recurring_plan",
+            plan_id,
+            "update",
+            diff={"total_cents": total, "anchor_day": anchor, "active": active},
+        )
     return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
 
 
 @router.post("/recurring/{plan_id}/deliveries")
-async def log_delivery(plan_id: int, label: str = Form(...), qty: int = Form(...),
-                       period: str = Form(""), note: str = Form("")):
+async def log_delivery(
+    plan_id: int,
+    label: str = Form(...),
+    qty: int = Form(...),
+    period: str = Form(""),
+    note: str = Form(""),
+):
     """Manually log a deliverable provided this (or another) period. Advisory
     tracking only — never touches invoices/billing, never auto-credited from
     galleries (the count is Kevin's, by doctrine)."""
-    d = get_plan(plan_id)
+    d = get_plan(plan_id)  # noqa: F841  # noqa: F841
     label = label.strip()
     if not label:
         raise HTTPException(status_code=400, detail="label required")
@@ -189,11 +230,23 @@ async def log_delivery(plan_id: int, label: str = Form(...), qty: int = Form(...
         cur = con.execute(
             "INSERT INTO retainer_deliveries (plan_id, period, label, qty, note) "
             "VALUES (?,?,?,?,?)",
-            (plan_id, period, label, qty, note.strip() or None))
-        audit.log(con, "recurring_plan", plan_id, "delivery_logged",
-                  diff={"period": period, "label": label, "qty": qty})
-    log.info("retainer plan %s logged delivery %s (%s ×%d) for %s",
-             plan_id, cur.lastrowid, label, qty, period)
+            (plan_id, period, label, qty, note.strip() or None),
+        )
+        audit.log(
+            con,
+            "recurring_plan",
+            plan_id,
+            "delivery_logged",
+            diff={"period": period, "label": label, "qty": qty},
+        )
+    log.info(
+        "retainer plan %s logged delivery %s (%s ×%d) for %s",
+        plan_id,
+        cur.lastrowid,
+        label,
+        qty,
+        period,
+    )
     return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
 
 
@@ -203,18 +256,27 @@ async def delete_delivery(plan_id: int, delivery_id: int):
     with db.tx() as con:
         # Scope the delete to this plan so a wrong id can't reach another plan's log.
         deleted = con.execute(
-            "DELETE FROM retainer_deliveries WHERE id=? AND plan_id=?",
-            (delivery_id, plan_id)).rowcount
+            "DELETE FROM retainer_deliveries WHERE id=? AND plan_id=?", (delivery_id, plan_id)
+        ).rowcount
         if deleted:
-            audit.log(con, "recurring_plan", plan_id, "delivery_deleted",
-                      diff={"delivery_id": delivery_id})
+            audit.log(
+                con,
+                "recurring_plan",
+                plan_id,
+                "delivery_deleted",
+                diff={"delivery_id": delivery_id},
+            )
     return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
 
 
 @router.post("/recurring/{plan_id}/calendar")
-async def add_calendar_slot(plan_id: int, slot_date: str = Form(...),
-                            label: str = Form(...), title: str = Form(""),
-                            note: str = Form("")):
+async def add_calendar_slot(
+    plan_id: int,
+    slot_date: str = Form(...),
+    label: str = Form(...),
+    title: str = Form(""),
+    note: str = Form(""),
+):
     """Schedule a planned content slot on a date. Planning only — no billing
     effect, never auto-credits the quota delivery count."""
     get_plan(plan_id)
@@ -228,11 +290,22 @@ async def add_calendar_slot(plan_id: int, slot_date: str = Form(...),
         cur = con.execute(
             "INSERT INTO content_calendar (plan_id, slot_date, label, title, note) "
             "VALUES (?,?,?,?,?)",
-            (plan_id, slot_date, label, title.strip() or None, note.strip() or None))
-        audit.log(con, "recurring_plan", plan_id, "calendar_slot_added",
-                  diff={"slot_date": slot_date, "label": label})
-    log.info("retainer plan %s added calendar slot %s (%s on %s)",
-             plan_id, cur.lastrowid, label, slot_date)
+            (plan_id, slot_date, label, title.strip() or None, note.strip() or None),
+        )
+        audit.log(
+            con,
+            "recurring_plan",
+            plan_id,
+            "calendar_slot_added",
+            diff={"slot_date": slot_date, "label": label},
+        )
+    log.info(
+        "retainer plan %s added calendar slot %s (%s on %s)",
+        plan_id,
+        cur.lastrowid,
+        label,
+        slot_date,
+    )
     return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
 
 
@@ -253,18 +326,28 @@ async def set_calendar_status(plan_id: int, slot_id: int, status: str = Form(...
     prefill = None
     with db.tx() as con:
         prior = con.execute(
-            "SELECT status, label, slot_date FROM content_calendar "
-            "WHERE id=? AND plan_id=?", (slot_id, plan_id)).fetchone()
+            "SELECT status, label, slot_date FROM content_calendar WHERE id=? AND plan_id=?",
+            (slot_id, plan_id),
+        ).fetchone()
         changed = con.execute(
             "UPDATE content_calendar SET status=? WHERE id=? AND plan_id=?",
-            (status, slot_id, plan_id)).rowcount
+            (status, slot_id, plan_id),
+        ).rowcount
         if changed:
-            audit.log(con, "recurring_plan", plan_id, "calendar_slot_status",
-                      diff={"slot_id": slot_id, "status": status})
+            audit.log(
+                con,
+                "recurring_plan",
+                plan_id,
+                "calendar_slot_status",
+                diff={"slot_id": slot_id, "status": status},
+            )
             # Fire only on the transition INTO delivered, not on every render / re-save.
             if status == "delivered" and prior and prior["status"] != "delivered":
-                prefill = {"credit_label": prior["label"], "credit_qty": 1,
-                           "credit_period": prior["slot_date"][:7]}
+                prefill = {
+                    "credit_label": prior["label"],
+                    "credit_qty": 1,
+                    "credit_period": prior["slot_date"][:7],
+                }
     url = f"/admin/studio/recurring/{plan_id}"
     if prefill:
         url += "?" + urlencode(prefill) + "#log-delivery"
@@ -276,11 +359,12 @@ async def delete_calendar_slot(plan_id: int, slot_id: int):
     get_plan(plan_id)
     with db.tx() as con:
         deleted = con.execute(
-            "DELETE FROM content_calendar WHERE id=? AND plan_id=?",
-            (slot_id, plan_id)).rowcount
+            "DELETE FROM content_calendar WHERE id=? AND plan_id=?", (slot_id, plan_id)
+        ).rowcount
         if deleted:
-            audit.log(con, "recurring_plan", plan_id, "calendar_slot_deleted",
-                      diff={"slot_id": slot_id})
+            audit.log(
+                con, "recurring_plan", plan_id, "calendar_slot_deleted", diff={"slot_id": slot_id}
+            )
     return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
 
 
@@ -295,15 +379,19 @@ def _caption_slot_id(plan_id: int, raw: str) -> int | None:
         sid = int(raw)
     except ValueError:
         raise HTTPException(status_code=400, detail="bad slot reference")
-    owned = db.one("SELECT id FROM content_calendar WHERE id=? AND plan_id=?",
-                   (sid, plan_id))
+    owned = db.one("SELECT id FROM content_calendar WHERE id=? AND plan_id=?", (sid, plan_id))
     return sid if owned else None
 
 
 @router.post("/recurring/{plan_id}/captions")
-async def add_caption(plan_id: int, label: str = Form(...), body: str = Form(...),
-                      period: str = Form(""), slot_id: str = Form(""),
-                      note: str = Form("")):
+async def add_caption(
+    plan_id: int,
+    label: str = Form(...),
+    body: str = Form(...),
+    period: str = Form(""),
+    slot_id: str = Form(""),
+    note: str = Form(""),
+):
     """Create a caption deliverable (manual text in 6a — no AI). Decoupled from the
     delivery log: this writes only the caption, never a retainer_deliveries row."""
     get_plan(plan_id)
@@ -321,17 +409,27 @@ async def add_caption(plan_id: int, label: str = Form(...), body: str = Form(...
         cur = con.execute(
             "INSERT INTO retainer_captions (plan_id, slot_id, period, label, body, note) "
             "VALUES (?,?,?,?,?,?)",
-            (plan_id, sid, period, label, body, note.strip() or None))
-        audit.log(con, "recurring_plan", plan_id, "caption_added",
-                  diff={"caption_id": cur.lastrowid, "period": period, "label": label})
-    log.info("retainer plan %s added caption %s (%s, %s)",
-             plan_id, cur.lastrowid, label, period)
+            (plan_id, sid, period, label, body, note.strip() or None),
+        )
+        audit.log(
+            con,
+            "recurring_plan",
+            plan_id,
+            "caption_added",
+            diff={"caption_id": cur.lastrowid, "period": period, "label": label},
+        )
+    log.info("retainer plan %s added caption %s (%s, %s)", plan_id, cur.lastrowid, label, period)
     return RedirectResponse(f"/admin/studio/recurring/{plan_id}#captions", status_code=303)
 
 
 @router.post("/recurring/{plan_id}/captions/{caption_id}")
-async def update_caption(plan_id: int, caption_id: int, label: str = Form(...),
-                         body: str = Form(...), note: str = Form("")):
+async def update_caption(
+    plan_id: int,
+    caption_id: int,
+    label: str = Form(...),
+    body: str = Form(...),
+    note: str = Form(""),
+):
     """Edit a caption's text/label inline. Plan-scoped; writes no delivery row."""
     get_plan(plan_id)
     label = label.strip()
@@ -343,10 +441,16 @@ async def update_caption(plan_id: int, caption_id: int, label: str = Form(...),
     with db.tx() as con:
         changed = con.execute(
             "UPDATE retainer_captions SET label=?, body=?, note=? WHERE id=? AND plan_id=?",
-            (label, body, note.strip() or None, caption_id, plan_id)).rowcount
+            (label, body, note.strip() or None, caption_id, plan_id),
+        ).rowcount
         if changed:
-            audit.log(con, "recurring_plan", plan_id, "caption_updated",
-                      diff={"caption_id": caption_id, "label": label})
+            audit.log(
+                con,
+                "recurring_plan",
+                plan_id,
+                "caption_updated",
+                diff={"caption_id": caption_id, "label": label},
+            )
     return RedirectResponse(f"/admin/studio/recurring/{plan_id}#captions", status_code=303)
 
 
@@ -364,18 +468,28 @@ async def set_caption_status(plan_id: int, caption_id: int, status: str = Form(.
     prefill = None
     with db.tx() as con:
         prior = con.execute(
-            "SELECT status, label, period FROM retainer_captions "
-            "WHERE id=? AND plan_id=?", (caption_id, plan_id)).fetchone()
+            "SELECT status, label, period FROM retainer_captions WHERE id=? AND plan_id=?",
+            (caption_id, plan_id),
+        ).fetchone()
         changed = con.execute(
             "UPDATE retainer_captions SET status=? WHERE id=? AND plan_id=?",
-            (status, caption_id, plan_id)).rowcount
+            (status, caption_id, plan_id),
+        ).rowcount
         if changed:
-            audit.log(con, "recurring_plan", plan_id, "caption_status",
-                      diff={"caption_id": caption_id, "status": status})
+            audit.log(
+                con,
+                "recurring_plan",
+                plan_id,
+                "caption_status",
+                diff={"caption_id": caption_id, "status": status},
+            )
             # Fire only on the transition INTO approved, not on every re-save.
             if status == "approved" and prior and prior["status"] != "approved":
-                prefill = {"credit_label": prior["label"], "credit_qty": 1,
-                           "credit_period": prior["period"]}
+                prefill = {
+                    "credit_label": prior["label"],
+                    "credit_qty": 1,
+                    "credit_period": prior["period"],
+                }
     url = f"/admin/studio/recurring/{plan_id}"
     if prefill:
         url += "?" + urlencode(prefill) + "#log-delivery"
@@ -389,11 +503,12 @@ async def delete_caption(plan_id: int, caption_id: int):
     get_plan(plan_id)
     with db.tx() as con:
         deleted = con.execute(
-            "DELETE FROM retainer_captions WHERE id=? AND plan_id=?",
-            (caption_id, plan_id)).rowcount
+            "DELETE FROM retainer_captions WHERE id=? AND plan_id=?", (caption_id, plan_id)
+        ).rowcount
         if deleted:
-            audit.log(con, "recurring_plan", plan_id, "caption_deleted",
-                      diff={"caption_id": caption_id})
+            audit.log(
+                con, "recurring_plan", plan_id, "caption_deleted", diff={"caption_id": caption_id}
+            )
     return RedirectResponse(f"/admin/studio/recurring/{plan_id}#captions", status_code=303)
 
 
@@ -420,8 +535,7 @@ async def draft_caption(plan_id: int, caption_id: int, replace: str = Form("")):
     The mesh call is expected to fail sometimes; on any failure we write nothing and
     surface the message. Odysseus owns model selection — Mise only passes context."""
     d = get_plan(plan_id)
-    cap = db.one("SELECT * FROM retainer_captions WHERE id=? AND plan_id=?",
-                 (caption_id, plan_id))
+    cap = db.one("SELECT * FROM retainer_captions WHERE id=? AND plan_id=?", (caption_id, plan_id))
     if not cap:
         raise HTTPException(status_code=404)
 
@@ -435,9 +549,13 @@ async def draft_caption(plan_id: int, caption_id: int, replace: str = Form("")):
 
     proj = get_project(d["project_id"])
     client = db.one("SELECT name, company FROM clients WHERE id=?", (proj["client_id"],))
-    ctx = {"label": cap["label"], "note": cap["note"] or "",
-           "client": client["company"] or client["name"] if client else "",
-           "period": cap["period"], "plan_title": d["title"]}
+    ctx = {
+        "label": cap["label"],
+        "note": cap["note"] or "",
+        "client": client["company"] or client["name"] if client else "",
+        "period": cap["period"],
+        "plan_title": d["title"],
+    }
     try:
         result = caption_ai.draft_caption(ctx)
     except caption_ai.CaptionDraftError as e:
@@ -448,13 +566,20 @@ async def draft_caption(plan_id: int, caption_id: int, replace: str = Form("")):
         con.execute(
             "UPDATE retainer_captions SET body=?, ai_drafted=1, ai_model=?, "
             "ai_drafted_at=datetime('now'), ai_draft_original=? WHERE id=? AND plan_id=?",
-            (result["caption"], result["model"], result["caption"], caption_id, plan_id))
+            (result["caption"], result["model"], result["caption"], caption_id, plan_id),
+        )
         # Status is deliberately NOT touched — an AI draft is a suggestion, not a
         # delivery. Crediting stays the slice-4/6a human approve -> /deliveries path.
-        audit.log(con, "recurring_plan", plan_id, "caption_ai_drafted",
-                  diff={"caption_id": caption_id, "model": result["model"]})
-    log.info("retainer plan %s caption %s AI-drafted (model=%s)",
-             plan_id, caption_id, result["model"])
+        audit.log(
+            con,
+            "recurring_plan",
+            plan_id,
+            "caption_ai_drafted",
+            diff={"caption_id": caption_id, "model": result["model"]},
+        )
+    log.info(
+        "retainer plan %s caption %s AI-drafted (model=%s)", plan_id, caption_id, result["model"]
+    )
     return _back()
 
 
@@ -473,21 +598,35 @@ def generate_for_plan(plan: "db.sqlite3.Row", period: str) -> int | None:
             "UPDATE recurring_plans SET last_run_period=? "
             "WHERE id=? AND active=1 AND total_cents>0 "
             "AND deleted_at IS NULL AND COALESCE(last_run_period,'')<>?",
-            (period, plan["id"], period)).rowcount
+            (period, plan["id"], period),
+        ).rowcount
         if claimed != 1:
             return None
         cur = con.execute(
             "INSERT INTO invoices (project_id, slug, title, line_items, total_cents, "
             "recurring_plan_id) VALUES (?,?,?,?,?,?)",
-            (plan["project_id"], security.new_slug(),
-             f"{plan['title']} — {period}", plan["line_items"], plan["total_cents"],
-             plan["id"]))
+            (
+                plan["project_id"],
+                security.new_slug(),
+                f"{plan['title']} — {period}",
+                plan["line_items"],
+                plan["total_cents"],
+                plan["id"],
+            ),
+        )
         iid = cur.lastrowid
-        audit.log(con, "invoice", iid, "create",
-                  diff={"recurring_plan_id": plan["id"], "period": period,
-                        "total_cents": plan["total_cents"]})
-    log.info("recurring plan %s generated draft invoice %s for %s",
-             plan["id"], iid, period)
+        audit.log(
+            con,
+            "invoice",
+            iid,
+            "create",
+            diff={
+                "recurring_plan_id": plan["id"],
+                "period": period,
+                "total_cents": plan["total_cents"],
+            },
+        )
+    log.info("recurring plan %s generated draft invoice %s for %s", plan["id"], iid, period)
     return iid
 
 
@@ -502,7 +641,8 @@ def run_due_plans(today: dt.date | None = None) -> int:
     due = db.all_(
         "SELECT * FROM recurring_plans WHERE active=1 AND total_cents>0 "
         "AND deleted_at IS NULL AND anchor_day<=? AND COALESCE(last_run_period,'')<>?",
-        (today.day, period))
+        (today.day, period),
+    )
     n = sum(1 for plan in due if generate_for_plan(plan, period) is not None)
     if n:
         log.info("recurring sweep: generated %d draft(s) for %s", n, period)
@@ -518,12 +658,10 @@ async def generate_draft(plan_id: int):
         raise HTTPException(status_code=400, detail="plan total must be above zero")
     period = _period()
     if d["last_run_period"] == period:
-        raise HTTPException(status_code=400,
-                            detail=f"already generated a draft for {period}")
+        raise HTTPException(status_code=400, detail=f"already generated a draft for {period}")
     iid = generate_for_plan(d, period)
     if iid is None:  # raced a concurrent sweep/click between the check and the claim
-        raise HTTPException(status_code=400,
-                            detail=f"already generated a draft for {period}")
+        raise HTTPException(status_code=400, detail=f"already generated a draft for {period}")
     return RedirectResponse(f"/admin/studio/invoices/{iid}", status_code=303)
 
 
@@ -531,8 +669,7 @@ async def generate_draft(plan_id: int):
 async def delete_plan(plan_id: int):
     d = get_plan(plan_id)
     with db.tx() as con:
-        con.execute("UPDATE recurring_plans SET deleted_at=datetime('now') WHERE id=?",
-                    (plan_id,))
+        con.execute("UPDATE recurring_plans SET deleted_at=datetime('now') WHERE id=?", (plan_id,))
         audit.log(con, "recurring_plan", plan_id, "delete")
     log.info("recurring plan %s soft-deleted", plan_id)
     return RedirectResponse(f"/admin/studio/projects/{d['project_id']}", status_code=303)

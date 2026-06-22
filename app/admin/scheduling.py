@@ -18,15 +18,27 @@ from .. import audit, booking_notify, db, gcal, scheduling, security
 from ..render import templates
 
 log = logging.getLogger("mise.admin.scheduling")
-router = APIRouter(prefix="/admin/scheduling",
-                   dependencies=[Depends(security.require_admin)])
+router = APIRouter(prefix="/admin/scheduling", dependencies=[Depends(security.require_admin)])
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-_EVENT_COLS = frozenset({
-    "name", "description", "duration_min", "location", "color",
-    "buffer_before_min", "buffer_after_min", "min_notice_hours", "max_per_day",
-    "booking_window_days", "slot_step_min", "position", "creates_notion_session"})
+_EVENT_COLS = frozenset(
+    {
+        "name",
+        "description",
+        "duration_min",
+        "location",
+        "color",
+        "buffer_before_min",
+        "buffer_after_min",
+        "min_notice_hours",
+        "max_per_day",
+        "booking_window_days",
+        "slot_step_min",
+        "position",
+        "creates_notion_session",
+    }
+)
 
 
 def _min_to_hhmm(m: int | None) -> str:
@@ -88,6 +100,7 @@ def _hours_label(hhmm_start: str, hhmm_end: str) -> str:
     def _m(s: str) -> int:
         hh, mm = s.split(":")
         return int(hh) * 60 + int(mm)
+
     return f"{_fmt_clock(_m(hhmm_start))} – {_fmt_clock(_m(hhmm_end))}"
 
 
@@ -102,10 +115,15 @@ def _global_week() -> list[dict]:
     out = []
     for wd in range(7):
         r = by_wd.get(wd)
-        out.append({"wd": wd, "label": WEEKDAYS[wd],
-                    "on": r is not None,
-                    "start": _min_to_hhmm(r["s"]) if r else "09:00",
-                    "end": _min_to_hhmm(r["e"]) if r else "17:00"})
+        out.append(
+            {
+                "wd": wd,
+                "label": WEEKDAYS[wd],
+                "on": r is not None,
+                "start": _min_to_hhmm(r["s"]) if r else "09:00",
+                "end": _min_to_hhmm(r["e"]) if r else "17:00",
+            }
+        )
     return out
 
 
@@ -114,8 +132,7 @@ def _global_week() -> list[dict]:
 _GERR = {
     "state": "Connection request expired or didn't match — please try again.",
     "denied": "Google sign-in was cancelled.",
-    "exchange": "Google rejected the connection. Re-check the OAuth client config "
-                "and try again.",
+    "exchange": "Google rejected the connection. Re-check the OAuth client config and try again.",
 }
 
 
@@ -130,17 +147,24 @@ def _sched_overview(events, week) -> dict:
     tz = scheduling._biz_tz()
     today = scheduling.now_utc().astimezone(tz).date()
 
-    types = [{
-        "id": e["id"], "slug": e["slug"], "name": e["name"], "dot": e["color"],
-        "on": bool(e["active"]),
-        "meta": f"{_fmt_dur(e['duration_min'])} · {e['location'] or 'No location set'}",
-        "upcoming": e["upcoming"],
-        "upcoming_label": (f"{e['upcoming']} upcoming" if e["upcoming"] else "No bookings"),
-    } for e in events]
+    types = [
+        {
+            "id": e["id"],
+            "slug": e["slug"],
+            "name": e["name"],
+            "dot": e["color"],
+            "on": bool(e["active"]),
+            "meta": f"{_fmt_dur(e['duration_min'])} · {e['location'] or 'No location set'}",
+            "upcoming": e["upcoming"],
+            "upcoming_label": (f"{e['upcoming']} upcoming" if e["upcoming"] else "No bookings"),
+        }
+        for e in events
+    ]
 
-    days = [{**d,
-             "hours": _hours_label(d["start"], d["end"]) if d["on"] else "Unavailable"}
-            for d in week]
+    days = [
+        {**d, "hours": _hours_label(d["start"], d["end"]) if d["on"] else "Unavailable"}
+        for d in week
+    ]
 
     # Upcoming list (next 5 confirmed).
     ups = db.all_("""SELECT b.start_utc, b.name, e.name AS event_name FROM bookings b
@@ -158,12 +182,25 @@ def _sched_overview(events, week) -> dict:
             time_lbl, soon = f"Tomorrow · {clock}", False
         else:
             time_lbl, soon = clock, False
-        upcoming.append({"day": ld.strftime("%-d"), "mon": ld.strftime("%b"),
-                         "client": b["name"], "type": b["event_name"],
-                         "time": time_lbl, "soon": soon})
+        upcoming.append(
+            {
+                "day": ld.strftime("%-d"),
+                "mon": ld.strftime("%b"),
+                "client": b["name"],
+                "type": b["event_name"],
+                "time": time_lbl,
+                "soon": soon,
+            }
+        )
 
-    next_up = upcoming[0]["time"].replace("Today · ", "today ") \
-        .replace("Tomorrow · ", "tomorrow ").lower() if upcoming else None
+    next_up = (
+        upcoming[0]["time"]
+        .replace("Today · ", "today ")
+        .replace("Tomorrow · ", "tomorrow ")
+        .lower()
+        if upcoming
+        else None
+    )
 
     # Mini calendar (current local month, Sunday-first) + booked-day dots.
     ndays = _calendar.monthrange(today.year, today.month)[1]
@@ -171,9 +208,11 @@ def _sched_overview(events, week) -> dict:
     lo = (first - dt.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
     hi = (first + dt.timedelta(days=ndays + 1)).strftime("%Y-%m-%d 00:00:00")
     booked: set[int] = set()
-    for r in db.all_("""SELECT start_utc FROM bookings
+    for r in db.all_(
+        """SELECT start_utc FROM bookings
                         WHERE status='confirmed' AND start_utc>=? AND start_utc<?""",
-                     (lo, hi)):
+        (lo, hi),
+    ):
         ld = _to_local(r["start_utc"]).date()
         if ld.year == today.year and ld.month == today.month:
             booked.add(ld.day)
@@ -185,18 +224,28 @@ def _sched_overview(events, week) -> dict:
     cal = []
     for c in cells:
         is_today = c.get("day") == today.day and not c.get("empty")
-        cal.append({"day": c.get("day", ""), "empty": c.get("empty", False),
-                    "today": is_today,
-                    "booked": (c.get("day") in booked) and not is_today})
+        cal.append(
+            {
+                "day": c.get("day", ""),
+                "empty": c.get("empty", False),
+                "today": is_today,
+                "booked": (c.get("day") in booked) and not is_today,
+            }
+        )
 
     week_mon = today - dt.timedelta(days=today.weekday())
-    booked_week = sum(1 for d in booked
-                      if 0 <= (first.replace(day=d) - week_mon).days <= 6)
+    booked_week = sum(1 for d in booked if 0 <= (first.replace(day=d) - week_mon).days <= 6)
 
-    return {"types": types, "days": days, "upcoming": upcoming, "next_up": next_up,
-            "booked_week": booked_week, "cal": cal,
-            "cal_label": first.strftime("%B %Y"),
-            "dow": ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]}
+    return {
+        "types": types,
+        "days": days,
+        "upcoming": upcoming,
+        "next_up": next_up,
+        "booked_week": booked_week,
+        "cal": cal,
+        "cal_label": first.strftime("%B %Y"),
+        "dow": ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
+    }
 
 
 @router.get("", response_class=HTMLResponse)
@@ -207,9 +256,13 @@ async def home(request: Request):
                            AND b.start_utc >= datetime('now')) AS upcoming
                         FROM event_types et ORDER BY et.position, et.id""")
     week = _global_week()
-    ctx = {"events": events, "week": week, "tz": scheduling.config.TIMEZONE,
-           "gcal": gcal.status(),
-           "g_error": _GERR.get(request.query_params.get("gerr"))}
+    ctx = {
+        "events": events,
+        "week": week,
+        "tz": scheduling.config.TIMEZONE,
+        "gcal": gcal.status(),
+        "g_error": _GERR.get(request.query_params.get("gerr")),
+    }
     ctx.update(_sched_overview(events, week))
     return templates.TemplateResponse(request, "admin/scheduling.html", ctx)
 
@@ -236,18 +289,27 @@ async def save_availability(request: Request):
     with db.tx() as con:
         con.execute("DELETE FROM availability_rules WHERE event_type_id IS NULL")
         for wd, s, e in rows:
-            con.execute("INSERT INTO availability_rules (event_type_id,weekday,start_min,end_min) "
-                        "VALUES (NULL,?,?,?)", (wd, s, e))
-        audit.log(con, "availability", 0, "set_global",
-                  diff={"days": [WEEKDAYS[wd] for wd, _, _ in rows]})
+            con.execute(
+                "INSERT INTO availability_rules (event_type_id,weekday,start_min,end_min) "
+                "VALUES (NULL,?,?,?)",
+                (wd, s, e),
+            )
+        audit.log(
+            con, "availability", 0, "set_global", diff={"days": [WEEKDAYS[wd] for wd, _, _ in rows]}
+        )
     return RedirectResponse("/admin/scheduling", status_code=303)
 
 
 @router.post("/override")
-async def add_override(request: Request, day: str = Form(...),
-                       mode: str = Form("block"),
-                       start: str = Form(""), end: str = Form("")):
+async def add_override(
+    request: Request,
+    day: str = Form(...),
+    mode: str = Form("block"),
+    start: str = Form(""),
+    end: str = Form(""),
+):
     import datetime as dt
+
     try:
         dt.date.fromisoformat(day)
     except ValueError:
@@ -260,18 +322,21 @@ async def add_override(request: Request, day: str = Form(...),
     else:
         avail, smin, emin = 0, None, None
     with db.tx() as con:
-        con.execute("""INSERT INTO date_overrides (event_type_id,day,available,start_min,end_min)
-                       VALUES (NULL,?,?,?,?)""", (day, avail, smin, emin))
-        audit.log(con, "date_override", 0, "add",
-                  diff={"day": day, "blocked": avail == 0})
+        con.execute(
+            """INSERT INTO date_overrides (event_type_id,day,available,start_min,end_min)
+                       VALUES (NULL,?,?,?,?)""",
+            (day, avail, smin, emin),
+        )
+        audit.log(con, "date_override", 0, "add", diff={"day": day, "blocked": avail == 0})
     return RedirectResponse("/admin/scheduling", status_code=303)
 
 
 @router.post("/override/{override_id}/delete")
 async def del_override(override_id: int):
     with db.tx() as con:
-        con.execute("DELETE FROM date_overrides WHERE id=? AND event_type_id IS NULL",
-                    (override_id,))
+        con.execute(
+            "DELETE FROM date_overrides WHERE id=? AND event_type_id IS NULL", (override_id,)
+        )
         audit.log(con, "date_override", override_id, "delete")
     return RedirectResponse("/admin/scheduling", status_code=303)
 
@@ -289,8 +354,14 @@ async def google_connect(request: Request):
         raise HTTPException(status_code=400, detail="Google client id/secret not set")
     state = security.new_slug(24)
     resp = RedirectResponse(gcal.auth_url(state), status_code=303)
-    resp.set_cookie(_STATE_COOKIE, state, max_age=600, httponly=True,
-                    samesite="lax", secure=scheduling.config.COOKIE_SECURE)
+    resp.set_cookie(
+        _STATE_COOKIE,
+        state,
+        max_age=600,
+        httponly=True,
+        samesite="lax",
+        secure=scheduling.config.COOKIE_SECURE,
+    )
     return resp
 
 
@@ -335,9 +406,11 @@ async def google_disconnect(request: Request):
 
 # ── event types ──────────────────────────────────────────────────────────────
 
+
 @router.post("/event")
-async def create_event(request: Request, name: str = Form(...), slug: str = Form(...),
-                       duration_min: int = Form(30)):
+async def create_event(
+    request: Request, name: str = Form(...), slug: str = Form(...), duration_min: int = Form(30)
+):
     name, slug = name.strip(), slug.strip().lower()
     if not name:
         raise HTTPException(status_code=400, detail="name required")
@@ -348,10 +421,11 @@ async def create_event(request: Request, name: str = Form(...), slug: str = Form
     if not (5 <= duration_min <= 1440):
         raise HTTPException(status_code=400, detail="duration 5–1440 min")
     with db.tx() as con:
-        cur = con.execute("INSERT INTO event_types (slug,name,duration_min) VALUES (?,?,?)",
-                          (slug, name, duration_min))
-        audit.log(con, "event_type", cur.lastrowid, "create",
-                  diff={"slug": slug, "name": name})
+        cur = con.execute(
+            "INSERT INTO event_types (slug,name,duration_min) VALUES (?,?,?)",
+            (slug, name, duration_min),
+        )
+        audit.log(con, "event_type", cur.lastrowid, "create", diff={"slug": slug, "name": name})
         eid = cur.lastrowid
     return RedirectResponse(f"/admin/scheduling/event/{eid}", status_code=303)
 
@@ -359,8 +433,9 @@ async def create_event(request: Request, name: str = Form(...), slug: str = Form
 @router.get("/event/{event_id}", response_class=HTMLResponse)
 async def edit_event(request: Request, event_id: int):
     e = _get_event(event_id)
-    return templates.TemplateResponse(request, "admin/scheduling_event.html",
-                                      {"e": e, "base_url": scheduling.config.BASE_URL})
+    return templates.TemplateResponse(
+        request, "admin/scheduling_event.html", {"e": e, "base_url": scheduling.config.BASE_URL}
+    )
 
 
 @router.post("/event/{event_id}")
@@ -388,10 +463,14 @@ async def update_event(request: Request, event_id: int):
     }
     sets = ", ".join(f"{db.ident(k, _EVENT_COLS)}=?" for k in fields)
     with db.tx() as con:
-        con.execute(f"UPDATE event_types SET {sets} WHERE id=?",
-                    (*fields.values(), event_id))
-        audit.log(con, "event_type", event_id, "update",
-                  diff={k: [e[k], v] for k, v in fields.items() if e[k] != v})
+        con.execute(f"UPDATE event_types SET {sets} WHERE id=?", (*fields.values(), event_id))
+        audit.log(
+            con,
+            "event_type",
+            event_id,
+            "update",
+            diff={k: [e[k], v] for k, v in fields.items() if e[k] != v},
+        )
     return RedirectResponse(f"/admin/scheduling/event/{event_id}", status_code=303)
 
 
@@ -411,8 +490,9 @@ async def delete_event(event_id: int):
     n = db.one("SELECT COUNT(*) AS n FROM bookings WHERE event_type_id=?", (event_id,))
     if n["n"]:
         # Bookings reference this event — deactivate instead of orphaning history.
-        raise HTTPException(status_code=400,
-                            detail="event has bookings; deactivate it instead of deleting")
+        raise HTTPException(
+            status_code=400, detail="event has bookings; deactivate it instead of deleting"
+        )
     with db.tx() as con:
         con.execute("DELETE FROM event_types WHERE id=?", (event_id,))
         audit.log(con, "event_type", event_id, "delete", diff={"slug": e["slug"]})
@@ -420,6 +500,7 @@ async def delete_event(event_id: int):
 
 
 # ── bookings list + admin cancel ─────────────────────────────────────────────
+
 
 @router.get("/bookings", response_class=HTMLResponse)
 async def bookings(request: Request):
@@ -431,9 +512,11 @@ async def bookings(request: Request):
                       JOIN event_types e ON e.id=b.event_type_id
                       WHERE b.status!='confirmed' OR b.start_utc < datetime('now')
                       ORDER BY b.start_utc DESC LIMIT 100""")
-    return templates.TemplateResponse(request, "admin/scheduling_bookings.html",
-                                      {"upcoming": upcoming, "past": past,
-                                       "tz": scheduling.config.TIMEZONE})
+    return templates.TemplateResponse(
+        request,
+        "admin/scheduling_bookings.html",
+        {"upcoming": upcoming, "past": past, "tz": scheduling.config.TIMEZONE},
+    )
 
 
 @router.post("/booking/{booking_id}/cancel")

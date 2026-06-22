@@ -25,7 +25,7 @@ from . import config, db, gcal, security
 
 log = logging.getLogger("mise.scheduling")
 
-_UTC = dt.timezone.utc
+_UTC = dt.UTC
 
 
 class SlotTaken(Exception):
@@ -60,6 +60,7 @@ def now_utc() -> dt.datetime:
 
 # ── event-type lookups ───────────────────────────────────────────────────────
 
+
 def active_event_types() -> list:
     return db.all_("SELECT * FROM event_types WHERE active=1 ORDER BY position, id")
 
@@ -69,6 +70,7 @@ def event_by_slug(slug: str):
 
 
 # ── availability windows for a local day ─────────────────────────────────────
+
 
 def _windows_for_day(con, et, day: dt.date) -> list[tuple[int, int]]:
     """Return [(start_min, end_min), ...] of business-local availability for `day`.
@@ -81,7 +83,8 @@ def _windows_for_day(con, et, day: dt.date) -> list[tuple[int, int]]:
         """SELECT available, start_min, end_min FROM date_overrides
            WHERE day=? AND (event_type_id=? OR event_type_id IS NULL)
            ORDER BY event_type_id IS NULL LIMIT 1""",
-        (iso, et["id"])).fetchone()
+        (iso, et["id"]),
+    ).fetchone()
     if ov is not None:
         if not ov["available"] or ov["start_min"] is None or ov["end_min"] is None:
             return []
@@ -91,17 +94,20 @@ def _windows_for_day(con, et, day: dt.date) -> list[tuple[int, int]]:
     rows = con.execute(
         """SELECT start_min, end_min FROM availability_rules
            WHERE event_type_id=? AND weekday=? ORDER BY start_min""",
-        (et["id"], wd)).fetchall()
+        (et["id"], wd),
+    ).fetchall()
     if not rows:
         rows = con.execute(
             """SELECT start_min, end_min FROM availability_rules
                WHERE event_type_id IS NULL AND weekday=? ORDER BY start_min""",
-            (wd,)).fetchall()
+            (wd,),
+        ).fetchall()
     return [(r["start_min"], r["end_min"]) for r in rows]
 
 
-def _overlaps(con, et, start_utc: dt.datetime, end_utc: dt.datetime,
-              exclude_id: int | None) -> bool:
+def _overlaps(
+    con, et, start_utc: dt.datetime, end_utc: dt.datetime, exclude_id: int | None
+) -> bool:
     """True if the new booking collides with any confirmed booking. Both sides are
     padded by their OWN buffers (the new one in Python, existing ones in SQL), so a
     buffer protects travel/turnaround time symmetrically — a new slot can sit no
@@ -115,12 +121,14 @@ def _overlaps(con, et, start_utc: dt.datetime, end_utc: dt.datetime,
              AND datetime(b.start_utc, '-'||e.buffer_before_min||' minutes') < ?
              AND datetime(b.end_utc,   '+'||e.buffer_after_min ||' minutes') > ?
              AND (? IS NULL OR b.id != ?)""",
-        (hi, lo, exclude_id, exclude_id)).fetchone()
+        (hi, lo, exclude_id, exclude_id),
+    ).fetchone()
     return row["n"] > 0
 
 
-def _busy_conflict(start_utc: dt.datetime, end_utc: dt.datetime,
-                   busy: list[tuple[dt.datetime, dt.datetime]] | None) -> bool:
+def _busy_conflict(
+    start_utc: dt.datetime, end_utc: dt.datetime, busy: list[tuple[dt.datetime, dt.datetime]] | None
+) -> bool:
     """True if [start_utc, end_utc) overlaps any busy interval already on Kevin's
     Google calendar. `busy` is None when the calendar isn't available (fail-open:
     hide nothing). Calendar buffers are intentionally NOT applied here — an
@@ -139,13 +147,18 @@ def _day_count(con, et, day: dt.date) -> int:
         """SELECT COUNT(*) AS n FROM bookings
            WHERE status='confirmed' AND event_type_id=?
              AND start_utc >= ? AND start_utc < ?""",
-        (et["id"], _fmt_utc(start), _fmt_utc(end))).fetchone()
+        (et["id"], _fmt_utc(start), _fmt_utc(end)),
+    ).fetchone()
     return row["n"]
 
 
-def _slots_utc(con, et, day: dt.date, ref_utc: dt.datetime,
-               busy: list[tuple[dt.datetime, dt.datetime]] | None = None
-               ) -> list[dt.datetime]:
+def _slots_utc(
+    con,
+    et,
+    day: dt.date,
+    ref_utc: dt.datetime,
+    busy: list[tuple[dt.datetime, dt.datetime]] | None = None,
+) -> list[dt.datetime]:
     """Open slot start instants (UTC) for `day`, after all policy filters.
 
     `busy` (optional) is Google free/busy intervals for a range covering `day`;
@@ -171,15 +184,19 @@ def _slots_utc(con, et, day: dt.date, ref_utc: dt.datetime,
             start_local = midnight + dt.timedelta(minutes=m)
             start_utc = start_local.astimezone(_UTC)
             end_utc = start_utc + dur
-            if (start_utc >= notice_cutoff and start_utc <= window_cutoff
-                    and not _busy_conflict(start_utc, end_utc, busy)
-                    and not _overlaps(con, et, start_utc, end_utc, None)):
+            if (
+                start_utc >= notice_cutoff
+                and start_utc <= window_cutoff
+                and not _busy_conflict(start_utc, end_utc, busy)
+                and not _overlaps(con, et, start_utc, end_utc, None)
+            ):
                 out.append(start_utc)
             m += step
     return out
 
 
 # ── public API ───────────────────────────────────────────────────────────────
+
 
 def slots_for_day(et, day: dt.date, visitor_tz: str = "") -> list[dict]:
     """Render-ready open slots for `day`: each item has the UTC value (form
@@ -196,8 +213,7 @@ def slots_for_day(et, day: dt.date, visitor_tz: str = "") -> list[dict]:
     out = []
     for s in starts:
         local = s.astimezone(disp)
-        out.append({"utc": _fmt_utc(s),
-                    "label": local.strftime("%-I:%M %p").lstrip("0")})
+        out.append({"utc": _fmt_utc(s), "label": local.strftime("%-I:%M %p").lstrip("0")})
     return out
 
 
@@ -206,22 +222,33 @@ def days_with_slots(et, start_day: dt.date, n_days: int) -> set[str]:
     used to light up the month picker without an HTMX round-trip per day."""
     tz = _biz_tz()
     win_start = dt.datetime.combine(start_day, dt.time(), tz).astimezone(_UTC)
-    win_end = dt.datetime.combine(
-        start_day + dt.timedelta(days=n_days), dt.time(), tz).astimezone(_UTC)
+    win_end = dt.datetime.combine(start_day + dt.timedelta(days=n_days), dt.time(), tz).astimezone(
+        _UTC
+    )
     busy = gcal.free_busy(win_start, win_end)
     con = db.connect()
     try:
         ref = now_utc()
-        return {d.isoformat()
-                for i in range(n_days)
-                for d in [start_day + dt.timedelta(days=i)]
-                if _slots_utc(con, et, d, ref, busy)}
+        return {
+            d.isoformat()
+            for i in range(n_days)
+            for d in [start_day + dt.timedelta(days=i)]
+            if _slots_utc(con, et, d, ref, busy)
+        }
     finally:
         con.close()
 
 
-def book(et, start_utc_str: str, name: str, email: str, phone: str, notes: str,
-         visitor_tz: str, exclude_id: int | None = None) -> tuple[int, str]:
+def book(
+    et,
+    start_utc_str: str,
+    name: str,
+    email: str,
+    phone: str,
+    notes: str,
+    visitor_tz: str,
+    exclude_id: int | None = None,
+) -> tuple[int, str]:
     """Atomically claim a slot. Returns (booking_id, manage_token).
 
     Raises SlotTaken if the submitted instant is not currently an open slot
@@ -253,8 +280,19 @@ def book(et, start_utc_str: str, name: str, email: str, phone: str, notes: str,
             """INSERT INTO bookings (token, event_type_id, name, email, phone,
                                      notes, start_utc, end_utc, tz, reschedule_of)
                VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (token, et["id"], name, email, phone, notes,
-             start_utc_str, _fmt_utc(end_utc), visitor_tz, exclude_id))
+            (
+                token,
+                et["id"],
+                name,
+                email,
+                phone,
+                notes,
+                start_utc_str,
+                _fmt_utc(end_utc),
+                visitor_tz,
+                exclude_id,
+            ),
+        )
         bid = cur.lastrowid
         con.execute("COMMIT")
         return bid, token
@@ -275,7 +313,9 @@ def booking_by_token(token: str):
         """SELECT b.*, e.name AS event_name, e.slug AS event_slug,
                   e.duration_min, e.location, e.min_notice_hours
            FROM bookings b JOIN event_types e ON e.id=b.event_type_id
-           WHERE b.token=?""", (token,))
+           WHERE b.token=?""",
+        (token,),
+    )
 
 
 def cancel(token: str, reason: str = "") -> bool:
@@ -286,7 +326,9 @@ def cancel(token: str, reason: str = "") -> bool:
         cur = con.execute(
             """UPDATE bookings SET status='cancelled', cancel_reason=?,
                       cancelled_at=datetime('now')
-               WHERE token=? AND status='confirmed'""", (reason, token))
+               WHERE token=? AND status='confirmed'""",
+            (reason, token),
+        )
         con.commit()
         return cur.rowcount > 0
     finally:

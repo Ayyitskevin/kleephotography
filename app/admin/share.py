@@ -30,27 +30,55 @@ def _build_urls() -> list[dict]:
     name = config.SITE_NAME
     default_img = _first_starred_id()
     urls: list[dict] = [
-        {"path": "/", "title": f"{name} — Food & Beverage Photography",
-         "description": "Menus, dishes, drinks, and the rooms they live in.",
-         "og_image_id": default_img, "kind": "marketing"},
-        {"path": "/portfolio", "title": f"Portfolio — {name}",
-         "description": "F&B photography portfolio — dishes, drinks, interiors.",
-         "og_image_id": default_img, "kind": "marketing"},
-        {"path": "/work", "title": f"Work — {name}",
-         "description": "Selected shoots — menus, dishes, drinks, and the rooms they live in.",
-         "og_image_id": default_img, "kind": "marketing"},
-        {"path": "/services", "title": f"Services — {name}",
-         "description": "F&B photography, videography, and monthly retainers — Asheville-based.",
-         "og_image_id": default_img, "kind": "marketing"},
-        {"path": "/about", "title": f"About — {name}",
-         "description": f"{name} — food & beverage photography.",
-         "og_image_id": default_img, "kind": "marketing"},
-        {"path": "/book", "title": f"Book a shoot — {name}",
-         "description": "Pick a date and a starting service.",
-         "og_image_id": default_img, "kind": "marketing"},
-        {"path": "/contact", "title": f"Contact — {name}",
-         "description": "Tell me about your restaurant, café, bar, or brand.",
-         "og_image_id": default_img, "kind": "marketing"},
+        {
+            "path": "/",
+            "title": f"{name} — Food & Beverage Photography",
+            "description": "Menus, dishes, drinks, and the rooms they live in.",
+            "og_image_id": default_img,
+            "kind": "marketing",
+        },
+        {
+            "path": "/portfolio",
+            "title": f"Portfolio — {name}",
+            "description": "F&B photography portfolio — dishes, drinks, interiors.",
+            "og_image_id": default_img,
+            "kind": "marketing",
+        },
+        {
+            "path": "/work",
+            "title": f"Work — {name}",
+            "description": "Selected shoots — menus, dishes, drinks, and the rooms they live in.",
+            "og_image_id": default_img,
+            "kind": "marketing",
+        },
+        {
+            "path": "/services",
+            "title": f"Services — {name}",
+            "description": "F&B photography, videography, and monthly retainers — Asheville-based.",
+            "og_image_id": default_img,
+            "kind": "marketing",
+        },
+        {
+            "path": "/about",
+            "title": f"About — {name}",
+            "description": f"{name} — food & beverage photography.",
+            "og_image_id": default_img,
+            "kind": "marketing",
+        },
+        {
+            "path": "/book",
+            "title": f"Book a shoot — {name}",
+            "description": "Pick a date and a starting service.",
+            "og_image_id": default_img,
+            "kind": "marketing",
+        },
+        {
+            "path": "/contact",
+            "title": f"Contact — {name}",
+            "description": "Tell me about your restaurant, café, bar, or brand.",
+            "og_image_id": default_img,
+            "kind": "marketing",
+        },
     ]
     # case studies — only published, with the gallery's own hero photo
     studies = db.all_("""SELECT g.slug, g.title, g.client_name, g.cs_tagline,
@@ -62,13 +90,17 @@ def _build_urls() -> list[dict]:
                          FROM galleries g WHERE g.cs_published=1
                          ORDER BY g.created_at DESC""")
     for s in studies:
-        urls.append({
-            "path": f"/work/{s['slug']}",
-            "title": f"{s['cs_tagline'] or s['title']} — {name}",
-            "description": (s["cs_brief"] or "")[:200],
-            "og_image_id": s["hero_id"], "kind": "case_study",
-            "client": s["client_name"], "location": s["cs_location"],
-        })
+        urls.append(
+            {
+                "path": f"/work/{s['slug']}",
+                "title": f"{s['cs_tagline'] or s['title']} — {name}",
+                "description": (s["cs_brief"] or "")[:200],
+                "og_image_id": s["hero_id"],
+                "kind": "case_study",
+                "client": s["client_name"],
+                "location": s["cs_location"],
+            }
+        )
     base = config.BASE_URL.rstrip("/")
     for u in urls:
         full = base + u["path"]
@@ -83,6 +115,6 @@ def _build_urls() -> list[dict]:
 
 @router.get("/share", response_class=HTMLResponse)
 async def share_debugger(request: Request):
-    return templates.TemplateResponse(request, "admin/share.html",
-                                      {"urls": _build_urls(),
-                                       "base_url": config.BASE_URL})
+    return templates.TemplateResponse(
+        request, "admin/share.html", {"urls": _build_urls(), "base_url": config.BASE_URL}
+    )

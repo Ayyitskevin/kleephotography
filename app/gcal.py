@@ -27,14 +27,16 @@ import urllib.request
 from . import config, db
 
 log = logging.getLogger("mise.gcal")
-_UTC = dt.timezone.utc
+_UTC = dt.UTC
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 API = "https://www.googleapis.com/calendar/v3"
 # Least-privilege: read busy intervals + read/write events. No full-calendar scope.
-SCOPES = ("https://www.googleapis.com/auth/calendar.freebusy "
-          "https://www.googleapis.com/auth/calendar.events")
+SCOPES = (
+    "https://www.googleapis.com/auth/calendar.freebusy "
+    "https://www.googleapis.com/auth/calendar.events"
+)
 
 
 class GcalError(Exception):
@@ -42,6 +44,7 @@ class GcalError(Exception):
 
 
 # ── small helpers ────────────────────────────────────────────────────────────
+
 
 def _parse(utc_str: str) -> dt.datetime:
     return dt.datetime.strptime(utc_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=_UTC)
@@ -70,6 +73,7 @@ def _cal() -> str:
 
 # ── connection state ─────────────────────────────────────────────────────────
 
+
 def configured() -> bool:
     """OAuth client creds present in .env — the feature is provisioned."""
     return bool(config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET)
@@ -86,36 +90,44 @@ def is_connected() -> bool:
 
 def status() -> dict:
     r = _row()
-    return {"configured": configured(),
-            "connected": bool(r and r["refresh_token"]),
-            "connected_at": r["connected_at"] if r else None,
-            "calendar_id": config.GOOGLE_CALENDAR_ID,
-            "redirect_uri": config.GOOGLE_REDIRECT_URI}
+    return {
+        "configured": configured(),
+        "connected": bool(r and r["refresh_token"]),
+        "connected_at": r["connected_at"] if r else None,
+        "calendar_id": config.GOOGLE_CALENDAR_ID,
+        "redirect_uri": config.GOOGLE_REDIRECT_URI,
+    }
 
 
 # ── OAuth flow ───────────────────────────────────────────────────────────────
 
+
 def auth_url(state: str) -> str:
     """Google consent URL. access_type=offline + prompt=consent guarantees a
     refresh token is issued (even on re-connect)."""
-    q = urllib.parse.urlencode({
-        "client_id": config.GOOGLE_CLIENT_ID,
-        "redirect_uri": config.GOOGLE_REDIRECT_URI,
-        "response_type": "code",
-        "scope": SCOPES,
-        "access_type": "offline",
-        "include_granted_scopes": "true",
-        "prompt": "consent",
-        "state": state,
-    })
+    q = urllib.parse.urlencode(
+        {
+            "client_id": config.GOOGLE_CLIENT_ID,
+            "redirect_uri": config.GOOGLE_REDIRECT_URI,
+            "response_type": "code",
+            "scope": SCOPES,
+            "access_type": "offline",
+            "include_granted_scopes": "true",
+            "prompt": "consent",
+            "state": state,
+        }
+    )
     return f"{AUTH_URL}?{q}"
 
 
 def _token_call(payload: dict) -> dict:
     body = urllib.parse.urlencode(payload).encode()
     req = urllib.request.Request(
-        TOKEN_URL, data=body, method="POST",
-        headers={"Content-Type": "application/x-www-form-urlencoded"})
+        TOKEN_URL,
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read())
@@ -128,16 +140,21 @@ def _token_call(payload: dict) -> dict:
 
 def exchange_code(code: str) -> None:
     """Trade the auth code for tokens and persist the refresh token."""
-    tok = _token_call({
-        "code": code,
-        "client_id": config.GOOGLE_CLIENT_ID,
-        "client_secret": config.GOOGLE_CLIENT_SECRET,
-        "redirect_uri": config.GOOGLE_REDIRECT_URI,
-        "grant_type": "authorization_code"})
+    tok = _token_call(
+        {
+            "code": code,
+            "client_id": config.GOOGLE_CLIENT_ID,
+            "client_secret": config.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": config.GOOGLE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        }
+    )
     refresh = tok.get("refresh_token")
     if not refresh:
-        raise GcalError("no refresh_token returned — revoke Mise's access in your "
-                        "Google account and reconnect to force re-consent")
+        raise GcalError(
+            "no refresh_token returned — revoke Mise's access in your "
+            "Google account and reconnect to force re-consent"
+        )
     db.run(
         """INSERT INTO google_oauth (id, refresh_token, access_token, access_expiry,
                                      scope, connected_at)
@@ -148,8 +165,13 @@ def exchange_code(code: str) -> None:
              access_expiry=excluded.access_expiry,
              scope=excluded.scope,
              connected_at=datetime('now')""",
-        (refresh, tok.get("access_token", ""),
-         _expiry_str(tok.get("expires_in")), tok.get("scope", "")))
+        (
+            refresh,
+            tok.get("access_token", ""),
+            _expiry_str(tok.get("expires_in")),
+            tok.get("scope", ""),
+        ),
+    )
     log.info("google calendar connected")
 
 
@@ -164,31 +186,39 @@ def _access_token() -> str:
         raise GcalError("not connected")
     if r["access_token"] and r["access_expiry"] and r["access_expiry"] > _now_plus(60):
         return r["access_token"]
-    tok = _token_call({
-        "client_id": config.GOOGLE_CLIENT_ID,
-        "client_secret": config.GOOGLE_CLIENT_SECRET,
-        "refresh_token": r["refresh_token"],
-        "grant_type": "refresh_token"})
+    tok = _token_call(
+        {
+            "client_id": config.GOOGLE_CLIENT_ID,
+            "client_secret": config.GOOGLE_CLIENT_SECRET,
+            "refresh_token": r["refresh_token"],
+            "grant_type": "refresh_token",
+        }
+    )
     access = tok.get("access_token")
     if not access:
         raise GcalError("refresh produced no access token")
-    db.run("UPDATE google_oauth SET access_token=?, access_expiry=? WHERE id=1",
-           (access, _expiry_str(tok.get("expires_in"))))
+    db.run(
+        "UPDATE google_oauth SET access_token=?, access_expiry=? WHERE id=1",
+        (access, _expiry_str(tok.get("expires_in"))),
+    )
     return access
 
 
 def _api(method: str, path: str, payload: dict | None = None) -> dict:
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(
-        f"{API}{path}", data=data, method=method,
-        headers={"Authorization": f"Bearer {_access_token()}",
-                 "Content-Type": "application/json"})
+        f"{API}{path}",
+        data=data,
+        method=method,
+        headers={"Authorization": f"Bearer {_access_token()}", "Content-Type": "application/json"},
+    )
     with urllib.request.urlopen(req, timeout=15) as resp:
         raw = resp.read()
         return json.loads(raw) if raw else {}
 
 
 # ── free/busy ────────────────────────────────────────────────────────────────
+
 
 def free_busy(time_min: dt.datetime, time_max: dt.datetime):
     """Busy intervals [(start_utc, end_utc), ...] on the business calendar, or None
@@ -197,10 +227,15 @@ def free_busy(time_min: dt.datetime, time_max: dt.datetime):
     if not configured() or not is_connected():
         return None
     try:
-        res = _api("POST", "/freeBusy", {
-            "timeMin": _rfc3339(time_min),
-            "timeMax": _rfc3339(time_max),
-            "items": [{"id": config.GOOGLE_CALENDAR_ID}]})
+        res = _api(
+            "POST",
+            "/freeBusy",
+            {
+                "timeMin": _rfc3339(time_min),
+                "timeMax": _rfc3339(time_max),
+                "items": [{"id": config.GOOGLE_CALENDAR_ID}],
+            },
+        )
         busy = res.get("calendars", {}).get(config.GOOGLE_CALENDAR_ID, {}).get("busy", [])
         return [(_parse_rfc3339(b["start"]), _parse_rfc3339(b["end"])) for b in busy]
     except Exception as e:
@@ -209,6 +244,7 @@ def free_busy(time_min: dt.datetime, time_max: dt.datetime):
 
 
 # ── event sync (booking lifecycle) ───────────────────────────────────────────
+
 
 def _event_body(b) -> dict:
     parts = [f"Email: {b['email']}", f"Phone: {b['phone'] or '—'}"]
@@ -246,7 +282,9 @@ def on_booking_confirmed(booking_id: int) -> None:
     b = db.one(
         """SELECT b.*, e.name AS event_name, e.location AS event_location
            FROM bookings b JOIN event_types e ON e.id=b.event_type_id
-           WHERE b.id=?""", (booking_id,))
+           WHERE b.id=?""",
+        (booking_id,),
+    )
     if not b:
         return
     try:
@@ -258,8 +296,7 @@ def on_booking_confirmed(booking_id: int) -> None:
         else:
             ev = _api("POST", f"/calendars/{_cal()}/events", body)
             if ev.get("id"):
-                db.run("UPDATE bookings SET google_event_id=? WHERE id=?",
-                       (ev["id"], booking_id))
+                db.run("UPDATE bookings SET google_event_id=? WHERE id=?", (ev["id"], booking_id))
         log.info("gcal event synced for booking %s", booking_id)
     except Exception as e:
         log.warning("gcal event sync for booking %s failed: %s", booking_id, e)

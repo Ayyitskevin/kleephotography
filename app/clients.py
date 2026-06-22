@@ -18,7 +18,8 @@ def ancestor_ids(client_id: int) -> list[int]:
         "  UNION"
         "  SELECT c.id, c.parent_id, sup.depth+1 FROM clients c JOIN sup ON c.id=sup.parent_id"
         ") SELECT id FROM sup WHERE id<>? ORDER BY depth",
-        (client_id, client_id))
+        (client_id, client_id),
+    )
     return [r["id"] for r in rows]
 
 
@@ -30,5 +31,6 @@ def descendant_ids(client_id: int) -> list[int]:
         "  UNION"
         "  SELECT c.id, sub.depth+1 FROM clients c JOIN sub ON c.parent_id=sub.id"
         ") SELECT id FROM sub WHERE id<>? ORDER BY depth, id",
-        (client_id, client_id))
+        (client_id, client_id),
+    )
     return [r["id"] for r in rows]

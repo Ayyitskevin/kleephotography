@@ -15,9 +15,9 @@ def _static_rev() -> int:
     every static URL. Recomputed per render (not frozen at startup) because
     CSS/JS deploys land via `git pull` with no service restart: a startup-frozen
     value would keep emitting the old `?v=` and browsers would serve stale CSS."""
-    return int(max(
-        (f.stat().st_mtime for f in (ROOT / "static").glob("*") if f.is_file()),
-        default=0))
+    return int(
+        max((f.stat().st_mtime for f in (ROOT / "static").glob("*") if f.is_file()), default=0)
+    )
 
 
 templates = Jinja2Templates(
@@ -92,8 +92,11 @@ def _localtime(utc_str, fmt="%a %b %-d · %-I:%M %p"):
     if not utc_str:
         return ""
     try:
-        d = dt.datetime.strptime(utc_str, "%Y-%m-%d %H:%M:%S").replace(
-            tzinfo=dt.timezone.utc).astimezone(ZoneInfo(config.TIMEZONE))
+        d = (
+            dt.datetime.strptime(utc_str, "%Y-%m-%d %H:%M:%S")
+            .replace(tzinfo=dt.UTC)
+            .astimezone(ZoneInfo(config.TIMEZONE))
+        )
     except (ValueError, TypeError):
         return utc_str
     return d.strftime(fmt)
@@ -140,12 +143,18 @@ def _apply_merge(text: str, ctx: dict) -> str:
 def email_template_options(d, p, doc_url: str) -> list[dict]:
     """Active email templates with merge fields resolved for this doc — feeds the
     one-click picker on the send form. Read-only; sends stay manual."""
-    rows = db.all_("SELECT name, subject, body FROM email_templates "
-                   "WHERE deleted_at IS NULL ORDER BY name")
+    rows = db.all_(
+        "SELECT name, subject, body FROM email_templates WHERE deleted_at IS NULL ORDER BY name"
+    )
     ctx = _merge_ctx(d, p, doc_url)
-    return [{"name": r["name"],
-             "subject": _apply_merge(r["subject"], ctx),
-             "body": _apply_merge(r["body"], ctx)} for r in rows]
+    return [
+        {
+            "name": r["name"],
+            "subject": _apply_merge(r["subject"], ctx),
+            "body": _apply_merge(r["body"], ctx),
+        }
+        for r in rows
+    ]
 
 
 templates.env.globals["email_template_options"] = email_template_options

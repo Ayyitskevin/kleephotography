@@ -22,8 +22,7 @@ from fastapi.responses import HTMLResponse
 from .. import config, db, security
 from ..render import templates
 
-router = APIRouter(prefix="/admin/portals",
-                   dependencies=[Depends(security.require_admin)])
+router = APIRouter(prefix="/admin/portals", dependencies=[Depends(security.require_admin)])
 
 
 def _rel(ts: str | None) -> str:
@@ -34,7 +33,7 @@ def _rel(ts: str | None) -> str:
         last = dt.datetime.fromisoformat(ts)
     except ValueError:
         return "unknown"
-    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    now = dt.datetime.now(dt.UTC).replace(tzinfo=None)
     secs = (now - last).total_seconds()
     if secs < 3600:
         return f"{max(int(secs // 60), 1)}m ago"
@@ -65,47 +64,77 @@ async def portals(request: Request):
                        AND a.kind='photo' AND a.status='ready') AS n_faves
              FROM portals po JOIN clients c ON c.id=po.client_id
             ORDER BY po.published DESC, po.last_visit IS NULL, po.last_visit DESC,
-                     c.name""")
+                     c.name"""
+    )
 
     base = config.BASE_URL.rstrip("/")
     portals = []
     for r in rows:
         biz = r["company"] or r["client_name"]
         url = f"{base}/portal/{r['slug']}"
-        body = quote(f"Here's the client portal for {biz}:\n\n{url}\n"
-                     f"PIN: {r['pin']}\n\nIt includes gallery deliveries, "
-                     f"social-ready crops of favourited photos, and brand assets.\n")
-        portals.append({
-            "id": r["id"], "client_id": r["client_id"], "biz": biz,
-            "published": bool(r["published"]), "slug": r["slug"], "pin": r["pin"],
-            "url": url, "path": f"/portal/{r['slug']}",
-            "share_href": f"mailto:?subject={quote('Your shared portal — ' + biz)}&body={body}",
-            "visits": r["visits"] or 0, "last": _rel(r["last_visit"]),
-            "n_galleries": r["n_galleries"], "n_faves": r["n_faves"],
-            "n_brand": r["n_brand"],
-            "rights": bool((r["usage_rights"] or "").strip()),
-        })
+        body = quote(
+            f"Here's the client portal for {biz}:\n\n{url}\n"
+            f"PIN: {r['pin']}\n\nIt includes gallery deliveries, "
+            f"social-ready crops of favourited photos, and brand assets.\n"
+        )
+        portals.append(
+            {
+                "id": r["id"],
+                "client_id": r["client_id"],
+                "biz": biz,
+                "published": bool(r["published"]),
+                "slug": r["slug"],
+                "pin": r["pin"],
+                "url": url,
+                "path": f"/portal/{r['slug']}",
+                "share_href": f"mailto:?subject={quote('Your shared portal — ' + biz)}&body={body}",
+                "visits": r["visits"] or 0,
+                "last": _rel(r["last_visit"]),
+                "n_galleries": r["n_galleries"],
+                "n_faves": r["n_faves"],
+                "n_brand": r["n_brand"],
+                "rights": bool((r["usage_rights"] or "").strip()),
+            }
+        )
 
     no_portal = db.all_(
         """SELECT id, name, company FROM clients
             WHERE id NOT IN (SELECT client_id FROM portals)
-            ORDER BY name""")
+            ORDER BY name"""
+    )
     no_portal = [{"id": c["id"], "biz": c["company"] or c["name"]} for c in no_portal]
 
     n_pub = sum(1 for p in portals if p["published"])
     n_visits = sum(p["visits"] for p in portals)
     n_unopened = sum(1 for p in portals if p["published"] and p["last"] == "never")
     cards = [
-        {"label": "Published portals", "value": str(n_pub), "tone": "dark",
-         "sub": f"{len(portals) - n_pub} draft"},
-        {"label": "Total visits", "value": f"{n_visits:,}", "tone": "ok",
-         "sub": "across all hubs"},
-        {"label": "Never opened", "value": str(n_unopened), "tone": "warn",
-         "sub": "published but unvisited"},
-        {"label": "No portal yet", "value": str(len(no_portal)), "tone": "plain",
-         "sub": "clients to set up"},
+        {
+            "label": "Published portals",
+            "value": str(n_pub),
+            "tone": "dark",
+            "sub": f"{len(portals) - n_pub} draft",
+        },
+        {"label": "Total visits", "value": f"{n_visits:,}", "tone": "ok", "sub": "across all hubs"},
+        {
+            "label": "Never opened",
+            "value": str(n_unopened),
+            "tone": "warn",
+            "sub": "published but unvisited",
+        },
+        {
+            "label": "No portal yet",
+            "value": str(len(no_portal)),
+            "tone": "plain",
+            "sub": "clients to set up",
+        },
     ]
 
-    return templates.TemplateResponse(request, "admin/portals.html", {
-        "cards": cards, "portals": portals, "no_portal": no_portal,
-    })
+    return templates.TemplateResponse(
+        request,
+        "admin/portals.html",
+        {
+            "cards": cards,
+            "portals": portals,
+            "no_portal": no_portal,
+        },
+    )

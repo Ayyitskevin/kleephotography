@@ -23,22 +23,27 @@ log = logging.getLogger("mise.ops_monitor")
 
 def _check_disk() -> None:
     import shutil
+
     free_gb = shutil.disk_usage(config.DATA_DIR).free / 1e9
     if free_gb < config.MIN_FREE_GB:
         alerts.ops_alert(
             "disk_low",
             f"Low disk — {free_gb:.1f} GB free, below the {config.MIN_FREE_GB} GB "
-            f"upload floor. New uploads are being refused until space is freed.")
+            f"upload floor. New uploads are being refused until space is freed.",
+        )
 
 
 def _check_backup() -> None:
     import datetime as dt
+
     bdir = config.DATA_DIR / "backups"
     snaps = sorted(bdir.glob("*.db.gz")) if bdir.exists() else []
     if not snaps:
-        alerts.ops_alert("backup_missing",
-                         "No database backup found at all — the nightly backup "
-                         "may have stopped. Check mise-backup.timer.")
+        alerts.ops_alert(
+            "backup_missing",
+            "No database backup found at all — the nightly backup "
+            "may have stopped. Check mise-backup.timer.",
+        )
         return
     newest = max(snaps, key=lambda p: p.stat().st_mtime)
     age_h = (dt.datetime.now().timestamp() - newest.stat().st_mtime) / 3600
@@ -47,7 +52,8 @@ def _check_backup() -> None:
             "backup_stale",
             f"Latest database backup is {int(age_h)}h old (over the "
             f"{config.BACKUP_STALE_HOURS}h threshold) — the nightly backup may "
-            f"have stopped. Check mise-backup.timer.")
+            f"have stopped. Check mise-backup.timer.",
+        )
 
 
 def sweep() -> None:

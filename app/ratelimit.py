@@ -25,8 +25,7 @@ _last_gc = 0.0
 
 def _bucket_for(path: str) -> str | None:
     """Bucket name to charge, or None to skip (exempt)."""
-    if path == "/healthz" or path.startswith(
-            ("/static/", "/media/", "/site/img/", "/work/")):
+    if path == "/healthz" or path.startswith(("/static/", "/media/", "/site/img/", "/work/")):
         return None  # static + media grid: legit bursts, never limited
     if "/download" in path:
         return "download"
@@ -63,7 +62,10 @@ def check(request: Request, path: str) -> JSONResponse | None:
     if len(dq) >= limit:
         retry = int(dq[0] + window - now) + 1
         log.warning("rate limit hit: %s bucket=%s ip=%s", path, bucket, ip)
-        return JSONResponse({"detail": "Too many requests — slow down."},
-                            status_code=429, headers={"Retry-After": str(retry)})
+        return JSONResponse(
+            {"detail": "Too many requests — slow down."},
+            status_code=429,
+            headers={"Retry-After": str(retry)},
+        )
     dq.append(now)
     return None

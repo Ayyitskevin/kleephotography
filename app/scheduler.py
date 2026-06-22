@@ -17,8 +17,14 @@ which is plenty for a monthly event.
 import logging
 import threading
 
-from . import (booking_reminders, config, contract_reminders, gallery_reminders,
-               ops_monitor, postshoot_reminders)
+from . import (
+    booking_reminders,
+    config,
+    contract_reminders,
+    gallery_reminders,
+    ops_monitor,
+    postshoot_reminders,
+)
 from .admin import recurring
 
 log = logging.getLogger("mise.scheduler")
@@ -60,8 +66,7 @@ def start() -> None:
     _stop.clear()
     _thread = threading.Thread(target=_loop, name="mise-recurring", daemon=True)
     _thread.start()
-    log.info("recurring scheduler up (every %ss, drafts only)",
-             config.RECURRING_TICK_SECONDS)
+    log.info("recurring scheduler up (every %ss, drafts only)", config.RECURRING_TICK_SECONDS)
 
 
 def stop() -> None:

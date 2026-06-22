@@ -16,7 +16,7 @@ import logging
 import urllib.error
 import urllib.request
 
-from . import config
+from . import config, features
 
 log = logging.getLogger("mise.caption_ai")
 
@@ -30,7 +30,7 @@ def is_enabled() -> bool:
     """AI drafting is armed only when BOTH the endpoint URL and the bearer token are
     configured. Either unset -> the "Draft with AI" button stays cleanly dormant
     (the route greys it out; a direct call raises CaptionDraftError, never crashes)."""
-    return bool(config.ODYSSEUS_CAPTION_URL and config.ODYSSEUS_CAPTION_TOKEN)
+    return features.odysseus_caption_enabled()
 
 
 def draft_caption(ctx: dict) -> dict:
@@ -42,10 +42,14 @@ def draft_caption(ctx: dict) -> dict:
     if not is_enabled():
         raise CaptionDraftError("AI drafting is not configured")
     req = urllib.request.Request(
-        config.ODYSSEUS_CAPTION_URL, method="POST",
+        config.ODYSSEUS_CAPTION_URL,
+        method="POST",
         data=json.dumps(ctx).encode(),
-        headers={"Content-Type": "application/json",
-                 "Authorization": f"Bearer {config.ODYSSEUS_CAPTION_TOKEN}"})
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {config.ODYSSEUS_CAPTION_TOKEN}",
+        },
+    )
     try:
         with urllib.request.urlopen(req, timeout=config.ODYSSEUS_TIMEOUT) as resp:
             payload = json.loads(resp.read().decode())

@@ -23,7 +23,7 @@ import logging
 import urllib.error
 import urllib.request
 
-from . import config
+from . import config, features
 
 log = logging.getLogger("mise.sms")
 
@@ -36,7 +36,7 @@ class SmsError(Exception):
 def configured() -> bool:
     """Armed only when an API key AND a from-number are set. Either unset -> the
     Inbox's SMS channel stays cleanly dormant."""
-    return bool(config.QUO_API_KEY and config.QUO_NUMBER)
+    return features.sms_enabled()
 
 
 def send(to: str, body: str) -> str:
@@ -53,11 +53,11 @@ def send(to: str, body: str) -> str:
     if not body:
         raise SmsError("message body is empty")
     req = urllib.request.Request(
-        f"{config.QUO_API_BASE}/messages", method="POST",
-        data=json.dumps({"from": config.QUO_NUMBER, "to": [to],
-                         "content": body}).encode(),
-        headers={"Content-Type": "application/json",
-                 "Authorization": config.QUO_API_KEY})
+        f"{config.QUO_API_BASE}/messages",
+        method="POST",
+        data=json.dumps({"from": config.QUO_NUMBER, "to": [to], "content": body}).encode(),
+        headers={"Content-Type": "application/json", "Authorization": config.QUO_API_KEY},
+    )
     try:
         with urllib.request.urlopen(req, timeout=config.QUO_TIMEOUT) as resp:
             payload = json.loads(resp.read().decode())

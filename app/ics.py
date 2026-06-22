@@ -19,23 +19,32 @@ def _compact(utc_str: str) -> str:
 
 
 def _esc(text: str) -> str:
-    return (text.replace("\\", "\\\\").replace(";", "\\;")
-                .replace(",", "\\,").replace("\n", "\\n"))
+    return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 
 def uid_for(booking_id: int) -> str:
     return f"mise-booking-{booking_id}@kleephotography.com"
 
 
-def build(*, uid: str, summary: str, description: str, location: str,
-          start_utc: str, end_utc: str, organizer_email: str,
-          attendee_email: str, sequence: int = 0, cancelled: bool = False) -> str:
+def build(
+    *,
+    uid: str,
+    summary: str,
+    description: str,
+    location: str,
+    start_utc: str,
+    end_utc: str,
+    organizer_email: str,
+    attendee_email: str,
+    sequence: int = 0,
+    cancelled: bool = False,
+) -> str:
     """Return a complete VCALENDAR string. method=CANCEL + STATUS:CANCELLED when
     `cancelled`, so an importing client removes the held slot instead of duplicating
     it. SEQUENCE must increase across updates for clients to honour the change."""
     method = "CANCEL" if cancelled else "REQUEST"
     status = "CANCELLED" if cancelled else "CONFIRMED"
-    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
@@ -60,14 +69,15 @@ def build(*, uid: str, summary: str, description: str, location: str,
     return "\r\n".join(lines) + "\r\n"
 
 
-def google_link(*, summary: str, details: str, location: str,
-                start_utc: str, end_utc: str) -> str:
+def google_link(*, summary: str, details: str, location: str, start_utc: str, end_utc: str) -> str:
     """Prefilled Google Calendar 'add event' URL (no login state required)."""
-    q = urlencode({
-        "action": "TEMPLATE",
-        "text": summary,
-        "dates": f"{_compact(start_utc)}/{_compact(end_utc)}",
-        "details": details,
-        "location": location,
-    })
+    q = urlencode(
+        {
+            "action": "TEMPLATE",
+            "text": summary,
+            "dates": f"{_compact(start_utc)}/{_compact(end_utc)}",
+            "details": details,
+            "location": location,
+        }
+    )
     return f"https://calendar.google.com/calendar/render?{q}"

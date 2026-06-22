@@ -40,20 +40,26 @@ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 # bleed_px/color_space/dpi are carried by the schema but not honored by the
 # render path yet, so they are deliberately not exposed — no inputs that do
 # nothing. active/brand_overlay have their own toggle routes.
-_EDIT_FIELDS = ["name", "ratio_label", "width", "height",
-                "centering_x", "centering_y", "target_channel", "sort"]
+_EDIT_FIELDS = [
+    "name",
+    "ratio_label",
+    "width",
+    "height",
+    "centering_x",
+    "centering_y",
+    "target_channel",
+    "sort",
+]
 
 
 def get_preset(preset_id: int) -> "db.sqlite3.Row":
-    p = db.one("SELECT * FROM crop_presets WHERE id=?", (preset_id,))
-    if not p:
-        raise HTTPException(status_code=404)
-    return p
+    return db.get_or_404("SELECT * FROM crop_presets WHERE id=?", (preset_id,))
 
 
 def _parse(form) -> dict:
     """Pull the editable preset fields out of a form into a normalized dict.
     Validates dimensions, centering, and sort; slug is handled separately."""
+
     def posint(key: str, lo: int, hi: int) -> int:
         try:
             v = int(form.get(key) or "")
@@ -99,14 +105,21 @@ async def presets_list(request: Request):
     rows = db.all_("SELECT * FROM crop_presets ORDER BY active DESC, sort, id")
     trail = db.all_(
         """SELECT entity_id, action, actor, diff_json, created_at FROM audit_log
-           WHERE entity_type='crop_preset' ORDER BY id DESC LIMIT 50""")
+           WHERE entity_type='crop_preset' ORDER BY id DESC LIMIT 50"""
+    )
     slug_by_id = {p["id"]: p["slug"] for p in rows}
     return templates.TemplateResponse(
-        request, "admin/presets.html",
-        {"presets": rows, "slug_by_id": slug_by_id,
-         "trail": [{**dict(t),
-                    "diff": json.loads(t["diff_json"]) if t["diff_json"] else None}
-                   for t in trail]})
+        request,
+        "admin/presets.html",
+        {
+            "presets": rows,
+            "slug_by_id": slug_by_id,
+            "trail": [
+                {**dict(t), "diff": json.loads(t["diff_json"]) if t["diff_json"] else None}
+                for t in trail
+            ],
+        },
+    )
 
 
 @router.post("/presets")
@@ -116,7 +129,8 @@ async def create_preset(request: Request):
     if not SLUG_RE.match(slug):
         raise HTTPException(
             status_code=400,
-            detail="slug must be lowercase letters/numbers/_/- (no spaces, dots, slashes)")
+            detail="slug must be lowercase letters/numbers/_/- (no spaces, dots, slashes)",
+        )
     new = _parse(form)
     with db.tx() as con:
         if con.execute("SELECT 1 FROM crop_presets WHERE slug=?", (slug,)).fetchone():
@@ -126,8 +140,18 @@ async def create_preset(request: Request):
                (slug, name, ratio_label, width, height, centering_x, centering_y,
                 target_channel, sort)
                VALUES (?,?,?,?,?,?,?,?,?)""",
-            (slug, new["name"], new["ratio_label"], new["width"], new["height"],
-             new["centering_x"], new["centering_y"], new["target_channel"], new["sort"]))
+            (
+                slug,
+                new["name"],
+                new["ratio_label"],
+                new["width"],
+                new["height"],
+                new["centering_x"],
+                new["centering_y"],
+                new["target_channel"],
+                new["sort"],
+            ),
+        )
         pid = cur.lastrowid
         audit.log(con, "crop_preset", pid, "create", diff={"slug": slug, **new})
     log.info("crop_preset %s created (slug=%s)", pid, slug)
@@ -146,9 +170,18 @@ async def update_preset(request: Request, preset_id: int):
         con.execute(
             """UPDATE crop_presets SET name=?, ratio_label=?, width=?, height=?,
                centering_x=?, centering_y=?, target_channel=?, sort=? WHERE id=?""",
-            (new["name"], new["ratio_label"], new["width"], new["height"],
-             new["centering_x"], new["centering_y"], new["target_channel"],
-             new["sort"], preset_id))
+            (
+                new["name"],
+                new["ratio_label"],
+                new["width"],
+                new["height"],
+                new["centering_x"],
+                new["centering_y"],
+                new["target_channel"],
+                new["sort"],
+                preset_id,
+            ),
+        )
         audit.log(con, "crop_preset", preset_id, "update", diff=diff)
     log.info("crop_preset %s updated (%d fields)", preset_id, len(diff))
     return RedirectResponse("/admin/studio/presets", status_code=303)
@@ -160,8 +193,9 @@ async def toggle_active(preset_id: int):
     new = 0 if p["active"] else 1
     with db.tx() as con:
         con.execute("UPDATE crop_presets SET active=? WHERE id=?", (new, preset_id))
-        audit.log(con, "crop_preset", preset_id, "active_change",
-                  diff={"active": [p["active"], new]})
+        audit.log(
+            con, "crop_preset", preset_id, "active_change", diff={"active": [p["active"], new]}
+        )
     log.info("crop_preset %s active %s -> %s", preset_id, p["active"], new)
     return RedirectResponse("/admin/studio/presets", status_code=303)
 
@@ -172,7 +206,12 @@ async def toggle_overlay(preset_id: int):
     new = 0 if p["brand_overlay"] else 1
     with db.tx() as con:
         con.execute("UPDATE crop_presets SET brand_overlay=? WHERE id=?", (new, preset_id))
-        audit.log(con, "crop_preset", preset_id, "overlay_change",
-                  diff={"brand_overlay": [p["brand_overlay"], new]})
+        audit.log(
+            con,
+            "crop_preset",
+            preset_id,
+            "overlay_change",
+            diff={"brand_overlay": [p["brand_overlay"], new]},
+        )
     log.info("crop_preset %s brand_overlay %s -> %s", preset_id, p["brand_overlay"], new)
     return RedirectResponse("/admin/studio/presets", status_code=303)

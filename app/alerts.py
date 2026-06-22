@@ -15,7 +15,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from . import config
+from . import config, features
 
 log = logging.getLogger("mise.alerts")
 
@@ -38,13 +38,14 @@ _ops_lock = threading.Lock()
 
 
 def is_enabled() -> bool:
-    return bool(config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID)
+    return features.telegram_enabled()
 
 
 def _send(text: str) -> None:
     url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendMessage"
     data = urllib.parse.urlencode(
-        {"chat_id": config.TELEGRAM_CHAT_ID, "text": text[:3800]}).encode()
+        {"chat_id": config.TELEGRAM_CHAT_ID, "text": text[:3800]}
+    ).encode()
     try:
         with urllib.request.urlopen(url, data=data, timeout=5) as r:
             r.read()
@@ -55,8 +56,7 @@ def _send(text: str) -> None:
 def security_alert(text: str) -> None:
     if not is_enabled():
         return
-    threading.Thread(target=_send, args=(f"\U0001f510 Mise: {text}",),
-                     daemon=True).start()
+    threading.Thread(target=_send, args=(f"\U0001f510 Mise: {text}",), daemon=True).start()
 
 
 def error_alert(signature: str, text: str) -> None:
@@ -79,8 +79,7 @@ def error_alert(signature: str, text: str) -> None:
     if suppressed:
         text += f"\n(+{suppressed} more like this in the last "
         text += f"{_ERROR_COOLDOWN // 60} min, not shown)"
-    threading.Thread(target=_send, args=(f"\U0001f4a5 Mise crash: {text}",),
-                     daemon=True).start()
+    threading.Thread(target=_send, args=(f"\U0001f4a5 Mise crash: {text}",), daemon=True).start()
 
 
 def ops_alert(signature: str, text: str) -> None:
@@ -95,8 +94,7 @@ def ops_alert(signature: str, text: str) -> None:
         if now - _ops_last.get(signature, 0.0) < _OPS_COOLDOWN:
             return
         _ops_last[signature] = now
-    threading.Thread(target=_send, args=(f"\U0001f6df Mise ops: {text}",),
-                     daemon=True).start()
+    threading.Thread(target=_send, args=(f"\U0001f6df Mise ops: {text}",), daemon=True).start()
 
 
 def notify(text: str) -> None:
@@ -105,5 +103,4 @@ def notify(text: str) -> None:
     for internal nudges to Kevin — never a client-facing message."""
     if not is_enabled():
         return
-    threading.Thread(target=_send, args=(f"\U0001f514 Mise: {text}",),
-                     daemon=True).start()
+    threading.Thread(target=_send, args=(f"\U0001f514 Mise: {text}",), daemon=True).start()

@@ -45,10 +45,14 @@ def check(request: Request) -> JSONResponse | None:
     if request.method in _SAFE_METHODS:
         return None
     ours = _origin(config.BASE_URL)
-    sent = _origin(request.headers.get("origin", "")) \
-        or _origin(request.headers.get("referer", ""))
+    sent = _origin(request.headers.get("origin", "")) or _origin(request.headers.get("referer", ""))
     if sent is None or sent == ours:
         return None
-    log.warning("cross-origin %s %s blocked: origin=%s expected=%s",
-                request.method, request.url.path, sent, ours)
+    log.warning(
+        "cross-origin %s %s blocked: origin=%s expected=%s",
+        request.method,
+        request.url.path,
+        sent,
+        ours,
+    )
     return JSONResponse({"detail": "cross-origin request blocked"}, status_code=403)

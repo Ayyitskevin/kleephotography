@@ -35,11 +35,14 @@ async def shots(session: str = ""):
     rows = db.all_(
         "SELECT title, category, priority FROM shot_list "
         "WHERE project_id=? AND deleted_at IS NULL ORDER BY sort_order, id",
-        (proj["id"],))
+        (proj["id"],),
+    )
     return {
         "matched": True,
         "project_id": proj["id"],
         "session": session,
-        "shots": [{"title": r["title"], "category": r["category"],
-                   "priority": r["priority"]} for r in rows],
+        "shots": [
+            {"title": r["title"], "category": r["category"], "priority": r["priority"]}
+            for r in rows
+        ],
     }

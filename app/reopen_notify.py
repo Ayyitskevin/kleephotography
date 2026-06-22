@@ -39,10 +39,14 @@ def notify_reopen(payload: dict) -> bool:
     if not is_enabled():
         return False
     req = urllib.request.Request(
-        config.REOPEN_NOTIFY_URL, method="POST",
+        config.REOPEN_NOTIFY_URL,
+        method="POST",
         data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json",
-                 "Authorization": f"Bearer {config.REOPEN_NOTIFY_TOKEN}"})
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {config.REOPEN_NOTIFY_TOKEN}",
+        },
+    )
     try:
         with urllib.request.urlopen(req, timeout=config.REOPEN_NOTIFY_TIMEOUT) as resp:
             if resp.status >= 400:
@@ -52,13 +56,15 @@ def notify_reopen(payload: dict) -> bool:
         log.warning("reopen notify: Odysseus returned HTTP %s", e.code)
         return False
     except (urllib.error.URLError, TimeoutError) as e:
-        log.warning("reopen notify: Odysseus unreachable: %s",
-                    getattr(e, "reason", e))
+        log.warning("reopen notify: Odysseus unreachable: %s", getattr(e, "reason", e))
         return False
     except Exception:
         log.exception("reopen notify: unexpected failure (non-fatal)")
         return False
-    log.info("reopen notify sent (gallery=%s asset=%s root=%s)",
-             payload.get("gallery_slug"), payload.get("asset_id"),
-             payload.get("root_id"))
+    log.info(
+        "reopen notify sent (gallery=%s asset=%s root=%s)",
+        payload.get("gallery_slug"),
+        payload.get("asset_id"),
+        payload.get("root_id"),
+    )
     return True

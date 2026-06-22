@@ -36,7 +36,8 @@ def _due() -> list["db.sqlite3.Row"]:
               AND ct.nudged_unsigned = 0
               AND ct.sent_at IS NOT NULL
               AND ct.sent_at <= datetime('now', '-{int(config.CONTRACT_NUDGE_DAYS)} days')
-            ORDER BY ct.sent_at ASC""")
+            ORDER BY ct.sent_at ASC"""
+    )
 
 
 def sweep() -> None:
@@ -50,7 +51,8 @@ def sweep() -> None:
             alerts.notify(
                 f"Contract still unsigned — {ct['title']} · {who} "
                 f"(sent {ct['age_d']}d ago). {config.BASE_URL}"
-                f"/admin/studio/contracts/{ct['id']}")
+                f"/admin/studio/contracts/{ct['id']}"
+            )
             db.run("UPDATE contracts SET nudged_unsigned=1 WHERE id=?", (ct["id"],))
             log.info("contract %s unsigned nudge sent (%sd old)", ct["id"], ct["age_d"])
         except Exception as e:

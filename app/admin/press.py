@@ -28,8 +28,20 @@ log = logging.getLogger("mise.admin.press")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])
 
 # Columns the diff/audit machinery tracks. Order = form/display order.
-_FIELDS = ["outlet", "title", "url", "publish_date", "channel", "credit", "note",
-           "client_id", "project_id", "gallery_id", "asset_id", "show_on_site"]
+_FIELDS = [
+    "outlet",
+    "title",
+    "url",
+    "publish_date",
+    "channel",
+    "credit",
+    "note",
+    "client_id",
+    "project_id",
+    "gallery_id",
+    "asset_id",
+    "show_on_site",
+]
 
 
 def _valid_date(s: str) -> bool:
@@ -128,14 +140,19 @@ def press_for_license(license_row) -> list[dict]:
         f"""SELECT * FROM press
             WHERE deleted_at IS NULL
               AND publish_date IS NOT NULL AND publish_date <= date('now', 'localtime')
-              AND ({' OR '.join(clauses)})
+              AND ({" OR ".join(clauses)})
             ORDER BY publish_date DESC, id DESC""",
-        tuple(params))
+        tuple(params),
+    )
 
     granted = set(json.loads(license_row["channels"] or "[]"))
-    return [{**{k: r[k] for k in r.keys()},
-             "channel_overlap": bool(r["channel"] and r["channel"] in granted)}
-            for r in rows]
+    return [
+        {
+            **{k: r[k] for k in r.keys()},
+            "channel_overlap": bool(r["channel"] and r["channel"] in granted),
+        }
+        for r in rows
+    ]
 
 
 @router.get("/press", response_class=HTMLResponse)
@@ -151,16 +168,25 @@ async def press_list(request: Request):
            LEFT JOIN galleries g ON g.id = p.gallery_id
            LEFT JOIN projects pr ON pr.id = p.project_id
            WHERE p.deleted_at IS NULL
-           ORDER BY p.publish_date IS NULL DESC, p.publish_date DESC, p.id DESC""")
-    clients = db.all_("SELECT id, name, company FROM clients ORDER BY name")
+           ORDER BY p.publish_date IS NULL DESC, p.publish_date DESC, p.id DESC"""
+    )
+    clients = db.clients_for_select()
     projects = db.all_(
         """SELECT pr.id, pr.title, c.name AS client_name FROM projects pr
-           JOIN clients c ON c.id = pr.client_id ORDER BY pr.created_at DESC""")
+           JOIN clients c ON c.id = pr.client_id ORDER BY pr.created_at DESC"""
+    )
     galleries = db.all_("SELECT id, title FROM galleries ORDER BY created_at DESC")
-    return templates.TemplateResponse(request, "admin/press.html",
-                                      {"press": rows, "clients": clients,
-                                       "projects": projects, "galleries": galleries,
-                                       "channels_vocab": CHANNELS})
+    return templates.TemplateResponse(
+        request,
+        "admin/press.html",
+        {
+            "press": rows,
+            "clients": clients,
+            "projects": projects,
+            "galleries": galleries,
+            "channels_vocab": CHANNELS,
+        },
+    )
 
 
 @router.post("/press")
@@ -172,15 +198,28 @@ async def create_press(request: Request):
                                   note, client_id, project_id, gallery_id, asset_id,
                                   show_on_site)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (new["outlet"], new["title"], new["url"], new["publish_date"],
-             new["channel"], new["credit"], new["note"], new["client_id"],
-             new["project_id"], new["gallery_id"], new["asset_id"],
-             new["show_on_site"]))
+            (
+                new["outlet"],
+                new["title"],
+                new["url"],
+                new["publish_date"],
+                new["channel"],
+                new["credit"],
+                new["note"],
+                new["client_id"],
+                new["project_id"],
+                new["gallery_id"],
+                new["asset_id"],
+                new["show_on_site"],
+            ),
+        )
         pid = cur.lastrowid
-        audit.log(con, "press", pid, "create",
-                  diff={k: new[k] for k in _FIELDS if new[k] is not None})
-    log.info("press %s created (outlet=%r, published=%s)",
-             pid, new["outlet"], bool(new["publish_date"]))
+        audit.log(
+            con, "press", pid, "create", diff={k: new[k] for k in _FIELDS if new[k] is not None}
+        )
+    log.info(
+        "press %s created (outlet=%r, published=%s)", pid, new["outlet"], bool(new["publish_date"])
+    )
     return RedirectResponse("/admin/studio/press", status_code=303)
 
 
@@ -196,10 +235,22 @@ async def update_press(request: Request, press_id: int):
             """UPDATE press SET outlet=?, title=?, url=?, publish_date=?, channel=?,
                credit=?, note=?, client_id=?, project_id=?, gallery_id=?, asset_id=?,
                show_on_site=?, updated_at=datetime('now') WHERE id=?""",
-            (new["outlet"], new["title"], new["url"], new["publish_date"],
-             new["channel"], new["credit"], new["note"], new["client_id"],
-             new["project_id"], new["gallery_id"], new["asset_id"],
-             new["show_on_site"], press_id))
+            (
+                new["outlet"],
+                new["title"],
+                new["url"],
+                new["publish_date"],
+                new["channel"],
+                new["credit"],
+                new["note"],
+                new["client_id"],
+                new["project_id"],
+                new["gallery_id"],
+                new["asset_id"],
+                new["show_on_site"],
+                press_id,
+            ),
+        )
         audit.log(con, "press", press_id, "update", diff=diff)
     log.info("press %s updated (%d fields)", press_id, len(diff))
     return RedirectResponse("/admin/studio/press", status_code=303)
@@ -210,7 +261,12 @@ async def delete_press(press_id: int):
     d = get_press(press_id)
     with db.tx() as con:
         con.execute("UPDATE press SET deleted_at=datetime('now') WHERE id=?", (press_id,))
-        audit.log(con, "press", press_id, "soft_delete",
-                  diff={"outlet": d["outlet"], "publish_date": d["publish_date"]})
+        audit.log(
+            con,
+            "press",
+            press_id,
+            "soft_delete",
+            diff={"outlet": d["outlet"], "publish_date": d["publish_date"]},
+        )
     log.info("press %s soft-deleted", press_id)
     return RedirectResponse("/admin/studio/press", status_code=303)

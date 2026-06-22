@@ -17,6 +17,7 @@ MAX_ATTEMPTS = 3
 
 # ── handlers ───────────────────────────────────────────────────────────────
 
+
 def _gallery_dirs(gallery_id: int) -> dict[str, Path]:
     base = config.MEDIA_DIR / str(gallery_id)
     return {k: base / k for k in ("original", "web", "thumb")}
@@ -30,10 +31,14 @@ def _h_image(p: dict) -> None:
     src = dirs["original"] / asset["stored"]
     base = Path(asset["stored"]).stem
     w, h = imaging.make_derivatives(
-        str(src), str(dirs["web"] / f"{base}.jpg"), str(dirs["thumb"] / f"{base}.jpg"),
-        config.WEB_MAX_PX, config.THUMB_MAX_PX, config.JPEG_QUALITY)
-    db.run("UPDATE assets SET status='ready', width=?, height=? WHERE id=?",
-           (w, h, asset["id"]))
+        str(src),
+        str(dirs["web"] / f"{base}.jpg"),
+        str(dirs["thumb"] / f"{base}.jpg"),
+        config.WEB_MAX_PX,
+        config.THUMB_MAX_PX,
+        config.JPEG_QUALITY,
+    )
+    db.run("UPDATE assets SET status='ready', width=?, height=? WHERE id=?", (w, h, asset["id"]))
 
 
 def _h_video(p: dict) -> None:
@@ -45,13 +50,21 @@ def _h_video(p: dict) -> None:
     base = Path(asset["stored"]).stem
     web_mp4 = dirs["web"] / f"{base}.mp4"
     poster = dirs["web"] / f"{base}.jpg"
-    info = video.transcode(str(src), str(web_mp4), str(poster),
-                           config.VIDEO_MAX_W, config.VIDEO_CRF)
-    imaging.make_derivatives(str(poster), str(dirs["web"] / f"{base}_poster.jpg"),
-                             str(dirs["thumb"] / f"{base}.jpg"),
-                             config.WEB_MAX_PX, config.THUMB_MAX_PX, config.JPEG_QUALITY)
-    db.run("UPDATE assets SET status='ready', width=?, height=?, duration=? WHERE id=?",
-           (info["width"], info["height"], info["duration"], asset["id"]))
+    info = video.transcode(
+        str(src), str(web_mp4), str(poster), config.VIDEO_MAX_W, config.VIDEO_CRF
+    )
+    imaging.make_derivatives(
+        str(poster),
+        str(dirs["web"] / f"{base}_poster.jpg"),
+        str(dirs["thumb"] / f"{base}.jpg"),
+        config.WEB_MAX_PX,
+        config.THUMB_MAX_PX,
+        config.JPEG_QUALITY,
+    )
+    db.run(
+        "UPDATE assets SET status='ready', width=?, height=?, duration=? WHERE id=?",
+        (info["width"], info["height"], info["duration"], asset["id"]),
+    )
 
 
 def crops_dir(gallery_id: int) -> Path:
@@ -60,8 +73,9 @@ def crops_dir(gallery_id: int) -> Path:
 
 def _h_crops(p: dict) -> None:
     """Social crops (1:1/4:5/9:16) for a favorited photo — idempotent by file existence."""
-    asset = db.one("SELECT * FROM assets WHERE id=? AND kind='photo' AND status='ready'",
-                   (p["asset_id"],))
+    asset = db.one(
+        "SELECT * FROM assets WHERE id=? AND kind='photo' AND status='ready'", (p["asset_id"],)
+    )
     if not asset:
         return
     out = crops_dir(asset["gallery_id"])
@@ -103,21 +117,21 @@ def _h_zip(p: dict) -> None:
             old.unlink(missing_ok=True)
 
 
-HANDLERS = {"image_derivatives": _h_image,
-            "social_crops": _h_crops,
-            "video_transcode": _h_video,
-            "zip_build": _h_zip,
-            "notion_sync_invoice":
-                lambda p: notion_sync.sync_invoice(p["invoice_id"]),
-            "notion_sync_gallery":
-                lambda p: notion_sync.sync_gallery(p["gallery_id"])}
+HANDLERS = {
+    "image_derivatives": _h_image,
+    "social_crops": _h_crops,
+    "video_transcode": _h_video,
+    "zip_build": _h_zip,
+    "notion_sync_invoice": lambda p: notion_sync.sync_invoice(p["invoice_id"]),
+    "notion_sync_gallery": lambda p: notion_sync.sync_gallery(p["gallery_id"]),
+}
 
 
 # ── queue machinery ────────────────────────────────────────────────────────
 
+
 def enqueue(kind: str, payload: dict) -> int:
-    job_id = db.run("INSERT INTO jobs (kind, payload) VALUES (?,?)",
-                    (kind, json.dumps(payload)))
+    job_id = db.run("INSERT INTO jobs (kind, payload) VALUES (?,?)", (kind, json.dumps(payload)))
     if _pool:
         _pool.submit(_execute, job_id)
     return job_id
@@ -128,7 +142,9 @@ def _claim(job_id: int) -> "db.sqlite3.Row | None":
     try:
         cur = con.execute(
             "UPDATE jobs SET status='running', attempts=attempts+1, "
-            "updated_at=datetime('now') WHERE id=? AND status='queued'", (job_id,))
+            "updated_at=datetime('now') WHERE id=? AND status='queued'",
+            (job_id,),
+        )
         con.commit()
         if cur.rowcount != 1:
             return None
@@ -144,15 +160,18 @@ def _execute(job_id: int) -> None:
     payload = json.loads(job["payload"])
     try:
         HANDLERS[job["kind"]](payload)
-        db.run("UPDATE jobs SET status='done', error=NULL, updated_at=datetime('now') "
-               "WHERE id=?", (job_id,))
+        db.run(
+            "UPDATE jobs SET status='done', error=NULL, updated_at=datetime('now') WHERE id=?",
+            (job_id,),
+        )
         log.info("job %s %s done", job_id, job["kind"])
     except Exception as e:
         status = "queued" if job["attempts"] < MAX_ATTEMPTS else "failed"
-        db.run("UPDATE jobs SET status=?, error=?, updated_at=datetime('now') WHERE id=?",
-               (status, str(e)[:500], job_id))
-        log.error("job %s %s attempt %s -> %s: %s",
-                  job_id, job["kind"], job["attempts"], status, e)
+        db.run(
+            "UPDATE jobs SET status=?, error=?, updated_at=datetime('now') WHERE id=?",
+            (status, str(e)[:500], job_id),
+        )
+        log.exception("job %s %s attempt %s -> %s", job_id, job["kind"], job["attempts"], status)
         if status == "failed" and "asset_id" in payload:
             db.run("UPDATE assets SET status='failed' WHERE id=?", (payload["asset_id"],))
         if status == "queued" and _pool:
@@ -164,7 +183,9 @@ def retry(job_id: int) -> bool:
     try:
         cur = con.execute(
             "UPDATE jobs SET status='queued', attempts=0, error=NULL, "
-            "updated_at=datetime('now') WHERE id=? AND status='failed'", (job_id,))
+            "updated_at=datetime('now') WHERE id=? AND status='failed'",
+            (job_id,),
+        )
         con.commit()
     finally:
         con.close()
@@ -184,8 +205,7 @@ def pending_count() -> int:
 def start() -> None:
     global _pool
     db.run("UPDATE jobs SET status='queued' WHERE status='running'")
-    _pool = ThreadPoolExecutor(max_workers=config.JOB_WORKERS,
-                               thread_name_prefix="mise-job")
+    _pool = ThreadPoolExecutor(max_workers=config.JOB_WORKERS, thread_name_prefix="mise-job")
     backlog = db.all_("SELECT id FROM jobs WHERE status='queued' ORDER BY id")
     for row in backlog:
         _pool.submit(_execute, row["id"])

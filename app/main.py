@@ -8,27 +8,48 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-
-from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import alerts, config, csrf, db, jobs, ratelimit, scheduler, service_api
-from .admin import (activity, audit, auth, content, contracts, doc_templates,
-                    email_templates, emails, financials, forms, galleries,
-                    inbox, invoices, licenses, portals, presets, press, proposals,
-                    recurring, reference, reports, search, settings, share,
-                    shotlist, studio, uploads)
+from .admin import (
+    activity,
+    audit,
+    auth,
+    content,
+    contracts,
+    doc_templates,
+    email_templates,
+    emails,
+    financials,
+    forms,
+    galleries,
+    inbox,
+    invoices,
+    licenses,
+    portals,
+    presets,
+    press,
+    proposals,
+    recurring,
+    reference,
+    reports,
+    search,
+    settings,
+    share,
+    shotlist,
+    studio,
+    uploads,
+)
 from .admin import scheduling as admin_scheduling
-from .public import docs, downloads, gallery, media, pay, portal, site, workspace
+from .public import docs, downloads, gallery, media, pay, portal, site, sms_webhook, workspace
 from .public import forms as public_forms
-from .public import sms_webhook
 from .public import scheduling as public_scheduling
 from .render import ROOT, templates
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("mise.app")
 
 
@@ -43,8 +64,14 @@ async def lifespan(app: FastAPI):
     jobs.stop()
 
 
-app = FastAPI(title="Mise", version="0.1.0", lifespan=lifespan, docs_url=None,
-              redoc_url=None, openapi_url=None)
+app = FastAPI(
+    title="Mise",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -54,20 +81,22 @@ app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 # exfil channels narrowed), NOT a full XSS lockdown. Plausible is the only
 # off-origin asset, and only when analytics is enabled. Dropping 'unsafe-inline'
 # later means moving inline handlers to /static JS + nonces first.
-CSP_POLICY = "; ".join((
-    "default-src 'self'",
-    "base-uri 'self'",
-    "object-src 'none'",
-    "frame-ancestors 'none'",
-    "frame-src 'none'",
-    "form-action 'self'",
-    "img-src 'self' data: blob:",
-    "media-src 'self'",
-    "font-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "script-src 'self' 'unsafe-inline' https://plausible.io",
-    "connect-src 'self' https://plausible.io",
-))
+CSP_POLICY = "; ".join(
+    (
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "frame-src 'none'",
+        "form-action 'self'",
+        "img-src 'self' data: blob:",
+        "media-src 'self'",
+        "font-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "script-src 'self' 'unsafe-inline' https://plausible.io",
+        "connect-src 'self' https://plausible.io",
+    )
+)
 
 
 @app.middleware("http")
@@ -109,12 +138,13 @@ _ERROR_MESSAGES = {
 @app.exception_handler(StarletteHTTPException)
 async def branded_errors(request: Request, exc: StarletteHTTPException):
     # browsers get a branded page; JSON/HTMX/media requests keep plain codes
-    if exc.status_code in _ERROR_MESSAGES and \
-            "text/html" in request.headers.get("accept", ""):
+    if exc.status_code in _ERROR_MESSAGES and "text/html" in request.headers.get("accept", ""):
         return templates.TemplateResponse(
-            request, "public/error.html",
+            request,
+            "public/error.html",
             {"message": _ERROR_MESSAGES[exc.status_code]},
-            status_code=exc.status_code)
+            status_code=exc.status_code,
+        )
     return await http_exception_handler(request, exc)
 
 
@@ -127,14 +157,18 @@ async def unhandled_errors(request: Request, exc: Exception):
     log.exception("unhandled error: %s %s", request.method, request.url.path)
     alerts.error_alert(
         f"{request.method} {request.url.path}|{type(exc).__name__}",
-        f"{type(exc).__name__} on {request.method} {request.url.path}: "
-        f"{str(exc)[:300]}")
+        f"{type(exc).__name__} on {request.method} {request.url.path}: {str(exc)[:300]}",
+    )
     if "text/html" in request.headers.get("accept", ""):
         return templates.TemplateResponse(
-            request, "public/error.html",
-            {"message": "Something went wrong on our end. "
-                        "Try again in a moment, or get in touch if it persists."},
-            status_code=500)
+            request,
+            "public/error.html",
+            {
+                "message": "Something went wrong on our end. "
+                "Try again in a moment, or get in touch if it persists."
+            },
+            status_code=500,
+        )
     return JSONResponse({"detail": "internal server error"}, status_code=500)
 
 
@@ -143,17 +177,46 @@ async def healthz():
     return {"ok": True, "service": "mise", "jobs_pending": jobs.pending_count()}
 
 
-for r in (auth.router, galleries.router, uploads.router, activity.router,
-          studio.router, proposals.router, contracts.router, invoices.router,
-          licenses.router, presets.router, press.router, recurring.router,
-          reports.router, email_templates.router, doc_templates.router,
-          reference.router, search.router,
-          shotlist.router, emails.router, share.router, forms.router,
-          audit.router, inbox.router, settings.router, financials.router,
-          content.router, portals.router,
-          admin_scheduling.router,
-          gallery.router, media.router,
-          downloads.router, docs.router, pay.router, portal.router, workspace.router,
-          public_forms.router, public_scheduling.router, site.router,
-          sms_webhook.router, service_api.router):
+for r in (
+    auth.router,
+    galleries.router,
+    uploads.router,
+    activity.router,
+    studio.router,
+    proposals.router,
+    contracts.router,
+    invoices.router,
+    licenses.router,
+    presets.router,
+    press.router,
+    recurring.router,
+    reports.router,
+    email_templates.router,
+    doc_templates.router,
+    reference.router,
+    search.router,
+    shotlist.router,
+    emails.router,
+    share.router,
+    forms.router,
+    audit.router,
+    inbox.router,
+    settings.router,
+    financials.router,
+    content.router,
+    portals.router,
+    admin_scheduling.router,
+    gallery.router,
+    media.router,
+    downloads.router,
+    docs.router,
+    pay.router,
+    portal.router,
+    workspace.router,
+    public_forms.router,
+    public_scheduling.router,
+    site.router,
+    sms_webhook.router,
+    service_api.router,
+):
     app.include_router(r)
