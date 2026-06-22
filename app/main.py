@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import config, db, jobs, ratelimit, scheduler, service_api
+from . import config, csrf, db, jobs, ratelimit, scheduler, service_api
 from .admin import (activity, audit, auth, content, contracts, doc_templates,
                     email_templates, emails, financials, forms, galleries,
                     inbox, invoices, licenses, portals, presets, press, proposals,
@@ -47,9 +47,39 @@ app = FastAPI(title="Mise", version="0.1.0", lifespan=lifespan, docs_url=None,
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
+# Inline <script>/style= attributes and on*-handlers are pervasive in the
+# templates, so script/style-src must permit 'unsafe-inline' — this CSP is
+# hardening-in-depth (object/base/form-action/frame-ancestors locked down,
+# exfil channels narrowed), NOT a full XSS lockdown. Plausible is the only
+# off-origin asset, and only when analytics is enabled. Dropping 'unsafe-inline'
+# later means moving inline handlers to /static JS + nonces first.
+CSP_POLICY = "; ".join((
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "frame-src 'none'",
+    "form-action 'self'",
+    "img-src 'self' data: blob:",
+    "media-src 'self'",
+    "font-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' https://plausible.io",
+    "connect-src 'self' https://plausible.io",
+))
+
+
 @app.middleware("http")
 async def rate_limit(request: Request, call_next):
     blocked = ratelimit.check(request, request.url.path)
+    if blocked is not None:
+        return blocked
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def csrf_guard(request: Request, call_next):
+    blocked = csrf.check(request)
     if blocked is not None:
         return blocked
     return await call_next(request)
@@ -64,6 +94,7 @@ async def common_headers(request: Request, call_next):
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "same-origin"
+    resp.headers["Content-Security-Policy"] = CSP_POLICY
     return resp
 
 

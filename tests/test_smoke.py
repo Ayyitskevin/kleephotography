@@ -101,6 +101,42 @@ def test_security_headers(client):
     assert home.headers["x-frame-options"] == "DENY"
 
 
+def test_csp_header(client):
+    # Content-Security-Policy ships on every response as XSS/clickjacking
+    # defense-in-depth (R18). script-src keeps 'unsafe-inline' for now because the
+    # templates use inline handlers; the locked-down directives are the win here.
+    csp = client.get("/healthz").headers["content-security-policy"]
+    for needed in ("default-src 'self'", "frame-ancestors 'none'",
+                   "object-src 'none'", "base-uri 'self'", "form-action 'self'"):
+        assert needed in csp, needed
+    # analytics is the only off-origin asset, allowed for script + connect
+    assert "https://plausible.io" in csp
+    # indexable marketing pages carry the policy too
+    assert "content-security-policy" in client.get("/").headers
+
+
+def test_csrf_same_origin_enforced(client):
+    from app import config, security
+    # a cross-origin state-changing POST is rejected by the guard, before auth
+    # even runs — the browser stamps Origin on a malicious cross-site form submit
+    r = client.post("/admin/login", data={"password": "x"},
+                    headers={"origin": "https://evil.example"}, follow_redirects=False)
+    assert r.status_code == 403
+    # Referer is the fallback signal when Origin is absent
+    r = client.post("/admin/login", data={"password": "x"},
+                    headers={"referer": "https://evil.example/page"}, follow_redirects=False)
+    assert r.status_code == 403
+    # a same-origin POST passes the guard (wrong pw -> 401, decidedly NOT 403)
+    r = client.post("/admin/login", data={"password": "nope"},
+                    headers={"origin": config.BASE_URL}, follow_redirects=False)
+    assert r.status_code == 401
+    # server-to-server webhooks send no Origin/Referer and stay unaffected
+    # (503 = not configured in tests; the point is it is NOT a 403)
+    r = client.post("/webhooks/stripe", content=b"{}")
+    assert r.status_code == 503
+    security.pin_clear("testclient", 0)  # drop the failed-login bookkeeping
+
+
 def test_branded_error_pages(client):
     # clients clicking bad links in a browser get a branded page, not raw JSON
     r = client.get("/g/nope12345678", headers={"accept": "text/html"})
