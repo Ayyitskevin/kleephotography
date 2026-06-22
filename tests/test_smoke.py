@@ -1860,6 +1860,113 @@ def test_gallery_expiry_reminder_rearms_on_date_change(admin):
     assert db.one("SELECT reminded_expiry r FROM galleries WHERE id=?", (gid,))["r"] == 1
 
 
+def test_contract_unsigned_nudge(client, monkeypatch):
+    # A contract sent past the threshold and still unsigned earns ONE internal
+    # Telegram nudge to Kevin — never the client. A fresh send, a signed contract,
+    # and a draft are all left alone; the nudge is one-shot via nudged_unsigned.
+    from app import alerts, config, contract_reminders
+    sent = []
+    monkeypatch.setattr(alerts, "is_enabled", lambda: True)
+    monkeypatch.setattr(alerts, "notify", lambda text: sent.append(text))
+    monkeypatch.setattr(config, "CONTRACT_NUDGE_DAYS", 3)
+
+    cid = db.run("INSERT INTO clients (name, company) VALUES (?,?)",
+                 ("Ana", "Bistro Verde"))
+    pid = db.run("INSERT INTO projects (client_id, title, status) VALUES (?,?,'contract_signed')",
+                 (cid, "Verde Fall Menu"))
+
+    def mk(slug, status, days_ago, nudged=0):
+        return db.run(
+            """INSERT INTO contracts (project_id, slug, title, body, status, sent_at,
+                                      nudged_unsigned)
+               VALUES (?,?,?,?,?,datetime('now', ?),?)""",
+            (pid, slug, "Services Agreement", "body", status,
+             f"-{days_ago} days", nudged))
+
+    overdue = mk("CtOverdue1", "sent", 5)
+    viewed = mk("CtViewed1", "viewed", 9)     # viewed-not-signed still counts
+    fresh = mk("CtFresh1", "sent", 1)         # under the threshold
+    signed = mk("CtSigned1", "signed", 9)     # already signed
+    already = mk("CtAlready1", "sent", 9, nudged=1)  # already nudged
+
+    contract_reminders.sweep()
+    flag = lambda i: db.one("SELECT nudged_unsigned n FROM contracts WHERE id=?", (i,))["n"]
+    assert flag(overdue) == 1 and flag(viewed) == 1
+    assert flag(fresh) == 0 and flag(signed) == 0
+    joined = " ".join(sent)
+    assert "/admin/studio/contracts/" in joined and "Bistro Verde" in joined
+    assert f"/admin/studio/contracts/{fresh}" not in joined
+    assert len(sent) == 2  # overdue + viewed only
+
+    # idempotent: a second sweep nudges nothing new
+    sent.clear()
+    contract_reminders.sweep()
+    assert sent == []
+
+    # guard: when Telegram is unconfigured the sweep no-ops and sets no flags,
+    # so enabling alerts later still catches an already-overdue contract.
+    monkeypatch.setattr(alerts, "is_enabled", lambda: False)
+    later = mk("CtLater1", "sent", 5)
+    contract_reminders.sweep()
+    assert flag(later) == 0
+
+
+def test_ops_monitor_heartbeat(monkeypatch, tmp_path):
+    # The ops heartbeat pushes a throttled Telegram alert on low disk or a stale/
+    # missing backup — the active-push twin of the Settings storage panel. Throttle
+    # collapses a persistent condition to at most one alert per window.
+    import os
+    import time as _time
+    from app import alerts, config, ops_monitor
+
+    sent = []
+
+    class _Inline:
+        def __init__(self, target, args=(), **kw):
+            self._t, self._a = target, args
+
+        def start(self):
+            self._t(*self._a)
+
+    monkeypatch.setattr(alerts, "_send", lambda text: sent.append(text))
+    monkeypatch.setattr(alerts.threading, "Thread", _Inline)
+    monkeypatch.setattr(alerts.config, "TELEGRAM_TOKEN", "t")
+    monkeypatch.setattr(alerts.config, "TELEGRAM_CHAT_ID", "c")
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    alerts._ops_last.clear()
+
+    # disk under the floor + no backups dir → two distinct alerts
+    monkeypatch.setattr(config, "MIN_FREE_GB", 10 ** 9)
+    ops_monitor.sweep()
+    assert any("Low disk" in s for s in sent)
+    assert any("No database backup" in s for s in sent)
+
+    # both conditions persist but are throttled → a second sweep sends nothing new
+    sent.clear()
+    ops_monitor.sweep()
+    assert sent == []
+
+    # disk healthy now; a backup that exists but is stale → backup_stale fires
+    sent.clear()
+    alerts._ops_last.clear()
+    monkeypatch.setattr(config, "MIN_FREE_GB", 0)
+    bdir = tmp_path / "backups"
+    bdir.mkdir()
+    snap = bdir / "mise-old.db.gz"
+    snap.write_bytes(b"x")
+    old = _time.time() - (config.BACKUP_STALE_HOURS + 5) * 3600
+    os.utime(snap, (old, old))
+    ops_monitor.sweep()
+    assert any("backup is" in s and "old" in s for s in sent)
+
+    # a fresh backup → silence (positive evidence, not a swallowed error)
+    sent.clear()
+    alerts._ops_last.clear()
+    (bdir / "mise-new.db.gz").write_bytes(b"x")
+    ops_monitor.sweep()
+    assert sent == []
+
+
 def test_final_email_auto_advances_project(admin, monkeypatch):
     from app import mailer
     monkeypatch.setattr(mailer, "configured", lambda: True)

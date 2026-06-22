@@ -28,6 +28,14 @@ _error_last: dict[str, float] = {}
 _error_suppressed: dict[str, int] = {}
 _error_lock = threading.Lock()
 
+# Throttle for operational heartbeat alerts (disk low, stale backup). Unlike a
+# crash, these conditions PERSIST across many sweeps, so without a cooldown the
+# hourly sweep would re-send the same warning every hour. 12h re-fires it at most
+# twice a day while it's still broken — present without nagging.
+_OPS_COOLDOWN = 12 * 3600  # seconds
+_ops_last: dict[str, float] = {}
+_ops_lock = threading.Lock()
+
 
 def is_enabled() -> bool:
     return bool(config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID)
@@ -72,4 +80,30 @@ def error_alert(signature: str, text: str) -> None:
         text += f"\n(+{suppressed} more like this in the last "
         text += f"{_ERROR_COOLDOWN // 60} min, not shown)"
     threading.Thread(target=_send, args=(f"\U0001f4a5 Mise crash: {text}",),
+                     daemon=True).start()
+
+
+def ops_alert(signature: str, text: str) -> None:
+    """Throttled outbound nudge for a PERSISTENT operational condition (low disk,
+    stale backup). At most one message per signature per _OPS_COOLDOWN while the
+    condition holds, so a sweep that keeps finding the same problem doesn't flood.
+    """
+    if not is_enabled():
+        return
+    now = time.time()
+    with _ops_lock:
+        if now - _ops_last.get(signature, 0.0) < _OPS_COOLDOWN:
+            return
+        _ops_last[signature] = now
+    threading.Thread(target=_send, args=(f"\U0001f6df Mise ops: {text}",),
+                     daemon=True).start()
+
+
+def notify(text: str) -> None:
+    """Fire-and-forget outbound nudge for a business event the CALLER has already
+    de-duplicated (e.g. a one-shot DB flag), so no throttle is applied here. Used
+    for internal nudges to Kevin — never a client-facing message."""
+    if not is_enabled():
+        return
+    threading.Thread(target=_send, args=(f"\U0001f514 Mise: {text}",),
                      daemon=True).start()

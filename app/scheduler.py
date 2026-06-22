@@ -17,7 +17,8 @@ which is plenty for a monthly event.
 import logging
 import threading
 
-from . import booking_reminders, config, gallery_reminders
+from . import (booking_reminders, config, contract_reminders, gallery_reminders,
+               ops_monitor)
 from .admin import recurring
 
 log = logging.getLogger("mise.scheduler")
@@ -40,6 +41,14 @@ def _loop() -> None:
             gallery_reminders.sweep()
         except Exception:
             log.exception("gallery reminder sweep failed")
+        try:
+            contract_reminders.sweep()
+        except Exception:
+            log.exception("contract reminder sweep failed")
+        try:
+            ops_monitor.sweep()
+        except Exception:
+            log.exception("ops monitor sweep failed")
 
 
 def start() -> None:

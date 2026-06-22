@@ -150,6 +150,16 @@ RECURRING_TICK_SECONDS = int(os.environ.get("MISE_RECURRING_TICK_SECONDS", "3600
 GALLERY_EXPIRY_REMINDER_DAYS = int(os.environ.get("MISE_GALLERY_EXPIRY_REMINDER_DAYS", "3"))
 GALLERY_PROOF_NUDGE_DAYS = int(os.environ.get("MISE_GALLERY_PROOF_NUDGE_DAYS", "5"))
 
+# Internal Telegram nudge: a contract sent this many days ago and still unsigned
+# gets one heads-up to Kevin (ops_monitor/contract_reminders). One-shot per
+# contract via the nudged_unsigned flag; never a message to the client.
+CONTRACT_NUDGE_DAYS = int(os.environ.get("MISE_CONTRACT_NUDGE_DAYS", "3"))
+
+# Operational heartbeat (ops_monitor): a backup older than this many hours is
+# flagged. Backups run daily (~02:3x via mise-backup.timer), so 26h gives a small
+# grace past the normal 24h gap before it reads as stale/missing.
+BACKUP_STALE_HOURS = int(os.environ.get("MISE_BACKUP_STALE_HOURS", "26"))
+
 PIN_MAX_FAILS = int(os.environ.get("MISE_PIN_MAX_FAILS", "5"))
 PIN_LOCKOUT_MIN = int(os.environ.get("MISE_PIN_LOCKOUT_MIN", "15"))
 
