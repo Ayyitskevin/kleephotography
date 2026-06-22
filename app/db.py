@@ -1,8 +1,11 @@
 """SQLite access — WAL mode, short-lived connections (safe across job threads)."""
 
+import datetime as dt
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
+
+from fastapi import HTTPException
 
 from . import config
 
@@ -72,6 +75,49 @@ def run(sql: str, params: tuple = ()) -> int:
         return cur.lastrowid
     finally:
         con.close()
+
+
+def get_or_404(sql: str, params: tuple = (), *, detail: str = "Not found") -> sqlite3.Row:
+    """Convenience wrapper: one() + 404 if missing.
+
+    Reduces the repeated get_* + 404 boilerplate across admin modules.
+    Use for simple ID lookups; complex JOIN queries can stay in place or use
+    this with their full SELECT.
+    """
+    row = one(sql, params)
+    if row is None:
+        raise HTTPException(status_code=404, detail=detail)
+    return row
+
+
+def clients_for_select() -> list[sqlite3.Row]:
+    """Lightweight list for admin <select> dropdowns (id, name, company)."""
+    return all_("SELECT id, name, company FROM clients ORDER BY name")
+
+
+def date_window_labels(today: dt.date, window: int) -> list[str]:
+    """ISO date labels for the trailing `window` days ending today (oldest first)."""
+    return [(today - dt.timedelta(days=i)).isoformat() for i in range(window - 1, -1, -1)]
+
+
+def spark_series(table: str, today: dt.date, window: int) -> tuple[list[int], int]:
+    """Daily counts for the `window` days ending `today` (reused from studio).
+
+    `table` must be allowlisted by caller (use ident if interpolated).
+    Returns (series_list aligned to date_window_labels, total).
+    """
+    start = (today - dt.timedelta(days=window - 1)).isoformat()
+    labels = date_window_labels(today, window)
+    rows = all_(
+        f"""SELECT date(created_at, 'localtime') AS d, COUNT(*) AS n
+                       FROM {table}
+                       WHERE date(created_at, 'localtime') >= ?
+                       GROUP BY date(created_at, 'localtime')""",
+        (start,),
+    )
+    b = {r["d"]: r["n"] for r in rows}
+    series = [b.get(d, 0) for d in labels]
+    return series, sum(series)
 
 
 @contextmanager

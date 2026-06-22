@@ -18,6 +18,20 @@
       if (localStorage.getItem("mise-theme") === "dark")
         document.documentElement.setAttribute("data-theme", "dark");
     } catch (e) {}
+
+    // data-confirm support for destructive actions (delete buttons etc).
+    // Lets us keep confirm text in the template (data-confirm) instead of
+    // scattered onclick="return confirm(...)". Progressive; works even if JS
+    // is blocked (we fall back to native if needed, but the listener prevents submit).
+    document.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('[data-confirm]');
+      if (btn && btn.form) {
+        if (!confirm(btn.getAttribute('data-confirm'))) {
+          ev.preventDefault();
+          ev.stopImmediatePropagation();
+        }
+      }
+    }, true);
   })();
 </script>
 {% block admin_head %}{% endblock %}

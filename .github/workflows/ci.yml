@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install system dependencies (ffmpeg for video pipeline tests)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: Create venv and install deps
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt pytest httpx
+
+      - name: Run unit tests (fast feedback)
+        run: |
+          .venv/bin/python -m pytest tests/ --ignore=tests/test_smoke.py -q -m unit --tb=short
+
+      - name: Lint with ruff
+        run: |
+          .venv/bin/pip install ruff
+          .venv/bin/ruff check . --output-format=github
+
+      - name: Check ruff format
+        run: |
+          .venv/bin/pip install ruff
+          .venv/bin/ruff format --check .
+
+      - name: Run full smoke suite
+        run: |
+          MISE_DATA_DIR=$(mktemp -d) \
+          MISE_SECRET_KEY=test-secret \
+          MISE_ADMIN_PASSWORD=test-pw \
+          MISE_ENV_FILE=/nonexistent \
+            .venv/bin/python -m pytest tests/test_smoke.py -q --tb=short
