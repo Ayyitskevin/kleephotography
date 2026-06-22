@@ -1,0 +1,23 @@
+# Dependabot — weekly dependency PRs for the Python stack. Minor/patch bumps are
+# grouped into one low-noise PR; majors come separately so breaking changes get a
+# closer look. Security fixes (CVE-driven) arrive on their own regardless of this
+# schedule once Dependabot security updates are enabled on the repo.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+    groups:
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
