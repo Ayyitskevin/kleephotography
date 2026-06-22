@@ -24,6 +24,17 @@ router = APIRouter(prefix="/admin/inbox",
 
 _TABS = ["all", "bookings", "archived"]
 
+# tab → (WHERE, ORDER BY). Fixed SQL fragments keyed by an allowlisted tab; the
+# dict lookup IS the gate — an unknown tab can't reach the query (falls to "all").
+_INBOX_FILTERS = {
+    "all": ("converted_at IS NULL AND dismissed_at IS NULL",
+            "ORDER BY created_at DESC"),
+    "bookings": ("converted_at IS NULL AND dismissed_at IS NULL AND kind='booking'",
+                 "ORDER BY created_at DESC"),
+    "archived": ("converted_at IS NOT NULL OR dismissed_at IS NOT NULL",
+                 "ORDER BY COALESCE(dismissed_at, converted_at) DESC"),
+}
+
 # Deterministic avatar tints by inquiry id — same forest/clay/teal family the
 # prototype hand-picked, cycled so each thread reads as a distinct contact.
 _AVATARS = [
@@ -155,15 +166,7 @@ def _active_ctx(inq) -> dict:
 async def inbox(request: Request, tab: str = "all", sel: int | None = None):
     if tab not in _TABS:
         tab = "all"
-    if tab == "archived":
-        where = "converted_at IS NOT NULL OR dismissed_at IS NOT NULL"
-        order = "ORDER BY COALESCE(dismissed_at, converted_at) DESC"
-    elif tab == "bookings":
-        where = "converted_at IS NULL AND dismissed_at IS NULL AND kind='booking'"
-        order = "ORDER BY created_at DESC"
-    else:
-        where = "converted_at IS NULL AND dismissed_at IS NULL"
-        order = "ORDER BY created_at DESC"
+    where, order = _INBOX_FILTERS[tab]
     rows = db.all_(f"SELECT * FROM inquiries WHERE {where} {order} LIMIT 100")
 
     counts = {

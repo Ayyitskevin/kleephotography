@@ -23,6 +23,10 @@ router = APIRouter(prefix="/admin/scheduling",
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+_EVENT_COLS = frozenset({
+    "name", "description", "duration_min", "location", "color",
+    "buffer_before_min", "buffer_after_min", "min_notice_hours", "max_per_day",
+    "booking_window_days", "slot_step_min", "position", "creates_notion_session"})
 
 
 def _min_to_hhmm(m: int | None) -> str:
@@ -382,7 +386,7 @@ async def update_event(request: Request, event_id: int):
         "position": _posint(form, "position", 0, 999),
         "creates_notion_session": 1 if form.get("creates_notion_session") else 0,
     }
-    sets = ", ".join(f"{k}=?" for k in fields)
+    sets = ", ".join(f"{db.ident(k, _EVENT_COLS)}=?" for k in fields)
     with db.tx() as con:
         con.execute(f"UPDATE event_types SET {sets} WHERE id=?",
                     (*fields.values(), event_id))

@@ -6936,3 +6936,14 @@ def test_quo_missed_call_and_transcript_enrichment(client, monkeypatch):
     finally:
         db.run("DELETE FROM messages WHERE provider_msg_id='QUO_CALL_2'")
         db.run("DELETE FROM inquiries WHERE phone=?", (phone,))
+
+
+def test_db_ident_allows_listed_identifier():
+    assert db.ident("reminded_24h", {"reminded_24h", "reminded_48h"}) == "reminded_24h"
+
+
+def test_db_ident_rejects_unlisted_identifier():
+    # The gate must fail loud so a stray identifier can't become injection.
+    import pytest
+    with pytest.raises(ValueError):
+        db.ident("bookings; DROP TABLE bookings", {"reminded_24h", "reminded_48h"})

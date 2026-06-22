@@ -18,6 +18,7 @@ from .booking_notify import _manage_url, _when
 
 log = logging.getLogger("mise.reminders")
 _UTC = dt.timezone.utc
+_REMINDER_COLS = frozenset({"reminded_48h", "reminded_24h"})
 
 
 def _due(now: dt.datetime):
@@ -60,7 +61,8 @@ def sweep() -> None:
         try:
             mailer.send(b["email"], f"Reminder — {b['event_name']} {lead}",
                         body, reply_to=config.GMAIL_USER)
-            db.run(f"UPDATE bookings SET {col}=1 WHERE id=?", (b["id"],))
+            db.run(f"UPDATE bookings SET {db.ident(col, _REMINDER_COLS)}=1 WHERE id=?",
+                   (b["id"],))
             log.info("booking %s %s reminder sent", b["id"], kind)
         except Exception as e:
             log.error("booking %s %s reminder failed: %s", b["id"], kind, e)

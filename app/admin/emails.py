@@ -18,7 +18,7 @@ async def email_doc(kind: str, doc_id: int, to: str = Form(...),
                     subject: str = Form(...), message: str = Form(...)):
     if kind not in KINDS:
         raise HTTPException(status_code=404)
-    d = db.one(f"SELECT * FROM {kind} WHERE id=?", (doc_id,))  # kind is allowlisted
+    d = db.one(f"SELECT * FROM {db.ident(kind, KINDS)} WHERE id=?", (doc_id,))
     if not d:
         raise HTTPException(status_code=404)
     if d["status"] == "draft":

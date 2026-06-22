@@ -36,6 +36,17 @@ def migrate() -> None:
         con.close()
 
 
+def ident(name: str, allowed) -> str:
+    """Gate a SQL identifier (table/column) that gets interpolated into a query
+    string. Values always go through `?` placeholders; identifiers can't, so any
+    interpolated name must be checked against an allowlist HERE, at the point of
+    use. Raises if `name` isn't allowed — a careless edit fails loud instead of
+    becoming injection (R12)."""
+    if name not in allowed:
+        raise ValueError(f"disallowed SQL identifier: {name!r}")
+    return name
+
+
 def one(sql: str, params: tuple = ()) -> sqlite3.Row | None:
     con = connect()
     try:

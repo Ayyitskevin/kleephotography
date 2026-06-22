@@ -96,14 +96,14 @@ def licenses_covering(client_id: int) -> list[dict]:
     out: list[dict] = []
     ancestors = clients.ancestor_ids(client_id)
     if ancestors:
-        ph = ",".join("?" * len(ancestors))
+        ph = ",".join("?" * len(ancestors))  # only ever "?,?,..." placeholders
         rows = db.all_(
-            f"SELECT l.id, l.title, l.usage_tier, l.exclusivity, l.status, l.published,"
-            f"       l.holder_client_id, h.name AS holder_name"
-            f"  FROM licenses l JOIN clients h ON h.id=l.holder_client_id"
-            f" WHERE l.coverage_scope='holder_and_descendants'"
+            "SELECT l.id, l.title, l.usage_tier, l.exclusivity, l.status, l.published,"
+            "       l.holder_client_id, h.name AS holder_name"
+            "  FROM licenses l JOIN clients h ON h.id=l.holder_client_id"
+            " WHERE l.coverage_scope='holder_and_descendants'"
             f"   AND l.holder_client_id IN ({ph}) AND l.deleted_at IS NULL"
-            f" ORDER BY l.status, l.title", tuple(ancestors))
+            " ORDER BY l.status, l.title", tuple(ancestors))
         out += [{**{k: r[k] for k in r.keys()}, "rel": "group"} for r in rows]
     rows = db.all_(
         "SELECT l.id, l.title, l.usage_tier, l.exclusivity, l.status, l.published,"
