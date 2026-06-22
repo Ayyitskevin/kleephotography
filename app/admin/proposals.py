@@ -117,15 +117,15 @@ PRESETS = {
         {"label": "Online gallery delivery + extended personal-use rights", "qty": 1, "unit_cents": 0},
     ]},
 
-    # ── Brand Sessions (placeholder pricing — set rates, then update) ────────
+    # ── Brand Sessions ──────────────────────────────────────────────────────
     "brand_halfday": {"title": "Brand Session — Half-Day", "items": [
-        {"label": "Half-day brand session (up to 4 hrs) — [Half-day price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Half-day brand session (up to 4 hrs)", "qty": 1, "unit_cents": 85000},
         {"label": "Personal-brand + headshot mix (~25 edited images)", "qty": 1, "unit_cents": 0},
         {"label": "Social crops (1:1, 4:5, 9:16) for hero selects", "qty": 1, "unit_cents": 0},
         {"label": "Online gallery delivery + commercial usage rights", "qty": 1, "unit_cents": 0},
     ]},
     "brand_full": {"title": "Brand Session — Full Package", "items": [
-        {"label": "Full-day brand session (up to 8 hrs) — [Full package price TBD]", "qty": 1, "unit_cents": 0},
+        {"label": "Full-day brand session (up to 8 hrs)", "qty": 1, "unit_cents": 150000},
         {"label": "Headshots, lifestyle, product & workspace (~50 edited images)", "qty": 1, "unit_cents": 0},
         {"label": "Full social crop pack (1:1, 4:5, 9:16) for every select", "qty": 1, "unit_cents": 0},
         {"label": "Brand-story direction + shot planning", "qty": 1, "unit_cents": 0},
