@@ -24,9 +24,9 @@ Live: <https://kleephotography.com> · Runs on a single always-on node behind a 
 
 FastAPI · Jinja2 · HTMX (no front-end build) · SQLite (WAL) · Pillow + pillow-heif (imaging) ·
 ffmpeg (video transcode/poster) · Stripe (payments) · itsdangerous (signed cookies).
-Python deps pinned in `requirements.txt`. ~10K LOC Python, ~20K total; one 120-case
-end-to-end smoke suite. No ORM, no JS framework, no message broker — the platform is the
-standard library plus four well-chosen packages.
+Python deps pinned in `requirements.txt`. ~12.5K LOC Python across 70 modules
+(~19.5K with tests); one 141-case end-to-end smoke suite. No ORM, no JS framework,
+no message broker — the platform is the standard library plus four well-chosen packages.
 
 ## Architecture
 
@@ -40,7 +40,7 @@ Three surfaces, one process:
 | Machine API | `app/service_api.py` | Internal automation | bearer token (`/api/shots`) |
 
 **Spine:** `main.py` (app factory + middleware), `config.py` (env-driven), `db.py`
-(SQLite, short-lived connections, 49 forward-only migrations in `migrations/`),
+(SQLite, short-lived connections, 53 forward-only migrations in `migrations/`),
 `security.py` (slugs/PINs/lockout/cookies), `jobs.py` (in-process queue for image
 derivatives + video transcodes), `scheduler.py` (retainer thread — drafts only).
 
@@ -72,7 +72,7 @@ don't need for operability I do:
 
 ## Testing
 
-`tests/test_smoke.py` is one end-to-end suite (120 cases) that exercises real routes against
+`tests/test_smoke.py` is one end-to-end suite (141 cases) that exercises real routes against
 a real SQLite DB via FastAPI's `TestClient` — auth gating, PIN lockout, the proposal →
 contract → invoice → receipt flow, Stripe webhook signature verification, and template
 rendering. Tests assert *intent* (e.g. a webhook with a bad signature is rejected), not just
@@ -94,11 +94,11 @@ app/
   service_api.py            bearer-gated /api/shots
   imaging.py video.py       media pipeline
   notion_sync.py caption_ai.py reopen_notify.py   one-way outbound integrations
-migrations/   001..049 forward-only (+ rollback/ down-scripts for risky changes)
-templates/    admin/ · public/ · site/   (80 Jinja + HTMX templates)
+migrations/   001..053 forward-only (+ rollback/ down-scripts for risky changes)
+templates/    admin/ · public/ · site/   (93 Jinja + HTMX templates)
 static/       mise.css + htmx.min.js + 4 vanilla JS (lightbox, copy-link, details-persist, site)
 ops/          systemd units + nightly backup
-tests/        test_smoke.py (120 end-to-end cases, real DB + TestClient)
+tests/        test_smoke.py (141 end-to-end cases, real DB + TestClient)
 ```
 
 ## Running it
@@ -132,6 +132,9 @@ and type scale are defined as CSS custom properties at the top of `mise.css`.
 - Gallery slugs are 14-char base62 (unguessable); all non-marketing routes send
   `X-Robots-Tag: noindex`; `X-Frame-Options: DENY` everywhere.
 - `CF-Connecting-IP` is trusted only when the peer is localhost (tunnel-correct rate limiting).
+- Query values always use `?` placeholders; the few interpolated table/column names pass
+  through `db.ident()`, an allowlist gate that raises rather than letting a stray identifier
+  reach the query.
 - Secrets in `.env` (mode 600), never in code, logs, or history. Stripe webhooks are
   signature-verified.
 
