@@ -1756,6 +1756,110 @@ def test_gallery_delivery_email(admin, monkeypatch):
                   "AND doc_id=?", (gid,))["n"] == 1
 
 
+def test_gallery_expiry_reminder(client, monkeypatch):
+    # As a published gallery nears expiry, the client gets a one-shot download
+    # reminder — but only if there's a client email on file, only inside the lead
+    # window, and only once. Asserted via the reminded_expiry flag so a shared-DB
+    # neighbour gallery can't make this flaky.
+    import datetime as dt
+    from app import gallery_reminders, mailer
+    sent = []
+    monkeypatch.setattr(mailer, "configured", lambda: True)
+    monkeypatch.setattr(mailer, "send",
+                        lambda to, subject, body, reply_to="": sent.append((to, subject, body)))
+    today = dt.date.today()
+    cid = db.run("INSERT INTO clients (name, email) VALUES (?,?)",
+                 ("Expiry Co", "expiry@bistro.com"))
+    soon = (today + dt.timedelta(days=2)).isoformat()
+    far = (today + dt.timedelta(days=30)).isoformat()
+    g_soon = db.run("INSERT INTO galleries (slug,title,pin,type,published,client_id,expires_at)"
+                    " VALUES (?,?,?,'gallery',1,?,?)",
+                    ("ExpSoon01", "Soon Gallery", "1111", cid, soon))
+    g_far = db.run("INSERT INTO galleries (slug,title,pin,type,published,client_id,expires_at)"
+                   " VALUES (?,?,?,'gallery',1,?,?)",
+                   ("ExpFar01", "Far Gallery", "2222", cid, far))
+    # only a free-text client_name, no linked client → no address → skipped
+    g_orphan = db.run("INSERT INTO galleries (slug,title,pin,type,published,client_name,expires_at)"
+                      " VALUES (?,?,?,'gallery',1,?,?)",
+                      ("ExpOrphan01", "Orphan", "3333", "Walk In", soon))
+
+    gallery_reminders.sweep()
+    assert db.one("SELECT reminded_expiry r FROM galleries WHERE id=?", (g_soon,))["r"] == 1
+    assert db.one("SELECT reminded_expiry r FROM galleries WHERE id=?", (g_far,))["r"] == 0
+    assert db.one("SELECT reminded_expiry r FROM galleries WHERE id=?", (g_orphan,))["r"] == 0
+    bodies = " ".join(s[2] for s in sent)
+    assert "/g/ExpSoon01" in bodies and "/g/ExpFar01" not in bodies
+    assert any(t[0] == "expiry@bistro.com" and "Soon Gallery" in t[1] for t in sent)
+
+    # idempotent — a second sweep does not re-send for the already-reminded gallery
+    sent.clear()
+    gallery_reminders.sweep()
+    assert all("/g/ExpSoon01" not in s[2] for s in sent)
+
+
+def test_gallery_proofing_nudge(client, monkeypatch):
+    # A published gallery that still has unmet proof targets and has been waiting
+    # past the nudge threshold gets one proofing reminder; a fresh one or one with
+    # no proof target does not.
+    import datetime as dt
+    from app import gallery_reminders, mailer
+    sent = []
+    monkeypatch.setattr(mailer, "configured", lambda: True)
+    monkeypatch.setattr(mailer, "send",
+                        lambda to, subject, body, reply_to="": sent.append((to, subject, body)))
+    today = dt.date.today()
+    old = (today - dt.timedelta(days=10)).isoformat() + " 12:00:00"
+    fresh = today.isoformat() + " 12:00:00"
+    cid = db.run("INSERT INTO clients (name, email) VALUES (?,?)",
+                 ("Proof Co", "proof@bistro.com"))
+    g_old = db.run("INSERT INTO galleries (slug,title,pin,type,published,client_id,created_at)"
+                   " VALUES (?,?,?,'gallery',1,?,?)",
+                   ("ProofOld01", "Old Proof", "1212", cid, old))
+    db.run("INSERT INTO sections (gallery_id,name,position,proof_target) VALUES (?,?,?,?)",
+           (g_old, "Picks", 0, 2))
+    g_fresh = db.run("INSERT INTO galleries (slug,title,pin,type,published,client_id,created_at)"
+                     " VALUES (?,?,?,'gallery',1,?,?)",
+                     ("ProofFresh01", "Fresh Proof", "1313", cid, fresh))
+    db.run("INSERT INTO sections (gallery_id,name,position,proof_target) VALUES (?,?,?,?)",
+           (g_fresh, "Picks", 0, 2))
+    g_noproof = db.run("INSERT INTO galleries (slug,title,pin,type,published,client_id,created_at)"
+                       " VALUES (?,?,?,'gallery',1,?,?)",
+                       ("ProofNone01", "No Target", "1414", cid, old))
+    db.run("INSERT INTO sections (gallery_id,name,position) VALUES (?,?,?)",
+           (g_noproof, "Freeform", 0))
+
+    gallery_reminders.sweep()
+    assert db.one("SELECT reminded_proofing r FROM galleries WHERE id=?", (g_old,))["r"] == 1
+    assert db.one("SELECT reminded_proofing r FROM galleries WHERE id=?", (g_fresh,))["r"] == 0
+    assert db.one("SELECT reminded_proofing r FROM galleries WHERE id=?", (g_noproof,))["r"] == 0
+    assert any("/g/ProofOld01" in s[2] for s in sent)
+
+    sent.clear()
+    gallery_reminders.sweep()
+    assert all("/g/ProofOld01" not in s[2] for s in sent)
+
+
+def test_gallery_expiry_reminder_rearms_on_date_change(admin):
+    # Editing a gallery's expiry date clears the one-shot flag so the new date
+    # re-reminds; an edit that leaves the date unchanged must NOT clear it.
+    import datetime as dt
+    today = dt.date.today()
+    gid = db.run("INSERT INTO galleries (slug,title,pin,type,published,expires_at,reminded_expiry)"
+                 " VALUES (?,?,?,'gallery',1,?,1)",
+                 ("ReArm01", "Rearm", "4444", (today + dt.timedelta(days=20)).isoformat()))
+    new_exp = (today + dt.timedelta(days=40)).isoformat()
+    base = {"title": "Rearm", "pin": "4444", "published": "true"}
+    r = admin.post(f"/admin/galleries/{gid}/settings",
+                   data={**base, "expires_at": new_exp}, follow_redirects=False)
+    assert r.status_code == 303
+    assert db.one("SELECT reminded_expiry r FROM galleries WHERE id=?", (gid,))["r"] == 0
+
+    db.run("UPDATE galleries SET reminded_expiry=1 WHERE id=?", (gid,))
+    admin.post(f"/admin/galleries/{gid}/settings",
+               data={**base, "expires_at": new_exp}, follow_redirects=False)
+    assert db.one("SELECT reminded_expiry r FROM galleries WHERE id=?", (gid,))["r"] == 1
+
+
 def test_final_email_auto_advances_project(admin, monkeypatch):
     from app import mailer
     monkeypatch.setattr(mailer, "configured", lambda: True)

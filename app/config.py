@@ -142,6 +142,14 @@ JOB_WORKERS = int(os.environ.get("MISE_JOB_WORKERS", "2"))
 # due monthly draft is caught up — an hour is plenty for a monthly event.
 RECURRING_TICK_SECONDS = int(os.environ.get("MISE_RECURRING_TICK_SECONDS", "3600"))
 
+# Gallery client reminders — fired off the same recurring sweep (gallery_reminders).
+# Both are idempotent per gallery via the reminded_* flags, so the interval only
+# governs latency, not duplication. Email only; Kevin isn't re-pinged. Expiry: warn
+# the client this many days before expires_at. Proofing: nudge once a gallery with
+# unmet proof targets has been published-and-waiting this many days (by created_at).
+GALLERY_EXPIRY_REMINDER_DAYS = int(os.environ.get("MISE_GALLERY_EXPIRY_REMINDER_DAYS", "3"))
+GALLERY_PROOF_NUDGE_DAYS = int(os.environ.get("MISE_GALLERY_PROOF_NUDGE_DAYS", "5"))
+
 PIN_MAX_FAILS = int(os.environ.get("MISE_PIN_MAX_FAILS", "5"))
 PIN_LOCKOUT_MIN = int(os.environ.get("MISE_PIN_LOCKOUT_MIN", "15"))
 

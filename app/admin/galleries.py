@@ -375,18 +375,23 @@ async def update_gallery(gallery_id: int, title: str = Form(...),
     old = get_gallery(gallery_id)
     if not (pin.isdigit() and len(pin) == 4):
         raise HTTPException(status_code=400, detail="PIN must be 4 digits")
+    new_expires = expires_at.strip() or None
     db.run("""UPDATE galleries SET title=?, client_name=?, pin=?, expires_at=?,
               published=?, client_id=?, project_id=?, captions=?,
               cs_published=?, cs_tagline=?, cs_brief=?, cs_credits=?, cs_location=?
               WHERE id=?""",
            (title.strip(), client_name.strip() or None, pin,
-            expires_at.strip() or None, 1 if published else 0,
+            new_expires, 1 if published else 0,
             client_id, project_id,
             captions.strip() or None,
             1 if cs_published else 0,
             cs_tagline.strip() or None, cs_brief.strip() or None,
             cs_credits.strip() or None, cs_location.strip() or None,
             gallery_id))
+    # Changing the expiry date re-arms the one-shot expiry reminder so an extended
+    # gallery re-reminds near its new date (the flag would otherwise stay set).
+    if new_expires != old["expires_at"]:
+        db.run("UPDATE galleries SET reminded_expiry=0 WHERE id=?", (gallery_id,))
     if published and project_id and (not old["published"] or old["project_id"] != project_id):
         jobs.enqueue("notion_sync_gallery", {"gallery_id": gallery_id})
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
