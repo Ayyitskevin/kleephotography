@@ -113,6 +113,11 @@ ARGUS_TOKEN = os.environ.get("MISE_ARGUS_TOKEN", "")
 ARGUS_TIMEOUT = int(os.environ.get("MISE_ARGUS_TIMEOUT", "30"))
 ARGUS_ANALYZE_LIMIT = int(os.environ.get("MISE_ARGUS_ANALYZE_LIMIT", "20"))
 
+# Plutus print upsell (Phase 1). BOTH url+token arm post-Argus recommend hooks.
+PLUTUS_URL = os.environ.get("MISE_PLUTUS_URL", "").rstrip("/")
+PLUTUS_TOKEN = os.environ.get("MISE_PLUTUS_TOKEN", "")
+PLUTUS_TIMEOUT = int(os.environ.get("MISE_PLUTUS_TIMEOUT", "30"))
+
 # studio-notify-on-reopen: best-effort push to Odysseus when a client reply
 # auto-reopens a resolved video-comment thread. Both unset -> dormant, no outbound
 # call. Timeout is SHORT (5s) — opposite of caption: a slow/down Odysseus must never

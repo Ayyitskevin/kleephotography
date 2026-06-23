@@ -96,14 +96,16 @@ async def galleries(published: bool = True):
     if published:
         rows = db.all_(
             """SELECT id, slug, title, project_id, published, client_id,
-                      argus_last_run_id, argus_last_job_id, argus_last_status, argus_last_at
+                      argus_last_run_id, argus_last_job_id, argus_last_status, argus_last_at,
+                      plutus_last_run_id, plutus_last_status, plutus_last_at
                FROM galleries WHERE published=1 AND type='gallery'
                ORDER BY id DESC""",
         )
     else:
         rows = db.all_(
             """SELECT id, slug, title, project_id, published, client_id,
-                      argus_last_run_id, argus_last_job_id, argus_last_status, argus_last_at
+                      argus_last_run_id, argus_last_job_id, argus_last_status, argus_last_at,
+                      plutus_last_run_id, plutus_last_status, plutus_last_at
                FROM galleries WHERE type='gallery' ORDER BY id DESC""",
         )
     return {
@@ -119,6 +121,9 @@ async def galleries(published: bool = True):
             "argus_last_job_id": r["argus_last_job_id"],
             "argus_last_status": r["argus_last_status"],
             "argus_last_at": r["argus_last_at"],
+            "plutus_last_run_id": r["plutus_last_run_id"],
+            "plutus_last_status": r["plutus_last_status"],
+            "plutus_last_at": r["plutus_last_at"],
         } for r in rows],
     }
 

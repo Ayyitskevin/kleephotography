@@ -274,6 +274,34 @@
       </section>
       {% endif %}
 
+      {% if plutus_enabled and g.published and not is_drop %}
+      <section class="gd-argus" style="margin-top:1rem;padding:1rem;border:1px solid #e8e4d8;border-radius:8px;background:#faf8f4">
+        <div class="gd-proof-head" style="margin-bottom:0.5rem">
+          <h3 style="margin:0">Plutus print upsell</h3>
+          {% if g.plutus_last_status %}
+          <span class="gd-proof-n">{{ g.plutus_last_status }}</span>
+          {% endif %}
+        </div>
+        {% if g.plutus_last_status == 'error' and g.plutus_last_error %}
+        <p class="muted" style="margin:0 0 0.6rem;color:#7C2F38">{{ g.plutus_last_error }}
+          {% if g.plutus_last_at %}<span> · {{ g.plutus_last_at }}</span>{% endif %}
+        </p>
+        {% elif g.plutus_last_at %}
+        <p class="muted" style="margin:0 0 0.6rem">Last run {{ g.plutus_last_at }}
+          {% if g.plutus_last_run_id %}
+          · <a href="{{ plutus_url }}/runs/{{ g.plutus_last_run_id }}" target="_blank" rel="noopener">view bundles</a>
+          · <a href="{{ plutus_url }}/runs/{{ g.plutus_last_run_id }}/pitch.txt" target="_blank" rel="noopener">client pitch</a>
+          {% endif %}
+        </p>
+        {% else %}
+        <p class="muted" style="margin:0 0 0.6rem">Queued after Argus analyze completes (or on publish when Argus is off).</p>
+        {% endif %}
+        <form method="post" action="/admin/galleries/{{ g.id }}/plutus-recommend" class="inline">
+          <button type="submit" class="link">Recommend prints now</button>
+        </form>
+      </section>
+      {% endif %}
+
       {% if not is_drop and assets %}
       {% set pct = (n_fav * 100 // (assets|length)) if assets else 0 %}
       <section class="gd-proof">

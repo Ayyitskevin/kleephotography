@@ -7,7 +7,7 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import argus_analyze, brand_kits, config, db, imaging, notion_sync, presets, video
+from . import argus_analyze, brand_kits, config, db, imaging, notion_sync, plutus_recommend, presets, video
 
 log = logging.getLogger("mise.jobs")
 
@@ -126,6 +126,7 @@ HANDLERS = {
     "notion_sync_gallery": lambda p: notion_sync.sync_gallery(p["gallery_id"]),
     "argus_analyze_gallery": lambda p: argus_analyze.run_for_gallery(
         p["gallery_id"], skip_dedup=bool(p.get("skip_dedup"))),
+    "plutus_recommend_gallery": lambda p: plutus_recommend.run_for_gallery(p["gallery_id"]),
 }
 
 

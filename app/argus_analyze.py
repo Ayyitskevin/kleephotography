@@ -12,7 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import config, db, platekit
+from . import config, db, platekit, plutus_recommend
 
 log = logging.getLogger("mise.argus")
 
@@ -48,6 +48,10 @@ def apply_callback(gallery_id: int, payload: dict) -> None:
                 platekit.notify_argus_complete(gallery_id, int(run_id))
             except Exception:
                 log.exception("platekit argus hook failed for gallery %s", gallery_id)
+        if plutus_recommend.is_enabled():
+            from . import jobs
+
+            jobs.enqueue("plutus_recommend_gallery", {"gallery_id": gallery_id})
     elif status == "queued":
         _record(gallery_id, status="queued", job_id=job_id)
     elif status in ("dead_letter", "failed"):
