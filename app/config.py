@@ -141,13 +141,15 @@ QUO_TIMEOUT = int(os.environ.get("MISE_QUO_TIMEOUT", "20"))
 # flow's .env. This is the ONLY inbound service-bearer surface in Mise.
 SHOTS_TOKEN = os.environ.get("MISE_SHOTS_TOKEN", "")
 
-# Platekit/Dionysus read bridge. Empty values keep the admin panel dormant.
+# Platekit/Dionysus bridge. Empty values keep the admin panel and Argus hook dormant.
+# When armed, GET packs for the client admin card; Argus job callbacks also POST
+# /api/mise/organizations/{slug}/argus-pack to draft keyword-enriched captions.
 PLATEKIT_API_BASE = os.environ.get(
     "MISE_PLATEKIT_API_BASE", os.environ.get("MISE_DIONYSUS_API_BASE", ""))
 PLATEKIT_API_TOKEN = os.environ.get(
     "MISE_PLATEKIT_API_TOKEN", os.environ.get("MISE_DIONYSUS_API_TOKEN", ""))
 PLATEKIT_TIMEOUT = int(os.environ.get(
-    "MISE_PLATEKIT_TIMEOUT", os.environ.get("MISE_DIONYSUS_TIMEOUT", "5")))
+    "MISE_PLATEKIT_TIMEOUT", os.environ.get("MISE_DIONYSUS_TIMEOUT", "10")))
 
 WEB_MAX_PX = int(os.environ.get("MISE_WEB_MAX_PX", "2048"))
 THUMB_MAX_PX = int(os.environ.get("MISE_THUMB_MAX_PX", "480"))

@@ -12,7 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import config, db
+from . import config, db, platekit
 
 log = logging.getLogger("mise.argus")
 
@@ -43,6 +43,11 @@ def apply_callback(gallery_id: int, payload: dict) -> None:
 
     if status == "done" or run_id:
         _record(gallery_id, status="done", run_id=run_id, job_id=job_id)
+        if run_id:
+            try:
+                platekit.notify_argus_complete(gallery_id, int(run_id))
+            except Exception:
+                log.exception("platekit argus hook failed for gallery %s", gallery_id)
     elif status == "queued":
         _record(gallery_id, status="queued", job_id=job_id)
     elif status in ("dead_letter", "failed"):
