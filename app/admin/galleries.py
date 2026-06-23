@@ -398,7 +398,7 @@ async def update_gallery(
     )
     if published and project_id and (not old["published"] or old["project_id"] != project_id):
         jobs.enqueue("notion_sync_gallery", {"gallery_id": gallery_id})
-    if (published and old["type"] != "drop"
+    if (argus_analyze.is_enabled() and published and old["type"] != "drop"
             and (not old["published"] or old["project_id"] != project_id)):
         jobs.enqueue("argus_analyze_gallery", {"gallery_id": gallery_id})
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)

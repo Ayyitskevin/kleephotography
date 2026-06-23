@@ -71,6 +71,22 @@ def test_publish_enqueues_argus_job(admin_client, monkeypatch):
     assert n_jobs() == 1
 
 
+def test_publish_does_not_enqueue_when_argus_disabled(admin_client, monkeypatch):
+    # Argus off → publishing must not stamp spurious "error" state via a job
+    # that only fails the enabled check.
+    monkeypatch.setattr(config, "ARGUS_URL", "")
+    monkeypatch.setattr(config, "ARGUS_TOKEN", "")
+    gid = db.run("INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+                 ("ArgusOff01", "Argus Off", "1234"))
+    r = admin_client.post(f"/admin/galleries/{gid}/settings",
+                          data={"title": "Argus Off", "pin": "1234", "published": "true"},
+                          follow_redirects=False)
+    assert r.status_code == 303
+    n = db.one("""SELECT COUNT(*) AS n FROM jobs WHERE kind='argus_analyze_gallery'
+                  AND json_extract(payload,'$.gallery_id')=?""", (gid,))["n"]
+    assert n == 0
+
+
 def test_run_for_gallery_records_queued(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
