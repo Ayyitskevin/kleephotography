@@ -9,6 +9,11 @@ from app.main import app
 def configure_tmp_db(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "mise.db")
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
+    monkeypatch.setattr(config, "ZIP_DIR", tmp_path / "zips")
+    monkeypatch.setattr(config, "TMP_DIR", tmp_path / "tmp")
+    monkeypatch.setattr(config, "BRAND_DIR", tmp_path / "brand")
+    monkeypatch.setattr(config, "RECEIPTS_DIR", tmp_path / "receipts")
     monkeypatch.setattr(config, "SHOTS_TOKEN", "service-test-token")
     db.migrate()
 

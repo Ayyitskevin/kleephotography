@@ -1,33 +1,36 @@
 """Argus Phase 6 wiring — mock outbound HTTP only."""
 
 import json
-import os
-import tempfile
-
-os.environ.setdefault("MISE_DATA_DIR", tempfile.mkdtemp(prefix="mise-argus-test-"))
-os.environ.setdefault("MISE_SECRET_KEY", "test-secret")
-os.environ.setdefault("MISE_ADMIN_PASSWORD", "test-pw")
-os.environ.setdefault("MISE_ENV_FILE", "/nonexistent")
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app import argus_analyze, config, db
+from app import argus_analyze, config, db, jobs
 from app.main import app
 
 
-@pytest.fixture(scope="module")
-def client():
-    with TestClient(app) as c:
-        yield c
+def _configure_tmp_db(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "mise.db")
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
+    monkeypatch.setattr(config, "ZIP_DIR", tmp_path / "zips")
+    monkeypatch.setattr(config, "TMP_DIR", tmp_path / "tmp")
+    monkeypatch.setattr(config, "BRAND_DIR", tmp_path / "brand")
+    monkeypatch.setattr(config, "RECEIPTS_DIR", tmp_path / "receipts")
+    monkeypatch.setattr(config, "SECRET_KEY", "test-secret")
+    monkeypatch.setattr(config, "ADMIN_PASSWORD", "test-pw")
+    db.migrate()
 
 
-@pytest.fixture(scope="module")
-def admin(client):
-    r = client.post("/admin/login", data={"password": os.environ["MISE_ADMIN_PASSWORD"]},
-                    follow_redirects=False)
-    assert r.status_code == 303
-    return client
+@pytest.fixture
+def admin_client(tmp_path, monkeypatch):
+    _configure_tmp_db(tmp_path, monkeypatch)
+    with TestClient(app) as client:
+        r = client.post("/admin/login", data={"password": "test-pw"},
+                        follow_redirects=False)
+        assert r.status_code == 303
+        yield client
+    jobs.stop()
 
 
 @pytest.fixture(autouse=True)
@@ -47,7 +50,7 @@ def test_argus_is_enabled(monkeypatch):
     assert argus_analyze.is_enabled() is True
 
 
-def test_publish_enqueues_argus_job(admin, monkeypatch):
+def test_publish_enqueues_argus_job(admin_client, monkeypatch):
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run("INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
@@ -57,18 +60,19 @@ def test_publish_enqueues_argus_job(admin, monkeypatch):
         return db.one("""SELECT COUNT(*) AS n FROM jobs WHERE kind='argus_analyze_gallery'
                          AND json_extract(payload,'$.gallery_id')=?""", (gid,))["n"]
 
-    r = admin.post(f"/admin/galleries/{gid}/settings",
-                   data={"title": "Argus Pub", "pin": "1234", "published": "true"},
-                   follow_redirects=False)
+    r = admin_client.post(f"/admin/galleries/{gid}/settings",
+                          data={"title": "Argus Pub", "pin": "1234", "published": "true"},
+                          follow_redirects=False)
     assert r.status_code == 303
     assert n_jobs() == 1
-    admin.post(f"/admin/galleries/{gid}/settings",
-               data={"title": "Argus Pub", "pin": "1234", "published": "true"},
-               follow_redirects=False)
+    admin_client.post(f"/admin/galleries/{gid}/settings",
+                      data={"title": "Argus Pub", "pin": "1234", "published": "true"},
+                      follow_redirects=False)
     assert n_jobs() == 1
 
 
-def test_run_for_gallery_records_queued(admin, monkeypatch):
+def test_run_for_gallery_records_queued(tmp_path, monkeypatch):
+    _configure_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
@@ -93,7 +97,8 @@ def test_run_for_gallery_records_queued(admin, monkeypatch):
     assert row["argus_last_at"]
 
 
-def test_run_for_gallery_records_sync_run(admin, monkeypatch):
+def test_run_for_gallery_records_sync_run(tmp_path, monkeypatch):
+    _configure_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
@@ -117,7 +122,8 @@ def test_run_for_gallery_records_sync_run(admin, monkeypatch):
     assert row["argus_last_status"] == "done"
 
 
-def test_run_for_gallery_swallows_errors(admin, monkeypatch):
+def test_run_for_gallery_swallows_errors(tmp_path, monkeypatch):
+    _configure_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
@@ -127,48 +133,42 @@ def test_run_for_gallery_swallows_errors(admin, monkeypatch):
         raise TimeoutError("timed out")
 
     monkeypatch.setattr(argus_analyze.urllib.request, "urlopen", boom)
-    argus_analyze.run_for_gallery(gid)  # must not raise
+    argus_analyze.run_for_gallery(gid)
     row = db.one("SELECT * FROM galleries WHERE id=?", (gid,))
     assert row["argus_last_status"] == "error"
     assert "timed out" in row["argus_last_error"]
 
 
-def test_manual_analyze_route(admin, monkeypatch):
+def test_manual_analyze_route(admin_client, monkeypatch):
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
                  ("ArgusMan01", "Manual", "1234"))
     before = db.one("SELECT COUNT(*) AS n FROM jobs WHERE kind='argus_analyze_gallery'")["n"]
-    r = admin.post(f"/admin/galleries/{gid}/argus-analyze", follow_redirects=False)
+    r = admin_client.post(f"/admin/galleries/{gid}/argus-analyze", follow_redirects=False)
     assert r.status_code == 303
     after = db.one("SELECT COUNT(*) AS n FROM jobs WHERE kind='argus_analyze_gallery'")["n"]
     assert after == before + 1
 
 
-def test_galleries_api(admin):
-    saved_url = config.ARGUS_URL
-    saved_token = config.ARGUS_TOKEN
-    try:
-        config.ARGUS_URL = "http://argus:8010"
-        config.ARGUS_TOKEN = ""
-        r = admin.get("/api/galleries")
-        assert r.status_code == 503
+def test_galleries_api(admin_client, monkeypatch):
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_TOKEN", "")
+    r = admin_client.get("/api/galleries")
+    assert r.status_code == 503
 
-        config.ARGUS_TOKEN = "api-secret"
-        gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
-                     ("ApiGal01", "API Gal", "1234"))
-        headers = {"Authorization": "Bearer api-secret"}
-        ok = admin.get("/api/galleries", headers=headers)
-        assert ok.status_code == 200
-        body = ok.json()
-        ids = [g["id"] for g in body["galleries"]]
-        assert gid in ids
-        match = next(g for g in body["galleries"] if g["id"] == gid)
-        assert match["slug"] == "ApiGal01"
-        assert match["published"] is True
+    monkeypatch.setattr(config, "ARGUS_TOKEN", "api-secret")
+    gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+                 ("ApiGal01", "API Gal", "1234"))
+    headers = {"Authorization": "Bearer api-secret"}
+    ok = admin_client.get("/api/galleries", headers=headers)
+    assert ok.status_code == 200
+    body = ok.json()
+    ids = [g["id"] for g in body["galleries"]]
+    assert gid in ids
+    match = next(g for g in body["galleries"] if g["id"] == gid)
+    assert match["slug"] == "ApiGal01"
+    assert match["published"] is True
 
-        bad = admin.get("/api/galleries", headers={"Authorization": "Bearer wrong"})
-        assert bad.status_code == 401
-    finally:
-        config.ARGUS_URL = saved_url
-        config.ARGUS_TOKEN = saved_token
+    bad = admin_client.get("/api/galleries", headers={"Authorization": "Bearer wrong"})
+    assert bad.status_code == 401
