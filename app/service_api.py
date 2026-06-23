@@ -22,7 +22,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from . import db, security
+from . import config, db, security
 
 log = logging.getLogger("mise.service_api")
 router = APIRouter(prefix="/api")
@@ -114,6 +114,7 @@ async def galleries(published: bool = True):
             "project_id": r["project_id"],
             "published": bool(r["published"]),
             "client_id": r["client_id"],
+            "originals_path": str(config.MEDIA_DIR / str(r["id"]) / "original"),
             "argus_last_run_id": r["argus_last_run_id"],
             "argus_last_job_id": r["argus_last_job_id"],
             "argus_last_status": r["argus_last_status"],

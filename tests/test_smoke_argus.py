@@ -185,6 +185,7 @@ def test_galleries_api(admin_client, monkeypatch):
     match = next(g for g in body["galleries"] if g["id"] == gid)
     assert match["slug"] == "ApiGal01"
     assert match["published"] is True
+    assert match["originals_path"].endswith(f"/media/{gid}/original")
 
     bad = admin_client.get("/api/galleries", headers={"Authorization": "Bearer wrong"})
     assert bad.status_code == 401
