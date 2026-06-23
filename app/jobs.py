@@ -124,7 +124,8 @@ HANDLERS = {
     "zip_build": _h_zip,
     "notion_sync_invoice": lambda p: notion_sync.sync_invoice(p["invoice_id"]),
     "notion_sync_gallery": lambda p: notion_sync.sync_gallery(p["gallery_id"]),
-    "argus_analyze_gallery": lambda p: argus_analyze.run_for_gallery(p["gallery_id"]),
+    "argus_analyze_gallery": lambda p: argus_analyze.run_for_gallery(
+        p["gallery_id"], skip_dedup=bool(p.get("skip_dedup"))),
 }
 
 

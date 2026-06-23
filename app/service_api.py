@@ -20,9 +20,9 @@ All are bearer-gated and read-only.
 import datetime as dt
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from . import config, db, security
+from . import argus_analyze, config, db, security
 
 log = logging.getLogger("mise.service_api")
 router = APIRouter(prefix="/api")
@@ -121,3 +121,20 @@ async def galleries(published: bool = True):
             "argus_last_at": r["argus_last_at"],
         } for r in rows],
     }
+
+
+@router.post("/argus/callback", dependencies=[Depends(security.require_argus_token)])
+async def argus_callback(request: Request, gallery_id: int):
+    """Argus job completion webhook — updates argus_last_* on the gallery row."""
+    if gallery_id <= 0:
+        raise HTTPException(status_code=400, detail="gallery_id required")
+    if not db.one("SELECT 1 AS x FROM galleries WHERE id=?", (gallery_id,)):
+        raise HTTPException(status_code=404, detail="gallery not found")
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="json body required")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="json object required")
+    argus_analyze.apply_callback(gallery_id, payload)
+    return {"ok": True, "gallery_id": gallery_id}

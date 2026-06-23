@@ -26,6 +26,32 @@ def is_enabled() -> bool:
     return bool(config.ARGUS_URL and config.ARGUS_TOKEN)
 
 
+def _callback_url(gallery_id: int) -> str | None:
+    """Tailnet callback for queued Argus jobs to update gallery status."""
+    if not config.BASE_URL:
+        return None
+    return f"{config.BASE_URL.rstrip('/')}/api/argus/callback?gallery_id={gallery_id}"
+
+
+def apply_callback(gallery_id: int, payload: dict) -> None:
+    """Best-effort status update from Argus job completion webhook."""
+    status = (payload.get("status") or "").strip()
+    result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+    run_id = payload.get("run_id") or result.get("run_id")
+    job_id = payload.get("job_id")
+    error = payload.get("error")
+
+    if status == "done" or run_id:
+        _record(gallery_id, status="done", run_id=run_id, job_id=job_id)
+    elif status == "queued":
+        _record(gallery_id, status="queued", job_id=job_id)
+    elif status in ("dead_letter", "failed"):
+        _record(gallery_id, status="error", run_id=run_id, job_id=job_id,
+                error=(error or f"Argus job {status}")[:500])
+    else:
+        log.info("argus callback ignored for gallery %s status=%s", gallery_id, status)
+
+
 def _record(gallery_id: int, *, status: str, run_id: int | None = None,
             job_id: str | None = None, error: str | None = None) -> None:
     db.run("""UPDATE galleries SET argus_last_run_id=?, argus_last_job_id=?,
@@ -34,7 +60,7 @@ def _record(gallery_id: int, *, status: str, run_id: int | None = None,
            (run_id, job_id, status, (error or None)[:500] if error else None, gallery_id))
 
 
-def trigger_gallery_analyze(gallery_id: int) -> dict:
+def trigger_gallery_analyze(gallery_id: int, *, skip_dedup: bool = False) -> dict:
     """POST /analyze-folder for one published gallery. Returns Argus JSON body."""
     if not is_enabled():
         raise ArgusAnalyzeError("Argus is not configured")
@@ -47,11 +73,17 @@ def trigger_gallery_analyze(gallery_id: int) -> dict:
     if g["type"] == "drop":
         raise ArgusAnalyzeError("transfers are not analyzed")
 
-    body = urllib.parse.urlencode({
+    fields = {
         "mise_gallery_id": gallery_id,
         "limit": config.ARGUS_ANALYZE_LIMIT,
         "source": "mise",
-    }).encode()
+    }
+    if skip_dedup:
+        fields["skip_dedup"] = "true"
+    callback = _callback_url(gallery_id)
+    if callback:
+        fields["callback_url"] = callback
+    body = urllib.parse.urlencode(fields).encode()
     req = urllib.request.Request(
         f"{config.ARGUS_URL}/analyze-folder",
         method="POST",
@@ -91,13 +123,13 @@ def trigger_gallery_analyze(gallery_id: int) -> dict:
     return payload
 
 
-def run_for_gallery(gallery_id: int) -> None:
+def run_for_gallery(gallery_id: int, *, skip_dedup: bool = False) -> None:
     """Background job entry — never raises; records status on the gallery row."""
     if not is_enabled():
         log.info("argus analyze skipped for %s (not configured)", gallery_id)
         return
     try:
-        result = trigger_gallery_analyze(gallery_id)
+        result = trigger_gallery_analyze(gallery_id, skip_dedup=skip_dedup)
     except ArgusAnalyzeError as e:
         log.warning("argus analyze failed for gallery %s: %s", gallery_id, e)
         _record(gallery_id, status="error", error=str(e))

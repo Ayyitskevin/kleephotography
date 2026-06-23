@@ -167,6 +167,22 @@ def test_manual_analyze_route(admin_client, monkeypatch):
     assert after == before + 1
 
 
+def test_argus_callback_updates_gallery(admin_client, monkeypatch):
+    monkeypatch.setattr(config, "ARGUS_TOKEN", "api-secret")
+    gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+                 ("CbGal01", "Callback", "1234"))
+    headers = {"Authorization": "Bearer api-secret", "Content-Type": "application/json"}
+    r = admin_client.post(
+        f"/api/argus/callback?gallery_id={gid}",
+        headers=headers,
+        json={"status": "done", "run_id": 99, "job_id": "job-xyz"},
+    )
+    assert r.status_code == 200
+    row = db.one("SELECT * FROM galleries WHERE id=?", (gid,))
+    assert row["argus_last_run_id"] == 99
+    assert row["argus_last_status"] == "done"
+
+
 def test_galleries_api(admin_client, monkeypatch):
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "")

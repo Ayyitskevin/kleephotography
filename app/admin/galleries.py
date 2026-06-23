@@ -414,7 +414,8 @@ async def argus_analyze_now(gallery_id: int):
         raise HTTPException(status_code=400, detail="transfers are not analyzed")
     if not argus_analyze.is_enabled():
         raise HTTPException(status_code=503, detail="Argus is not configured")
-    jobs.enqueue("argus_analyze_gallery", {"gallery_id": gallery_id})
+    jobs.enqueue("argus_analyze_gallery",
+                 {"gallery_id": gallery_id, "skip_dedup": True})
     log.info("argus analyze manually queued for gallery %s", gallery_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
