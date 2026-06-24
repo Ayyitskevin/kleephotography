@@ -400,11 +400,19 @@ async def update_gallery(
     )
     if published and project_id and (not old["published"] or old["project_id"] != project_id):
         jobs.enqueue("notion_sync_gallery", {"gallery_id": gallery_id})
-    if (argus_analyze.is_enabled() and published and old["type"] != "drop"
-            and (not old["published"] or old["project_id"] != project_id)):
+    if (
+        argus_analyze.is_enabled()
+        and published
+        and old["type"] != "drop"
+        and (not old["published"] or old["project_id"] != project_id)
+    ):
         jobs.enqueue("argus_analyze_gallery", {"gallery_id": gallery_id})
-    elif (plutus_recommend.is_enabled() and published and old["type"] != "drop"
-          and (not old["published"] or old["project_id"] != project_id)):
+    elif (
+        plutus_recommend.is_enabled()
+        and published
+        and old["type"] != "drop"
+        and (not old["published"] or old["project_id"] != project_id)
+    ):
         jobs.enqueue("plutus_recommend_gallery", {"gallery_id": gallery_id})
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
@@ -419,8 +427,7 @@ async def argus_analyze_now(gallery_id: int):
         raise HTTPException(status_code=400, detail="transfers are not analyzed")
     if not argus_analyze.is_enabled():
         raise HTTPException(status_code=503, detail="Argus is not configured")
-    jobs.enqueue("argus_analyze_gallery",
-                 {"gallery_id": gallery_id, "skip_dedup": True})
+    jobs.enqueue("argus_analyze_gallery", {"gallery_id": gallery_id, "skip_dedup": True})
     log.info("argus analyze manually queued for gallery %s", gallery_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 

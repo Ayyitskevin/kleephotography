@@ -5,7 +5,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app import argus_analyze, config, db, platekit
+from app import config, db, platekit
 from app.main import app
 
 
@@ -26,8 +26,7 @@ def _configure_tmp_db(tmp_path, monkeypatch):
 def admin_client(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
     with TestClient(app) as client:
-        r = client.post("/admin/login", data={"password": "test-pw"},
-                        follow_redirects=False)
+        r = client.post("/admin/login", data={"password": "test-pw"}, follow_redirects=False)
         assert r.status_code == 303
         yield client
 

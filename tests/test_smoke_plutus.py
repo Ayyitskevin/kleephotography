@@ -1,4 +1,5 @@
 """Plutus upsell integration smoke tests."""
+
 from __future__ import annotations
 
 import json
@@ -68,7 +69,8 @@ def test_argus_callback_enqueues_plutus(tmp_path, monkeypatch):
     )
     enqueued: list[tuple[str, dict]] = []
     monkeypatch.setattr(
-        jobs, "enqueue",
+        jobs,
+        "enqueue",
         lambda kind, payload: enqueued.append((kind, payload)) or 1,
     )
     argus_analyze.apply_callback(gid, {"status": "done", "run_id": 5})

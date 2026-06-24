@@ -26,8 +26,7 @@ def _configure_tmp_db(tmp_path, monkeypatch):
 def admin_client(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
     with TestClient(app) as client:
-        r = client.post("/admin/login", data={"password": "test-pw"},
-                        follow_redirects=False)
+        r = client.post("/admin/login", data={"password": "test-pw"}, follow_redirects=False)
         assert r.status_code == 303
         yield client
     jobs.stop()
@@ -36,6 +35,7 @@ def admin_client(tmp_path, monkeypatch):
 @pytest.fixture(autouse=True)
 def _reset_rate_limiter():
     from app import ratelimit
+
     ratelimit._hits.clear()
     yield
 
@@ -53,21 +53,30 @@ def test_argus_is_enabled(monkeypatch):
 def test_publish_enqueues_argus_job(admin_client, monkeypatch):
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
-    gid = db.run("INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
-                 ("ArgusPub01", "Argus Pub", "1234"))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("ArgusPub01", "Argus Pub", "1234"),
+    )
 
     def n_jobs():
-        return db.one("""SELECT COUNT(*) AS n FROM jobs WHERE kind='argus_analyze_gallery'
-                         AND json_extract(payload,'$.gallery_id')=?""", (gid,))["n"]
+        return db.one(
+            """SELECT COUNT(*) AS n FROM jobs WHERE kind='argus_analyze_gallery'
+                         AND json_extract(payload,'$.gallery_id')=?""",
+            (gid,),
+        )["n"]
 
-    r = admin_client.post(f"/admin/galleries/{gid}/settings",
-                          data={"title": "Argus Pub", "pin": "1234", "published": "true"},
-                          follow_redirects=False)
+    r = admin_client.post(
+        f"/admin/galleries/{gid}/settings",
+        data={"title": "Argus Pub", "pin": "1234", "published": "true"},
+        follow_redirects=False,
+    )
     assert r.status_code == 303
     assert n_jobs() == 1
-    admin_client.post(f"/admin/galleries/{gid}/settings",
-                      data={"title": "Argus Pub", "pin": "1234", "published": "true"},
-                      follow_redirects=False)
+    admin_client.post(
+        f"/admin/galleries/{gid}/settings",
+        data={"title": "Argus Pub", "pin": "1234", "published": "true"},
+        follow_redirects=False,
+    )
     assert n_jobs() == 1
 
 
@@ -76,14 +85,21 @@ def test_publish_does_not_enqueue_when_argus_disabled(admin_client, monkeypatch)
     # that only fails the enabled check.
     monkeypatch.setattr(config, "ARGUS_URL", "")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "")
-    gid = db.run("INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
-                 ("ArgusOff01", "Argus Off", "1234"))
-    r = admin_client.post(f"/admin/galleries/{gid}/settings",
-                          data={"title": "Argus Off", "pin": "1234", "published": "true"},
-                          follow_redirects=False)
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("ArgusOff01", "Argus Off", "1234"),
+    )
+    r = admin_client.post(
+        f"/admin/galleries/{gid}/settings",
+        data={"title": "Argus Off", "pin": "1234", "published": "true"},
+        follow_redirects=False,
+    )
     assert r.status_code == 303
-    n = db.one("""SELECT COUNT(*) AS n FROM jobs WHERE kind='argus_analyze_gallery'
-                  AND json_extract(payload,'$.gallery_id')=?""", (gid,))["n"]
+    n = db.one(
+        """SELECT COUNT(*) AS n FROM jobs WHERE kind='argus_analyze_gallery'
+                  AND json_extract(payload,'$.gallery_id')=?""",
+        (gid,),
+    )["n"]
     assert n == 0
 
 
@@ -91,8 +107,10 @@ def test_run_for_gallery_records_queued(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
-    gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
-                 ("ArgusRun01", "Run", "1234"))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("ArgusRun01", "Run", "1234"),
+    )
 
     class FakeResp:
         def read(self):
@@ -104,8 +122,7 @@ def test_run_for_gallery_records_queued(tmp_path, monkeypatch):
         def __exit__(self, *a):
             pass
 
-    monkeypatch.setattr(argus_analyze.urllib.request, "urlopen",
-                        lambda req, timeout: FakeResp())
+    monkeypatch.setattr(argus_analyze.urllib.request, "urlopen", lambda req, timeout: FakeResp())
     argus_analyze.run_for_gallery(gid)
     row = db.one("SELECT * FROM galleries WHERE id=?", (gid,))
     assert row["argus_last_job_id"] == "job-abc"
@@ -117,8 +134,10 @@ def test_run_for_gallery_records_sync_run(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
-    gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
-                 ("ArgusSync01", "Sync", "1234"))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("ArgusSync01", "Sync", "1234"),
+    )
 
     class FakeResp:
         def read(self):
@@ -130,8 +149,7 @@ def test_run_for_gallery_records_sync_run(tmp_path, monkeypatch):
         def __exit__(self, *a):
             pass
 
-    monkeypatch.setattr(argus_analyze.urllib.request, "urlopen",
-                        lambda req, timeout: FakeResp())
+    monkeypatch.setattr(argus_analyze.urllib.request, "urlopen", lambda req, timeout: FakeResp())
     argus_analyze.run_for_gallery(gid)
     row = db.one("SELECT * FROM galleries WHERE id=?", (gid,))
     assert row["argus_last_run_id"] == 42
@@ -142,8 +160,10 @@ def test_run_for_gallery_swallows_errors(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
-    gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
-                 ("ArgusErr01", "Err", "1234"))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("ArgusErr01", "Err", "1234"),
+    )
 
     def boom(req, timeout):
         raise TimeoutError("timed out")
@@ -158,8 +178,10 @@ def test_run_for_gallery_swallows_errors(tmp_path, monkeypatch):
 def test_manual_analyze_route(admin_client, monkeypatch):
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
-    gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
-                 ("ArgusMan01", "Manual", "1234"))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("ArgusMan01", "Manual", "1234"),
+    )
     before = db.one("SELECT COUNT(*) AS n FROM jobs WHERE kind='argus_analyze_gallery'")["n"]
     r = admin_client.post(f"/admin/galleries/{gid}/argus-analyze", follow_redirects=False)
     assert r.status_code == 303
@@ -169,8 +191,10 @@ def test_manual_analyze_route(admin_client, monkeypatch):
 
 def test_argus_callback_updates_gallery(admin_client, monkeypatch):
     monkeypatch.setattr(config, "ARGUS_TOKEN", "api-secret")
-    gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
-                 ("CbGal01", "Callback", "1234"))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("CbGal01", "Callback", "1234"),
+    )
     headers = {"Authorization": "Bearer api-secret", "Content-Type": "application/json"}
     r = admin_client.post(
         f"/api/argus/callback?gallery_id={gid}",
@@ -190,8 +214,10 @@ def test_galleries_api(admin_client, monkeypatch):
     assert r.status_code == 503
 
     monkeypatch.setattr(config, "ARGUS_TOKEN", "api-secret")
-    gid = db.run("INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
-                 ("ApiGal01", "API Gal", "1234"))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("ApiGal01", "API Gal", "1234"),
+    )
     headers = {"Authorization": "Bearer api-secret"}
     ok = admin_client.get("/api/galleries", headers=headers)
     assert ok.status_code == 200

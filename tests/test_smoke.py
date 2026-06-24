@@ -9263,6 +9263,7 @@ def test_db_ident_rejects_unlisted_identifier():
 
 def test_platekit_bridge_disabled_is_dormant(monkeypatch):
     from app import config
+
     monkeypatch.setattr(config, "PLATEKIT_API_BASE", "")
     monkeypatch.setattr(config, "PLATEKIT_API_TOKEN", "")
     state = platekit.packs_for_client({"name": "Blue Plate", "company": "Blue Plate"})

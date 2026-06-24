@@ -28,20 +28,38 @@ def test_galleries_expiring_api_is_bearer_gated_and_filters_window(tmp_path, mon
     db.run(
         """INSERT INTO galleries (slug,title,pin,published,client_name,expires_at)
            VALUES (?,?,?,?,?,?)""",
-        ("expiring-demo", "Expiring Demo", "1234", 1, "Blue Plate",
-         (today + dt.timedelta(days=3)).isoformat()),
+        (
+            "expiring-demo",
+            "Expiring Demo",
+            "1234",
+            1,
+            "Blue Plate",
+            (today + dt.timedelta(days=3)).isoformat(),
+        ),
     )
     db.run(
         """INSERT INTO galleries (slug,title,pin,published,client_name,expires_at)
            VALUES (?,?,?,?,?,?)""",
-        ("late-demo", "Late Demo", "1234", 1, "Blue Plate",
-         (today + dt.timedelta(days=20)).isoformat()),
+        (
+            "late-demo",
+            "Late Demo",
+            "1234",
+            1,
+            "Blue Plate",
+            (today + dt.timedelta(days=20)).isoformat(),
+        ),
     )
     db.run(
         """INSERT INTO galleries (slug,title,pin,published,client_name,expires_at)
            VALUES (?,?,?,?,?,?)""",
-        ("draft-demo", "Draft Demo", "1234", 0, "Blue Plate",
-         (today + dt.timedelta(days=3)).isoformat()),
+        (
+            "draft-demo",
+            "Draft Demo",
+            "1234",
+            0,
+            "Blue Plate",
+            (today + dt.timedelta(days=3)).isoformat(),
+        ),
     )
 
     client = TestClient(app)
@@ -65,8 +83,14 @@ def test_press_recent_api_excludes_pending_deleted_and_future_hits(tmp_path, mon
     db.run(
         """INSERT INTO press (client_id,outlet,title,url,publish_date,channel)
            VALUES (?,?,?,?,?,?)""",
-        (client_row["id"], "Past Times", "Published", "https://example.com/past",
-         (today - dt.timedelta(days=5)).isoformat(), "web"),
+        (
+            client_row["id"],
+            "Past Times",
+            "Published",
+            "https://example.com/past",
+            (today - dt.timedelta(days=5)).isoformat(),
+            "web",
+        ),
     )
     db.run(
         """INSERT INTO press (outlet,title,publish_date,channel)

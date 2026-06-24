@@ -55,26 +55,38 @@ def apply_callback(gallery_id: int, payload: dict) -> None:
     elif status == "queued":
         _record(gallery_id, status="queued", job_id=job_id)
     elif status in ("dead_letter", "failed"):
-        _record(gallery_id, status="error", run_id=run_id, job_id=job_id,
-                error=(error or f"Argus job {status}")[:500])
+        _record(
+            gallery_id,
+            status="error",
+            run_id=run_id,
+            job_id=job_id,
+            error=(error or f"Argus job {status}")[:500],
+        )
     else:
         log.info("argus callback ignored for gallery %s status=%s", gallery_id, status)
 
 
-def _record(gallery_id: int, *, status: str, run_id: int | None = None,
-            job_id: str | None = None, error: str | None = None) -> None:
-    db.run("""UPDATE galleries SET argus_last_run_id=?, argus_last_job_id=?,
+def _record(
+    gallery_id: int,
+    *,
+    status: str,
+    run_id: int | None = None,
+    job_id: str | None = None,
+    error: str | None = None,
+) -> None:
+    db.run(
+        """UPDATE galleries SET argus_last_run_id=?, argus_last_job_id=?,
               argus_last_status=?, argus_last_error=?, argus_last_at=datetime('now')
               WHERE id=?""",
-           (run_id, job_id, status, (error or None)[:500] if error else None, gallery_id))
+        (run_id, job_id, status, (error or None)[:500] if error else None, gallery_id),
+    )
 
 
 def trigger_gallery_analyze(gallery_id: int, *, skip_dedup: bool = False) -> dict:
     """POST /analyze-folder for one published gallery. Returns Argus JSON body."""
     if not is_enabled():
         raise ArgusAnalyzeError("Argus is not configured")
-    g = db.one("SELECT id, published, type, project_id FROM galleries WHERE id=?",
-               (gallery_id,))
+    g = db.one("SELECT id, published, type, project_id FROM galleries WHERE id=?", (gallery_id,))
     if not g:
         raise ArgusAnalyzeError(f"gallery {gallery_id} not found")
     if not g["published"]:
@@ -127,8 +139,7 @@ def trigger_gallery_analyze(gallery_id: int, *, skip_dedup: bool = False) -> dic
         raise ArgusAnalyzeError("Argus response missing run_id and job_id")
 
     mode = payload.get("mode") or ("queued" if job_id else "sync")
-    log.info("argus analyze gallery %s -> mode=%s run=%s job=%s",
-             gallery_id, mode, run_id, job_id)
+    log.info("argus analyze gallery %s -> mode=%s run=%s job=%s", gallery_id, mode, run_id, job_id)
     return payload
 
 

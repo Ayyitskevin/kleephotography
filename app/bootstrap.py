@@ -56,12 +56,8 @@ def ensure_public_showcase() -> bool:
     """
     changed = False
 
-    if not db.one(
-        "SELECT 1 AS x FROM assets WHERE portfolio=1 AND status='ready' LIMIT 1"
-    ):
-        photos = db.all_(
-            "SELECT id FROM assets WHERE kind='photo' AND status='ready' ORDER BY id"
-        )
+    if not db.one("SELECT 1 AS x FROM assets WHERE portfolio=1 AND status='ready' LIMIT 1"):
+        photos = db.all_("SELECT id FROM assets WHERE kind='photo' AND status='ready' ORDER BY id")
         for i, photo in enumerate(photos):
             db.run(
                 "UPDATE assets SET portfolio=1, portfolio_tag=? WHERE id=?",

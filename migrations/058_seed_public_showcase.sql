@@ -24,7 +24,11 @@ WHERE id=1 AND cs_published=0;
 INSERT INTO testimonials (quote, attribution_name, business, gallery_id, position, published)
 SELECT
   'Our reservations jumped the week the new photos went live. Kevin made the food look exactly like the room feels.',
-  'Maria Solis', 'Cúrate', 1, 0, 1
+  'Maria Solis',
+  'Cúrate',
+  (SELECT id FROM galleries WHERE id=1),
+  0,
+  1
 WHERE NOT EXISTS (SELECT 1 FROM testimonials WHERE published=1);
 
 INSERT INTO testimonials (quote, attribution_name, business, gallery_id, position, published)

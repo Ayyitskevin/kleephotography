@@ -109,22 +109,25 @@ async def galleries(published: bool = True):
                FROM galleries WHERE type='gallery' ORDER BY id DESC""",
         )
     return {
-        "galleries": [{
-            "id": r["id"],
-            "slug": r["slug"],
-            "title": r["title"],
-            "project_id": r["project_id"],
-            "published": bool(r["published"]),
-            "client_id": r["client_id"],
-            "originals_path": str(config.MEDIA_DIR / str(r["id"]) / "original"),
-            "argus_last_run_id": r["argus_last_run_id"],
-            "argus_last_job_id": r["argus_last_job_id"],
-            "argus_last_status": r["argus_last_status"],
-            "argus_last_at": r["argus_last_at"],
-            "plutus_last_run_id": r["plutus_last_run_id"],
-            "plutus_last_status": r["plutus_last_status"],
-            "plutus_last_at": r["plutus_last_at"],
-        } for r in rows],
+        "galleries": [
+            {
+                "id": r["id"],
+                "slug": r["slug"],
+                "title": r["title"],
+                "project_id": r["project_id"],
+                "published": bool(r["published"]),
+                "client_id": r["client_id"],
+                "originals_path": str(config.MEDIA_DIR / str(r["id"]) / "original"),
+                "argus_last_run_id": r["argus_last_run_id"],
+                "argus_last_job_id": r["argus_last_job_id"],
+                "argus_last_status": r["argus_last_status"],
+                "argus_last_at": r["argus_last_at"],
+                "plutus_last_run_id": r["plutus_last_run_id"],
+                "plutus_last_status": r["plutus_last_status"],
+                "plutus_last_at": r["plutus_last_at"],
+            }
+            for r in rows
+        ],
     }
 
 
