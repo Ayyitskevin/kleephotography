@@ -5558,3 +5558,441 @@ html[data-theme="dark"] .site-body .stack-form button[type=submit],
 html[data-theme="dark"] .site-body .stack-form button:not(.site-theme-toggle) {
   background: var(--accent); color: #06231a;
 }
+
+/* ===== CLAUDE PROTOTYPE SLATE/ROSE/GOLD THEME ===== */
+/* Final cascade layer from the highwind .dc.html prototypes. Keep the live
+   Jinja/backend behavior, but make the shipped default visual system the
+   prototype's slate background, rose action color, and muted gold accent. */
+:root {
+  --accent: #d37e88;
+}
+
+.site-body,
+.cream-theme {
+  color-scheme: dark;
+  --bg: #0e1319;
+  --ink: #afbbca;
+  --ink-soft: #cdd0d4;
+  --muted: #bfc3c8;
+  --accent: #d37e88;
+  --accent-lt: #d0b162;
+  --card: #1e2a3c;
+  --line: #24303e;
+  --paper2: #161e28;
+  --espresso: #161e28;
+  --espresso2: #1e2a3c;
+  --cream: #e7dfcd;
+  background: #0e1319;
+  color: #afbbca;
+}
+
+.site-body .site-nav {
+  background: transparent;
+}
+.site-body .site-nav.scrolled {
+  background: rgba(14, 19, 25, .86);
+  border-bottom-color: #24303e;
+}
+.site-body .site-brand b,
+.site-body h1,
+.site-body h2,
+.site-body h3 {
+  color: #afbbca;
+}
+.site-body .site-brand small,
+.site-body .eyebrow,
+.site-body .it-accent,
+.site-body .btn-ghost:hover,
+.site-body .site-nav nav a:hover,
+.site-body .svc-num,
+.site-body .svc-cta,
+.site-body .crop-btn.on,
+.site-body .proof-heart {
+  color: #d37e88;
+}
+.site-body .site-nav nav a {
+  color: #d7d9dc;
+}
+.site-body .btn-pill,
+.site-body .site-nav nav a.nav-cta,
+.site-body .stack-form button[type=submit],
+.site-body .stack-form button:not(.site-theme-toggle) {
+  background: #161e28;
+  color: #e7dfcd;
+  border-color: #161e28;
+}
+.site-body .btn-pill:hover,
+.site-body .site-nav nav a.nav-cta:hover,
+.site-body .stack-form button[type=submit]:hover,
+.site-body .stack-form button:not(.site-theme-toggle):hover {
+  background: #d0b162;
+  color: #afbbca;
+  border-color: #d0b162;
+}
+.site-body .btn-ghost,
+.site-body .btn-ghost-dark {
+  color: #afbbca;
+  border-bottom-color: #24303e;
+}
+.site-body .btn-ghost-dark:hover {
+  color: #d37e88;
+  border-bottom-color: #d37e88;
+}
+.site-body .hero-photo,
+.site-body .work-grid .tile,
+.site-body .about-photo,
+.site-body .ab-photo,
+.site-body .contact-photo,
+.site-body .portfolio-tile,
+.site-body .reel,
+.site-body .work-card,
+.site-body .svc-card,
+.site-body .svc-tier,
+.site-body .proc-card,
+.site-body .testimonial,
+.site-body .book-card,
+.site-body .book-open a,
+.site-body .book-slot,
+.site-body .stack-form input,
+.site-body .stack-form select,
+.site-body .stack-form textarea {
+  background-color: #1e2a3c;
+  border-color: #24303e;
+  color: #afbbca;
+}
+.site-body .services,
+.site-body .delivery-light,
+.site-body .book-rail,
+.site-body .marquee,
+.site-body .about,
+.site-body .page-body {
+  background-color: #0e1319;
+  border-color: #24303e;
+}
+.site-body .motion-sec,
+.site-body .delivery,
+.site-body .site-footer,
+.site-body .proof-panel {
+  background: #161e28;
+  color: #e7dfcd;
+}
+.site-body .crop-demo,
+.site-body .footer-base,
+.site-body .proof-bar,
+.site-body .crop-btn,
+.site-body .book-rail,
+.site-body .book-main {
+  border-color: #24303e;
+}
+.site-body .crop-btn,
+.site-body .proof-head span,
+.site-body .crop-meta p,
+.site-body .footer-brand p,
+.site-body .footer-col a,
+.site-body .site-footer {
+  color: #cdd0d4;
+}
+.site-body .crop-btn.on,
+.site-body .proof-fill {
+  background: #d0b162;
+  color: #0e1319;
+}
+.site-body .stack-form input::placeholder,
+.site-body .stack-form textarea::placeholder {
+  color: #97a6ba;
+}
+.site-body .site-theme-toggle {
+  display: none;
+}
+
+.admin-shell {
+  color-scheme: dark;
+  --bg: #0e1319;
+  --bg-glow: #101720;
+  --surface: #1e2a3c;
+  --surface-sunk: #161e28;
+  --surface-rail: #101720;
+  --ink: #afbbca;
+  --ink-soft: #cdd0d4;
+  --ink-faint: #bfc3c8;
+  --ink-ghost: #97a6ba;
+  --terra: #d37e88;
+  --terra-deep: #d37e88;
+  --terra-tint: #2b202b;
+  --terra-tint-2: #3b2731;
+  --gold: #d0b162;
+  --ok: #97a6ba;
+  --ok-bg: #161e28;
+  --ok-line: #24303e;
+  --honey: #d0b162;
+  --honey-bg: #1e2a3c;
+  --honey-line: #24303e;
+  --neutral: #bfc3c8;
+  --neutral-bg: #161e28;
+  --neutral-line: #24303e;
+  --clay: #d37e88;
+  --clay-bg: #2b202b;
+  --clay-line: #3b2731;
+  --line: #24303e;
+  --line-strong: #2f3d50;
+  --line-faint: #1c2530;
+  color: #afbbca;
+  background: #0e1319;
+}
+.admin-shell .admin-col,
+.admin-shell .admin-main {
+  background: #0e1319;
+}
+.admin-shell .admin-nav,
+.admin-shell .ns-shell {
+  background: #101720;
+  border-right-color: #263549;
+  color: #d0d6df;
+}
+.admin-shell .admin-brand {
+  border-bottom-color: #263549;
+}
+.admin-shell .admin-brand .mark,
+.admin-shell h1,
+.admin-shell h2,
+.admin-shell h3,
+.admin-shell .pgtop-lead h1,
+.admin-shell .dash-top-lead h1 {
+  color: #afbbca;
+}
+.admin-shell .admin-brand .mark b,
+.admin-shell .ns-crm,
+.admin-shell .admin-nav a.is-active .ico {
+  color: #d0b162;
+}
+.admin-shell .ns-crm {
+  border-color: rgba(237, 178, 60, .45);
+}
+.admin-shell .ns-crest {
+  background: #d0b162;
+  box-shadow: inset 0 0 0 1.5px rgba(20, 60, 47, .22);
+}
+.admin-shell .ns-cmd,
+.admin-shell .ns-kbd {
+  background: #101720;
+  border-color: #263549;
+  color: #b7bbc1;
+}
+.admin-shell .ns-cmd:hover {
+  background: #101720;
+  border-color: #263549;
+  box-shadow: 0 0 0 3px rgba(237, 178, 60, .08);
+}
+.admin-shell .admin-nav-label {
+  color: #c3c6cb;
+}
+.admin-shell .admin-nav a {
+  color: #b9c2cd;
+}
+.admin-shell .admin-nav a:hover {
+  color: #ebeef2;
+  background: transparent;
+}
+.admin-shell .ns-ind,
+.admin-shell .ns-list a.is-active {
+  background: #101720;
+}
+.admin-shell .ns-list a.is-active {
+  color: #e7dfcd;
+}
+.admin-shell .ns-list a.is-active::before {
+  background: #d0b162;
+}
+.admin-shell .ns-pulse {
+  background: #101720;
+  box-shadow: 0 0 8px #101720;
+}
+.admin-shell .admin-topbar,
+.admin-shell .pgtop,
+.admin-shell .dash-top,
+.admin-shell .gd-topbar {
+  background: rgba(18, 24, 20, .85);
+  border-bottom-color: #24303e;
+  color: #afbbca;
+}
+.admin-shell .qc-btn,
+.admin-shell .dash-new,
+.admin-shell .pgtop-new,
+.admin-shell button.primary,
+.admin-shell button[type=submit].primary,
+.admin-shell .fin-export-btn,
+.admin-shell .tk-add-form button,
+.admin-shell .tr-send,
+.admin-shell .ib-reply-btn,
+.admin-shell .ib-reply-send,
+.admin-shell .ib-act {
+  background: #d37e88;
+  border-color: #d37e88;
+  color: #e7dfcd;
+}
+.admin-shell .qc-btn:hover,
+.admin-shell .dash-new:hover,
+.admin-shell .pgtop-new:hover,
+.admin-shell button.primary:hover,
+.admin-shell button[type=submit].primary:hover,
+.admin-shell .fin-export-btn:hover,
+.admin-shell .tk-add-form button:hover,
+.admin-shell .tr-send:hover,
+.admin-shell .ib-reply-btn:hover,
+.admin-shell .ib-reply-send:hover,
+.admin-shell .ib-act:hover {
+  background: #d0b162;
+  border-color: #d0b162;
+  color: #0e1319;
+}
+.admin-shell .pgtop-link,
+.admin-shell .gd-back,
+.admin-shell .gd-btn-sm,
+.admin-shell input,
+.admin-shell textarea,
+.admin-shell select,
+.admin-shell .search-hits a,
+.admin-shell .search-page-form input,
+.admin-shell .qc-menu,
+.admin-shell .stu-card,
+.admin-shell .stu-col,
+.admin-shell .kpi-card,
+.admin-shell .rep-card,
+.admin-shell .rf-card,
+.admin-shell .gx-card,
+.admin-shell .gd-stat,
+.admin-shell .gd-favtoggle,
+.admin-shell .gd-deliver,
+.admin-shell .gd-proof,
+.admin-shell .gd-panel,
+.admin-shell .sch-card,
+.admin-shell .sch-type,
+.admin-shell .tk-col,
+.admin-shell .tk-chip,
+.admin-shell .fin-card,
+.admin-shell .fin-range,
+.admin-shell .fin-seg,
+.admin-shell .fin-form-card,
+.admin-shell .rc-card,
+.admin-shell .ct-kit,
+.admin-shell .ct-preset,
+.admin-shell .ct-cap,
+.admin-shell .pt-card,
+.admin-shell .ib-threads,
+.admin-shell .ib-tab,
+.admin-shell .ib-context,
+.admin-shell .ib-convo,
+.admin-shell .set-op-value,
+.admin-shell .tr-drop,
+.admin-shell .tr-seg,
+.admin-shell .gd-manage-body,
+.admin-shell .ns-pal-box,
+.admin-shell .ns-pal-esc,
+.admin-shell .ns-pal-ic {
+  background-color: #1e2a3c;
+  border-color: #24303e;
+  color: #afbbca;
+}
+.admin-shell .gd-cover,
+.admin-shell .sch-hero,
+.admin-shell .dash-money,
+.admin-shell .tc-card,
+.admin-shell .rf-pricing,
+.admin-shell .gd-live,
+.admin-shell .project-head {
+  background: #161e28;
+  border-color: #24303e;
+  color: #e7dfcd;
+}
+.admin-shell .gd-live h3,
+.admin-shell .gd-cover-text h2,
+.admin-shell .gd-cover-text p,
+.admin-shell .sch-hero-body h2,
+.admin-shell .dash-money,
+.admin-shell .tc-card h2,
+.admin-shell .rf-pricing h2 {
+  color: #e7dfcd;
+}
+.admin-shell .gd-live-label,
+.admin-shell .gd-live-url,
+.admin-shell .gd-deliver-m,
+.admin-shell .gd-proof-note,
+.admin-shell .gx-card-client,
+.admin-shell .gx-card-photos,
+.admin-shell .stu-card-proj,
+.admin-shell .sch-type-meta,
+.admin-shell .sch-up-type,
+.admin-shell .fin-muted,
+.admin-shell .muted {
+  color: #cdd0d4;
+}
+.admin-shell .gd-copy,
+.admin-shell .sch-hero-copy,
+.admin-shell .gd-proof-fill,
+.admin-shell .pnl-bar-fill,
+.admin-shell .fin-bycat-fill {
+  background-color: #d0b162;
+  color: #0e1319;
+}
+.admin-shell .dash-paid-amt,
+.admin-shell .tc-amt {
+  color: #d0b162;
+}
+.admin-shell .gx-pill.is-active,
+.admin-shell .gd-pill.is-active,
+.admin-shell .stu-viewpill button.is-active,
+.admin-shell .rep-seg .fin-range-pill.is-active,
+.admin-shell .dash-horizon button.is-active {
+  background: #161e28;
+  border-color: #161e28;
+  color: #e7dfcd;
+}
+.admin-shell .gx-pill,
+.admin-shell .gd-pill,
+.admin-shell .fin-range-pill,
+.admin-shell .stu-viewpill {
+  background: #0e1319;
+  border-color: #24303e;
+  color: #cdd0d4;
+}
+.admin-shell .theme-toggle {
+  display: none;
+}
+
+.ns-pal {
+  background: rgba(11, 17, 24, .62);
+}
+.ns-pal-box {
+  background: #0e1319;
+  border-color: #24303e;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .65);
+}
+.ns-pal-head,
+.ns-pal-foot {
+  border-color: #24303e;
+}
+.ns-pal-input {
+  color: #afbbca;
+}
+.ns-pal-input::placeholder {
+  color: #b8bcc1;
+}
+.ns-pal-row {
+  color: #b1bbc9;
+}
+.ns-pal-row.sel {
+  background: #101720;
+  color: #e7dfcd;
+}
+.ns-pal-row.sel .ns-pal-ic,
+.ns-pal-row.sel .ns-pal-go.cur {
+  background: #d0b162;
+  color: #0e1319;
+}
+.ns-pal-group,
+.ns-pal-sub,
+.ns-pal-foot,
+.ns-pal-empty {
+  color: #b8bcc1;
+}
+/* ===== END CLAUDE PROTOTYPE SLATE/ROSE/GOLD THEME ===== */
