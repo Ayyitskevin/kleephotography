@@ -11,6 +11,8 @@ log = logging.getLogger("mise.bootstrap")
 _PHOTO_TAGS = ("dishes", "drinks", "pastry", "interiors", "dishes", "drinks")
 
 _DEMO_CS = {
+    "title": "Seasonal Tasting Menu",
+    "client_name": "Cúrate",
     "cs_tagline": "A tasting menu, shot at its peak.",
     "cs_brief": (
         "A full menu refresh and brand library in a single service window — "
@@ -18,7 +20,7 @@ _DEMO_CS = {
         "with social crops baked in."
     ),
     "cs_credits": (
-        "Client: Mise Demo\n"
+        "Client: Cúrate\n"
         "Scope: Menu refresh · brand library\n"
         "Deliverables: 6 finals · social crop pack\n"
         "Turnaround: Same-week gallery"
@@ -76,13 +78,18 @@ def ensure_public_showcase() -> bool:
         changed = True
         log.info("portfolio video starred for motion sections")
 
-    gallery = db.one("SELECT id, cs_published FROM galleries ORDER BY id LIMIT 1")
+    gallery = db.one(
+        "SELECT id, title, client_name, cs_published FROM galleries ORDER BY id LIMIT 1"
+    )
     if gallery and not gallery["cs_published"]:
         db.run(
             """UPDATE galleries
-               SET cs_published=1, cs_tagline=?, cs_brief=?, cs_credits=?, cs_location=?
+               SET title=?, client_name=?, cs_published=1,
+                   cs_tagline=?, cs_brief=?, cs_credits=?, cs_location=?
                WHERE id=?""",
             (
+                _DEMO_CS["title"],
+                _DEMO_CS["client_name"],
                 _DEMO_CS["cs_tagline"],
                 _DEMO_CS["cs_brief"],
                 _DEMO_CS["cs_credits"],
@@ -92,6 +99,30 @@ def ensure_public_showcase() -> bool:
         )
         changed = True
         log.info("demo case study published (gallery %s)", gallery["id"])
+    elif gallery and (
+        (gallery["client_name"] or "").strip() in {"", "Mise Demo"}
+        or (gallery["title"] or "").strip() == "Sample Tasting Menu"
+    ):
+        db.run(
+            """UPDATE galleries SET title=?, client_name=?,
+                   cs_tagline=COALESCE(NULLIF(cs_tagline,''), ?),
+                   cs_brief=COALESCE(NULLIF(cs_brief,''), ?),
+                   cs_credits=COALESCE(NULLIF(cs_credits,''), ?),
+                   cs_location=COALESCE(NULLIF(cs_location,''), ?),
+                   cs_published=1
+               WHERE id=?""",
+            (
+                _DEMO_CS["title"],
+                _DEMO_CS["client_name"],
+                _DEMO_CS["cs_tagline"],
+                _DEMO_CS["cs_brief"],
+                _DEMO_CS["cs_credits"],
+                _DEMO_CS["cs_location"],
+                gallery["id"],
+            ),
+        )
+        changed = True
+        log.info("showcase gallery relabeled (gallery %s)", gallery["id"])
 
     if not db.one("SELECT 1 AS x FROM testimonials WHERE published=1 LIMIT 1"):
         gid = gallery["id"] if gallery else None
