@@ -38,38 +38,40 @@ SERVICES = [
         "key": "photography",
         "title": "Photography",
         "tagline": "Menus, dishes, drinks, and the rooms they live in. "
-        "Natural light first; styled when the work needs it.",
+        "Every tier delivers a private same-week gallery with social crops baked in.",
         "monthly": False,
         "tiers": [
             {
                 "name": "Starter",
                 "price_cents": 90000,
                 "includes": [
-                    "Half-day shoot (up to 4 hours)",
-                    "Up to 20 edited, web-ready images",
-                    "Online gallery delivery",
-                    "Standard usage rights",
+                    "Up to 3 hours on site, one location",
+                    "20 edited finals",
+                    "Social crops — 1:1 · 4:5 · 9:16",
+                    "One revision round",
+                    "Same-week gallery delivery",
                 ],
             },
             {
                 "name": "Standard",
                 "price_cents": 180000,
                 "includes": [
-                    "Full-day shoot (up to 8 hours)",
-                    "Up to 50 edited images",
-                    "Social crops (1:1, 4:5, 9:16) for hero selects",
-                    "Online gallery + standard usage rights",
+                    "Up to 6 hours — menu, drinks & room",
+                    "45 edited finals",
+                    "Full social crop pack",
+                    "Two revision rounds",
+                    "Brand library starter set",
                 ],
             },
             {
                 "name": "Premium",
                 "price_cents": 320000,
                 "includes": [
-                    "Extended-day shoot (up to 10 hours)",
-                    "Up to 75 edited images",
-                    "Social crops for every select",
-                    "5-day rush turnaround",
-                    "Extended usage rights",
+                    "Up to two shoot days",
+                    "Full menu + campaign concepts",
+                    "90+ edited finals",
+                    "On-set art direction",
+                    "Commercial usage license",
                 ],
             },
         ],
@@ -77,38 +79,41 @@ SERVICES = [
     {
         "key": "videography",
         "title": "Videography",
-        "tagline": "Short-form social motion that earns the scroll, plus "
-        "hero brand films for the launches and campaigns.",
+        "tagline": "Short-form social motion that earns the scroll, plus hero "
+        "brand films for launches and campaigns.",
         "monthly": False,
         "tiers": [
             {
                 "name": "Starter",
                 "price_cents": 180000,
                 "includes": [
-                    "Half-day shoot (up to 4 hours)",
-                    "3 short-form vertical reels (15–30s each)",
-                    "Licensed music + color grade",
-                    "Standard usage rights",
+                    "Half-day shoot",
+                    "One hero reel, 15–30s",
+                    "Three vertical cutdowns",
+                    "Licensed audio",
+                    "Delivered 9:16 + 1:1",
                 ],
             },
             {
                 "name": "Standard",
                 "price_cents": 320000,
                 "includes": [
-                    "Full-day shoot (up to 8 hours)",
-                    "6 short-form vertical reels (15–60s each)",
-                    "B-roll package + color grade + licensed music",
-                    "Standard usage rights",
+                    "Full-day shoot",
+                    "One brand film, 45–60s",
+                    "Five social cutdowns",
+                    "Photo stills included",
+                    "Color grade + captions",
                 ],
             },
             {
                 "name": "Premium",
                 "price_cents": 580000,
                 "includes": [
-                    "Two shoot days (up to 16 hours total)",
-                    "10 short-form reels + 1 hero brand video (60–90s)",
-                    "B-roll package, color grade, rush available",
-                    "Extended usage rights",
+                    "Two shoot days",
+                    "Hero film + reel series",
+                    "Storyboard & art direction",
+                    "Cinematic color grade",
+                    "Full usage license",
                 ],
             },
         ],
@@ -116,110 +121,99 @@ SERVICES = [
     {
         "key": "brand_partner",
         "title": "Brand Partner",
-        "tagline": "A monthly content rhythm — photo, photo + reels, or "
-        "a two-day photo + video schedule — at a meaningful "
-        "discount vs ad-hoc. Three-month minimum, month-to-month after.",
+        "tagline": "A monthly content rhythm with a built-in discount versus "
+        "ad-hoc. Deliverables auto-draft each month — never auto-sent or charged.",
         "monthly": True,
         "tiers": [
             {
                 "name": "Starter",
                 "price_cents": 140000,
                 "includes": [
-                    "1 photo content day per month",
-                    "~20 edited images",
-                    "Social crop pack (1:1, 4:5, 9:16) for hero selects",
-                    "Standing client portal + priority scheduling",
+                    "One half-day shoot monthly",
+                    "20 finals each month",
+                    "Social crop pack",
+                    "Rolling content calendar",
+                    "Cancel anytime",
                 ],
             },
             {
                 "name": "Standard",
                 "price_cents": 220000,
                 "includes": [
-                    "1 photo + short-form video content day per month",
-                    "~30 edited images + 3 short-form reels",
-                    "Social crop pack for every select",
-                    "Priority scheduling + standing client portal",
+                    "One full-day shoot monthly",
+                    "30 finals + 4 reels",
+                    "Caption packs",
+                    "Brand kit on file",
+                    "Priority scheduling",
                 ],
             },
             {
                 "name": "Premium",
                 "price_cents": 380000,
                 "includes": [
-                    "Two content days per month (photo + video)",
-                    "~50 edited images + 6 short-form reels",
-                    "Quarterly hero brand video (60–90s)",
-                    "Extended usage rights + concierge scheduling",
+                    "Two shoot days monthly",
+                    "Photo + video each visit",
+                    "Quarterly hero film",
+                    "Biggest per-asset discount",
+                    "Dedicated calendar",
                 ],
             },
         ],
     },
 ]
 
-# F&B-specific FAQs — same list on /book and /contact so a question answered once
-# never has to be answered by email again. Also emitted as JSON-LD FAQPage schema
-# for Google's rich-result FAQ blocks.
-FAQS = [
+# Page-specific FAQs — prototype copy from Contact.dc.html and Book.dc.html.
+CONTACT_FAQS = [
     (
-        "What's the turnaround on edited images?",
-        "Typically 7–10 business days from the shoot for photo deliveries; "
-        "short-form video edits add 3–5 days. Rush turnaround is available for an "
-        "additional fee — mention it in your booking message.",
+        "What does a typical project cost?",
+        "It depends on scope — a half-day menu refresh and a multi-day campaign "
+        "sit far apart. Send a few details and I will quote the right tier; full "
+        "ranges live on the Services page.",
     ),
     (
-        "What are your service tiers?",
-        "Three categories — Photography, Videography, and the Brand Partner "
-        "monthly retainer — each with Starter, Standard, and Premium tiers. "
-        "Photography tiers scale from a half-day shoot (~20 images) up to an "
-        "extended day with ~75 images and rush turnaround. Videography tiers "
-        "scale from 3 short-form reels up to two shoot days with a hero brand "
-        "video. The Brand Partner retainer locks in monthly content days "
-        "(photo, photo + reels, or a two-day photo + video schedule with a "
-        "quarterly hero video) at a meaningful discount vs ad-hoc — tell me "
-        "your goal and I'll quote the right tier.",
+        "How soon can you shoot?",
+        "Usually within two to three weeks, sometimes sooner for a launch. Tell "
+        "me your target date and I will be honest about what is open.",
     ),
     (
-        "Do I need to bring a food stylist or video crew?",
-        "Not required — for most shoots I can work with what you put in front "
-        "of me. For menu launches, campaigns, or hero video work I keep a short "
-        "list of food stylists, prop stylists, and video assistants I trust and "
-        "can bring in. Mention your budget on the booking form and I'll line it up.",
+        "Do you offer ongoing content?",
+        "Yes — the Brand Partner retainer covers a monthly rhythm of photo, photo "
+        "+ reels, or a two-day schedule, at a built-in discount versus ad-hoc shoots.",
     ),
     (
-        "Where do you shoot?",
-        "Based in Asheville — Western North Carolina is home turf with no travel "
-        "fee. Charlotte, Raleigh, and Wilmington are regulars and quoted per trip. "
-        "Anywhere else is happily quoted; on-site at your restaurant, café, or "
-        "venue is preferred because the room and the natural light tell the story.",
-    ),
-    (
-        "What about usage rights?",
-        "Standard delivery gives you full rights to use the photos and videos on "
-        "your website, social, menus, in-store, press kits, and advertising. I "
-        "retain the right to use selects in my own portfolio and marketing. "
-        "Premium tiers include extended usage rights; exclusivity and talent "
-        "releases are available on request.",
-    ),
-    (
-        "How do payments work?",
-        "A 50% deposit holds the date; the balance is due on delivery. Card or "
-        "ACH via Stripe — invoices come from this same site. Brand Partner "
-        "retainers are billed at the start of each month.",
-    ),
-    (
-        "What if we need to reschedule?",
-        "Reschedules with at least 7 days' notice are no-charge — your deposit "
-        "moves to the new date. Inside 7 days, ask me — I'll do everything I can "
-        "to make it work.",
-    ),
-    (
-        "How does the Brand Partner retainer save money?",
-        "Brand Partner locks in a monthly content rhythm — photo, photo + reels, "
-        "or a two-day photo-plus-video schedule — at roughly 35–40% off the "
-        "equivalent ad-hoc bundle, with priority scheduling and a standing client "
-        "portal. It's built for restaurants and brands with seasonal menus or "
-        "weekly social cadence. Three-month minimum, month-to-month after.",
+        "Who owns the photos?",
+        "You get a clear commercial usage license for your marketing and social. "
+        "Licensing terms are spelled out in your gallery and proposal — no surprises.",
     ),
 ]
+
+BOOK_FAQS = [
+    (
+        "How far in advance should I book?",
+        "Two to three weeks is comfortable, but I keep a few slots open for menu "
+        "changes and launches. If it is urgent, say so in the form and I will tell "
+        "you honestly what is possible.",
+    ),
+    (
+        "Do you style the food?",
+        "Light, honest styling is included — the goal is for the dish to look like "
+        "what arrives at the table, at its best. For elaborate set styling I can "
+        "bring in a stylist and fold it into the quote.",
+    ),
+    (
+        "What do I actually get, and when?",
+        "A private online gallery, usually within the week: full-resolution "
+        "downloads, your favorites, and social crops in 1:1, 4:5, and 9:16 — "
+        "already sized for every platform.",
+    ),
+    (
+        "Do you travel outside Asheville?",
+        "Often. Charlotte, Raleigh, and Wilmington are regular trips, and travel is "
+        "easy to fold into a quote for anywhere in Western North Carolina and beyond.",
+    ),
+]
+
+FAQS = BOOK_FAQS  # default for templates that don't override
 templates.env.globals["faqs"] = FAQS
 
 
@@ -402,7 +396,14 @@ async def contact(request: Request):
     return templates.TemplateResponse(
         request,
         "site/contact.html",
-        {"sent": False, "error": None, "prefill": pf, "featured": _portfolio_assets()[:1]},
+        {
+            "sent": False,
+            "error": None,
+            "prefill": pf,
+            "featured": _portfolio_assets()[:1],
+            "faqs": CONTACT_FAQS,
+            "faq_heading": "Good to know",
+        },
     )
 
 
@@ -423,7 +424,14 @@ async def submit_inquiry(
     # Honeypot: real visitors never see the "website" field — bots fill it.
     if website.strip():
         return templates.TemplateResponse(
-            request, "site/contact.html", {"sent": True, "error": None}
+            request,
+            "site/contact.html",
+            {
+                "sent": True,
+                "error": None,
+                "faqs": CONTACT_FAQS,
+                "faq_heading": "Good to know",
+            },
         )
     # Per-IP throttle: 3 inquiries / hour. Real visitors send 1; a determined
     # spammer's 4th submit hits this wall (honeypot kicks in earlier for naive
@@ -438,6 +446,8 @@ async def submit_inquiry(
                 "sent": False,
                 "error": "You've sent a few inquiries recently — give me a chance to reply "
                 "before sending another one. If it's urgent, email me directly.",
+                "faqs": CONTACT_FAQS,
+                "faq_heading": "Good to know",
             },
             status_code=429,
         )
@@ -446,7 +456,12 @@ async def submit_inquiry(
         return templates.TemplateResponse(
             request,
             "site/contact.html",
-            {"sent": False, "error": "Please fill in your name, a valid email, and a message."},
+            {
+                "sent": False,
+                "error": "Please add your name, a valid email, and a short message.",
+                "faqs": CONTACT_FAQS,
+                "faq_heading": "Good to know",
+            },
             status_code=400,
         )
     # Optional scope fields from the quote-request form. service + target date
@@ -488,7 +503,16 @@ async def submit_inquiry(
     else:
         log.error("inquiry %s stored — mailer not configured, no email sent", iid)
     log.info("inquiry %s received", iid)
-    return templates.TemplateResponse(request, "site/contact.html", {"sent": True, "error": None})
+    return templates.TemplateResponse(
+        request,
+        "site/contact.html",
+        {
+            "sent": True,
+            "error": None,
+            "faqs": CONTACT_FAQS,
+            "faq_heading": "Good to know",
+        },
+    )
 
 
 @router.get("/work", response_class=HTMLResponse)

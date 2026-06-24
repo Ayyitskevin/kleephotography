@@ -36,8 +36,8 @@
   {# RIGHT — the real quote-request form, unchanged in scope #}
   <div class="contact-card" data-reveal>
     {% if sent %}
-    <p class="sent-note">Thanks — your inquiry's in. I'll get back to you within
-       a business day.</p>
+    <p class="sent-note">Thanks — your inquiry is in. I read every message and
+       I'll get back to you within a business day.</p>
     {% else %}
     <form method="post" action="/contact" class="stack-form contact-form">
       <label>Name <input type="text" name="name" required></label>
@@ -76,7 +76,7 @@
       <input type="text" name="website" class="hp-field" tabindex="-1"
              autocomplete="off" aria-hidden="true">
       {% if error %}<p class="error">{{ error }}</p>{% endif %}
-      <button type="submit">Send inquiry</button>
+      <button type="submit">Send inquiry &rarr;</button>
     </form>
     {% endif %}
   </div>

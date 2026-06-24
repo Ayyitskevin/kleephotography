@@ -97,8 +97,14 @@ def _picker_ctx(et, request: Request, *, is_reschedule=False, token=""):
 
 @router.get("/book", response_class=HTMLResponse)
 async def book_index(request: Request):
+    from .site import BOOK_FAQS
+
     events = scheduling.active_event_types()
-    return templates.TemplateResponse(request, "public/book_index.html", {"events": events})
+    return templates.TemplateResponse(
+        request,
+        "public/book_index.html",
+        {"events": events, "faqs": BOOK_FAQS, "faq_heading": "Common questions"},
+    )
 
 
 @router.get("/book/{slug}", response_class=HTMLResponse)
