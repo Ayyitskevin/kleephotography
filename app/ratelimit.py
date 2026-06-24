@@ -31,7 +31,7 @@ def _bucket_for(path: str) -> str | None:
         return "download"
     if path.startswith("/admin"):
         return "admin"
-    if path.startswith(("/g/", "/portal/", "/i/", "/p/", "/contact", "/book")):
+    if path.startswith(("/g/", "/portal/", "/i/", "/p/", "/contact", "/book", "/forms/")):
         return "public"
     return None
 

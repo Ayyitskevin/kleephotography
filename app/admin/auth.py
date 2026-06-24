@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, security
+from .. import security
 from ..render import templates
 
 log = logging.getLogger("mise.admin.auth")
@@ -29,15 +29,7 @@ async def login(request: Request, password: str = Form(...)):
         )
     security.pin_clear(ip, 0)
     resp = RedirectResponse("/admin/home", status_code=303)
-    resp.set_cookie(
-        security.ADMIN_COOKIE,
-        security.sign("admin"),
-        max_age=config.SESSION_MAX_AGE,
-        httponly=True,
-        secure=config.COOKIE_SECURE,
-        samesite="lax",
-        path="/",
-    )
+    security.set_signed_session_cookie(resp, security.ADMIN_COOKIE, "admin")
     log.info("admin login from %s", ip)
     return resp
 
@@ -45,5 +37,5 @@ async def login(request: Request, password: str = Form(...)):
 @router.post("/logout")
 async def logout():
     resp = RedirectResponse("/admin/login", status_code=303)
-    resp.delete_cookie(security.ADMIN_COOKIE, path="/")
+    security.delete_session_cookie(resp, security.ADMIN_COOKIE)
     return resp

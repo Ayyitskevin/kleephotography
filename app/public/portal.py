@@ -163,15 +163,7 @@ async def check_pin(request: Request, slug: str, pin: str = Form(...)):
         )
     security.pin_clear(ip, -p["id"])
     resp = RedirectResponse(f"/portal/{slug}", status_code=303)
-    resp.set_cookie(
-        _cookie_name(p["id"]),
-        security.sign(f"portal:{p['id']}"),
-        max_age=config.SESSION_MAX_AGE,
-        httponly=True,
-        secure=config.COOKIE_SECURE,
-        samesite="lax",
-        path="/",
-    )
+    security.set_signed_session_cookie(resp, _cookie_name(p["id"]), f"portal:{p['id']}")
     return resp
 
 

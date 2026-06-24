@@ -90,15 +90,7 @@ def _view_drop(request: Request, g):
         request, "public/drop.html", {"g": g, "assets": assets, "visitor": visitor}
     )
     if new_cookie:
-        resp.set_cookie(
-            security.visitor_cookie_name(g["id"]),
-            new_cookie,
-            max_age=config.SESSION_MAX_AGE,
-            httponly=True,
-            secure=config.COOKIE_SECURE,
-            samesite="lax",
-            path="/",
-        )
+        security.set_session_cookie(resp, security.visitor_cookie_name(g["id"]), new_cookie)
     return resp
 
 
@@ -123,15 +115,7 @@ async def check_pin(request: Request, slug: str, pin: str = Form(...)):
     security.pin_clear(ip, g["id"])
     _, cookie_val = security.create_visitor(g["id"])
     resp = RedirectResponse(f"/g/{slug}", status_code=303)
-    resp.set_cookie(
-        security.visitor_cookie_name(g["id"]),
-        cookie_val,
-        max_age=config.SESSION_MAX_AGE,
-        httponly=True,
-        secure=config.COOKIE_SECURE,
-        samesite="lax",
-        path="/",
-    )
+    security.set_session_cookie(resp, security.visitor_cookie_name(g["id"]), cookie_val)
     return resp
 
 

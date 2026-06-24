@@ -100,6 +100,111 @@ def test_csrf_same_origin_enforced(client):
 
 
 @pytest.mark.unit
+def test_session_cookie_helper_sets_shared_policy(monkeypatch):
+    from http.cookies import SimpleCookie
+
+    from fastapi import Response
+
+    from app import security
+
+    monkeypatch.setattr(security.config, "COOKIE_SECURE", True)
+    resp = Response()
+    security.set_signed_session_cookie(resp, security.ADMIN_COOKIE, "admin", max_age=123)
+
+    cookie = SimpleCookie()
+    cookie.load(resp.headers["set-cookie"])
+    morsel = cookie[security.ADMIN_COOKIE]
+
+    assert security.unsign(morsel.value) == "admin"
+    assert morsel["max-age"] == "123"
+    assert morsel["path"] == "/"
+    assert morsel["httponly"]
+    assert morsel["secure"]
+    assert morsel["samesite"].lower() == "lax"
+
+
+@pytest.mark.unit
+def test_access_routes_use_shared_session_cookie_policy(client, monkeypatch):
+    from http.cookies import SimpleCookie
+
+    from app import config, db, gcal, security
+
+    def morsel(response, name: str):
+        cookie = SimpleCookie()
+        cookie.load(response.headers["set-cookie"])
+        return cookie[name]
+
+    def assert_session_cookie(response, name: str, max_age: int = config.SESSION_MAX_AGE):
+        m = morsel(response, name)
+        assert m["max-age"] == str(max_age)
+        assert m["path"] == "/"
+        assert m["httponly"]
+        assert m["samesite"].lower() == "lax"
+        return m
+
+    admin = client.post(
+        "/admin/login", data={"password": config.ADMIN_PASSWORD}, follow_redirects=False
+    )
+    assert admin.status_code == 303
+    assert security.unsign(assert_session_cookie(admin, security.ADMIN_COOKIE).value) == "admin"
+
+    db.run(
+        "INSERT INTO galleries (slug,title,pin,published) VALUES (?,?,?,1)",
+        ("cookie-gallery", "Cookie Gallery", "1234"),
+    )
+    gallery = db.one("SELECT * FROM galleries WHERE slug='cookie-gallery'")
+    gallery_pin = client.post("/g/cookie-gallery/pin", data={"pin": "1234"}, follow_redirects=False)
+    assert gallery_pin.status_code == 303
+    assert security.unsign(assert_session_cookie(gallery_pin, f"mise_g{gallery['id']}").value)
+
+    client_id = db.run(
+        "INSERT INTO clients (name, company, email) VALUES (?,?,?)",
+        ("Cookie Client", "Cookie Co", "client@example.test"),
+    )
+    portal_id = db.run(
+        "INSERT INTO portals (client_id, slug, pin, published) VALUES (?,?,?,1)",
+        (client_id, "cookie-portal", "2468"),
+    )
+    portal_pin = client.post(
+        "/portal/cookie-portal/pin", data={"pin": "2468"}, follow_redirects=False
+    )
+    assert portal_pin.status_code == 303
+    assert security.unsign(assert_session_cookie(portal_pin, f"mise_p{portal_id}").value) == (
+        f"portal:{portal_id}"
+    )
+
+    project_id = db.run(
+        """INSERT INTO projects
+           (client_id, title, workspace_slug, workspace_pin, workspace_published)
+           VALUES (?,?,?,?,1)""",
+        (client_id, "Cookie Project", "cookie-workspace", "1357"),
+    )
+    workspace_pin = client.post(
+        "/w/cookie-workspace/pin", data={"pin": "1357"}, follow_redirects=False
+    )
+    assert workspace_pin.status_code == 303
+    assert security.unsign(assert_session_cookie(workspace_pin, f"mise_w{project_id}").value) == (
+        f"workspace:{project_id}"
+    )
+
+    monkeypatch.setattr(gcal, "configured", lambda: True)
+    monkeypatch.setattr(
+        gcal, "auth_url", lambda state: f"https://accounts.example/auth?state={state}"
+    )
+    oauth = client.get("/admin/scheduling/google/connect", follow_redirects=False)
+    assert oauth.status_code == 303
+    assert assert_session_cookie(oauth, "g_oauth_state", max_age=600).value
+
+
+@pytest.mark.unit
+def test_custom_forms_are_public_rate_limited():
+    from app import ratelimit
+
+    assert ratelimit._bucket_for("/forms/wedding-lead") == "public"
+    assert ratelimit._bucket_for("/static/mise.css") is None
+
+
+@pytest.mark.unit
 def test_branded_error_pages(client):
     # clients clicking bad links in a browser get a branded page, not raw JSON
     r = client.get("/g/nope12345678", headers={"accept": "text/html"})

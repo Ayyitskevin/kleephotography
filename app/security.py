@@ -5,7 +5,7 @@ import secrets
 import string
 import time
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Response
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from . import alerts, config, db, features
@@ -146,6 +146,41 @@ def require_visitor(request: Request, gallery_id: int) -> "db.sqlite3.Row":
     if not v:
         raise HTTPException(status_code=403, detail="gallery access required")
     return v
+
+
+def set_session_cookie(
+    response: Response,
+    name: str,
+    value: str,
+    *,
+    max_age: int | None = None,
+    path: str = "/",
+) -> None:
+    """Set a site session cookie with one hardened policy shared by every route."""
+    response.set_cookie(
+        name,
+        value,
+        max_age=config.SESSION_MAX_AGE if max_age is None else max_age,
+        httponly=True,
+        secure=config.COOKIE_SECURE,
+        samesite="lax",
+        path=path,
+    )
+
+
+def set_signed_session_cookie(
+    response: Response,
+    name: str,
+    payload: str,
+    *,
+    max_age: int | None = None,
+    path: str = "/",
+) -> None:
+    set_session_cookie(response, name, sign(payload), max_age=max_age, path=path)
+
+
+def delete_session_cookie(response: Response, name: str, *, path: str = "/") -> None:
+    response.delete_cookie(name, path=path)
 
 
 # ── Admin session ──────────────────────────────────────────────────────────

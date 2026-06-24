@@ -118,13 +118,5 @@ async def check_pin(request: Request, slug: str, pin: str = Form(...)):
         )
     security.pin_clear(ip, key)
     resp = RedirectResponse(f"/w/{slug}", status_code=303)
-    resp.set_cookie(
-        _cookie_name(p["id"]),
-        security.sign(f"workspace:{p['id']}"),
-        max_age=config.SESSION_MAX_AGE,
-        httponly=True,
-        secure=config.COOKIE_SECURE,
-        samesite="lax",
-        path="/",
-    )
+    security.set_signed_session_cookie(resp, _cookie_name(p["id"]), f"workspace:{p['id']}")
     return resp

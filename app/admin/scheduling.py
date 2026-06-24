@@ -354,14 +354,7 @@ async def google_connect(request: Request):
         raise HTTPException(status_code=400, detail="Google client id/secret not set")
     state = security.new_slug(24)
     resp = RedirectResponse(gcal.auth_url(state), status_code=303)
-    resp.set_cookie(
-        _STATE_COOKIE,
-        state,
-        max_age=600,
-        httponly=True,
-        samesite="lax",
-        secure=scheduling.config.COOKIE_SECURE,
-    )
+    security.set_session_cookie(resp, _STATE_COOKIE, state, max_age=600)
     return resp
 
 
@@ -375,7 +368,7 @@ async def google_callback(request: Request):
     def _back(gerr: str | None = None):
         url = "/admin/scheduling" + (f"?gerr={gerr}" if gerr else "")
         r = RedirectResponse(url, status_code=303)
-        r.delete_cookie(_STATE_COOKIE)
+        security.delete_session_cookie(r, _STATE_COOKIE)
         return r
 
     if q.get("error"):
