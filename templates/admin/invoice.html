@@ -1,104 +1,198 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}{{ d.title }} · Studio · Mise{% endblock %}
 {% import "admin/_copy_link.html" as cp %}
+{% set is_draft = d.status == 'draft' %}
+{% set paid = namespace(cents=0) %}
+{% for pay in payments %}
+  {% set paid.cents = paid.cents + pay.amount_cents %}
+{% endfor %}
+{% set balance_cents = [d.total_cents - paid.cents, 0]|max %}
 {% block topbar %}
-<header class="admin-topbar pgtop">
+<header class="admin-topbar pgtop inv-top">
   <div class="pgtop-lead">
-    <h1>Invoice</h1>
+    <p class="pgtop-eyebrow">Studio · Invoice</p>
+    <h1>{{ d.title }}</h1>
     <p class="pgtop-sub">
-      {{ d.status }} · <b>${{ "%.2f" % (d.total_cents / 100) }}</b>
+      {{ d.status|replace('_', ' ')|title }} · <b>${{ "%.2f" % (d.total_cents / 100) }}</b>
       {% if d.paid_at %}· <span class="pos">paid {{ d.paid_at[:10] }}</span>
       {% elif d.sent_at %}· sent {{ d.sent_at[:10] }}{% endif %}
     </p>
   </div>
   <div class="pgtop-actions">
-    <a class="pgtop-link" href="/admin/studio/projects/{{ p.id }}">{{ p.title }} <span aria-hidden="true">&rarr;</span></a>
+    <a class="pgtop-link" href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
+    {% if not is_draft %}
+      <a class="pgtop-link" href="{{ base_url }}/i/{{ d.slug }}" target="_blank" rel="noreferrer">Client view</a>
+    {% endif %}
   </div>
 </header>
 {% endblock %}
 {% block admin_body %}
-<main class="admin-main">
-  <p>Client link: <code class="slug">{{ base_url }}/i/{{ d.slug }}</code>
-  {{ cp.copy_link(base_url ~ "/i/" ~ d.slug) }}
-  {% if d.sent_at %}<span class="muted">· sent {{ d.sent_at }}</span>{% endif %}
-  {% if d.viewed_at %}<span class="muted">· viewed {{ d.viewed_at }}</span>{% endif %}
-  {% if d.paid_at %}<span class="muted">· paid {{ d.paid_at }}</span>{% endif %}</p>
+<main class="admin-main inv-screen">
+  {% if is_draft %}
+  <form id="inv-send-form" method="post" action="/admin/studio/invoices/{{ d.id }}/send"
+        onsubmit="return confirm('Lock this invoice and mark it sent? It becomes payable at the client link.')"></form>
+  <form method="post" action="/admin/studio/invoices/{{ d.id }}" class="inv-layout">
+  {% else %}
+  <div class="inv-layout">
+  {% endif %}
+    <section class="inv-paper" aria-label="Invoice preview">
+      <div class="inv-letterhead">
+        <div class="inv-brand">
+          <span class="inv-brand-mark">K</span>
+          <div>
+            <strong>Kevin Lee</strong>
+            <span>Food &amp; beverage photography</span>
+          </div>
+        </div>
+        <div class="inv-id">
+          <span>Invoice</span>
+          <strong>#{{ d.id }}</strong>
+          <em class="inv-status is-{{ d.status|replace('_', '-') }}">{{ d.status|replace('_', ' ')|title }}</em>
+        </div>
+      </div>
 
-  {% if d.status == 'draft' %}
-  <form method="post" action="/admin/studio/invoices/{{ d.id }}" class="stack-form" style="max-width:680px">
-    <label>Title <input type="text" name="title" value="{{ d.title }}" required></label>
-    <table class="list">
-      <tr><th>Line item</th><th>Qty</th><th>Unit $</th></tr>
-      {% for row in rows %}
-      <tr>
-        <td><input type="text" name="item_label_{{ loop.index0 }}" value="{{ row.label or '' }}"></td>
-        <td><input type="number" name="item_qty_{{ loop.index0 }}" min="1"
-                   value="{{ row.qty or 1 }}" style="width:4.5em"></td>
-        <td><input type="number" name="item_price_{{ loop.index0 }}" min="0" step="0.01"
-                   value="{{ '%.2f' % (row.unit_cents / 100) if row.unit_cents is defined else '' }}"
-                   style="width:7em"></td>
-      </tr>
-      {% endfor %}
-    </table>
-    <label>Deposit $ <input type="number" name="deposit" min="0" step="0.01"
-           value="{{ '%.2f' % (d.deposit_cents / 100) }}" style="width:7em"></label>
-    <label>Due date <input type="date" name="due_date" value="{{ d.due_date or '' }}"></label>
-    <label>Payment terms / schedule
-      <textarea name="terms" rows="3"
-        placeholder="Shown to the client on the pay page — e.g. deposit due to hold the date, balance due before delivery, deposits non-refundable. You set the wording.">{{ d.terms or '' }}</textarea></label>
-    <p><strong>Total: ${{ "%.2f" % (d.total_cents / 100) }}</strong>
-       <span class="muted">(recalculated on save · deposit 0 = no split)</span></p>
-    <button type="submit">Save draft</button>
-  </form>
-  <form method="post" action="/admin/studio/invoices/{{ d.id }}/send"
-        onsubmit="return confirm('Lock this invoice and mark it sent? It becomes payable at the client link.')">
-    <button type="submit">Mark sent (locks editing)</button>
+      <div class="inv-billrow">
+        <div>
+          <span class="inv-label">Billed to</span>
+          <p>{{ p.company or p.client_name }}<br><small>{{ p.client_name }}{% if p.client_email %} · {{ p.client_email }}{% endif %}</small></p>
+        </div>
+        <div>
+          <span class="inv-label">Project</span>
+          <p>{{ p.title }}<br><small>{% if d.created_at %}Issued {{ d.created_at[:10] }}{% else %}Draft{% endif %}{% if d.due_date %} · Due {{ d.due_date }}{% endif %}</small></p>
+        </div>
+      </div>
+
+      {% if is_draft %}
+      <label class="inv-title-edit">
+        <span class="inv-label">Invoice title</span>
+        <input type="text" name="title" value="{{ d.title }}" required>
+      </label>
+      {% endif %}
+
+      <div class="inv-table-wrap">
+      <table class="inv-line-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="inv-num">Qty</th>
+            <th class="inv-num">Unit</th>
+            <th class="inv-num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          {% set qty = row.qty if row.qty is defined and row.qty else 1 %}
+          {% set unit_cents = row.unit_cents if row.unit_cents is defined and row.unit_cents else 0 %}
+          {% if is_draft %}
+          <tr>
+            <td><input class="inv-in" type="text" name="item_label_{{ loop.index0 }}" value="{{ row.label or '' }}" placeholder="Line item"></td>
+            <td><input class="inv-in inv-num" type="number" name="item_qty_{{ loop.index0 }}" min="1" value="{{ qty }}"></td>
+            <td><input class="inv-in inv-num" type="number" name="item_price_{{ loop.index0 }}" min="0" step="0.01" value="{{ '%.2f' % (unit_cents / 100) if unit_cents else '' }}" placeholder="0.00"></td>
+            <td class="inv-num">${{ "%.2f" % ((qty * unit_cents) / 100) }}</td>
+          </tr>
+          {% elif row.label %}
+          <tr>
+            <td><strong>{{ row.label }}</strong></td>
+            <td class="inv-num">{{ qty }}</td>
+            <td class="inv-num">${{ "%.2f" % (unit_cents / 100) }}</td>
+            <td class="inv-num">${{ "%.2f" % ((qty * unit_cents) / 100) }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+
+      <div class="inv-totalbox">
+        <div><span>Subtotal</span><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></div>
+        {% if d.deposit_cents %}
+        <div><span>Deposit</span><strong>${{ "%.2f" % (d.deposit_cents / 100) }}</strong></div>
+        {% endif %}
+        {% if paid.cents %}
+        <div><span>Paid</span><strong>${{ "%.2f" % (paid.cents / 100) }}</strong></div>
+        {% endif %}
+        <div class="inv-grand"><span>{{ "Amount due" if not is_draft else "Total" }}</span><strong>${{ "%.2f" % ((balance_cents if not is_draft else d.total_cents) / 100) }}</strong></div>
+      </div>
+
+      {% if d.terms and not is_draft %}
+      <div class="inv-terms">
+        <span class="inv-label">Payment terms</span>
+        <p>{{ d.terms }}</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <aside class="inv-rail" aria-label="Invoice controls">
+      <section class="inv-card inv-linkcard">
+        <span class="inv-label">Client link</span>
+        <code class="slug">{{ base_url }}/i/{{ d.slug }}</code>
+        <div class="inv-copy">{{ cp.copy_link(base_url ~ "/i/" ~ d.slug) }}</div>
+      </section>
+
+      <section class="inv-card">
+        <span class="inv-label">Status</span>
+        <ol class="inv-steps">
+          <li class="inv-step is-done"><span>1</span><div><strong>Created</strong><small>{% if d.created_at %}{{ d.created_at[:10] }}{% else %}Draft ready{% endif %}</small></div></li>
+          <li class="inv-step {% if d.sent_at or d.status != 'draft' %}is-done{% else %}is-current{% endif %}"><span>2</span><div><strong>Sent</strong><small>{% if d.sent_at %}{{ d.sent_at[:10] }}{% else %}Not sent yet{% endif %}</small></div></li>
+          <li class="inv-step {% if d.viewed_at or d.status in ('viewed','deposit_paid','paid') %}is-done{% endif %}"><span>3</span><div><strong>Viewed</strong><small>{% if d.viewed_at %}{{ d.viewed_at[:10] }}{% else %}Awaiting client{% endif %}</small></div></li>
+          <li class="inv-step {% if d.status == 'paid' %}is-done{% elif d.status == 'deposit_paid' %}is-current{% endif %}"><span>4</span><div><strong>Paid</strong><small>{% if d.paid_at %}{{ d.paid_at[:10] }}{% elif d.status == 'deposit_paid' %}Deposit received{% else %}Balance open{% endif %}</small></div></li>
+        </ol>
+      </section>
+
+      {% if is_draft %}
+      <section class="inv-card inv-draft-controls">
+        <span class="inv-label">Payment setup</span>
+        <label>Deposit
+          <input type="number" name="deposit" min="0" step="0.01" value="{{ '%.2f' % (d.deposit_cents / 100) }}">
+        </label>
+        <label>Due date
+          <input type="date" name="due_date" value="{{ d.due_date or '' }}">
+        </label>
+        <label>Terms
+          <textarea name="terms" rows="5" placeholder="Deposit due to hold the date, balance due before delivery.">{{ d.terms or '' }}</textarea>
+        </label>
+      </section>
+      <section class="inv-card inv-actions">
+        <button type="submit" class="primary">Save draft</button>
+        <button type="submit" form="inv-send-form" class="ghost">Mark sent</button>
+        <p class="muted">Sending locks the invoice and opens the client payment page.</p>
+      </section>
+      {% else %}
+      <section class="inv-card">
+        <span class="inv-label">Stripe payments</span>
+        <div class="inv-pay-summary">
+          <div><span>Paid</span><strong>${{ "%.2f" % (paid.cents / 100) }}</strong></div>
+          <div><span>Balance</span><strong>${{ "%.2f" % (balance_cents / 100) }}</strong></div>
+        </div>
+        {% if payments %}
+        <ul class="inv-payments">
+          {% for pay in payments %}
+          <li><span>{{ pay.kind|replace('_', ' ')|title }}<small>{{ pay.created_at }}</small></span><strong>${{ "%.2f" % (pay.amount_cents / 100) }}</strong></li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted">No payments yet.</p>
+        {% endif %}
+      </section>
+      <section class="inv-card inv-actions">
+        <form method="post" action="/admin/studio/invoices/{{ d.id }}/duplicate"
+              onsubmit="return confirm('Make an editable copy of this invoice as a new draft? Payments stay with the original.')">
+          <button type="submit" class="ghost">Duplicate as draft</button>
+        </form>
+      </section>
+      {% endif %}
+    </aside>
+  {% if is_draft %}
   </form>
   {% else %}
-  <p class="muted">Locked — invoices can’t be edited after sending.
-    <form method="post" action="/admin/studio/invoices/{{ d.id }}/duplicate"
-          class="inline-form"
-          onsubmit="return confirm('Make an editable copy of this invoice as a new draft? Payments stay with the original.')">
-      <button type="submit" class="link">Duplicate as draft</button>
-    </form></p>
-  <table class="list">
-    <tr><th>Line item</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th></tr>
-    {% for row in rows if row.label %}
-    <tr>
-      <td>{{ row.label }}</td>
-      <td class="num">{{ row.qty }}</td>
-      <td class="num">${{ "%.2f" % (row.unit_cents / 100) }}</td>
-      <td class="num">${{ "%.2f" % (row.qty * row.unit_cents / 100) }}</td>
-    </tr>
-    {% endfor %}
-    <tr><td colspan="3"><strong>Total</strong></td>
-        <td class="num"><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></td></tr>
-    {% if d.deposit_cents %}
-    <tr><td colspan="3">Deposit</td><td class="num">${{ "%.2f" % (d.deposit_cents / 100) }}</td></tr>
-    {% endif %}
-  </table>
-
-  {% if d.terms %}<p class="muted"><strong>Payment terms:</strong> {{ d.terms }}</p>{% endif %}
-
-  <h2>Payments</h2>
-  <table class="list">
-    <tr><th>When</th><th>Kind</th><th class="num">Amount</th><th>Stripe event</th></tr>
-    {% for pay in payments %}
-    <tr>
-      <td class="muted">{{ pay.created_at }}</td>
-      <td>{{ pay.kind }}</td>
-      <td class="num">${{ "%.2f" % (pay.amount_cents / 100) }}</td>
-      <td><code>{{ pay.stripe_event_id or "—" }}</code></td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% if not payments %}<p class="muted">No payments yet.</p>{% endif %}
-
-  {% set email_action = "/admin/studio/invoices/" ~ d.id ~ "/email" %}
-  {% set email_subject = "Invoice — " ~ p.title %}
-  {% set email_intro = "Your invoice is ready — you can pay securely online (card or bank transfer):" %}
-  {% set email_link = base_url ~ "/i/" ~ d.slug %}
-  {% include "admin/_email_form.html" %}
+  </div>
+  <section class="inv-email-card">
+    {% set email_action = "/admin/studio/invoices/" ~ d.id ~ "/email" %}
+    {% set email_subject = "Invoice — " ~ p.title %}
+    {% set email_intro = "Your invoice is ready — you can pay securely online (card or bank transfer):" %}
+    {% set email_link = base_url ~ "/i/" ~ d.slug %}
+    {% include "admin/_email_form.html" %}
+  </section>
   {% endif %}
 </main>
 {% endblock %}

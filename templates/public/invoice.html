@@ -1,61 +1,94 @@
 {% extends "base_cream.html" %}
 {% block title %}{{ d.title }} · {{ site_name }}{% endblock %}
+{% block cream_head %}
+<link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
+{% endblock %}
 {% block content %}
-<main class="doc-page">
-  <header class="doc-head">
-    <p class="muted">{{ site_name }}</p>
-    <h1>{{ d.title }}</h1>
-    <p class="muted">Invoice #{{ d.id }}{% if d.created_at %} · issued {{ d.created_at[:10] }}{% endif %}
-       {% if d.due_date %}· due {{ d.due_date }}{% endif %}</p>
-    <p class="muted">Billed to {{ d.client_name }}{% if d.company %} · {{ d.company }}{% endif %}</p>
-  </header>
-
-  <table class="list doc-items">
-    <tr><th>Item</th><th>Qty</th><th>Unit</th><th>Amount</th></tr>
-    {% for i in items %}
-    <tr>
-      <td>{{ i.label }}</td>
-      <td>{{ i.qty }}</td>
-      <td>{% if i.unit_cents %}${{ "%.2f" % (i.unit_cents / 100) }}{% else %}included{% endif %}</td>
-      <td>{% if i.unit_cents %}${{ "%.2f" % (i.qty * i.unit_cents / 100) }}{% else %}—{% endif %}</td>
-    </tr>
-    {% endfor %}
-    <tr><td colspan="3"><strong>Total</strong></td>
-        <td><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></td></tr>
-    {% if d.deposit_cents %}
-    <tr><td colspan="3">Deposit to reserve your date</td>
-        <td>${{ "%.2f" % (d.deposit_cents / 100) }}</td></tr>
-    {% endif %}
-  </table>
-
-  {% if d.terms %}
-  <section class="doc-terms">
-    <h2>Payment terms</h2>
-    <p>{{ d.terms }}</p>
-  </section>
-  {% endif %}
-
-  <p class="no-print"><button onclick="window.print()" class="link">Print / save as PDF</button>
-    {% if paid_cents %}· <a href="/i/{{ d.slug }}/receipt" class="link">View receipt</a>{% endif %}</p>
-
-  {% if d.status == 'paid' %}
-  <p class="doc-accepted">✓ Paid in full {{ d.paid_at }} — thank you!</p>
-  {% elif amount_due %}
-  {% if d.status == 'deposit_paid' %}
-  <p class="doc-accepted">✓ Deposit received — your date is reserved.</p>
-  {% endif %}
-  {% if payments_on %}
-  <div class="doc-actions">
-    <form method="post" action="/i/{{ d.slug }}/pay">
-      <button type="submit">Pay {{ "deposit" if pay_kind == "deposit"
-        else ("balance" if pay_kind == "balance" else "now") }} —
-        ${{ "%.2f" % (amount_due / 100) }}</button>
-    </form>
-    <span class="muted">Secure checkout by Stripe · card or bank transfer</span>
+{% set paid_total = paid_cents or 0 %}
+{% set balance_cents = [d.total_cents - paid_total, 0]|max %}
+<main class="doc-page client-doc">
+  <div class="client-doc-brandbar">
+    <div>
+      <strong>{{ site_name }}</strong>
+      <span>Food &amp; Beverage</span>
+    </div>
+    <span>Invoice #{{ d.id }}</span>
   </div>
-  {% else %}
-  <p class="muted">To pay, reply to the email thread — online payment is being set up.</p>
-  {% endif %}
-  {% endif %}
+
+  <section class="client-doc-paper">
+    <header class="client-doc-head">
+      <div>
+        <p class="client-doc-kicker">Billed to</p>
+        <h1>{{ d.company or d.client_name }}</h1>
+        <p>{{ d.client_name }}{% if d.project_title %} · {{ d.project_title }}{% endif %}</p>
+      </div>
+      <div class="client-doc-meta">
+        <p><span>Issued</span>{% if d.created_at %}{{ d.created_at[:10] }}{% else %}Invoice ready{% endif %}</p>
+        <p><span>Due</span>{{ d.due_date or "On delivery" }}</p>
+      </div>
+    </header>
+
+    <div class="client-doc-table-wrap">
+    <table class="client-doc-table">
+      <thead>
+        <tr><th>Item</th><th class="doc-r">Qty</th><th class="doc-r">Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for i in items %}
+        <tr>
+          <td><strong>{{ i.label }}</strong>{% if i.desc %}<br><small>{{ i.desc }}</small>{% endif %}</td>
+          <td class="doc-r">{{ i.qty }}</td>
+          <td class="doc-r">{% if i.unit_cents %}${{ "%.2f" % (i.qty * i.unit_cents / 100) }}{% else %}Included{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+
+    <div class="client-doc-totals">
+      <div><span>Subtotal</span><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></div>
+      {% if paid_total %}
+      <div><span>Paid</span><strong>-${{ "%.2f" % (paid_total / 100) }}</strong></div>
+      {% elif d.deposit_cents %}
+      <div><span>Deposit to reserve your date</span><strong>${{ "%.2f" % (d.deposit_cents / 100) }}</strong></div>
+      {% endif %}
+      <div class="client-doc-due"><span>{{ "Amount due" if amount_due else "Balance" }}</span><strong>${{ "%.2f" % ((amount_due or balance_cents) / 100) }}</strong></div>
+    </div>
+
+    {% if d.terms %}
+    <section class="client-doc-terms">
+      <h2>Payment terms</h2>
+      <p>{{ d.terms }}</p>
+    </section>
+    {% endif %}
+
+    {% if d.status == 'paid' %}
+    <p class="doc-accepted">Paid in full {{ d.paid_at }} — thank you.</p>
+    {% elif amount_due %}
+      {% if d.status == 'deposit_paid' %}
+      <p class="doc-accepted">Deposit received — your date is reserved.</p>
+      {% endif %}
+      {% if payments_on %}
+      <div class="client-doc-actions no-print">
+        <form method="post" action="/i/{{ d.slug }}/pay">
+          <button type="submit" class="client-pay-btn">Pay {{ "deposit" if pay_kind == "deposit" else ("balance" if pay_kind == "balance" else "now") }} — ${{ "%.2f" % (amount_due / 100) }}</button>
+        </form>
+        <button type="button" onclick="window.print()" class="client-secondary-btn">Print / save as PDF</button>
+      </div>
+      <p class="client-doc-security no-print">Secured by Stripe · card or bank transfer · questions can stay in the email thread.</p>
+      {% else %}
+      <p class="muted">To pay, reply to the email thread — online payment is being set up.</p>
+      {% endif %}
+    {% endif %}
+
+    {% if not (amount_due and payments_on) or paid_total %}
+    <p class="no-print client-doc-print">
+      {% if not (amount_due and payments_on) %}<button type="button" onclick="window.print()" class="link">Print / save as PDF</button>{% endif %}
+      {% if paid_total %}{% if not (amount_due and payments_on) %} · {% endif %}<a href="/i/{{ d.slug }}/receipt" class="link">View receipt</a>{% endif %}
+    </p>
+    {% endif %}
+  </section>
+
+  <p class="client-doc-foot">Proposal → Contract → Invoice — clean documents, secure payment, no extra portal friction.</p>
 </main>
 {% endblock %}

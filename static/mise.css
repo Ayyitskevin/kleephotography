@@ -1562,6 +1562,301 @@ a.tk-chip:hover { color: var(--ink); background: #e7e0d0; }
 .tk-due.is-urgent { color: var(--clay); }
 @media (max-width: 980px) { .tk-grid { grid-template-columns: 1fr; } }
 
+
+
+/* ---- Admin invoice designer (Claude document-paper + action rail, Mise palette) ---- */
+.admin-shell .inv-screen { max-width: 1280px; }
+.admin-shell .inv-top .pgtop-eyebrow { margin: 0 0 .2rem; }
+.admin-shell .inv-layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+  gap: clamp(18px, 2.4vw, 28px); align-items: start;
+}
+.admin-shell .inv-paper,
+.admin-shell .inv-card,
+.admin-shell .inv-email-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-sm);
+}
+.admin-shell .inv-paper { padding: clamp(24px, 3vw, 40px); }
+.admin-shell .inv-letterhead,
+.admin-shell .inv-billrow {
+  display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+}
+.admin-shell .inv-letterhead {
+  align-items: flex-start; padding-bottom: 24px; border-bottom: 1px solid var(--line);
+}
+.admin-shell .inv-brand { display: flex; gap: 11px; align-items: center; }
+.admin-shell .inv-brand-mark {
+  width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--terra-deep); color: var(--gold);
+  font-family: var(--font-display); font-weight: 600; font-size: 1.25rem;
+}
+.admin-shell .inv-brand strong {
+  display: block; font-family: var(--font-display); font-weight: 500;
+  font-size: 1.35rem; line-height: 1; color: var(--ink);
+}
+.admin-shell .inv-brand span,
+.admin-shell .inv-id strong,
+.admin-shell .inv-billrow small {
+  display: block; margin-top: 5px; color: var(--ink-soft); font-size: .82rem;
+}
+.admin-shell .inv-id { text-align: right; }
+.admin-shell .inv-id > span {
+  display: block; font-family: var(--font-display); font-size: 2rem;
+  line-height: 1; color: var(--ink);
+}
+.admin-shell .inv-status {
+  display: inline-flex; margin-top: 9px; border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 9px; color: var(--terra-deep);
+  background: var(--terra-tint); font: 700 .62rem/1 var(--font-ui);
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.admin-shell .inv-status.is-paid { color: #2f7d57; background: #e1f2e9; border-color: #cfe6d8; }
+.admin-shell .inv-status.is-draft { color: var(--ink-soft); background: var(--neutral-bg); border-color: var(--neutral-line); }
+.admin-shell .inv-billrow { padding: 22px 0 18px; }
+.admin-shell .inv-billrow p { margin: 8px 0 0; font-weight: 700; color: var(--ink); }
+.admin-shell .inv-label {
+  display: block; font: 700 .66rem/1 var(--font-ui); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.admin-shell .inv-title-edit { display: block; margin: 0 0 12px; }
+.admin-shell .inv-title-edit input {
+  width: 100%; margin-top: 8px; padding: .7rem .8rem; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--surface-sunk); color: var(--ink);
+  font: 600 1rem var(--font-ui);
+}
+.admin-shell .inv-table-wrap { overflow-x: auto; }
+.admin-shell .inv-line-table { width: 100%; min-width: 560px; border-collapse: collapse; margin-top: 8px; }
+.admin-shell .inv-line-table th {
+  padding: 0 9px 11px; color: var(--ink-faint); text-align: left;
+  font: 700 .64rem/1 var(--font-ui); letter-spacing: .07em; text-transform: uppercase;
+}
+.admin-shell .inv-line-table td {
+  border-top: 1px solid var(--line); padding: 7px 9px; color: var(--ink);
+  font-size: .9rem; vertical-align: middle;
+}
+.admin-shell .inv-num { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-shell .inv-in {
+  width: 100%; min-width: 0; border: 1px solid transparent; border-radius: 7px;
+  background: transparent; padding: 7px 9px; color: var(--ink);
+  font: 500 .9rem var(--font-ui); outline: none;
+}
+.admin-shell .inv-in:focus { border-color: var(--terra); background: var(--surface-sunk); }
+.admin-shell .inv-totalbox {
+  margin-top: 24px; margin-left: auto; width: min(320px, 100%);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.admin-shell .inv-totalbox div { display: flex; justify-content: space-between; gap: 20px; color: var(--ink-soft); }
+.admin-shell .inv-totalbox strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.admin-shell .inv-totalbox .inv-grand {
+  align-items: baseline; padding-top: 12px; border-top: 1px solid var(--line);
+  color: var(--ink);
+}
+.admin-shell .inv-totalbox .inv-grand strong {
+  font-family: var(--font-display); font-size: 1.65rem; font-weight: 500;
+  color: var(--terra-deep);
+}
+.admin-shell .inv-terms {
+  margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line);
+}
+.admin-shell .inv-terms p { margin: 8px 0 0; color: var(--ink-soft); }
+.admin-shell .inv-rail {
+  display: flex; flex-direction: column; gap: 16px; position: sticky; top: 68px;
+}
+.admin-shell .inv-card { padding: 18px 20px; }
+.admin-shell .inv-linkcard code {
+  display: block; margin: 8px 0 6px; white-space: normal; word-break: break-all;
+}
+.admin-shell .inv-copy { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.admin-shell .inv-steps { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 0; }
+.admin-shell .inv-step { display: grid; grid-template-columns: 24px 1fr; gap: 11px; position: relative; }
+.admin-shell .inv-step:not(:last-child)::after {
+  content: ""; position: absolute; left: 9px; top: 22px; bottom: 2px;
+  width: 2px; background: var(--line);
+}
+.admin-shell .inv-step > span {
+  width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center;
+  background: var(--surface-sunk); border: 2px solid var(--line-strong);
+  color: var(--ink-soft); font: 700 .64rem/1 var(--font-ui); z-index: 1;
+}
+.admin-shell .inv-step.is-done > span {
+  background: var(--terra-deep); border-color: var(--terra-deep); color: #F3F0E2;
+}
+.admin-shell .inv-step.is-current > span {
+  border-color: var(--gold); color: var(--terra-deep); background: #fff8e7;
+}
+.admin-shell .inv-step div { padding-bottom: 14px; }
+.admin-shell .inv-step strong { display: block; color: var(--ink); font-size: .86rem; line-height: 1.2; }
+.admin-shell .inv-step small { display: block; margin-top: 3px; color: var(--ink-faint); font-size: .74rem; line-height: 1.3; }
+.admin-shell .inv-draft-controls { display: grid; gap: 12px; }
+.admin-shell .inv-draft-controls label {
+  display: flex; flex-direction: column; gap: 7px; color: var(--ink-soft);
+  font: 700 .72rem/1 var(--font-ui); letter-spacing: .04em; text-transform: uppercase;
+}
+.admin-shell .inv-draft-controls input,
+.admin-shell .inv-draft-controls textarea {
+  width: 100%; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--surface-sunk); color: var(--ink); padding: .65rem .75rem;
+  font: 500 .9rem var(--font-ui); text-transform: none; letter-spacing: 0;
+}
+.admin-shell .inv-actions { display: grid; gap: 9px; }
+.admin-shell .inv-actions button { width: 100%; justify-content: center; }
+.admin-shell .inv-actions form { margin: 0; }
+.admin-shell .inv-pay-summary {
+  margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.admin-shell .inv-pay-summary div {
+  padding: 12px; background: var(--surface-sunk); border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.admin-shell .inv-pay-summary span,
+.admin-shell .inv-payments small { display: block; color: var(--ink-faint); font-size: .72rem; }
+.admin-shell .inv-pay-summary strong { display: block; margin-top: 4px; color: var(--ink); }
+.admin-shell .inv-payments { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+.admin-shell .inv-payments li {
+  display: flex; justify-content: space-between; gap: 12px; padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.admin-shell .inv-payments span { color: var(--ink); font-weight: 600; }
+.admin-shell .inv-payments strong { color: var(--terra-deep); white-space: nowrap; }
+.admin-shell .inv-email-card { margin-top: 20px; padding: 20px; max-width: 860px; }
+.admin-shell .inv-email-card h2 { margin-top: 0; }
+.admin-shell .inv-email-card .stack-form { max-width: none !important; }
+
+@media (max-width: 1080px) {
+  .admin-shell .inv-layout { grid-template-columns: 1fr; }
+  .admin-shell .inv-rail { position: static; }
+}
+@media (max-width: 640px) {
+  .admin-shell .inv-paper { padding: 20px 16px; }
+  .admin-shell .inv-id { text-align: left; }
+}
+
+html[data-theme="dark"] .admin-shell .inv-paper,
+html[data-theme="dark"] .admin-shell .inv-card,
+html[data-theme="dark"] .admin-shell .inv-email-card {
+  background: var(--surface); border-color: var(--line);
+}
+html[data-theme="dark"] .admin-shell .inv-title-edit input,
+html[data-theme="dark"] .admin-shell .inv-in:focus,
+html[data-theme="dark"] .admin-shell .inv-draft-controls input,
+html[data-theme="dark"] .admin-shell .inv-draft-controls textarea,
+html[data-theme="dark"] .admin-shell .inv-pay-summary div {
+  background: var(--surface-sunk); border-color: var(--line); color: var(--ink);
+}
+html[data-theme="dark"] .admin-shell .inv-status.is-current,
+html[data-theme="dark"] .admin-shell .inv-step.is-current > span {
+  background: var(--honey-bg); color: var(--honey); border-color: var(--honey-line);
+}
+html[data-theme="dark"] .admin-shell .inv-totalbox .inv-grand strong,
+html[data-theme="dark"] .admin-shell .inv-payments strong { color: var(--terra); }
+
+/* ---- Client invoice document (Claude client-document composition, Mise palette) ---- */
+.client-doc {
+  max-width: none; min-height: 100vh; margin: 0; padding: clamp(24px, 5vw, 60px) 20px 44px;
+  font-family: "Archivo", system-ui, sans-serif;
+}
+.client-doc-brandbar {
+  max-width: 720px; margin: 0 auto clamp(18px, 3vw, 28px);
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  color: var(--muted);
+}
+.client-doc-brandbar strong {
+  display: block; font-family: "Newsreader", Georgia, serif; font-size: 1.35rem;
+  font-weight: 500; line-height: 1; color: var(--ink);
+}
+.client-doc-brandbar span {
+  display: block; font: 700 .58rem/1 "Archivo", sans-serif; letter-spacing: .28em;
+  text-transform: uppercase; color: var(--accent); margin-top: 4px;
+}
+.client-doc-brandbar > span {
+  margin: 0; letter-spacing: 0; text-transform: none; color: var(--muted);
+  font-size: .82rem;
+}
+.client-doc-paper {
+  max-width: 720px; margin: 0 auto; background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: clamp(26px, 5vw, 48px);
+  box-shadow: 0 30px 60px -42px rgba(40, 30, 12, .28);
+}
+.client-doc-head {
+  display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+.client-doc-kicker,
+.client-doc-meta span {
+  display: block; margin: 0 0 6px; font: 700 .66rem/1 "Archivo", sans-serif;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
+}
+.client-doc-head h1 {
+  margin: 0; font-family: "Newsreader", Georgia, serif; font-weight: 500;
+  font-size: clamp(1.7rem, 4vw, 2.35rem); color: var(--ink);
+}
+.client-doc-head p { margin: 8px 0 0; color: var(--muted); }
+.client-doc-meta { text-align: right; }
+.client-doc-meta p { margin: 0 0 12px; color: var(--ink); font-weight: 700; }
+.client-doc-table-wrap { overflow-x: auto; }
+.client-doc-table { width: 100%; min-width: 520px; border-collapse: collapse; }
+.client-doc-table th {
+  padding: 0 0 12px; text-align: left; font: 700 .66rem/1 "Archivo", sans-serif;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
+}
+.client-doc-table td {
+  padding: 15px 0; border-top: 1px solid var(--line);
+  color: var(--ink); font: 500 .92rem/1.45 "Archivo", sans-serif;
+}
+.client-doc-table small { color: var(--muted); }
+.client-doc .doc-r { text-align: right; font-variant-numeric: tabular-nums; }
+.client-doc-totals {
+  margin-top: 24px; margin-left: auto; width: min(310px, 100%);
+  display: flex; flex-direction: column; gap: 10px; align-items: stretch;
+}
+.client-doc-totals div { display: flex; justify-content: space-between; gap: 36px; color: var(--muted); }
+.client-doc-totals strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.client-doc-totals .client-doc-due {
+  align-items: baseline; padding-top: 11px; border-top: 1px solid var(--line);
+}
+.client-doc-totals .client-doc-due span {
+  font-family: "Newsreader", Georgia, serif; font-size: 1.22rem; color: var(--ink);
+}
+.client-doc-totals .client-doc-due strong {
+  font-family: "Newsreader", Georgia, serif; font-weight: 500; font-size: 1.36rem;
+  color: var(--accent);
+}
+.client-doc-terms {
+  margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line);
+}
+.client-doc-terms h2 {
+  margin: 0 0 8px; font: 700 .66rem/1 "Archivo", sans-serif;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
+}
+.client-doc-terms p { margin: 0; color: var(--muted); line-height: 1.6; }
+.client-doc-actions {
+  margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;
+}
+.client-doc-actions form { flex: 1 1 250px; margin: 0; }
+.client-pay-btn,
+.client-secondary-btn {
+  width: 100%; margin: 0; border-radius: 12px; padding: 1em 1.25em;
+  font: 700 .92rem/1 "Archivo", sans-serif;
+}
+.client-pay-btn { background: var(--accent); color: #fff; border: 0; }
+.client-secondary-btn {
+  width: auto; min-width: 170px; background: var(--card); color: var(--ink);
+  border: 1px solid var(--line);
+}
+.client-doc-security,
+.client-doc-foot,
+.client-doc-print {
+  max-width: 720px; margin: 18px auto 0; text-align: center;
+  color: var(--muted); font-size: .78rem;
+}
+.client-doc-print { margin-top: 16px; }
+@media (max-width: 620px) {
+  .client-doc-brandbar, .client-doc-head { align-items: flex-start; }
+  .client-doc-meta { text-align: left; }
+  .client-secondary-btn { width: 100%; }
+}
+
 /* ---- Calendar (strict 1:1 — month grid, 3-bucket legend) ---- */
 .cal-top { gap: 16px; flex-wrap: wrap; }
 .cal-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
