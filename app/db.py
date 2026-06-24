@@ -10,6 +10,13 @@ from fastapi import HTTPException
 from . import config
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
+MIGRATION_ALIASES = {
+    # Flow briefly applied the Plutus gallery columns under this later filename.
+    # Treat both names as equivalent so a clean GitHub deploy does not re-run
+    # the same ALTER TABLE statements against production.
+    "055_plutus_upsell.sql": {"058_plutus_upsell.sql"},
+    "058_plutus_upsell.sql": {"055_plutus_upsell.sql"},
+}
 
 
 def connect() -> sqlite3.Connection:
@@ -30,7 +37,8 @@ def migrate() -> None:
                        applied_at TEXT NOT NULL DEFAULT (datetime('now')))""")
         applied = {r["name"] for r in con.execute("SELECT name FROM schema_migrations")}
         for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
-            if path.name in applied:
+            aliases = MIGRATION_ALIASES.get(path.name, set())
+            if path.name in applied or aliases.intersection(applied):
                 continue
             con.executescript(path.read_text())
             con.execute("INSERT INTO schema_migrations (name) VALUES (?)", (path.name,))

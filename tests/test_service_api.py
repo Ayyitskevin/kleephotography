@@ -22,6 +22,32 @@ def bearer():
     return {"Authorization": "Bearer service-test-token"}
 
 
+def test_migration_alias_skips_flow_plutus_filename(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "mise.db")
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
+    monkeypatch.setattr(config, "ZIP_DIR", tmp_path / "zips")
+    monkeypatch.setattr(config, "TMP_DIR", tmp_path / "tmp")
+    monkeypatch.setattr(config, "BRAND_DIR", tmp_path / "brand")
+    monkeypatch.setattr(config, "RECEIPTS_DIR", tmp_path / "receipts")
+    migration_dir = tmp_path / "migrations"
+    monkeypatch.setattr(db, "MIGRATIONS_DIR", migration_dir)
+    migration_dir.mkdir()
+    (migration_dir / "001_init.sql").write_text("CREATE TABLE galleries (id INTEGER PRIMARY KEY);")
+    (migration_dir / "055_plutus_upsell.sql").write_text(
+        "ALTER TABLE galleries ADD COLUMN plutus_last_run_id INTEGER;"
+    )
+
+    db.migrate()
+    db.run("INSERT INTO schema_migrations (name) VALUES (?)", ("058_plutus_upsell.sql",))
+    db.run("DELETE FROM schema_migrations WHERE name=?", ("055_plutus_upsell.sql",))
+    db.migrate()
+
+    applied = {row["name"] for row in db.all_("SELECT name FROM schema_migrations")}
+    assert "058_plutus_upsell.sql" in applied
+    assert "055_plutus_upsell.sql" not in applied
+
+
 def test_galleries_expiring_api_is_bearer_gated_and_filters_window(tmp_path, monkeypatch):
     configure_tmp_db(tmp_path, monkeypatch)
     today = dt.date.today()
