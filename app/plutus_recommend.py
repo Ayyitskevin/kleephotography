@@ -97,6 +97,22 @@ def trigger_gallery_recommend(gallery_id: int) -> dict:
     return payload
 
 
+def apply_callback(gallery_id: int, payload: dict) -> None:
+    """Record Plutus hand-off result (from Mise job worker or Argus callback)."""
+    status = (payload.get("status") or "done").strip()
+    run_id = payload.get("run_id")
+    error = payload.get("error")
+    if status == "done" and run_id is not None:
+        _record(gallery_id, status="done", run_id=int(run_id))
+        return
+    _record(
+        gallery_id,
+        status="error" if status != "done" else "done",
+        run_id=int(run_id) if run_id is not None else None,
+        error=str(error) if error else None,
+    )
+
+
 def run_for_gallery(gallery_id: int) -> None:
     if not is_enabled():
         log.info("plutus recommend skipped for %s (not configured)", gallery_id)
