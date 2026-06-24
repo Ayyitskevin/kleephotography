@@ -124,6 +124,43 @@ def test_session_cookie_helper_sets_shared_policy(monkeypatch):
 
 
 @pytest.mark.unit
+def test_public_showcase_bootstrap_relabels_demo_gallery(client):
+    from app import bootstrap, db
+
+    gid = db.run(
+        """INSERT INTO galleries
+           (slug, title, client_name, pin, published, cs_published, cs_tagline,
+            cs_brief, cs_credits, cs_location)
+           VALUES (?,?,?,?,1,1,?,?,?,?)""",
+        (
+            "showcase-demo",
+            "Sample Tasting Menu",
+            "Mise Demo",
+            "1234",
+            "Old tagline",
+            "",
+            "Client: Mise Demo",
+            "",
+        ),
+    )
+
+    assert bootstrap.ensure_public_showcase() is True
+    gallery = db.one(
+        "SELECT title, client_name, cs_published, cs_tagline, cs_brief, "
+        "cs_credits, cs_location FROM galleries WHERE id=?",
+        (gid,),
+    )
+
+    assert gallery["title"] == "Seasonal Tasting Menu"
+    assert gallery["client_name"] == "Cúrate"
+    assert gallery["cs_published"] == 1
+    assert gallery["cs_tagline"] == "Old tagline"
+    assert "same-week gallery" in gallery["cs_brief"]
+    assert "Client: Cúrate" in gallery["cs_credits"]
+    assert gallery["cs_location"] == "Asheville, NC"
+
+
+@pytest.mark.unit
 def test_access_routes_use_shared_session_cookie_policy(client, monkeypatch):
     from http.cookies import SimpleCookie
 

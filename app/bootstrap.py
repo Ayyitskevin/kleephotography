@@ -107,7 +107,9 @@ def ensure_public_showcase() -> bool:
             """UPDATE galleries SET title=?, client_name=?,
                    cs_tagline=COALESCE(NULLIF(cs_tagline,''), ?),
                    cs_brief=COALESCE(NULLIF(cs_brief,''), ?),
-                   cs_credits=COALESCE(NULLIF(cs_credits,''), ?),
+                   cs_credits=CASE
+                       WHEN cs_credits IS NULL OR cs_credits='' OR cs_credits LIKE '%Mise Demo%'
+                       THEN ? ELSE cs_credits END,
                    cs_location=COALESCE(NULLIF(cs_location,''), ?),
                    cs_published=1
                WHERE id=?""",
