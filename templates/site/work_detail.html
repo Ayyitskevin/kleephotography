@@ -55,7 +55,8 @@
       {'col': 4, 'ar': '4/5'},
       {'col': 12, 'ar': '21/9'},
     ] %}
-    {% for a in photos[1:] if photos|length > 1 else photos %}
+    {% set gallery_photos = photos[1:] if photos|length > 1 else photos %}
+    {% for a in gallery_photos %}
     {% set p = spans[loop.index0 % spans|length] %}
     <figure class="tile wg-tile" data-web="/site/img/{{ a.id }}"
             style="grid-column: span {{ p.col }}; aspect-ratio: {{ p.ar }};">

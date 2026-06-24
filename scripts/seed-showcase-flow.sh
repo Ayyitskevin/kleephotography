@@ -38,16 +38,19 @@ done
 run_on_flow "curl -sS -c /tmp/mise-seed-cookie -b /tmp/mise-seed-cookie -o /dev/null -X POST '$BASE/admin/galleries/$GALLERY_ID/assets/$VIDEO_ID/tag' -d 'portfolio_tag=motion'"
 
 echo "==> publish case study"
-run_on_flow "curl -sS -c /tmp/mise-seed-cookie -b /tmp/mise-seed-cookie -o /dev/null -X POST '$BASE/admin/galleries/$GALLERY_ID/settings" \
-  -d "title=Sample+Tasting+Menu" \
-  -d "client_name=Mise+Demo" \
-  -d "pin=2468" \
-  -d "published=on" \
-  -d "cs_published=on" \
-  -d "cs_tagline=A+tasting+menu%2C+shot+at+its+peak." \
-  -d "cs_brief=A+full+menu+refresh+and+brand+library+in+a+single+service+window+%E2%80%94+plating%2C+pours%2C+and+the+dining+room%2C+delivered+as+a+same-week+gallery+with+social+crops+baked+in." \
-  -d "cs_credits=Client%3A+Mise+Demo%0AScope%3A+Menu+refresh+%C2%B7+brand+library%0ADeliverables%3A+6+finals+%C2%B7+social+crop+pack%0ATurnaround%3A+Same-week+gallery" \
-  -d "cs_location=Asheville%2C+NC"
+run_on_flow "curl -sS -c /tmp/mise-seed-cookie -b /tmp/mise-seed-cookie -o /dev/null -X POST ${BASE}/admin/galleries/${GALLERY_ID}/settings \
+  --data-urlencode title='Sample Tasting Menu' \
+  --data-urlencode client_name='Mise Demo' \
+  --data-urlencode pin=2468 \
+  --data-urlencode published=on \
+  --data-urlencode cs_published=on \
+  --data-urlencode cs_tagline='A tasting menu, shot at its peak.' \
+  --data-urlencode cs_brief='A full menu refresh and brand library in a single service window — plating, pours, and the dining room, delivered as a same-week gallery with social crops baked in.' \
+  --data-urlencode cs_credits='Client: Mise Demo
+Scope: Menu refresh · brand library
+Deliverables: 6 finals · social crop pack
+Turnaround: Same-week gallery' \
+  --data-urlencode cs_location='Asheville, NC'"
 
 echo "==> seed testimonials (skip when already published)"
 for payload in \
