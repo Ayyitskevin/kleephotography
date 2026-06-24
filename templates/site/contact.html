@@ -7,8 +7,9 @@
   <aside class="contact-aside" data-reveal>
     <p class="eyebrow">Contact</p>
     <h1>Work with <span class="it-accent">me.</span></h1>
-    <p class="lede">Tell me about your business and what you need. More detail
-       means a faster quote — usually within a business day.</p>
+    <p class="lede">Tell me about your restaurant, café, bar, or brand and what
+       you need — a menu refresh, a launch, or ongoing content. I read every
+       message and reply within a business day.</p>
 
     <div class="contact-details">
       {% if contact_email %}
@@ -19,7 +20,7 @@
       {% endif %}
       <div class="contact-detail">
         <span class="cd-label">Studio</span>
-        <span>Asheville &amp; Western North Carolina</span>
+        <span>Asheville, North Carolina</span>
       </div>
     </div>
 
@@ -36,8 +37,10 @@
   {# RIGHT — the real quote-request form, unchanged in scope #}
   <div class="contact-card" data-reveal>
     {% if sent %}
-    <p class="sent-note">Thanks — your inquiry is in. I read every message and
-       I'll get back to you within a business day.</p>
+    <div class="sent-note">
+      <h2>Thanks — your inquiry is in.</h2>
+      <p>I read every message and I'll get back to you within a business day.</p>
+    </div>
     {% else %}
     <form method="post" action="/contact" class="stack-form contact-form">
       <label>Name <input type="text" name="name" required></label>

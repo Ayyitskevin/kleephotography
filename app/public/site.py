@@ -43,6 +43,8 @@ SERVICES = [
         "tiers": [
             {
                 "name": "Starter",
+                "subtitle": "Half day",
+                "display_price": "$650",
                 "price_cents": 90000,
                 "includes": [
                     "Up to 3 hours on site, one location",
@@ -54,6 +56,8 @@ SERVICES = [
             },
             {
                 "name": "Standard",
+                "subtitle": "Full day",
+                "display_price": "$1,200",
                 "price_cents": 180000,
                 "includes": [
                     "Up to 6 hours — menu, drinks & room",
@@ -65,6 +69,8 @@ SERVICES = [
             },
             {
                 "name": "Premium",
+                "subtitle": "Extended",
+                "display_price": "$2,400",
                 "price_cents": 320000,
                 "includes": [
                     "Up to two shoot days",
@@ -85,6 +91,8 @@ SERVICES = [
         "tiers": [
             {
                 "name": "Starter",
+                "subtitle": "The reel",
+                "display_price": "$850",
                 "price_cents": 180000,
                 "includes": [
                     "Half-day shoot",
@@ -96,6 +104,8 @@ SERVICES = [
             },
             {
                 "name": "Standard",
+                "subtitle": "Social set",
+                "display_price": "$1,800",
                 "price_cents": 320000,
                 "includes": [
                     "Full-day shoot",
@@ -107,6 +117,8 @@ SERVICES = [
             },
             {
                 "name": "Premium",
+                "subtitle": "Campaign",
+                "display_price": "$3,900",
                 "price_cents": 580000,
                 "includes": [
                     "Two shoot days",
@@ -126,7 +138,10 @@ SERVICES = [
         "monthly": True,
         "tiers": [
             {
-                "name": "Starter",
+                "name": "Photo",
+                "subtitle": "per month",
+                "display_price": "$900",
+                "price_unit": "/mo",
                 "price_cents": 140000,
                 "includes": [
                     "One half-day shoot monthly",
@@ -137,7 +152,10 @@ SERVICES = [
                 ],
             },
             {
-                "name": "Standard",
+                "name": "Photo + Reels",
+                "subtitle": "per month",
+                "display_price": "$1,600",
+                "price_unit": "/mo",
                 "price_cents": 220000,
                 "includes": [
                     "One full-day shoot monthly",
@@ -148,7 +166,10 @@ SERVICES = [
                 ],
             },
             {
-                "name": "Premium",
+                "name": "Two-day",
+                "subtitle": "per month",
+                "display_price": "$2,900",
+                "price_unit": "/mo",
                 "price_cents": 380000,
                 "includes": [
                     "Two shoot days monthly",
@@ -185,6 +206,12 @@ CONTACT_FAQS = [
         "You get a clear commercial usage license for your marketing and social. "
         "Licensing terms are spelled out in your gallery and proposal — no surprises.",
     ),
+]
+
+BOOK_PROMISES = [
+    "Reply within one business day",
+    "Tailored proposal — no obligation",
+    "Same-week gallery after the shoot",
 ]
 
 BOOK_FAQS = [

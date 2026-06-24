@@ -1,15 +1,18 @@
 {% extends "site/base_site.html" %}
 {% block title %}Book a time — {{ site_name }}{% endblock %}
 {% block site_content %}
-<section class="page-hero">
-  <div class="page-hero-inner" data-reveal>
+<section class="book-split">
+  <aside class="book-aside" data-reveal>
     <p class="eyebrow">Book a shoot</p>
     <h1>Pick a date. <span class="it-accent">I'll handle the rest.</span></h1>
     <p class="lede">Choose a starting service and a preferred date — I'll confirm
        availability and follow up with a tailored proposal, usually within a
        business day.</p>
-  </div>
-</section>
+    <ul class="book-promises">
+      {% for p in book_promises %}<li>{{ p }}</li>{% endfor %}
+    </ul>
+  </aside>
+  <div class="book-main">
 <main class="site-main site-narrow flush-top">
   {% if events %}
   <p>Pick what you'd like to set up and choose a time that works for you.
@@ -35,4 +38,6 @@
   {% endif %}
   {% include "site/_faq.html" %}
 </main>
+  </div>
+</section>
 {% endblock %}

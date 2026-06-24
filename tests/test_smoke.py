@@ -5372,21 +5372,19 @@ def test_services_page():
             for t in s["tiers"]:
                 # every tier name should appear at least 3 times (once per category)
                 # but we just need each card present per service
-                assert ">{t['name']}<" in r.text
+                assert f">{t['name']}</h3>" in r.text
         # tier count is 9 (3 categories × 3 tiers)
         assert r.text.count("svc-tier ") + r.text.count('svc-tier"') >= 9
         # middle tier flagged as "Most picked" (UX nudge), 3 times
         assert r.text.count("Most picked") == 3
-        # Quoting-first: no flat prices on the page — tiers list inclusions only
-        # and every quote is tailored on /contact. (Prices live in SERVICES for
-        # the admin proposal presets, not the public page.)
+        # Prototype copy: public tier cards show marketing display prices.
         for s in SERVICES:
             for t in s["tiers"]:
-                assert f"${t['price_cents'] // 100:,}" not in r.text, (s["key"], t["name"])
-        # Quoting-first: tier + foot CTAs route to /contact ("Request a quote"),
-        # not a flat-rate /book. Secondary "See past work" routes to /portfolio.
-        assert r.text.count('href="/contact"') >= 4  # 9 tier CTAs + foot CTA + lede
-        assert 'href="/portfolio"' in r.text
+                assert t["display_price"] in r.text, (s["key"], t["name"])
+                assert t["subtitle"] in r.text, (s["key"], t["name"])
+        # Tier + foot CTAs route to /book; secondary "See past work" → /work.
+        assert r.text.count('href="/book"') >= 10
+        assert 'href="/work"' in r.text
         # nav from any other site page links to /services
         assert 'href="/services"' in pub.get("/").text
         # SEO bits

@@ -14,6 +14,7 @@
 {% block site_content %}
 <main class="site-main">
   <article class="work-detail">
+    <p class="work-back"><a href="/work">&larr; All work</a></p>
     <header class="work-head" data-reveal>
       <p class="muted work-eyebrow">
         {{ g.client_name or "Case study" }}{% if g.client_name and g.cs_location %} · {% endif %}{{ g.cs_location or "" }}
