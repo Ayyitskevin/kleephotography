@@ -8,36 +8,47 @@
     <p class="lede">Choose a starting service and a preferred date — I'll confirm
        availability and follow up with a tailored proposal, usually within a
        business day.</p>
+    {% if book_photo %}
+    <div class="book-aside-photo">
+      <img src="/site/img/{{ book_photo.id }}?variant=web" loading="lazy" decoding="async"
+           srcset="/site/img/{{ book_photo.id }}?variant=thumb 480w, /site/img/{{ book_photo.id }}?variant=web 2048w"
+           sizes="(max-width: 900px) 100vw, 40vw"
+           alt="{{ book_photo|portfolio_alt }}">
+    </div>
+    {% endif %}
     <ul class="book-promises">
       {% for p in book_promises %}<li>{{ p }}</li>{% endfor %}
     </ul>
   </aside>
   <div class="book-main">
-<main class="site-main site-narrow flush-top">
-  {% if events %}
-  <p>Pick what you'd like to set up and choose a time that works for you.
-     You'll get an instant confirmation with a calendar invite.</p>
-  <ul class="book-events">
-    {% for e in events %}
-    <li class="book-event-card">
-      <a href="/book/{{ e.slug }}">
-        <span class="book-event-dot" style="background:{{ e.color }}"></span>
-        <span class="book-event-body">
-          <strong>{{ e.name }}</strong>
-          <span class="book-event-meta">{{ e.duration_min }} min{% if e.location %} · {{ e.location }}{% endif %}</span>
-          {% if e.description %}<span class="book-event-desc">{{ e.description }}</span>{% endif %}
-        </span>
-        <span class="book-event-go" aria-hidden="true">&rarr;</span>
-      </a>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p>Online booking isn't open just now — please
-     <a href="/contact">send an inquiry</a> and I'll get back to you within a business day.</p>
-  {% endif %}
-  {% include "site/_faq.html" %}
-</main>
+    <div class="book-form-card" data-reveal>
+      {% if events %}
+      <p>Pick what you'd like to set up and choose a time that works for you.
+         You'll get an instant confirmation with a calendar invite.</p>
+      <ul class="book-events">
+        {% for e in events %}
+        <li class="book-event-card">
+          <a href="/book/{{ e.slug }}">
+            <span class="book-event-dot" style="background:{{ e.color }}"></span>
+            <span class="book-event-body">
+              <strong>{{ e.name }}</strong>
+              <span class="book-event-meta">{{ e.duration_min }} min{% if e.location %} · {{ e.location }}{% endif %}</span>
+              {% if e.description %}<span class="book-event-desc">{{ e.description }}</span>{% endif %}
+            </span>
+            <span class="book-event-go" aria-hidden="true">&rarr;</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>Online booking isn't open just now — please
+         <a href="/contact">send an inquiry</a> and I'll get back to you within a business day.</p>
+      {% endif %}
+    </div>
   </div>
+</section>
+
+<section class="faq-narrow contact-faq">
+  {% include "site/_faq.html" %}
 </section>
 {% endblock %}

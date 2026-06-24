@@ -1,7 +1,7 @@
 {# Shared FAQ block — included on /book and /contact. List comes from
    site.FAQS as a Jinja global so both pages stay in sync. Also emits
    FAQPage JSON-LD so Google can show rich FAQ snippets. #}
-<section class="faq" aria-label="Frequently asked questions">
+<section class="faq faq-block" aria-label="Frequently asked questions">
   <h2>{{ faq_heading or "Common questions" }}</h2>
   {% for q, a in (faqs or []) %}
   <details class="faq-item">

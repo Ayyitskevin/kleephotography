@@ -2,21 +2,44 @@
 {% block title %}Work — {{ site_name }}{% endblock %}
 {% block site_content %}
 
-<section class="page-hero">
+<section class="page-hero page-hero-work">
   <div class="page-hero-inner" data-reveal>
     <p class="eyebrow">Work</p>
     <h1>Selected <span class="it-accent">case studies.</span></h1>
     <p class="lede">Menus, dishes, drinks, and the rooms they live in — and
        what happened after the photos went live.</p>
   </div>
+
+  {% if studies %}
+  {% set feat = studies[0] %}
+  <a class="work-feature" href="/work/{{ feat.slug }}" data-reveal>
+    <div class="work-feature-media">
+      {% if feat.hero_id %}
+      <img src="/site/img/{{ feat.hero_id }}?variant=web" loading="lazy" decoding="async"
+           srcset="/site/img/{{ feat.hero_id }}?variant=thumb 480w, /site/img/{{ feat.hero_id }}?variant=web 2048w"
+           sizes="(max-width: 900px) 100vw, 55vw"
+           alt="{{ feat.cs_tagline or feat.title }}">
+      <span class="work-feature-badge">Featured</span>
+      {% else %}
+      <span class="placeholder">no hero photo starred yet</span>
+      {% endif %}
+    </div>
+    <div class="work-feature-copy">
+      <p class="work-feature-eyebrow">{{ feat.client_name or "" }}{% if feat.client_name and feat.cs_location %} · {% endif %}{{ feat.cs_location or "" }}</p>
+      <h2>{{ feat.cs_tagline or feat.title }}</h2>
+      {% if feat.cs_brief %}<p>{{ feat.cs_brief[:280] }}{% if feat.cs_brief|length > 280 %}&hellip;{% endif %}</p>{% endif %}
+      <span class="work-feature-link">Read the case study &rarr;</span>
+    </div>
+  </a>
+  {% endif %}
 </section>
 
 <main class="site-main flush-top">
   {% if studies %}
-  <ul class="work-list" data-reveal>
-    {% for s in studies %}
-    <li class="work-card">
-      <a href="/work/{{ s.slug }}" class="work-card-img">
+  <div class="work-editorial-grid" data-reveal>
+    {% for s in studies[1:] %}
+    <a class="work-editorial-card" href="/work/{{ s.slug }}">
+      <div class="work-editorial-img">
         {% if s.hero_id %}
         <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
              srcset="/site/img/{{ s.hero_id }}?variant=thumb 480w, /site/img/{{ s.hero_id }}?variant=web 2048w"
@@ -25,20 +48,18 @@
         {% else %}
         <span class="placeholder">no hero photo starred yet</span>
         {% endif %}
-      </a>
-      <div class="work-card-body">
-        <h2><a href="/work/{{ s.slug }}">{{ s.cs_tagline or s.title }}</a></h2>
-        <p class="muted">{{ s.client_name or "" }}{% if s.client_name and s.cs_location %} · {% endif %}{{ s.cs_location or "" }}</p>
       </div>
-    </li>
+      <h3>{{ s.cs_tagline or s.title }}</h3>
+      <p class="muted">{{ s.client_name or "" }}{% if s.client_name and s.cs_location %} · {% endif %}{{ s.cs_location or "" }}</p>
+    </a>
     {% endfor %}
-  </ul>
+  </div>
   {% else %}
   {% include "site/_empty_portfolio.html" %}
   {% endif %}
 </main>
 
-<section class="cta">
+<section class="cta cta-band">
   <div class="cta-inner" data-reveal>
     <h2>Your shoot could be the <span class="it-accent">next one here.</span></h2>
     <div class="cta-actions">

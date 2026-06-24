@@ -9,9 +9,10 @@
   var reduceMotion = window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // --- fixed nav scroll state + hero parallax ---
+  // --- fixed nav scroll state + scroll progress + parallax ---
   var nav = document.querySelector("[data-nav]");
-  var heroImg = document.querySelector("[data-hero-img]");
+  var progressBar = document.querySelector("[data-progress-bar]");
+  var parallaxEls = document.querySelectorAll("[data-parallax]");
   var ticking = false;
   function onScroll() {
     if (ticking) return;
@@ -19,7 +20,16 @@
     requestAnimationFrame(function () {
       var y = window.scrollY;
       if (nav) nav.classList.toggle("scrolled", y > 24);
-      if (heroImg && !reduceMotion) heroImg.style.transform = "translateY(" + (y * 0.08) + "px)";
+      if (progressBar) {
+        var h = document.documentElement.scrollHeight - window.innerHeight;
+        progressBar.style.width = (h > 0 ? (y / h) * 100 : 0) + "%";
+      }
+      if (!reduceMotion) {
+        parallaxEls.forEach(function (el) {
+          var speed = parseFloat(el.getAttribute("data-parallax")) || 0;
+          el.style.transform = "translateY(" + (y * speed) + "px)";
+        });
+      }
       ticking = false;
     });
   }

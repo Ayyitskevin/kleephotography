@@ -2,8 +2,10 @@
 {% block title %}{{ site_name }} — Food &amp; Beverage Photography{% endblock %}
 {% block site_content %}
 
+<div class="scroll-progress" aria-hidden="true"><div data-progress-bar></div></div>
+
 {# HERO #}
-<section class="hero">
+<section class="hero hero-viewport">
   <div class="hero-inner">
     <div data-reveal>
       <p class="eyebrow">Asheville &amp; Western North Carolina</p>
@@ -15,27 +17,33 @@
         <a class="btn-ghost" href="/portfolio">View the portfolio</a>
       </div>
     </div>
-    <figure class="hero-photo" style="margin:0;">
+    <figure class="hero-photo hero-media" style="margin:0;">
       {% if featured %}
-      <img data-hero-img src="/site/img/{{ featured[0].id }}?variant=web" fetchpriority="high" decoding="async"
+      <img data-hero-img data-parallax="0.05"
+           src="/site/img/{{ featured[0].id }}?variant=web" fetchpriority="high" decoding="async"
            srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
            sizes="(max-width: 900px) 100vw, 55vw"
            alt="{{ featured[0]|portfolio_alt }}">
       {% if featured[0].portfolio_tag %}
       <figcaption>{{ featured[0].portfolio_tag|capitalize }}</figcaption>
       {% endif %}
+      {% if hero_reel %}
+      <div class="hero-reel" data-parallax="-0.06">
+        <video autoplay muted loop playsinline preload="metadata"
+               poster="/site/poster/{{ hero_reel.id }}">
+          <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
+        </video>
+      </div>
+      {% endif %}
       {% endif %}
     </figure>
   </div>
-
-  <div class="hero-meta" data-reveal>
-    <div><b>120+</b><span>Menus shot</span></div>
-    <div><b>Same week</b><span>Gallery delivery</span></div>
-    <div><b>1:1 · 4:5 · 9:16</b><span>Social crops included</span></div>
+  <div class="hero-scroll-cue" aria-hidden="true">
+    <span>Scroll</span><span class="hero-scroll-arrow">&darr;</span>
   </div>
 </section>
 
-{# PRESS MARQUEE — only when Kevin has featured press #}
+{# PRESS MARQUEE #}
 {% if press %}
 <section class="marquee" aria-label="As seen in">
   <div class="marquee-track">
@@ -45,7 +53,7 @@
 </section>
 {% endif %}
 
-{# SELECTED WORK — real portfolio assets, wired to the shared lightbox #}
+{# SELECTED WORK #}
 {% if featured %}
 <section class="sec" id="work">
   <div class="sec-inner">
@@ -59,21 +67,156 @@
       <a class="btn-ghost" href="/portfolio">Full portfolio &rarr;</a>
     </div>
     <div class="work-grid" data-reveal>
-      {% for a in featured %}
+      {% for a in featured[:3] %}
       <figure class="tile" data-web="/site/img/{{ a.id }}">
         <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
              srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
              sizes="(max-width: 700px) 50vw, 25vw"
              alt="{{ a|portfolio_alt }}">
         {% if a.portfolio_tag %}
-        <figcaption class="work-cap">{{ a.portfolio_tag|capitalize }}</figcaption>
+        <figcaption class="work-cap">{{ a.portfolio_tag|capitalize }}{% if a.client_name %}
+          <small>{{ a.client_name }}</small>{% elif a.gallery_title %}
+          <small>{{ a.gallery_title }}</small>{% endif %}
+        </figcaption>
         {% endif %}
       </figure>
       {% endfor %}
     </div>
+    {% if featured|length > 3 %}
+    <div class="work-grid work-grid-row2" data-reveal>
+      {% for a in featured[3:6] %}
+      <figure class="tile" data-web="/site/img/{{ a.id }}">
+        <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+             srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
+             sizes="(max-width: 700px) 50vw, 25vw"
+             alt="{{ a|portfolio_alt }}">
+        {% if a.portfolio_tag %}
+        <figcaption class="work-cap">{{ a.portfolio_tag|capitalize }}{% if a.client_name %}
+          <small>{{ a.client_name }}</small>{% elif a.gallery_title %}
+          <small>{{ a.gallery_title }}</small>{% endif %}
+        </figcaption>
+        {% endif %}
+      </figure>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
 </section>
 {% endif %}
+
+{# MOTION / REELS #}
+{% if reels %}
+<section class="motion-sec" id="motion">
+  <div class="sec-inner">
+    <div class="motion-head" data-reveal>
+      <div>
+        <p class="eyebrow">Motion</p>
+        <h2>Motion that <span class="it-accent">earns the scroll.</span></h2>
+      </div>
+      <p class="motion-lede">The steam. The pour. The first cut. Built vertical for the feed.</p>
+    </div>
+    <div class="motion-feature" data-reveal>
+      <video autoplay muted loop playsinline preload="metadata"
+             poster="/site/poster/{{ reels[0].id }}">
+        <source src="/site/vid/{{ reels[0].id }}" type="video/mp4">
+      </video>
+      <div class="motion-feature-meta">
+        <div>
+          <span class="motion-feature-label">House reel</span>
+          <p>{{ reels[0].portfolio_tag|capitalize if reels[0].portfolio_tag else 'Featured reel' }}</p>
+        </div>
+        <a class="motion-feature-link" href="/reels">All reels &rarr;</a>
+      </div>
+    </div>
+    {% if reels|length > 1 %}
+    <div class="motion-strip" data-reveal>
+      {% for r in reels[1:5] %}
+      <figure class="motion-reel">
+        <video autoplay muted loop playsinline preload="metadata"
+               poster="/site/poster/{{ r.id }}">
+          <source src="/site/vid/{{ r.id }}" type="video/mp4">
+        </video>
+        <div class="motion-reel-meta">
+          <span>{{ r.portfolio_tag|capitalize if r.portfolio_tag else 'Reel' }}</span>
+          <span class="motion-reel-bar"><i></i></span>
+        </div>
+      </figure>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{# DELIVERY — light band; dark proof panel only #}
+<section class="delivery delivery-light" id="delivery">
+  <div class="sec-inner">
+    <div class="delivery-intro" data-reveal>
+      <p class="eyebrow">After the shoot</p>
+      <h2>Delivery is the easy part.</h2>
+      <p>A private gallery the day after the shoot. Proof, download, post —
+         every crop already sized.</p>
+      {% if demo_gallery %}
+      <p class="delivery-demo-link"><a class="btn-ghost" href="{{ demo_gallery.url }}">Try the sample gallery &rarr;</a>
+        {% if demo_gallery.pin %}<span class="muted">PIN <b>{{ demo_gallery.pin }}</b></span>
+        {% else %}<a class="muted" href="/contact?prefill=demo_gallery">(ask for PIN)</a>{% endif %}
+      </p>
+      {% endif %}
+    </div>
+
+    <div class="delivery-grid">
+      <div class="proof-panel" data-reveal data-proof>
+        <div class="proof-head">
+          <b>Proof &amp; favorite</b>
+          <span><b data-proof-count>0</b> of {{ featured|length if featured else 6 }} selected</span>
+        </div>
+        <div class="proof-bar"><div class="proof-fill" data-proof-fill></div></div>
+        <div class="proof-thumbs">
+          {% if featured %}
+          {% for a in featured %}
+          <button class="proof-thumb" data-proof-thumb type="button" aria-label="Favorite">
+            <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async" alt="Proof thumbnail">
+            <span class="proof-heart">&hearts;</span>
+          </button>
+          {% endfor %}
+          {% else %}
+          {% for i in range(6) %}
+          <button class="proof-thumb" data-proof-thumb type="button" aria-label="Favorite">
+            <span class="proof-ph"></span>
+            <span class="proof-heart">&hearts;</span>
+          </button>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="crop-demo" data-reveal data-crop>
+        <p class="eyebrow">Social crops, auto-made</p>
+        <h3>One favorite. Every format.</h3>
+        <div class="crop-btns">
+          <button class="crop-btn" data-crop-btn data-ratio="1 / 1" data-name="Square · 1:1"
+                  data-use="Instagram feed &amp; grid posts.">1:1</button>
+          <button class="crop-btn on" data-crop-btn data-ratio="4 / 5" data-name="Portrait · 4:5"
+                  data-use="Maximum feed real estate on mobile.">4:5</button>
+          <button class="crop-btn" data-crop-btn data-ratio="9 / 16" data-name="Story · 9:16"
+                  data-use="Reels, Stories, and TikTok.">9:16</button>
+        </div>
+        <div class="crop-stage">
+          <div class="crop-preview" data-crop-preview style="aspect-ratio: 4 / 5;">
+            {% if featured %}<img src="/site/img/{{ featured[0].id }}?variant=thumb" decoding="async"
+              srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
+              sizes="(max-width: 700px) 80vw, 40vw" alt="Crop preview">
+            {% else %}<span class="crop-ph"></span>{% endif %}
+          </div>
+          <div class="crop-meta">
+            <b data-crop-name>Portrait · 4:5</b>
+            <p data-crop-use>Maximum feed real estate on mobile.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 {# SERVICES PREVIEW #}
 <section class="services" id="services">
@@ -108,79 +251,6 @@
   </div>
 </section>
 
-{# DELIVERY — dark interactive showcase of the gallery features #}
-<section class="delivery" id="delivery">
-  <div class="sec-inner">
-    <div class="delivery-intro" data-reveal>
-      <p class="eyebrow">After the shoot</p>
-      <h2>Delivery is the easy part.</h2>
-      <p>A private gallery the day after the shoot. Proof, download, post —
-         every crop already sized.</p>
-      {% if demo_gallery %}
-      <p class="delivery-demo-link"><a class="btn-ghost" href="{{ demo_gallery.url }}">Try the sample gallery &rarr;</a>
-        {% if demo_gallery.pin %}<span class="muted">PIN <b>{{ demo_gallery.pin }}</b></span>
-        {% else %}<a class="muted" href="/contact?prefill=demo_gallery">(ask for PIN)</a>{% endif %}
-      </p>
-      {% endif %}
-    </div>
-
-    <div class="delivery-grid">
-      {# interactive proofing demo #}
-      <div class="proof-panel" data-reveal data-proof>
-        <div class="proof-head">
-          <b>Proof &amp; favorite</b>
-          <span><b data-proof-count>0</b> of {{ featured|length if featured else 6 }} selected</span>
-        </div>
-        <div class="proof-bar"><div class="proof-fill" data-proof-fill></div></div>
-        <div class="proof-thumbs">
-          {% if featured %}
-          {% for a in featured %}
-          <button class="proof-thumb" data-proof-thumb type="button" aria-label="Favorite">
-            <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async" alt="Proof thumbnail">
-            <span class="proof-heart">&hearts;</span>
-          </button>
-          {% endfor %}
-          {% else %}
-          {% for i in range(6) %}
-          <button class="proof-thumb" data-proof-thumb type="button" aria-label="Favorite">
-            <span class="proof-ph"></span>
-            <span class="proof-heart">&hearts;</span>
-          </button>
-          {% endfor %}
-          {% endif %}
-        </div>
-      </div>
-
-      {# interactive social-crop switcher #}
-      <div class="crop-demo" data-reveal data-crop>
-        <p class="eyebrow">Social crops, auto-made</p>
-        <h3>One favorite. Every format.</h3>
-        <div class="crop-btns">
-          <button class="crop-btn" data-crop-btn data-ratio="1 / 1" data-name="Square · 1:1"
-                  data-use="Instagram feed &amp; grid posts.">1:1</button>
-          <button class="crop-btn on" data-crop-btn data-ratio="4 / 5" data-name="Portrait · 4:5"
-                  data-use="Maximum feed real estate on mobile.">4:5</button>
-          <button class="crop-btn" data-crop-btn data-ratio="9 / 16" data-name="Story · 9:16"
-                  data-use="Reels, Stories, and TikTok.">9:16</button>
-        </div>
-        <div class="crop-stage">
-          <div class="crop-preview" data-crop-preview style="aspect-ratio: 4 / 5;">
-            {% if featured %}<img src="/site/img/{{ featured[0].id }}?variant=thumb" decoding="async"
-              srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
-              sizes="(max-width: 700px) 80vw, 40vw" alt="Crop preview">
-            {% else %}<span class="crop-ph"></span>{% endif %}
-          </div>
-          <div class="crop-meta">
-            <b data-crop-name>Portrait · 4:5</b>
-            <p data-crop-use>Maximum feed real estate on mobile.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-{# TESTIMONIALS (shared partial, editorial restyle) #}
 {% include "site/_testimonials.html" %}
 
 {# ABOUT STRIP #}

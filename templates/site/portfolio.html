@@ -2,18 +2,15 @@
 {% block title %}Portfolio — {{ site_name }}{% endblock %}
 {% block site_content %}
 
-<section class="page-hero">
+<section class="page-hero page-hero-portfolio">
   <div class="page-hero-inner" data-reveal>
     <p class="eyebrow">Portfolio</p>
     <h1>Every dish, photographed <span class="it-accent">at its peak.</span></h1>
     <p class="lede">A working archive of menus, drinks, pastry, and the rooms
        they live in — across Asheville and Western North Carolina.</p>
   </div>
-</section>
-
-<main class="site-main flush-top">
   {% if tags %}
-  <nav class="portfolio-filter" aria-label="Filter portfolio by tag">
+  <nav class="portfolio-filter" aria-label="Filter portfolio by tag" data-reveal>
     <button class="pf-chip pf-chip-active" data-filter="">All
       <span class="muted">({{ assets|length }})</span></button>
     {% for tag in tags %}
@@ -23,54 +20,34 @@
     {% endfor %}
   </nav>
   {% endif %}
+</section>
+
+<main class="site-main flush-top">
   {% if assets %}
-  <div class="grid site-grid portfolio-grid">
+  <div class="portfolio-masonry">
     {% for a in assets %}
-    <figure class="tile{% if a.portfolio_tag %} pf-tile{% endif %}"
+    <figure class="tile pf-masonry-tile{% if a.portfolio_tag %} pf-tile{% endif %}"
             {% if a.portfolio_tag %}data-tag="{{ a.portfolio_tag|lower }}"{% endif %}
             data-web="/site/img/{{ a.id }}">
       <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
            srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
-           sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 25vw"
-           alt="{{ a|portfolio_alt }}"></figure>
+           sizes="(max-width: 700px) 100vw, 300px"
+           alt="{{ a|portfolio_alt }}">
+      {% if a.portfolio_tag %}
+      <figcaption class="portfolio-cap">{{ a.portfolio_tag|capitalize }}{% if a.client_name %}
+        <small>{{ a.client_name }}</small>{% elif a.gallery_title %}
+        <small>{{ a.gallery_title }}</small>{% endif %}
+      </figcaption>
+      {% endif %}
+    </figure>
     {% endfor %}
   </div>
   {% else %}
   {% include "site/_empty_portfolio.html" %}
   {% endif %}
-
-  {% if studies %}
-  <section class="featured-clients">
-    <p class="eyebrow">Featured clients</p>
-    <h2>The story behind the plate.</h2>
-    <p class="muted">Full shoots, start to finish — restaurants, cafés, and brands.</p>
-    <ul class="work-list">
-      {% for s in studies %}
-      <li class="work-card">
-        <a href="/work/{{ s.slug }}" class="work-card-img">
-          {% if s.hero_id %}
-          <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
-               srcset="/site/img/{{ s.hero_id }}?variant=thumb 480w, /site/img/{{ s.hero_id }}?variant=web 2048w"
-               sizes="(max-width: 700px) 100vw, 50vw"
-               alt="{{ s.cs_tagline or s.title }}">
-          {% else %}
-          <span class="placeholder">no hero photo starred yet</span>
-          {% endif %}
-        </a>
-        <div class="work-card-body">
-          <h3><a href="/work/{{ s.slug }}">{{ s.cs_tagline or s.title }}</a></h3>
-          <p class="muted">{{ s.client_name or "" }}{% if s.client_name and s.cs_location %} · {% endif %}{{ s.cs_location or "" }}</p>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
 </main>
 
-{# CLOSING CTA #}
-<section class="cta">
+<section class="cta cta-band">
   <div class="cta-inner" data-reveal>
     <h2>Let's add your restaurant to <span class="it-accent">the archive.</span></h2>
     <div class="cta-actions">
@@ -82,9 +59,8 @@
 {% include "site/_lightbox.html" %}
 {% if tags %}
 <script>
-  // Tag chip filter — vanilla JS, no reload. Hash sync so #dishes is shareable.
   (function () {
-    const tiles = document.querySelectorAll(".portfolio-grid .tile");
+    const tiles = document.querySelectorAll(".portfolio-masonry .pf-masonry-tile");
     const chips = document.querySelectorAll(".pf-chip");
     function apply(tag) {
       tiles.forEach(t => {

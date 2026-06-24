@@ -5,7 +5,6 @@
 {% endblock %}
 {% block site_content %}
 
-{# PAGE HEADER #}
 <section class="page-hero">
   <div class="page-hero-inner" data-reveal>
     <p class="eyebrow">Motion</p>
@@ -15,19 +14,36 @@
 </section>
 
 {% if reels %}
-<section class="reel-sec">
+<section class="motion-sec motion-page">
   <div class="sec-inner">
-    <div class="reel-grid" data-reveal>
-      {% for r in reels %}
-      <figure class="reel">
-        <video class="reel-vid" controls playsinline preload="none"
-               poster="/site/poster/{{ r.id }}"
-               {% if r.width and r.height %}style="aspect-ratio: {{ r.width }} / {{ r.height }};"{% endif %}>
+    <div class="motion-feature" data-reveal>
+      <video autoplay muted loop playsinline preload="metadata"
+             poster="/site/poster/{{ reels[0].id }}">
+        <source src="/site/vid/{{ reels[0].id }}" type="video/mp4">
+      </video>
+      <div class="motion-feature-meta">
+        <div>
+          <span class="motion-feature-label">House reel</span>
+          <p>{{ reels[0].portfolio_tag|capitalize if reels[0].portfolio_tag else 'Featured reel' }}</p>
+        </div>
+      </div>
+    </div>
+    {% if reels|length > 1 %}
+    <div class="motion-strip" data-reveal>
+      {% for r in reels[1:] %}
+      <figure class="motion-reel">
+        <video autoplay muted loop playsinline preload="metadata"
+               poster="/site/poster/{{ r.id }}">
           <source src="/site/vid/{{ r.id }}" type="video/mp4">
         </video>
+        <div class="motion-reel-meta">
+          <span>{{ r.portfolio_tag|capitalize if r.portfolio_tag else 'Reel' }}</span>
+          <span class="motion-reel-bar"><i></i></span>
+        </div>
       </figure>
       {% endfor %}
     </div>
+    {% endif %}
   </div>
 </section>
 {% else %}
@@ -38,7 +54,6 @@
 </section>
 {% endif %}
 
-{# FOOT — bordeaux card #}
 <section class="svc-foot-sec">
   <div class="svc-foot-card" data-reveal>
     <div>

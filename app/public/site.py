@@ -245,9 +245,26 @@ templates.env.globals["faqs"] = FAQS
 
 
 def _portfolio_assets() -> list:
-    return db.all_("""SELECT * FROM assets
-                      WHERE portfolio=1 AND status='ready' AND kind='photo'
-                      ORDER BY id DESC""")
+    return db.all_("""SELECT a.*, g.client_name, g.title AS gallery_title
+                      FROM assets a
+                      LEFT JOIN galleries g ON g.id = a.gallery_id
+                      WHERE a.portfolio=1 AND a.status='ready' AND a.kind='photo'
+                      ORDER BY a.id DESC""")
+
+
+def _parse_cs_credits(raw: str | None) -> list[dict]:
+    """Turn case-study credit lines into label/value pairs for the grid layout."""
+    out: list[dict] = []
+    for ln in (raw or "").splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        if ":" in ln:
+            label, _, value = ln.partition(":")
+            out.append({"label": label.strip(), "value": value.strip()})
+        else:
+            out.append({"label": "Credit", "value": ln})
+    return out
 
 
 def _portfolio_reels() -> list:
@@ -363,11 +380,14 @@ def _contact_prefill(request: Request) -> dict:
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     featured = _portfolio_assets()[:6]
+    reels = _portfolio_reels()
     return templates.TemplateResponse(
         request,
         "site/home.html",
         {
             "featured": featured,
+            "reels": reels,
+            "hero_reel": reels[0] if reels else None,
             "press": _press_features()[:12],
             "testimonials": _testimonials(limit=3),
             "demo_gallery": _demo_gallery(),
@@ -562,15 +582,17 @@ async def work_detail(request: Request, slug: str):
                         ORDER BY position, id""",
         (g["id"],),
     )
-    credits = [ln.strip() for ln in (g["cs_credits"] or "").splitlines() if ln.strip()]
+    credit_items = _parse_cs_credits(g["cs_credits"])
+    testimonials = _testimonials(gallery_id=g["id"])
     return templates.TemplateResponse(
         request,
         "site/work_detail.html",
         {
             "g": g,
             "photos": photos,
-            "credits": credits,
-            "testimonials": _testimonials(gallery_id=g["id"]),
+            "credit_items": credit_items,
+            "testimonials": testimonials,
+            "pull_quote": testimonials[0] if testimonials else None,
         },
     )
 
