@@ -1,46 +1,81 @@
 {% extends "base_cream.html" %}
 {% block title %}{{ d.title }} · {{ site_name }}{% endblock %}
+{% block cream_head %}
+<link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
+{% endblock %}
 {% block content %}
-<main class="doc-page">
-  <header class="doc-head">
-    <p class="muted">{{ site_name }}</p>
-    <h1>{{ d.title }}</h1>
-    <p class="muted">Prepared for {{ d.client_name }}{% if d.company %} · {{ d.company }}{% endif %}</p>
-  </header>
-
-  {% if d.intro %}<p class="doc-intro">{{ d.intro }}</p>{% endif %}
-
-  <table class="list doc-items">
-    <tr><th>Item</th><th>Qty</th><th>Unit</th><th>Amount</th></tr>
-    {% for i in items %}
-    <tr>
-      <td>{{ i.label }}</td>
-      <td>{{ i.qty }}</td>
-      <td>{% if i.unit_cents %}${{ "%.2f" % (i.unit_cents / 100) }}{% else %}included{% endif %}</td>
-      <td>{% if i.unit_cents %}${{ "%.2f" % (i.qty * i.unit_cents / 100) }}{% else %}—{% endif %}</td>
-    </tr>
-    {% endfor %}
-    <tr><td colspan="3"><strong>Total</strong></td>
-        <td><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></td></tr>
-  </table>
-
-  <p class="no-print"><button onclick="window.print()" class="link">Print / save as PDF</button></p>
-
-  {% if d.status == 'accepted' %}
-  <p class="doc-accepted">✓ Accepted {{ d.accepted_at }} — thank you! Next step: contract &amp; invoice will follow by email.</p>
-  {% elif d.status == 'declined' %}
-  <p class="muted">This proposal was declined. Reply to the email thread if you’d like to revisit it.</p>
-  {% else %}
-  <div class="doc-actions">
-    <form method="post" action="/p/{{ d.slug }}/accept"
-          onsubmit="return confirm('Accept this proposal?')">
-      <button type="submit">Accept proposal</button>
-    </form>
-    <form method="post" action="/p/{{ d.slug }}/decline"
-          onsubmit="return confirm('Decline this proposal?')">
-      <button type="submit" class="link">Decline</button>
-    </form>
+<main class="doc-page client-doc client-doc-proposal">
+  <div class="client-doc-brandbar">
+    <div>
+      <strong>{{ site_name }}</strong>
+      <span>Food &amp; Beverage</span>
+    </div>
+    <span>Proposal #{{ d.id }}</span>
   </div>
-  {% endif %}
+
+  <section class="client-doc-paper">
+    <header class="client-doc-head">
+      <div>
+        <p class="client-doc-kicker">Prepared for</p>
+        <h1>{{ d.company or d.client_name }}</h1>
+        <p>{{ d.client_name }}{% if d.project_title %} · {{ d.project_title }}{% endif %}</p>
+      </div>
+      <div class="client-doc-meta">
+        <p><span>Status</span>{{ d.status|replace('_', ' ')|title }}</p>
+        <p><span>Document</span>Proposal #{{ d.id }}</p>
+      </div>
+    </header>
+
+    {% if d.intro %}
+    <section class="client-doc-intro">
+      <p>{{ d.intro }}</p>
+    </section>
+    {% endif %}
+
+    <div class="client-doc-table-wrap">
+    <table class="client-doc-table">
+      <thead>
+        <tr><th>Item</th><th class="doc-r">Qty</th><th class="doc-r">Unit</th><th class="doc-r">Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for i in items %}
+        <tr>
+          <td><strong>{{ i.label }}</strong>{% if i.desc %}<br><small>{{ i.desc }}</small>{% endif %}</td>
+          <td class="doc-r">{{ i.qty }}</td>
+          <td class="doc-r">{% if i.unit_cents %}${{ "%.2f" % (i.unit_cents / 100) }}{% else %}Included{% endif %}</td>
+          <td class="doc-r">{% if i.unit_cents %}${{ "%.2f" % (i.qty * i.unit_cents / 100) }}{% else %}Included{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+
+    <div class="client-doc-totals">
+      <div class="client-doc-due"><span>Total proposal</span><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></div>
+    </div>
+
+    {% if d.status == 'accepted' %}
+    <p class="client-doc-status is-ok">Accepted {{ d.accepted_at }}. Thank you. Contract and invoice will follow by email.</p>
+    {% elif d.status == 'declined' %}
+    <p class="client-doc-status is-muted">This proposal was declined. Reply to the email thread if you would like to revisit it.</p>
+    {% else %}
+    <div class="client-doc-actions no-print client-doc-actions-split">
+      <form method="post" action="/p/{{ d.slug }}/accept"
+            onsubmit="return confirm('Accept this proposal?')">
+        <button type="submit" class="client-pay-btn">Accept proposal</button>
+      </form>
+      <form method="post" action="/p/{{ d.slug }}/decline"
+            onsubmit="return confirm('Decline this proposal?')">
+        <button type="submit" class="client-secondary-btn">Decline</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <p class="no-print client-doc-print">
+      <button type="button" onclick="window.print()" class="link">Print / save as PDF</button>
+    </p>
+  </section>
+
+  <p class="client-doc-foot">Proposal -> Contract -> Invoice - clean documents, secure approvals, one email thread.</p>
 </main>
 {% endblock %}

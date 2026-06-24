@@ -28,7 +28,7 @@ Scope rules:
 | Admin Content | `/admin/content` · `templates/admin/content.html` | Partial | Brand kit/caption surfaces exist; needs screenshot QA. |
 | Admin Dashboard | `/admin/home` · `templates/admin/home.html` | Partial | Dashboard systems exist; needs final parity review. |
 | Admin Deals | `/admin/studio` · `templates/admin/studio.html` | Partial | Maps to pipeline/deals board. |
-| Admin Document | `/i/{slug}`, `/c/{slug}`, `/p/{slug}` · public document templates | In progress | Invoice client document upgraded in this slice; contract/proposal still need full paper pass. |
+| Admin Document | `/i/{slug}`, `/c/{slug}`, `/p/{slug}` · public document templates | Close | Invoice, proposal, and contract now share the Claude document-paper family with live pay/accept/sign behavior preserved. |
 | Admin Expenses | `/admin/financials/expenses` · `templates/admin/financials_expenses.html` | Partial | Functional; design pass pending. |
 | Admin Financials | `/admin/financials` · `templates/admin/financials.html` | Partial | Existing financial dashboard needs prototype parity QA. |
 | Admin Forms | `/admin/forms`, `/admin/forms/{id}` · form templates | Partial | Functional builder exists; prototype polish pending. |
@@ -58,10 +58,9 @@ Scope rules:
 | Admin Templates | `/admin/templates`, `/admin/email-templates` · template galleries | Partial | Functional; design pass pending. |
 | Admin Transfers | `/admin/transfers` · `templates/admin/transfers.html` | Partial | Functional upload/drop surface; design pass pending. |
 
-Current correction slice:
+Completed correction slices:
 - `Admin Invoice` admin detail.
-- Client invoice side of `Admin Document`.
+- `Admin Document` client document family for invoice, proposal, and contract.
 
 Next recommended slice:
-- Finish `Admin Document` for proposal and contract.
-- Then move to `Admin Project` + `Admin Client`, because those pages sit at the center of the 46-screen workflow.
+- Move to `Admin Project` + `Admin Client`, because those pages sit at the center of the 46-screen workflow.

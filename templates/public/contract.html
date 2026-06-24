@@ -1,31 +1,57 @@
 {% extends "base_cream.html" %}
 {% block title %}{{ d.title }} · {{ site_name }}{% endblock %}
+{% block cream_head %}
+<link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
+{% endblock %}
 {% block content %}
-<main class="doc-page">
-  <header class="doc-head">
-    <p class="muted no-print">{{ site_name }}</p>
-    <h1>{{ d.title }}</h1>
-    <p class="muted">Prepared for {{ d.client_name }}{% if d.company %} · {{ d.company }}{% endif %}</p>
-  </header>
+<main class="doc-page client-doc client-doc-contract">
+  <div class="client-doc-brandbar">
+    <div>
+      <strong>{{ site_name }}</strong>
+      <span>Food &amp; Beverage</span>
+    </div>
+    <span>Agreement #{{ d.id }}</span>
+  </div>
 
-  <pre class="doc-body">{{ d.body }}</pre>
+  <section class="client-doc-paper">
+    <header class="client-doc-head">
+      <div>
+        <p class="client-doc-kicker">Agreement for</p>
+        <h1>{{ d.company or d.client_name }}</h1>
+        <p>{{ d.client_name }}{% if d.project_title %} · {{ d.project_title }}{% endif %}</p>
+      </div>
+      <div class="client-doc-meta">
+        <p><span>Status</span>{{ d.status|replace('_', ' ')|title }}</p>
+        <p><span>Document</span>Agreement #{{ d.id }}</p>
+      </div>
+    </header>
 
-  {% if d.status == 'signed' %}
-  <p class="doc-accepted">✓ Signed by {{ d.signer_name }} on {{ d.signed_at }}</p>
-  {% if d.countersigned_at %}
-  <p class="doc-accepted">✓ Countersigned by {{ d.countersigner_name }} on {{ d.countersigned_at }}</p>
-  {% endif %}
-  <p class="muted">Document SHA-256: {{ d.body_sha256 }}</p>
-  <p class="no-print"><button onclick="window.print()" class="link">Print / save as PDF</button></p>
-  {% else %}
-  <form method="post" action="/c/{{ d.slug }}/sign" class="stack-form doc-sign no-print"
-        onsubmit="return confirm('Sign this agreement as ' + this.signer_name.value + '?')">
-    <label>Type your full legal name
-      <input type="text" name="signer_name" required autocomplete="name"></label>
-    <label class="row"><input type="checkbox" name="agree" value="yes" required>
-      I have read this agreement and intend my typed name to be my legal signature.</label>
-    <button type="submit">Sign agreement</button>
-  </form>
-  {% endif %}
+    <pre class="client-doc-contract-body">{{ d.body }}</pre>
+
+    {% if d.status == 'signed' %}
+    <div class="client-doc-signatures">
+      <p class="client-doc-status is-ok">Signed by {{ d.signer_name }} on {{ d.signed_at }}</p>
+      {% if d.countersigned_at %}
+      <p class="client-doc-status is-ok">Countersigned by {{ d.countersigner_name }} on {{ d.countersigned_at }}</p>
+      {% endif %}
+    </div>
+    <p class="client-doc-hash">Document SHA-256: {{ d.body_sha256 }}</p>
+    <p class="no-print client-doc-print">
+      <button type="button" onclick="window.print()" class="link">Print / save as PDF</button>
+    </p>
+    {% else %}
+    <form method="post" action="/c/{{ d.slug }}/sign" class="client-doc-sign no-print"
+          onsubmit="return confirm('Sign this agreement as ' + this.signer_name.value + '?')">
+      <span class="client-doc-kicker">E-signature</span>
+      <label>Type your full legal name
+        <input type="text" name="signer_name" required autocomplete="name"></label>
+      <label class="client-doc-check"><input type="checkbox" name="agree" value="yes" required>
+        <span>I have read this agreement and intend my typed name to be my legal signature.</span></label>
+      <button type="submit" class="client-pay-btn">Sign agreement</button>
+    </form>
+    {% endif %}
+  </section>
+
+  <p class="client-doc-foot">Secure typed-name signature. The locked agreement hash is kept with the signed record.</p>
 </main>
 {% endblock %}

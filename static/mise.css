@@ -1857,6 +1857,63 @@ html[data-theme="dark"] .admin-shell .inv-payments strong { color: var(--terra);
   .client-secondary-btn { width: 100%; }
 }
 
+
+
+/* ---- Client proposal + contract documents (complete Claude document family) ---- */
+.client-doc-intro {
+  margin: -6px 0 26px; padding: 18px 20px; border: 1px solid var(--line);
+  border-radius: 13px; background: var(--card);
+}
+.client-doc-intro p {
+  margin: 0; color: var(--ink); font: 500 .96rem/1.65 "Archivo", sans-serif;
+  white-space: pre-wrap;
+}
+.client-doc-status {
+  margin: 26px 0 0; padding: 15px 17px; border-radius: 12px;
+  border: 1px solid var(--line); font: 600 .9rem/1.45 "Archivo", sans-serif;
+}
+.client-doc-status.is-ok {
+  background: #e7efe9; border-color: #cfe0d4; color: #1C4A3A;
+}
+.client-doc-status.is-muted {
+  background: var(--card); color: var(--muted);
+}
+.client-doc-actions-split form { flex: 1 1 190px; }
+.client-doc-contract-body {
+  margin: 0; padding: 22px 0 0; border-top: 1px solid var(--line);
+  background: transparent; color: var(--ink); white-space: pre-wrap;
+  font: 500 .94rem/1.72 "Archivo", system-ui, sans-serif;
+}
+.client-doc-signatures { display: grid; gap: 10px; margin-top: 26px; }
+.client-doc-signatures .client-doc-status { margin: 0; }
+.client-doc-hash {
+  margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line);
+  color: var(--muted); font: 500 .75rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+.client-doc-sign {
+  margin-top: 30px; padding: 20px; border: 1px solid var(--line);
+  border-radius: 14px; background: var(--card);
+  display: grid; gap: 14px;
+}
+.client-doc-sign label {
+  display: grid; gap: 8px; color: var(--ink); font: 700 .78rem/1.25 "Archivo", sans-serif;
+}
+.client-doc-sign input[type="text"] {
+  width: 100%; padding: .78rem .86rem; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--card); color: var(--ink);
+  font: 500 .96rem "Archivo", sans-serif;
+}
+.client-doc-check {
+  grid-template-columns: 18px 1fr; align-items: start; gap: 10px !important;
+  color: var(--muted) !important; font-weight: 500 !important; line-height: 1.45 !important;
+}
+.client-doc-check input { margin-top: 2px; accent-color: var(--accent); }
+.client-doc-sign .client-pay-btn { width: 100%; }
+@media (max-width: 620px) {
+  .client-doc-sign { padding: 16px; }
+}
+
 /* ---- Calendar (strict 1:1 — month grid, 3-bucket legend) ---- */
 .cal-top { gap: 16px; flex-wrap: wrap; }
 .cal-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
