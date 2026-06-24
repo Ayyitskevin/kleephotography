@@ -31,12 +31,19 @@ def _record(
     status: str,
     run_id: int | None = None,
     error: str | None = None,
+    offer_url: str | None = None,
 ) -> None:
     db.run(
         """UPDATE galleries SET plutus_last_run_id=?, plutus_last_status=?,
-              plutus_last_error=?, plutus_last_at=datetime('now')
+              plutus_last_error=?, plutus_last_offer_url=?, plutus_last_at=datetime('now')
               WHERE id=?""",
-        (run_id, status, (error or None)[:500] if error else None, gallery_id),
+        (
+            run_id,
+            status,
+            (error or None)[:500] if error else None,
+            (offer_url or None)[:500] if offer_url else None,
+            gallery_id,
+        ),
     )
 
 
@@ -102,14 +109,21 @@ def apply_callback(gallery_id: int, payload: dict) -> None:
     status = (payload.get("status") or "done").strip()
     run_id = payload.get("run_id")
     error = payload.get("error")
+    offer_url = payload.get("offer_url")
     if status == "done" and run_id is not None:
-        _record(gallery_id, status="done", run_id=int(run_id))
+        _record(
+            gallery_id,
+            status="done",
+            run_id=int(run_id),
+            offer_url=str(offer_url) if offer_url else None,
+        )
         return
     _record(
         gallery_id,
         status="error" if status != "done" else "done",
         run_id=int(run_id) if run_id is not None else None,
         error=str(error) if error else None,
+        offer_url=str(offer_url) if offer_url else None,
     )
 
 
@@ -128,4 +142,9 @@ def run_for_gallery(gallery_id: int) -> None:
         _record(gallery_id, status="error", error=str(e)[:500])
         return
 
-    _record(gallery_id, status="done", run_id=int(result["run_id"]))
+    _record(
+        gallery_id,
+        status="done",
+        run_id=int(result["run_id"]),
+        offer_url=result.get("offer_url"),
+    )

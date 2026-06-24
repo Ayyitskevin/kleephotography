@@ -38,7 +38,11 @@ def test_run_for_gallery_records_done(tmp_path, monkeypatch):
         "INSERT INTO galleries (slug, title, pin, type, published) VALUES (?,?,?,?,1)",
         ("abc", "Test", "1234", "gallery"),
     )
-    payload = {"run_id": 12, "bundles": [{"id": "wall-hero"}]}
+    payload = {
+        "run_id": 12,
+        "bundles": [{"id": "wall-hero"}],
+        "offer_url": "https://plutus.test/store/studio/offer/abc",
+    }
 
     class _Resp:
         def read(self):
@@ -52,9 +56,31 @@ def test_run_for_gallery_records_done(tmp_path, monkeypatch):
 
     monkeypatch.setattr(plutus_recommend.urllib.request, "urlopen", lambda req, timeout: _Resp())
     plutus_recommend.run_for_gallery(gid)
-    row = db.one("SELECT plutus_last_run_id, plutus_last_status FROM galleries WHERE id=?", (gid,))
+    row = db.one(
+        "SELECT plutus_last_run_id, plutus_last_status, plutus_last_offer_url FROM galleries WHERE id=?",
+        (gid,),
+    )
     assert row["plutus_last_run_id"] == 12
     assert row["plutus_last_status"] == "done"
+    assert row["plutus_last_offer_url"] == payload["offer_url"]
+
+
+def test_apply_callback_records_offer_url(tmp_path, monkeypatch):
+    _configure_tmp_db(tmp_path, monkeypatch)
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, type, published) VALUES (?,?,?,?,1)",
+        ("abc", "Test", "1234", "gallery"),
+    )
+    plutus_recommend.apply_callback(
+        gid,
+        {
+            "status": "done",
+            "run_id": 9,
+            "offer_url": "https://plutus.test/store/flow/offer/tok",
+        },
+    )
+    row = db.one("SELECT plutus_last_offer_url FROM galleries WHERE id=?", (gid,))
+    assert row["plutus_last_offer_url"] == "https://plutus.test/store/flow/offer/tok"
 
 
 def test_argus_callback_enqueues_plutus(tmp_path, monkeypatch):

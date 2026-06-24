@@ -294,6 +294,9 @@
           · <a href="{{ plutus_url }}/runs/{{ g.plutus_last_run_id }}" target="_blank" rel="noopener">view bundles</a>
           · <a href="{{ plutus_url }}/runs/{{ g.plutus_last_run_id }}/pitch.txt" target="_blank" rel="noopener">client pitch</a>
           {% endif %}
+          {% if g.plutus_last_offer_url %}
+          · <a href="{{ g.plutus_last_offer_url }}" target="_blank" rel="noopener">client offer</a>
+          {% endif %}
         </p>
         {% else %}
         <p class="muted" style="margin:0 0 0.6rem">Queued after Argus analyze completes (or on publish when Argus is off).</p>
