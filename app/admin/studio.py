@@ -102,19 +102,16 @@ async def studio_clients(request: Request):
     )
 
 
-def _studio_context(request: Request) -> dict:
-    """Shared context for the Studio board and its Activity sub-view. Both render
-    from the same pipeline + needs-attention computation: the board template reads
-    the project/stage subset, the activity template the strips + sparklines. Kept
-    as one function so the "X needs action" badge on the board and the strips it
-    links to can never drift out of sync."""
-    # Financial semantics: an invoice is overdue when its due_date is past on the
-    # OPERATOR'S WALL CLOCK (localtime, the canonical studio clock) — not UTC.
-    # Judging on UTC would declare an invoice overdue hours early in the evening
-    # EDT once UTC has rolled past midnight, which is a wrong statement about a
-    # client. due_date is a stored wall-clock date; compare it to local "today"
-    # passed as a bound param so SQLite never derives its own UTC 'now' here.
-    today_iso = _today().isoformat()
+def _ctx_pipeline(today_iso: str) -> dict:
+    """Pipeline board: projects (non-archived), per-stage value rollup, status
+    counts, and per-stage overdue-invoice tally.
+
+    Financial semantics: an invoice is overdue when its due_date is past on the
+    OPERATOR'S WALL CLOCK (localtime, the canonical studio clock) — not UTC.
+    Judging on UTC would declare an invoice overdue hours early in the evening
+    EDT once UTC has rolled past midnight, which is a wrong statement about a
+    client. due_date is a stored wall-clock date; compare it to local "today"
+    passed as a bound param so SQLite never derives its own UTC 'now' here."""
     projects = db.all_(
         """SELECT p.*, c.name AS client_name, c.company,
                           CAST(julianday('now')
@@ -162,7 +159,18 @@ def _studio_context(request: Request) -> dict:
     for p in projects:
         if p["n_overdue"]:
             overdue_by_stage[p["status"]] = overdue_by_stage.get(p["status"], 0) + 1
-    outstanding = common.open_invoice_balance()
+    return {
+        "projects": projects,
+        "stage_value": stage_value,
+        "pipeline_value_total": pipeline_value_total,
+        "booked_value": booked_value,
+        "counts": counts,
+        "overdue_by_stage": overdue_by_stage,
+    }
+
+
+def _ctx_inquiries() -> dict:
+    """Open inquiries (live triage) + a recently-resolved archive tail."""
     inquiries = db.all_(
         "SELECT * FROM inquiries "
         "WHERE converted_at IS NULL AND dismissed_at IS NULL "
@@ -173,9 +181,13 @@ def _studio_context(request: Request) -> dict:
         "WHERE converted_at IS NOT NULL OR dismissed_at IS NOT NULL "
         "ORDER BY COALESCE(dismissed_at, converted_at) DESC LIMIT 50"
     )
-    # Licenses expiring within 45 days (or already lapsed) — active, dated,
-    # non-perpetual. Silent when empty. Mirrors the dedicated /licenses strip.
-    licenses_expiring = db.all_(
+    return {"inquiries": inquiries, "inquiries_archived": inquiries_archived}
+
+
+def _ctx_licenses_expiring() -> list:
+    """Licenses expiring within 45 days (or already lapsed) — active, dated,
+    non-perpetual. Silent when empty. Mirrors the dedicated /licenses strip."""
+    return db.all_(
         """SELECT l.id, l.title, l.usage_tier, l.ends_on,
                   c.name AS holder_name, c.company AS holder_company,
                   CAST(julianday(l.ends_on) - julianday(date('now', 'localtime')) AS INTEGER) AS days_left
@@ -185,12 +197,15 @@ def _studio_context(request: Request) -> dict:
              AND julianday(l.ends_on) - julianday(date('now', 'localtime')) <= 45
            ORDER BY l.ends_on"""
     )
-    # Retainer drafts waiting to send — invoices the recurring scheduler (or the
-    # manual Generate button) auto-created and that Kevin hasn't sent yet. Slice 2
-    # made these appear unattended, so without this strip an auto-generated draft
-    # can rot unsent — the manual-send doctrine's safety valve. Silent when empty;
-    # oldest first so the most-stale nags loudest.
-    retainer_drafts = db.all_(
+
+
+def _ctx_retainer_drafts() -> list:
+    """Retainer drafts waiting to send — invoices the recurring scheduler (or the
+    manual Generate button) auto-created and that Kevin hasn't sent yet. Slice 2
+    made these appear unattended, so without this strip an auto-generated draft
+    can rot unsent — the manual-send doctrine's safety valve. Silent when empty;
+    oldest first so the most-stale nags loudest."""
+    return db.all_(
         """SELECT i.id, i.title, i.total_cents,
                   c.name AS client_name, c.company,
                   CAST(julianday(date('now')) - julianday(date(i.created_at)) AS INTEGER) AS age_days
@@ -200,15 +215,17 @@ def _studio_context(request: Request) -> dict:
            WHERE i.recurring_plan_id IS NOT NULL AND i.status='draft'
            ORDER BY i.created_at ASC"""
     )
-    # Activity sparklines — Inquiries / Downloads / Favorites — over a 7 / 30 /
-    # 90 day window picked via ?days=. Other values clamp to the closest
-    # allowed bucket so link tampering / typos always render something useful.
+
+
+def _ctx_sparklines(request: Request, today: dt.date) -> dict:
+    """Activity sparklines — Inquiries / Downloads / Favorites — over a 7 / 30 /
+    90 day window picked via ?days=. Other values clamp to the closest
+    allowed bucket so link tampering / typos always render something useful."""
     try:
         raw_days = int(request.query_params.get("days", 7))
     except ValueError:
         raw_days = 7
     spark_days_window = min((7, 30, 90), key=lambda d: abs(d - raw_days))
-    today = dt.date.today()
     spark_inq, spark_inq_total = _spark_series("inquiries", today, spark_days_window)
     spark_dl, spark_dl_total = _spark_series("downloads", today, spark_days_window)
     spark_fav, spark_fav_total = _spark_series("favorites", today, spark_days_window)
@@ -220,10 +237,18 @@ def _studio_context(request: Request) -> dict:
         {"label": "Downloads", "series": spark_dl, "total": spark_dl_total},
         {"label": "Favorites", "series": spark_fav, "total": spark_fav_total},
     ]
-    # Upcoming-shoots strip: next 14 days, non-archived. Also surfaces shoots
-    # already in the past but not yet shipped (status pre-'shooting') as overdue
-    # — those are the "the shoot was Tuesday and nothing's been edited" gotchas.
-    upcoming = db.all_(
+    return {
+        "sparklines": sparklines,
+        "spark_days": day_strs,
+        "spark_window": spark_days_window,
+    }
+
+
+def _ctx_upcoming() -> list:
+    """Upcoming-shoots strip: next 14 days, non-archived. Also surfaces shoots
+    already in the past but not yet shipped (status pre-'shooting') as overdue
+    — those are the "the shoot was Tuesday and nothing's been edited" gotchas."""
+    return db.all_(
         """SELECT p.id, p.title, p.status, p.shoot_date,
                   c.name AS client_name, c.company,
                   CAST(julianday(p.shoot_date) -
@@ -234,11 +259,15 @@ def _studio_context(request: Request) -> dict:
              AND p.shoot_date <= date('now', 'localtime', '+14 days')
            ORDER BY p.shoot_date ASC"""
     )
-    # Proofing-waiting strip: galleries with proofing sections that haven't been
-    # filled yet — threads with ships #24 (proofing) + #28 (proofing-prompt
-    # email kind). Linked to projects so Kevin can find the inquiry context;
-    # each chip links to the gallery admin where the "Proofing prompt" email
-    # template is one click away.
+
+
+def _ctx_proofing() -> list:
+    """Proofing-waiting strip: galleries with proofing sections that haven't been
+    filled yet — threads with ships #24 (proofing) + #28 (proofing-prompt
+    email kind). Linked to projects so Kevin can find the inquiry context;
+    each chip links to the gallery admin where the "Proofing prompt" email
+    template is one click away. Rolled up to one row per project with N waiting
+    chapters + M picks remaining."""
     proofing_waiting = db.all_(
         """SELECT p.id AS project_id, p.title AS project_title,
                   c.name AS client_name, c.company,
@@ -254,7 +283,6 @@ def _studio_context(request: Request) -> dict:
              AND s.proof_target IS NOT NULL AND s.proof_target > 0
            ORDER BY p.id, s.position"""
     )
-    # Roll up to one row per project with N waiting chapters + M picks remaining.
     waiting: dict = {}
     for r in proofing_waiting:
         if r["picks"] >= r["proof_target"]:
@@ -275,10 +303,14 @@ def _studio_context(request: Request) -> dict:
         )
         proj["n_chapters"] += 1
         proj["remaining"] += r["proof_target"] - r["picks"]
-    # Booking-conflict guard: any date in the next 90 days that hosts 2+ items
-    # (active project shoot + active project shoot, or active shoot + pending
-    # booking inquiry). Silent if empty. -7 day floor catches "I just booked
-    # someone on a date I already had taken" near-misses.
+    return list(waiting.values())
+
+
+def _ctx_conflicts() -> list:
+    """Booking-conflict guard: any date in the next 90 days that hosts 2+ items
+    (active project shoot + active project shoot, or active shoot + pending
+    booking inquiry). Silent if empty. -7 day floor catches "I just booked
+    someone on a date I already had taken" near-misses."""
     conf_projects = db.all_(
         """SELECT p.id, p.title, p.status, p.shoot_date,
                   c.name AS client_name, c.company
@@ -317,18 +349,21 @@ def _studio_context(request: Request) -> dict:
                 "company": None,
             }
         )
-    conflicts = [
+    return [
         {"shoot_date": d, "entries": items}
         for d, items in sorted(by_date.items())
         if len(items) >= 2
     ]
-    # Retainers behind quota (Domain G) — active plans whose this-period delivery
-    # lags the month's run-rate. PACE-AWARE: a label is "behind" when its
-    # delivered count is below target × fraction-of-month-elapsed, so on-track
-    # retainers stay silent all month and one only surfaces once it slips behind
-    # pace (the gap widens toward month-end). quota is JSON, so the gap is summed
-    # in Python. Silent when empty; worst deficit first. 0-target lines are
-    # placeholders and never count as behind.
+
+
+def _ctx_quota_behind(today: dt.date) -> list:
+    """Retainers behind quota (Domain G) — active plans whose this-period delivery
+    lags the month's run-rate. PACE-AWARE: a label is "behind" when its
+    delivered count is below target × fraction-of-month-elapsed, so on-track
+    retainers stay silent all month and one only surfaces once it slips behind
+    pace (the gap widens toward month-end). quota is JSON, so the gap is summed
+    in Python. Silent when empty; worst deficit first. 0-target lines are
+    placeholders and never count as behind."""
     period = today.strftime("%Y-%m")
     days_in_month = calendar.monthrange(today.year, today.month)[1]
     elapsed = today.day / days_in_month
@@ -378,20 +413,25 @@ def _studio_context(request: Request) -> dict:
                 }
             )
     quota_behind.sort(key=lambda x: x["worst"]["to_go"], reverse=True)
-    # Content due (Domain G) — calendar slots scheduled THIS period and not yet
-    # delivered: the "what's coming" companion to behind-quota's "what's at risk".
-    # A delivered slot drops off (composes with slice-4 assisted credit). Overdue
-    # (slot_date < today, not delivered) is INCLUDED and flagged urgent — it's the
-    # most actionable thing here, never hidden behind an upcoming-only filter. One
-    # chip PER PLAN (soonest/overdue item + "+N more"), plans sorted by their most
-    # urgent slot. A plan may ALSO show in behind-quota; that co-occurrence is
-    # accepted — the strips answer different questions (no cross-strip dedup).
-    # Carryover (overdue-rollover VISIBILITY fix): undelivered slots from PRIOR
-    # periods (slot_date before this period's first day, still planned/shot) stay
-    # visible instead of vanishing when the month rolls over — an owed shoot doesn't
-    # disappear just because the period turned. Delivering it still drops it off
-    # (status leaves planned/shot). Future-period look-ahead remains period-bounded
-    # (month-end blindness for UPCOMING slots is the accepted idiom). Read-only.
+    return quota_behind
+
+
+def _ctx_content_due(today: dt.date) -> list:
+    """Content due (Domain G) — calendar slots scheduled THIS period and not yet
+    delivered: the "what's coming" companion to behind-quota's "what's at risk".
+    A delivered slot drops off (composes with slice-4 assisted credit). Overdue
+    (slot_date < today, not delivered) is INCLUDED and flagged urgent — it's the
+    most actionable thing here, never hidden behind an upcoming-only filter. One
+    chip PER PLAN (soonest/overdue item + "+N more"), plans sorted by their most
+    urgent slot. A plan may ALSO show in behind-quota; that co-occurrence is
+    accepted — the strips answer different questions (no cross-strip dedup).
+    Carryover (overdue-rollover VISIBILITY fix): undelivered slots from PRIOR
+    periods (slot_date before this period's first day, still planned/shot) stay
+    visible instead of vanishing when the month rolls over — an owed shoot doesn't
+    disappear just because the period turned. Delivering it still drops it off
+    (status leaves planned/shot). Future-period look-ahead remains period-bounded
+    (month-end blindness for UPCOMING slots is the accepted idiom). Read-only."""
+    period = today.strftime("%Y-%m")
     today_iso = today.isoformat()
     soon_iso = (today + dt.timedelta(days=3)).isoformat()
     due_by_plan = {}
@@ -430,17 +470,21 @@ def _studio_context(request: Request) -> dict:
     for g in content_due:
         g["worst"] = g["slots"][0]  # SQL ordered slots soonest-first
     content_due.sort(key=lambda g: g["worst"]["slot_date"])
-    # Press → confirm published (Domain H, H2 rollup of H3's per-license cue). H3
-    # renders, on a license detail page, a "review & confirm published" cue when
-    # published press evidence matches a license whose `published` flag is still 0.
-    # This strip rolls that cue up to the dashboard so a matched-but-unconfirmed
-    # license doesn't stay hidden on its detail page. ACTIVE licenses only — the
-    # actionable case is a live grant; draft/expired/renewed/terminated stay quiet.
-    # Reuses press_for_license verbatim (deferred import breaks the studio<->press
-    # <->licenses cycle, as license_detail does). READ-ONLY: never flips
-    # `published` — the human does that on the license form (the control H3 sits
-    # beside). Silent when empty; most-evidence first; chip links to the detail
-    # where the evidence and the Published checkbox live.
+    return content_due
+
+
+def _ctx_press_confirm() -> list:
+    """Press → confirm published (Domain H, H2 rollup of H3's per-license cue). H3
+    renders, on a license detail page, a "review & confirm published" cue when
+    published press evidence matches a license whose `published` flag is still 0.
+    This strip rolls that cue up to the dashboard so a matched-but-unconfirmed
+    license doesn't stay hidden on its detail page. ACTIVE licenses only — the
+    actionable case is a live grant; draft/expired/renewed/terminated stay quiet.
+    Reuses press_for_license verbatim (deferred import breaks the studio<->press
+    <->licenses cycle, as license_detail does). READ-ONLY: never flips
+    `published` — the human does that on the license form (the control H3 sits
+    beside). Silent when empty; most-evidence first; chip links to the detail
+    where the evidence and the Published checkbox live."""
     from .press import press_for_license
 
     press_confirm = []
@@ -463,29 +507,35 @@ def _studio_context(request: Request) -> dict:
                 }
             )
     press_confirm.sort(key=lambda x: x["n"], reverse=True)
+    return press_confirm
+
+
+def _studio_context(request: Request) -> dict:
+    """Shared context for the Studio board and its Activity sub-view. Both render
+    from the same pipeline + needs-attention computation: the board template reads
+    the project/stage subset, the activity template the strips + sparklines. Kept
+    as one assembler so the "X needs action" badge on the board and the strips it
+    links to can never drift out of sync — each strip is one _ctx_* helper.
+
+    Two clocks: the financial overdue boundary uses _today() (the monkeypatchable
+    canonical studio clock); the activity/calendar strips use dt.date.today()."""
+    today_iso = _today().isoformat()
+    today = dt.date.today()
     return {
-        "projects": projects,
         "statuses": PROJECT_STATUSES,
-        "counts": counts,
         "stale_days": STALE_DAYS,
-        "outstanding": outstanding,
-        "inquiries": inquiries,
-        "inquiries_archived": inquiries_archived,
-        "licenses_expiring": licenses_expiring,
-        "retainer_drafts": retainer_drafts,
-        "quota_behind": quota_behind,
-        "content_due": content_due,
-        "press_confirm": press_confirm,
-        "upcoming": upcoming,
-        "proofing_waiting": list(waiting.values()),
-        "conflicts": conflicts,
-        "overdue_by_stage": overdue_by_stage,
-        "sparklines": sparklines,
-        "spark_days": day_strs,
-        "spark_window": spark_days_window,
-        "stage_value": stage_value,
-        "pipeline_value_total": pipeline_value_total,
-        "booked_value": booked_value,
+        **_ctx_pipeline(today_iso),
+        "outstanding": common.open_invoice_balance(),
+        **_ctx_inquiries(),
+        "licenses_expiring": _ctx_licenses_expiring(),
+        "retainer_drafts": _ctx_retainer_drafts(),
+        **_ctx_sparklines(request, today),
+        "upcoming": _ctx_upcoming(),
+        "proofing_waiting": _ctx_proofing(),
+        "conflicts": _ctx_conflicts(),
+        "quota_behind": _ctx_quota_behind(today),
+        "content_due": _ctx_content_due(today),
+        "press_confirm": _ctx_press_confirm(),
     }
 
 
