@@ -92,10 +92,7 @@ def _parse_form(form) -> dict:
 
 
 def get_press(press_id: int) -> "db.sqlite3.Row":
-    p = db.one("SELECT * FROM press WHERE id=? AND deleted_at IS NULL", (press_id,))
-    if not p:
-        raise HTTPException(status_code=404)
-    return p
+    return db.get_or_404("SELECT * FROM press WHERE id=? AND deleted_at IS NULL", (press_id,))
 
 
 def press_for_license(license_row) -> list[dict]:

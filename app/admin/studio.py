@@ -44,21 +44,15 @@ KIT_POSITIONS = {"tl", "tc", "tr", "ml", "c", "mr", "bl", "bc", "br"}
 
 
 def get_client(client_id: int) -> "db.sqlite3.Row":
-    c = db.one("SELECT * FROM clients WHERE id=?", (client_id,))
-    if not c:
-        raise HTTPException(status_code=404)
-    return c
+    return db.get_or_404("SELECT * FROM clients WHERE id=?", (client_id,))
 
 
 def get_project(project_id: int) -> "db.sqlite3.Row":
-    p = db.one(
+    return db.get_or_404(
         """SELECT p.*, c.name AS client_name, c.company, c.email AS client_email
                   FROM projects p JOIN clients c ON c.id=p.client_id WHERE p.id=?""",
         (project_id,),
     )
-    if not p:
-        raise HTTPException(status_code=404)
-    return p
 
 
 def _today() -> dt.date:

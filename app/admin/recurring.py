@@ -32,10 +32,9 @@ CAPTION_STATUSES = ("draft", "approved")
 
 
 def get_plan(plan_id: int) -> "db.sqlite3.Row":
-    d = db.one("SELECT * FROM recurring_plans WHERE id=? AND deleted_at IS NULL", (plan_id,))
-    if not d:
-        raise HTTPException(status_code=404)
-    return d
+    return db.get_or_404(
+        "SELECT * FROM recurring_plans WHERE id=? AND deleted_at IS NULL", (plan_id,)
+    )
 
 
 def _period(today: dt.date | None = None) -> str:

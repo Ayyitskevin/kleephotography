@@ -39,10 +39,7 @@ PORTFOLIO_TAG_SUGGESTIONS = [
 
 
 def get_gallery(gallery_id: int) -> "db.sqlite3.Row":
-    g = db.one("SELECT * FROM galleries WHERE id=?", (gallery_id,))
-    if not g:
-        raise HTTPException(status_code=404)
-    return g
+    return db.get_or_404("SELECT * FROM galleries WHERE id=?", (gallery_id,))
 
 
 @router.get("")
@@ -542,10 +539,9 @@ async def add_section(gallery_id: int, name: str = Form(...)):
 
 
 def get_section(gallery_id: int, section_id: int) -> "db.sqlite3.Row":
-    s = db.one("SELECT * FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id))
-    if not s:
-        raise HTTPException(status_code=404)
-    return s
+    return db.get_or_404(
+        "SELECT * FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id)
+    )
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/rename")
