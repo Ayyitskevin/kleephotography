@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Red
 
 from .. import config, db, security
 from ..render import templates
+from . import common
 
 router = APIRouter(prefix="/admin/financials", dependencies=[Depends(security.require_admin)])
 
@@ -43,10 +44,6 @@ def _usd(cents: int) -> str:
 
 def _usd0(cents: int) -> str:
     return "$" + f"{round(cents / 100):,}"
-
-
-def _cents(usd: str) -> int:
-    return round(float(usd.replace("$", "").replace(",", "")) * 100)
 
 
 def _initials(name: str) -> str:
@@ -115,16 +112,6 @@ def _outstanding_rows(start: str, end: str):
     )
 
 
-def _open_total() -> dict:
-    """All currently-open invoices (not range-bound) — what's owed right now."""
-    return db.one(
-        """SELECT COUNT(*) AS n, COALESCE(SUM(CASE
-             WHEN status='deposit_paid' THEN total_cents - deposit_cents
-             ELSE total_cents END), 0) AS cents
-           FROM invoices WHERE status IN ('sent','viewed','deposit_paid')"""
-    )
-
-
 def _ledger(start: str, end: str) -> list[dict]:
     out = []
     for r in _collected_rows(start, end):
@@ -174,7 +161,7 @@ async def income(request: Request, range: str = "quarter"):
            FROM payments WHERE created_at >= ? AND created_at < ?""",
         (start, end),
     )
-    openv = _open_total()
+    openv = common.open_invoice_balance()
     rows = _ledger(start, end)
 
     cards = [
@@ -240,8 +227,8 @@ async def income_csv(
     if fmt == "summary":
         paid = sum(1 for r in rows if r["st"] == "paid")
         out_n = sum(1 for r in rows if r["st"] == "out")
-        paid_c = sum(_cents(r["amount"]) for r in rows if r["st"] == "paid")
-        out_c = sum(_cents(r["amount"]) for r in rows if r["st"] == "out")
+        paid_c = sum(_to_cents(r["amount"]) for r in rows if r["st"] == "paid")
+        out_c = sum(_to_cents(r["amount"]) for r in rows if r["st"] == "out")
         return (
             "category,count,amount_usd\n"
             f"Paid,{paid},{paid_c / 100:.2f}\n"

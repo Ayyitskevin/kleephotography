@@ -168,12 +168,7 @@ def _studio_context(request: Request) -> dict:
     for p in projects:
         if p["n_overdue"]:
             overdue_by_stage[p["status"]] = overdue_by_stage.get(p["status"], 0) + 1
-    outstanding = db.one(
-        """SELECT COUNT(*) AS n, COALESCE(SUM(CASE
-             WHEN status='deposit_paid' THEN total_cents - deposit_cents
-             ELSE total_cents END), 0) AS cents
-           FROM invoices WHERE status IN ('sent','viewed','deposit_paid')"""
-    )
+    outstanding = common.open_invoice_balance()
     inquiries = db.all_(
         "SELECT * FROM inquiries "
         "WHERE converted_at IS NULL AND dismissed_at IS NULL "

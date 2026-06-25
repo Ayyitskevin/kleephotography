@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
 from .. import config, db, jobs, security
 from ..render import templates
+from . import common
 
 log = logging.getLogger("mise.admin.activity")
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -50,12 +51,7 @@ async def home(request: Request):
     new_inquiries = db.one(
         "SELECT COUNT(*) AS n FROM inquiries WHERE converted_at IS NULL AND dismissed_at IS NULL"
     )["n"]
-    outstanding = db.one(
-        """SELECT COUNT(*) AS n, COALESCE(SUM(CASE
-             WHEN status='deposit_paid' THEN total_cents - deposit_cents
-             ELSE total_cents END), 0) AS cents
-           FROM invoices WHERE status IN ('sent','viewed','deposit_paid')"""
-    )
+    outstanding = common.open_invoice_balance()
     upcoming_n = db.one(
         """SELECT COUNT(*) AS n FROM projects
            WHERE status != 'archived' AND shoot_date IS NOT NULL

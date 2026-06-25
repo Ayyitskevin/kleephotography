@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from .. import db, security
 from ..render import templates
+from . import common
 from .financials import _RANGE_LABELS, _RANGES, _range_bounds, _usd0
 from .studio import PROJECT_STATUSES
 
@@ -91,12 +92,7 @@ async def reports(request: Request, period: str = Query("ytd", alias="range")):
            FROM payments WHERE created_at >= ? AND created_at < ?""",
         (r_start, r_end),
     )
-    outstanding = db.one(
-        """SELECT COUNT(*) AS n, COALESCE(SUM(CASE
-             WHEN status='deposit_paid' THEN total_cents - deposit_cents
-             ELSE total_cents END), 0) AS cents
-           FROM invoices WHERE status IN ('sent','viewed','deposit_paid')"""
-    )
+    outstanding = common.open_invoice_balance()
     booked = db.one(
         """SELECT COUNT(*) AS n, COALESCE(SUM(total_cents), 0) AS cents
            FROM invoices

@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, security
 from ..render import templates
+from . import common
 from .contracts import render_template
 from .studio import get_project
 
@@ -246,7 +247,7 @@ def parse_items(form) -> tuple[str, int]:
             continue
         try:
             qty = max(1, int(form.get(f"item_qty_{i}") or "1"))
-            unit_cents = round(float(form.get(f"item_price_{i}") or "0") * 100)
+            unit_cents = common.parse_form_cents(form, f"item_price_{i}")
         except ValueError:
             raise HTTPException(status_code=400, detail=f"bad numbers on row {i + 1}")
         items.append({"label": label, "qty": qty, "unit_cents": unit_cents})

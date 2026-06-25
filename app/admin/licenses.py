@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import audit, clients, config, db, pricing, security
 from ..render import templates
 from ..usage_vocab import CHANNELS
+from . import common
 from .studio import get_client
 
 log = logging.getLogger("mise.admin.licenses")
@@ -145,7 +146,7 @@ def _parse_form(form) -> dict:
 
     def cents(key: str) -> int:
         try:
-            return round(float(form.get(key) or "0") * 100)
+            return common.parse_form_cents(form, key)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"bad amount: {key}")
 

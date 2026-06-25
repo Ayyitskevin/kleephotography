@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, jobs, security
 from ..render import templates
+from . import common
 from .proposals import MAX_ITEM_ROWS, parse_items
 from .studio import get_project
 
@@ -61,7 +62,7 @@ async def update_invoice(request: Request, invoice_id: int):
     form = await request.form()
     items_json, total = parse_items(form)
     try:
-        deposit = round(float(form.get("deposit") or "0") * 100)
+        deposit = common.parse_form_cents(form, "deposit")
     except ValueError:
         raise HTTPException(status_code=400, detail="bad deposit amount")
     if deposit < 0 or deposit > total:

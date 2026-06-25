@@ -13,6 +13,24 @@ _STATUS_STYLE = {
 }
 
 
+def parse_form_cents(form, key: str) -> int:
+    """Form dollar field → integer cents (empty/missing → 0). Raises ValueError on
+    non-numeric input so each route can 400 with its own field-specific message."""
+    return round(float(form.get(key) or "0") * 100)
+
+
+def open_invoice_balance():
+    """Count + total cents still owed across all currently-open invoices — the AR
+    figure behind the studio/reports/activity/financials 'outstanding' widgets.
+    A deposit_paid invoice owes (total - deposit); sent/viewed owe the full total."""
+    return db.one(
+        """SELECT COUNT(*) AS n, COALESCE(SUM(CASE
+             WHEN status='deposit_paid' THEN total_cents - deposit_cents
+             ELSE total_cents END), 0) AS cents
+           FROM invoices WHERE status IN ('sent','viewed','deposit_paid')"""
+    )
+
+
 def dir_size(path: Path) -> int:
     if not path.exists():
         return 0
