@@ -126,10 +126,17 @@
           {% else %}
           <div class="gd-tile-ph">{{ a.status }}</div>
           {% endif %}
+          {% if a.id in hero_asset_ids %}<span class="gd-tile-hero" title="Argus hero pick">&#9733;</span>{% endif %}
           {% if a.n_fav %}<span class="gd-tile-fav" title="{{ a.n_fav }} client favorite{{ '' if a.n_fav == 1 else 's' }}">&#9829;{% if a.n_fav > 1 %} {{ a.n_fav }}{% endif %}</span>{% endif %}
           {% if a.kind == 'video' %}<span class="gd-tile-vid" title="Video">&#9658;</span>{% endif %}
           <figcaption class="gd-ov">
             <span class="gd-ov-name">{{ a.filename }}</span>
+            {% if a.argus_keeper_score is not none %}
+            <span class="gd-ov-score" title="Argus keeper score">{{ '%.0f'|format(a.argus_keeper_score * 100) }}%</span>
+            {% endif %}
+            {% if a.argus_alt_text %}
+            <span class="gd-ov-alt" title="{{ a.argus_alt_text }}">{{ a.argus_alt_text[:72] }}{% if a.argus_alt_text|length > 72 %}…{% endif %}</span>
+            {% endif %}
           </figcaption>
           <details class="gd-manage">
             <summary class="gd-gear" title="Manage this file">&#9881;</summary>
@@ -267,6 +274,8 @@
             {% elif g.argus_last_at %}
             <p class="gd-pipeline-detail muted">
               {{ g.argus_last_at }}
+              {% if g.argus_analyzed_count %} · {{ g.argus_analyzed_count }} photo{{ '' if g.argus_analyzed_count == 1 else 's' }} synced{% endif %}
+              {% if hero_asset_ids %} · {{ hero_asset_ids|length }} hero{{ '' if hero_asset_ids|length == 1 else 's' }}{% endif %}
               {% set argus_review = g.argus_last_review_url or (argus_url ~ '/runs/' ~ g.argus_last_run_id if g.argus_last_run_id else (argus_url ~ '/ui/jobs/' ~ g.argus_last_job_id if g.argus_last_job_id else '')) %}
               {% if argus_review %}
               · <a href="{{ argus_review }}" target="_blank" rel="noopener">view analysis</a>
