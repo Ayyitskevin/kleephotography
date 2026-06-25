@@ -1337,7 +1337,9 @@ def _stripe_sig(payload: bytes, secret: str) -> str:
     return f"t={t},v1={mac}"
 
 
-def _checkout_event(event_id, invoice_id, kind, amount):
+def _checkout_event(
+    event_id, invoice_id, kind, amount, payment_status="paid", etype="checkout.session.completed"
+):
     import json as _json
 
     return _json.dumps(
@@ -1345,12 +1347,12 @@ def _checkout_event(event_id, invoice_id, kind, amount):
             "id": event_id,
             "object": "event",
             "api_version": "2024-06-20",
-            "type": "checkout.session.completed",
+            "type": etype,
             "data": {
                 "object": {
                     "id": f"cs_{event_id}",
                     "object": "checkout.session",
-                    "payment_status": "paid",
+                    "payment_status": payment_status,
                     "amount_total": amount,
                     "metadata": {"invoice_id": str(invoice_id), "kind": kind},
                 }
@@ -9336,3 +9338,124 @@ def test_platekit_bridge_disabled_is_dormant(monkeypatch):
     assert state["enabled"] is False
     assert state["slug"] == "blue-plate"
     assert state["packs"] == []
+
+
+# ── Stripe webhook: project advance + guard rails ────────────────────────────
+# test_invoice_lifecycle (above) already drives the happy path with a REAL HMAC
+# signature: deposit→deposit_paid, idempotent retry, balance→paid, bad-sig 400,
+# disabled 503. What it never asserts is the side of the webhook that moves the
+# FUNNEL — the project advance — plus three guard rails a forged-or-replayed event
+# could trip. These seed a throwaway client→project→invoice so they can pin the
+# project status before and after, reusing the same _checkout_event/_stripe_sig
+# path (no parallel monkeypatched harness). jobs.enqueue is stubbed so the Notion
+# sync side-job can't race the per-test cleanup.
+
+
+def _seed_money_chain(*, project_status, total=90000, deposit=0):
+    """A throwaway client → project → invoice chain. project_status pins where the
+    funnel sits before the payment lands, so a test can assert the advance — or,
+    deliberately, the non-advance. Returns (client_id, project_id, invoice_id)."""
+    cid = db.run(
+        "INSERT INTO clients (name, email) VALUES (?,?)", ("Webhook Diner", "wh@diner.test")
+    )
+    pid = db.run(
+        "INSERT INTO projects (client_id, title, status) VALUES (?,?,?)",
+        (cid, "Tasting menu shoot", project_status),
+    )
+    iid = db.run(
+        "INSERT INTO invoices (project_id, slug, title, total_cents, deposit_cents, status) "
+        "VALUES (?,?,?,?,?,?)",
+        (pid, f"wh-{pid}", "Tasting invoice", total, deposit, "sent"),
+    )
+    return cid, pid, iid
+
+
+def _cleanup_money_chain(cid, pid, iid):
+    db.run("DELETE FROM payments WHERE invoice_id=?", (iid,))
+    db.run("DELETE FROM invoices WHERE id=?", (iid,))
+    db.run("DELETE FROM projects WHERE id=?", (pid,))
+    db.run("DELETE FROM clients WHERE id=?", (cid,))
+
+
+def _post_signed(client, body):
+    return client.post(
+        "/webhooks/stripe",
+        content=body,
+        headers={"stripe-signature": _stripe_sig(body, "whsec_test")},
+    )
+
+
+def test_webhook_payment_advances_project_to_retainer_paid(client, monkeypatch):
+    # The funnel's money gate: a payment on a pre-payment project must move it to
+    # retainer_paid. The lifecycle test asserts the invoice side of this event;
+    # nothing asserts the project side, so a broken advance would ship silently.
+    from app import config
+    from app.public import pay
+
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    r = _post_signed(client, _checkout_event("evt_adv_1", iid, "full", 90000))
+    assert r.status_code == 200 and r.json() == {"ok": True}
+    assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "paid"
+    assert db.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "retainer_paid"
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_does_not_rewind_a_later_stage_project(client, monkeypatch):
+    # The advance is forward-only — it fires only from the four pre-payment funnel
+    # stages. A late or second-channel payment on a project already in session
+    # planning must record the payment + settle the invoice but leave the project
+    # where it is, never drag it back to retainer_paid.
+    from app import config
+    from app.public import pay
+
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    cid, pid, iid = _seed_money_chain(project_status="session_planning", total=90000)
+    r = _post_signed(client, _checkout_event("evt_norewind_1", iid, "full", 90000))
+    assert r.status_code == 200 and r.json() == {"ok": True}
+    assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "paid"
+    assert db.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "session_planning"
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_ach_pending_records_nothing(client, monkeypatch):
+    # ACH checkouts complete with payment_status != 'paid' and settle later via the
+    # async event. Pending must be a no-op: no payment row, invoice untouched,
+    # project not advanced — otherwise the studio books money that has not cleared.
+    from app import config
+    from app.public import pay
+
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    r = _post_signed(
+        client, _checkout_event("evt_ach_1", iid, "full", 90000, payment_status="unpaid")
+    )
+    assert r.status_code == 200 and r.json() == {"ok": True, "pending": True}
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
+    assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "sent"
+    assert db.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "proposal_sent"
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_unknown_invoice_404(client, monkeypatch):
+    # A paid event whose metadata points at no invoice must fail loud (404 → Stripe
+    # retries + it surfaces in logs), not silently swallow a real payment.
+    from app import config
+
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    r = _post_signed(client, _checkout_event("evt_missing_1", 999999, "full", 90000))
+    assert r.status_code == 404
+
+
+def test_webhook_ignores_unrelated_event_type(client, monkeypatch):
+    # A correctly-signed but irrelevant event type is acknowledged and ignored —
+    # never mistaken for a payment.
+    from app import config
+
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    body = _checkout_event("evt_other_1", 1, "full", 1, etype="payment_intent.created")
+    r = _post_signed(client, body)
+    assert r.status_code == 200 and r.json()["ignored"] == "payment_intent.created"
