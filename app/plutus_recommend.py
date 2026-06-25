@@ -31,8 +31,10 @@ def _record(
     status: str,
     run_id: int | None = None,
     error: str | None = None,
-    offer_url: str | None = None,
+    review_url: str | None = None,
+    pitch_url: str | None = None,
 ) -> None:
+    # plutus_last_offer_url stores review_url for backward-compatible schema
     db.run(
         """UPDATE galleries SET plutus_last_run_id=?, plutus_last_status=?,
               plutus_last_error=?, plutus_last_offer_url=?, plutus_last_at=datetime('now')
@@ -41,10 +43,11 @@ def _record(
             run_id,
             status,
             (error or None)[:500] if error else None,
-            (offer_url or None)[:500] if offer_url else None,
+            (review_url or None)[:500] if review_url else None,
             gallery_id,
         ),
     )
+
 
 
 def trigger_gallery_recommend(gallery_id: int) -> dict:
@@ -109,13 +112,15 @@ def apply_callback(gallery_id: int, payload: dict) -> None:
     status = (payload.get("status") or "done").strip()
     run_id = payload.get("run_id")
     error = payload.get("error")
-    offer_url = payload.get("offer_url")
+    review_url = payload.get("review_url") or payload.get("offer_url")
+    pitch_url = payload.get("pitch_url")
     if status == "done" and run_id is not None:
         _record(
             gallery_id,
             status="done",
             run_id=int(run_id),
-            offer_url=str(offer_url) if offer_url else None,
+            review_url=str(review_url) if review_url else None,
+            pitch_url=str(pitch_url) if pitch_url else None,
         )
         return
     _record(
@@ -123,7 +128,8 @@ def apply_callback(gallery_id: int, payload: dict) -> None:
         status="error" if status != "done" else "done",
         run_id=int(run_id) if run_id is not None else None,
         error=str(error) if error else None,
-        offer_url=str(offer_url) if offer_url else None,
+        review_url=str(review_url) if review_url else None,
+        pitch_url=str(pitch_url) if pitch_url else None,
     )
 
 
@@ -146,5 +152,6 @@ def run_for_gallery(gallery_id: int) -> None:
         gallery_id,
         status="done",
         run_id=int(result["run_id"]),
-        offer_url=result.get("offer_url"),
+        review_url=result.get("review_url"),
+        pitch_url=result.get("pitch_url"),
     )

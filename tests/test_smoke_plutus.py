@@ -41,7 +41,8 @@ def test_run_for_gallery_records_done(tmp_path, monkeypatch):
     payload = {
         "run_id": 12,
         "bundles": [{"id": "wall-hero"}],
-        "offer_url": "https://plutus.test/store/studio/offer/abc",
+        "review_url": "https://plutus.test/runs/12",
+        "pitch_url": "https://plutus.test/runs/12/pitch.txt",
     }
 
     class _Resp:
@@ -62,10 +63,10 @@ def test_run_for_gallery_records_done(tmp_path, monkeypatch):
     )
     assert row["plutus_last_run_id"] == 12
     assert row["plutus_last_status"] == "done"
-    assert row["plutus_last_offer_url"] == payload["offer_url"]
+    assert row["plutus_last_offer_url"] == payload["review_url"]
 
 
-def test_apply_callback_records_offer_url(tmp_path, monkeypatch):
+def test_apply_callback_records_review_url(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin, type, published) VALUES (?,?,?,?,1)",
@@ -76,11 +77,12 @@ def test_apply_callback_records_offer_url(tmp_path, monkeypatch):
         {
             "status": "done",
             "run_id": 9,
-            "offer_url": "https://plutus.test/store/flow/offer/tok",
+            "review_url": "https://plutus.test/runs/9",
+            "pitch_url": "https://plutus.test/runs/9/pitch.txt",
         },
     )
     row = db.one("SELECT plutus_last_offer_url FROM galleries WHERE id=?", (gid,))
-    assert row["plutus_last_offer_url"] == "https://plutus.test/store/flow/offer/tok"
+    assert row["plutus_last_offer_url"] == "https://plutus.test/runs/9"
 
 
 def test_argus_callback_enqueues_plutus(tmp_path, monkeypatch):

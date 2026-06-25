@@ -279,7 +279,7 @@
       {% if plutus_enabled and g.published and not is_drop %}
       <section class="gd-argus" style="margin-top:1rem;padding:1rem;border:1px solid #e8e4d8;border-radius:8px;background:#faf8f4">
         <div class="gd-proof-head" style="margin-bottom:0.5rem">
-          <h3 style="margin:0">Plutus print upsell</h3>
+          <h3 style="margin:0">Print &amp; album bundles</h3>
           {% if g.plutus_last_status %}
           <span class="gd-proof-n">{{ g.plutus_last_status }}</span>
           {% endif %}
@@ -291,11 +291,10 @@
         {% elif g.plutus_last_at %}
         <p class="muted" style="margin:0 0 0.6rem">Last run {{ g.plutus_last_at }}
           {% if g.plutus_last_run_id %}
-          · <a href="{{ plutus_url }}/runs/{{ g.plutus_last_run_id }}" target="_blank" rel="noopener">view bundles</a>
-          · <a href="{{ plutus_url }}/runs/{{ g.plutus_last_run_id }}/pitch.txt" target="_blank" rel="noopener">client pitch</a>
-          {% endif %}
-          {% if g.plutus_last_offer_url %}
-          · <a href="{{ g.plutus_last_offer_url }}" target="_blank" rel="noopener">client offer</a>
+          · <a href="{{ plutus_url }}/runs/{{ g.plutus_last_run_id }}" target="_blank" rel="noopener">review bundles</a>
+          · <a href="{{ plutus_url }}/runs/{{ g.plutus_last_run_id }}/pitch.txt" target="_blank" rel="noopener">copy client pitch</a>
+          {% elif g.plutus_last_offer_url %}
+          · <a href="{{ g.plutus_last_offer_url }}" target="_blank" rel="noopener">review bundles</a>
           {% endif %}
         </p>
         {% else %}
