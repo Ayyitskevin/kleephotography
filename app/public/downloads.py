@@ -3,7 +3,6 @@
 import hashlib
 import logging
 import re
-import zipfile
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -35,16 +34,15 @@ def _email_required(g) -> bool:
 
 def _store_zip(gallery_id: int, assets, out: Path) -> None:
     src_dir = config.MEDIA_DIR / str(gallery_id) / "original"
-    tmp = out.with_suffix(".part")
-    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as zf:
-        names: set[str] = set()
-        for a in assets:
-            name = a["filename"]
-            if name in names:
-                name = f"{Path(name).stem}_{a['id']}{Path(name).suffix}"
-            names.add(name)
-            zf.write(src_dir / a["stored"], arcname=name)
-    tmp.rename(out)
+    names: set[str] = set()
+    entries = []
+    for a in assets:
+        name = a["filename"]
+        if name in names:
+            name = f"{Path(name).stem}_{a['id']}{Path(name).suffix}"
+        names.add(name)
+        entries.append((src_dir / a["stored"], name))
+    jobs.build_zip(out, entries)
 
 
 def _target(slug: str, asset_id: int | None, fav: int | None, section: int | None) -> str:

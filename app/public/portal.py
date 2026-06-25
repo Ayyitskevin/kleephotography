@@ -5,7 +5,6 @@ import hashlib
 import logging
 import mimetypes
 import re
-import zipfile
 from pathlib import Path
 from urllib.parse import quote
 
@@ -238,16 +237,15 @@ async def crops_zip(request: Request, slug: str):
     key = hashlib.sha256("|".join(f"{a['id']}:{r}" for a, r, _ in files).encode()).hexdigest()[:8]
     out = config.ZIP_DIR / f"p{p['id']}-{key}.zip"
     if not out.is_file():
-        part = out.with_suffix(".part")
         seen: set[str] = set()
-        with zipfile.ZipFile(part, "w", zipfile.ZIP_STORED) as zf:
-            for a, ratio, path in files:
-                arc = f"{Path(a['filename']).stem}_{ratio}.jpg"
-                if arc in seen:
-                    arc = f"{Path(a['filename']).stem}_{ratio}_{a['id']}.jpg"
-                seen.add(arc)
-                zf.write(path, arc)
-        part.rename(out)
+        entries = []
+        for a, ratio, path in files:
+            arc = f"{Path(a['filename']).stem}_{ratio}.jpg"
+            if arc in seen:
+                arc = f"{Path(a['filename']).stem}_{ratio}_{a['id']}.jpg"
+            seen.add(arc)
+            entries.append((path, arc))
+        jobs.build_zip(out, entries)
         for old in config.ZIP_DIR.glob(f"p{p['id']}-*.zip"):
             if old != out:
                 old.unlink(missing_ok=True)

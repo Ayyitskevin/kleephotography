@@ -104,6 +104,17 @@ def zip_path(gallery_id: int, rev: int) -> Path:
     return config.ZIP_DIR / f"g{gallery_id}-r{rev}.zip"
 
 
+def build_zip(out: Path, entries) -> None:
+    """Atomically write a STORED zip (media is already compressed) at `out` from an
+    iterable of (source_path, archive_name) pairs. Goes via a .part temp + rename so
+    a reader never sees a half-built archive. Callers own arcname de-duplication."""
+    tmp = out.with_suffix(".part")
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as zf:
+        for src, arc in entries:
+            zf.write(src, arcname=arc)
+    tmp.rename(out)
+
+
 def _h_zip(p: dict) -> None:
     """Full-gallery ZIP of originals — STORE (media doesn't deflate), atomic rename."""
     gid, rev = p["gallery_id"], p["rev"]
@@ -112,16 +123,15 @@ def _h_zip(p: dict) -> None:
         return
     assets = db.all_("SELECT * FROM assets WHERE gallery_id=? AND status='ready'", (gid,))
     src_dir = _gallery_dirs(gid)["original"]
-    tmp = final.with_suffix(".part")
-    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as zf:
-        names: set[str] = set()
-        for a in assets:
-            name = a["filename"]
-            if name in names:
-                name = f"{Path(name).stem}_{a['id']}{Path(name).suffix}"
-            names.add(name)
-            zf.write(src_dir / a["stored"], arcname=name)
-    tmp.rename(final)
+    names: set[str] = set()
+    entries = []
+    for a in assets:
+        name = a["filename"]
+        if name in names:
+            name = f"{Path(name).stem}_{a['id']}{Path(name).suffix}"
+        names.add(name)
+        entries.append((src_dir / a["stored"], name))
+    build_zip(final, entries)
     for old in config.ZIP_DIR.glob(f"g{gid}-r*.zip"):
         if old != final:
             old.unlink(missing_ok=True)
