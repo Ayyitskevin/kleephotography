@@ -27,14 +27,6 @@
       {% if featured[0].portfolio_tag %}
       <figcaption>{{ featured[0].portfolio_tag|capitalize }}</figcaption>
       {% endif %}
-      {% if hero_reel %}
-      <div class="hero-reel" data-parallax="-0.06">
-        <video autoplay muted loop playsinline preload="metadata"
-               poster="/site/poster/{{ hero_reel.id }}">
-          <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
-        </video>
-      </div>
-      {% endif %}
       {% endif %}
     </figure>
   </div>
