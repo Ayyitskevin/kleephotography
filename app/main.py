@@ -56,7 +56,8 @@ log = logging.getLogger("mise.app")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.migrate()
-    bootstrap.ensure_public_showcase()
+    if config.SHOWCASE_SEED:
+        bootstrap.ensure_public_showcase()
     jobs.start()
     scheduler.start()
     log.info("Mise up on :%s · data=%s", config.PORT, config.DATA_DIR)

@@ -55,6 +55,10 @@ PLAUSIBLE_DOMAIN = os.environ.get("MISE_PLAUSIBLE_DOMAIN", "")  # e.g. kleephoto
 # Sample client gallery for prospects (/g/{slug}). Slug auto-detected when unset.
 DEMO_GALLERY_SLUG = os.environ.get("MISE_DEMO_GALLERY_SLUG", "")
 DEMO_GALLERY_PIN = os.environ.get("MISE_DEMO_GALLERY_PIN", "")  # show on site when set
+# Idempotent demo-showcase backfill so a fresh prototype site isn't blank (see
+# bootstrap.ensure_public_showcase). Off in the test suite so empty-baseline
+# assertions exercise the real empty→populated path instead of seeded rows.
+SHOWCASE_SEED = _b("MISE_SHOWCASE_SEED", "true")
 
 # Business-local timezone for the scheduler. Availability is authored in this
 # zone; booking instants are stored UTC and converted per-day (DST-safe). Change

@@ -378,16 +378,21 @@ async def update_gallery(
     old = get_gallery(gallery_id)
     if not (pin.isdigit() and len(pin) == 4):
         raise HTTPException(status_code=400, detail="PIN must be 4 digits")
+    new_exp = expires_at.strip() or None
+    # Changing the expiry date re-arms the one-shot expiry reminder so the new
+    # date re-reminds the client (see gallery_reminders); an unchanged date keeps it.
+    reminded_expiry = 0 if new_exp != old["expires_at"] else old["reminded_expiry"]
     db.run(
         """UPDATE galleries SET title=?, client_name=?, pin=?, expires_at=?,
               published=?, client_id=?, project_id=?, captions=?,
-              cs_published=?, cs_tagline=?, cs_brief=?, cs_credits=?, cs_location=?
+              cs_published=?, cs_tagline=?, cs_brief=?, cs_credits=?, cs_location=?,
+              reminded_expiry=?
               WHERE id=?""",
         (
             title.strip(),
             client_name.strip() or None,
             pin,
-            expires_at.strip() or None,
+            new_exp,
             1 if published else 0,
             client_id,
             project_id,
@@ -397,6 +402,7 @@ async def update_gallery(
             cs_brief.strip() or None,
             cs_credits.strip() or None,
             cs_location.strip() or None,
+            reminded_expiry,
             gallery_id,
         ),
     )

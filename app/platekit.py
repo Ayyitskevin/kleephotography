@@ -111,9 +111,7 @@ def packs_for_client(client, *, include_drafts: bool = False) -> dict:
         log.warning("Platekit unreachable for slug=%s: %s", slug, e)
         return _empty(slug=slug, status="error", message="Platekit is unreachable")
     except (ValueError, json.JSONDecodeError):
-        return _empty(
-            slug=slug, status="error", message="Platekit returned an unreadable response"
-        )
+        return _empty(slug=slug, status="error", message="Platekit returned an unreadable response")
 
     return {
         "enabled": True,

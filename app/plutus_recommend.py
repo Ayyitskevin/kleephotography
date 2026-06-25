@@ -68,7 +68,6 @@ def _bundle_meta(payload: dict) -> tuple[int | None, int | None]:
     return count, int(cents) if cents is not None else None
 
 
-
 def trigger_gallery_recommend(gallery_id: int) -> dict:
     if not is_enabled():
         raise PlutusRecommendError("Plutus is not configured")

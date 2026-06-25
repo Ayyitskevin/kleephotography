@@ -158,7 +158,7 @@ def test_run_for_gallery_records_sync_run(tmp_path, monkeypatch):
 
 
 def test_sync_argus_enqueues_plutus(tmp_path, monkeypatch):
-    from app import jobs, plutus_recommend
+    from app import jobs
 
     _configure_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")

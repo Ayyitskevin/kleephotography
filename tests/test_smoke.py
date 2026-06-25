@@ -558,7 +558,7 @@ def test_video_comments_flow(admin):
 
         # client posts a top-level note anchored at 12.5s → persists with that timecode
         r = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "Tighten this cut", "timecode": 12.5},
         )
         assert r.status_code == 200
@@ -570,7 +570,7 @@ def test_video_comments_flow(admin):
 
         # a reply inherits the parent's timecode (ignores any posted timecode)
         r = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "agreed", "parent_id": top["id"], "timecode": 99},
         )
         assert r.status_code == 200
@@ -578,35 +578,37 @@ def test_video_comments_flow(admin):
         assert reply["timecode"] == 12.5  # inherited, not 99
 
         # GET returns the visible thread (both rows), ordered for display
-        got = pub.get("/g/{g['slug']}/comments/{vid['id']}").json()
+        got = pub.get(f"/g/{g['slug']}/comments/{vid['id']}").json()
         assert {c["id"] for c in got} == {top["id"], reply["id"]}
 
         # gate: empty body 400, bogus reply target 400, photo/asset are not video → 404
         assert (
-            pub.post("/g/{g['slug']}/comments/{vid['id']}", data={"body": "   "}).status_code == 400
+            pub.post(f"/g/{g['slug']}/comments/{vid['id']}", data={"body": "   "}).status_code
+            == 400
         )
         assert (
             pub.post(
-                "/g/{g['slug']}/comments/{vid['id']}", data={"body": "x", "parent_id": 999999}
+                f"/g/{g['slug']}/comments/{vid['id']}", data={"body": "x", "parent_id": 999999}
             ).status_code
             == 400
         )
-        assert pub.get("/g/{g['slug']}/comments/{photo['id']}").status_code == 404
+        assert pub.get(f"/g/{g['slug']}/comments/{photo['id']}").status_code == 404
         assert (
-            pub.post("/g/{g['slug']}/comments/{photo['id']}", data={"body": "x"}).status_code == 404
+            pub.post(f"/g/{g['slug']}/comments/{photo['id']}", data={"body": "x"}).status_code
+            == 404
         )
 
     # gate: a visitor cookie is required (no PIN → 403 on read and write)
     with TestClient(app) as anon:
-        assert anon.get("/g/{g['slug']}/comments/{vid['id']}").status_code == 403
+        assert anon.get(f"/g/{g['slug']}/comments/{vid['id']}").status_code == 403
         assert (
-            anon.post("/g/{g['slug']}/comments/{vid['id']}", data={"body": "x"}).status_code == 403
+            anon.post(f"/g/{g['slug']}/comments/{vid['id']}", data={"body": "x"}).status_code == 403
         )
 
     # admin authors a studio note + a reply; both visible in the shared thread
     assert (
         admin.post(
-            "/admin/galleries/{g['id']}/comments/{vid['id']}",
+            f"/admin/galleries/{g['id']}/comments/{vid['id']}",
             data={"body": "Color is warm here", "timecode": 5},
             follow_redirects=False,
         ).status_code
@@ -618,7 +620,7 @@ def test_video_comments_flow(admin):
     assert studio and studio["timecode"] == 5.0
     assert (
         admin.post(
-            "/admin/galleries/{g['id']}/comments/{vid['id']}",
+            f"/admin/galleries/{g['id']}/comments/{vid['id']}",
             data={"body": "reply under client note", "parent_id": top["id"]},
             follow_redirects=False,
         ).status_code
@@ -633,7 +635,9 @@ def test_video_comments_flow(admin):
     audit_before = db.one("SELECT COUNT(*) AS n FROM audit_log WHERE entity_type='video_comment'")[
         "n"
     ]
-    assert admin.post("/admin/comments/{top['id']}/hide", follow_redirects=False).status_code == 303
+    assert (
+        admin.post(f"/admin/comments/{top['id']}/hide", follow_redirects=False).status_code == 303
+    )
     # top + its client reply + the admin reply under it all hidden together
     visible = db.all_(
         "SELECT id FROM video_comments WHERE asset_id=? AND deleted_at IS NULL", (vid["id"],)
@@ -649,7 +653,7 @@ def test_video_comments_flow(admin):
     # hidden comments drop from the client-facing thread too
     with TestClient(app) as pub:
         pub.post(f"/g/{g['slug']}/pin", data={"pin": "1234"}, follow_redirects=False)
-        got = pub.get("/g/{g['slug']}/comments/{vid['id']}").json()
+        got = pub.get(f"/g/{g['slug']}/comments/{vid['id']}").json()
         assert top["id"] not in {c["id"] for c in got}
 
     # bogus comment id → 404
@@ -671,17 +675,17 @@ def test_video_comment_resolve_flow(admin):
         # the wall ships the resolve filter/count UI
         assert 'class="vc-filter"' in pub.get(f"/g/{g['slug']}").text
         root = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "Re-grade the intro", "timecode": 3},
         ).json()[0]
         # a new comment is born 'open' and the status field surfaces client-side
         assert root["status"] == "open"
         pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "esp. the first shot", "parent_id": root["id"]},
         )
         sib = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "Audio dips at the end", "timecode": 20},
         ).json()
         sibling = next(c for c in sib if c["parent_id"] is None and c["id"] != root["id"])
@@ -696,7 +700,7 @@ def test_video_comment_resolve_flow(admin):
         "WHERE entity_type='video_comment' AND action='resolved'"
     )["n"]
     assert (
-        admin.post("/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
         == 303
     )
     assert (
@@ -719,22 +723,22 @@ def test_video_comment_resolve_flow(admin):
     # client thread reflects resolved status (render extends; server-proven)
     with TestClient(app) as pub:
         pub.post(f"/g/{g['slug']}/pin", data={"pin": "1234"}, follow_redirects=False)
-        got = {c["id"]: c["status"] for c in pub.get("/g/{g['slug']}/comments/{vid['id']}").json()}
+        got = {c["id"]: c["status"] for c in pub.get(f"/g/{g['slug']}/comments/{vid['id']}").json()}
         assert got[root["id"]] == "resolved" and got[reply["id"]] == "resolved"
         assert got[sibling["id"]] == "open"
 
     # illegal transitions rejected: re-resolve → 409, reopen an open one → 409
     assert (
-        admin.post("/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
         == 409
     )
     assert (
-        admin.post("/admin/comments/{sibling['id']}/reopen", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{sibling['id']}/reopen", follow_redirects=False).status_code
         == 409
     )
     # a reply (non-root) is not independently transitionable → 400
     assert (
-        admin.post("/admin/comments/{reply['id']}/resolve", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{reply['id']}/resolve", follow_redirects=False).status_code
         == 400
     )
 
@@ -743,7 +747,8 @@ def test_video_comment_resolve_flow(admin):
         "SELECT COUNT(*) AS n FROM audit_log WHERE entity_type='video_comment' AND action='open'"
     )["n"]
     assert (
-        admin.post("/admin/comments/{root['id']}/reopen", follow_redirects=False).status_code == 303
+        admin.post(f"/admin/comments/{root['id']}/reopen", follow_redirects=False).status_code
+        == 303
     )
     assert db.one("SELECT status FROM video_comments WHERE id=?", (root["id"],))["status"] == "open"
     assert (
@@ -756,11 +761,11 @@ def test_video_comment_resolve_flow(admin):
 
     # hide × status orthogonal: a hidden comment is out of the workflow → 404
     assert (
-        admin.post("/admin/comments/{sibling['id']}/hide", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{sibling['id']}/hide", follow_redirects=False).status_code
         == 303
     )
     assert (
-        admin.post("/admin/comments/{sibling['id']}/resolve", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{sibling['id']}/resolve", follow_redirects=False).status_code
         == 404
     )
 
@@ -783,15 +788,15 @@ def test_video_comment_reply_reopen_flow(admin):
     with TestClient(app) as pub:
         pub.post(f"/g/{g['slug']}/pin", data={"pin": "1234"}, follow_redirects=False)
         root = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "Re-grade the intro", "timecode": 3},
         ).json()[0]
         pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "first shot esp.", "parent_id": root["id"]},
         )
         sib = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "Audio dips at the end", "timecode": 20},
         ).json()
         sibling = next(c for c in sib if c["parent_id"] is None and c["id"] != root["id"])
@@ -799,7 +804,7 @@ def test_video_comment_reply_reopen_flow(admin):
 
     # admin resolves the root thread (cascades 'resolved' to root + child)
     assert (
-        admin.post("/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
         == 303
     )
     assert (
@@ -816,7 +821,7 @@ def test_video_comment_reply_reopen_flow(admin):
         pub.post(f"/g/{g['slug']}/pin", data={"pin": "1234"}, follow_redirects=False)
         # reply to the CHILD (depth 2) — the upward walk must still reach the root
         thread = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "still too warm", "parent_id": child["id"], "timecode": 99},
         ).json()
     new_reply = db.one("SELECT * FROM video_comments WHERE body='still too warm'")
@@ -857,7 +862,7 @@ def test_video_comment_reply_reopen_flow(admin):
     with TestClient(app) as pub:
         pub.post(f"/g/{g['slug']}/pin", data={"pin": "1234"}, follow_redirects=False)
         pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "one more on audio", "parent_id": sibling["id"]},
         )
     assert (
@@ -871,15 +876,15 @@ def test_video_comment_reply_reopen_flow(admin):
 
     # ── admin transition guards still intact after the helper extraction ─────
     assert (
-        admin.post("/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
         == 303
     )  # open → resolved
     assert (
-        admin.post("/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
         == 409
     )  # already resolved
     assert (
-        admin.post("/admin/comments/{child['id']}/reopen", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{child['id']}/reopen", follow_redirects=False).status_code
         == 400
     )  # non-root target
 
@@ -905,16 +910,16 @@ def test_video_comment_reopen_notify_flow(admin, monkeypatch):
     with TestClient(app) as pub:
         pub.post(f"/g/{g['slug']}/pin", data={"pin": "1234"}, follow_redirects=False)
         root = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "Re-grade the intro", "timecode": 3},
         ).json()[0]
         pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "first shot esp.", "parent_id": root["id"]},
         )
     child = db.one("SELECT * FROM video_comments WHERE parent_id=?", (root["id"],))
     assert (
-        admin.post("/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
         == 303
     )
     assert not pushed  # building + resolving never pushes — only a client reopen does
@@ -923,7 +928,7 @@ def test_video_comment_reopen_notify_flow(admin, monkeypatch):
     with TestClient(app) as pub:
         pub.post(f"/g/{g['slug']}/pin", data={"pin": "1234"}, follow_redirects=False)
         r = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "notify-reopen warm", "parent_id": child["id"]},
         )
         assert r.status_code == 200
@@ -938,14 +943,14 @@ def test_video_comment_reopen_notify_flow(admin, monkeypatch):
     with TestClient(app) as pub:
         pub.post(f"/g/{g['slug']}/pin", data={"pin": "1234"}, follow_redirects=False)
         pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "one more", "parent_id": new_reply["id"]},
         )
     assert len(pushed) == 1  # the thread was already open — no reopen, no push
 
     # ── a push that BLOWS UP must not break the comment or the reopen ────────
     assert (
-        admin.post("/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
+        admin.post(f"/admin/comments/{root['id']}/resolve", follow_redirects=False).status_code
         == 303
     )  # resolve again
 
@@ -960,7 +965,7 @@ def test_video_comment_reopen_notify_flow(admin, monkeypatch):
     with TestClient(app) as pub:
         pub.post(f"/g/{g['slug']}/pin", data={"pin": "1234"}, follow_redirects=False)
         r = pub.post(
-            "/g/{g['slug']}/comments/{vid['id']}",
+            f"/g/{g['slug']}/comments/{vid['id']}",
             data={"body": "still warm again", "parent_id": child["id"]},
         )
         assert r.status_code == 200  # client comment unaffected by the push failure
@@ -1031,7 +1036,7 @@ def test_expired_gallery(admin):
     # the orphan strip may mention it earlier) and read to the card's </a>.
     def card_of(gid):
         page = admin.get("/admin/galleries").text
-        start = page.rindex("/admin/galleries/{gid}")
+        start = page.rindex(f"/admin/galleries/{gid}")
         return page[start : page.index("</a>", start)]
 
     card = card_of(g["id"])
@@ -1049,7 +1054,7 @@ def test_expired_gallery(admin):
     assert ">Expiring<" not in card_of(g["id"])
 
     # delivery email prefill carries the expiry note (form renders when published)
-    assert "Available until {far}" in admin.get(f"/admin/galleries/{g['id']}").text
+    assert f"Available until {far}" in admin.get(f"/admin/galleries/{g['id']}").text
     db.run(
         "UPDATE galleries SET expires_at=NULL, published=? WHERE id=?", (g["published"], g["id"])
     )
@@ -1060,7 +1065,7 @@ def test_studio_clients_projects(admin):
     r = admin.post(
         "/admin/studio/clients",
         data={
-            "name": "Dana Che",
+            "name": "Dana Chef",
             "company": "Test Bistro",
             "email": "dana@bistro.com",
             "phone": "",
@@ -1069,11 +1074,11 @@ def test_studio_clients_projects(admin):
     )
     assert r.status_code == 303
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
-    assert c["name"] == "Dana Che" and c["company"] == "Test Bistro"
+    assert c["name"] == "Dana Chef" and c["company"] == "Test Bistro"
 
     # project
     r = admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Spring menu shoot"},
         follow_redirects=False,
     )
@@ -1083,7 +1088,7 @@ def test_studio_clients_projects(admin):
 
     # status advances and pages render
     r = admin.post(
-        "/admin/studio/projects/{p['id']}",
+        f"/admin/studio/projects/{p['id']}",
         data={
             "title": p["title"],
             "status": "proposal_sent",
@@ -1098,13 +1103,13 @@ def test_studio_clients_projects(admin):
     for url in (
         "/admin/studio",
         f"/admin/studio/clients/{c['id']}",
-        "/admin/studio/projects/{p['id']}",
+        f"/admin/studio/projects/{p['id']}",
     ):
         assert admin.get(url).status_code == 200
 
     # bad status rejected
     r = admin.post(
-        "/admin/studio/projects/{p['id']}",
+        f"/admin/studio/projects/{p['id']}",
         data={"title": p["title"], "status": "bogus"},
         follow_redirects=False,
     )
@@ -1130,7 +1135,7 @@ def test_client_activity_timeline(admin):
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
 
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Autumn menu shoot"},
         follow_redirects=False,
     )
@@ -1144,22 +1149,22 @@ def test_client_activity_timeline(admin):
     # a sent proposal produces drafted + sent events that must surface here,
     # not only on the project page
     admin.post(
-        "/admin/studio/projects/{p['id']}/proposals",
+        f"/admin/studio/projects/{p['id']}/proposals",
         data={"preset": "photo_starter"},
         follow_redirects=False,
     )
     d = db.one("SELECT * FROM proposals ORDER BY id DESC LIMIT 1")
-    admin.post("/admin/studio/proposals/{d['id']}/send", follow_redirects=False)
+    admin.post(f"/admin/studio/proposals/{d['id']}/send", follow_redirects=False)
 
     page = admin.get(f"/admin/studio/clients/{c['id']}").text
     assert "No document activity yet" not in page
     assert 'class="timeline"' in page
-    assert "Proposal “{d['title']}” sent" in page
+    assert f"Proposal “{d['title']}” sent" in page
 
     # Clean up: force-delete this client so the "latest client/project" rows the
     # downstream studio lifecycle tests depend on revert to their fixtures.
     r = admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert r.status_code == 303
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
@@ -1172,14 +1177,14 @@ def test_proposal_lifecycle(admin):
 
     # create from preset
     r = admin.post(
-        "/admin/studio/projects/{p['id']}/proposals",
+        f"/admin/studio/projects/{p['id']}/proposals",
         data={"preset": "photo_starter"},
         follow_redirects=False,
     )
     assert r.status_code == 303
     d = db.one("SELECT * FROM proposals ORDER BY id DESC LIMIT 1")
     assert d["status"] == "draft" and d["total_cents"] == 90000
-    page = admin.get("/admin/studio/proposals/{d['id']}")
+    page = admin.get(f"/admin/studio/proposals/{d['id']}")
     assert page.status_code == 200
     # copy-link macro emits a "Copy link" button (no PIN) carrying the public URL
     assert "Copy link</button>" in page.text  # no "+ PIN" because pin=None
@@ -1187,11 +1192,11 @@ def test_proposal_lifecycle(admin):
 
     # draft is hidden from the public link
     with TestClient(app) as pub:
-        assert pub.get("/p/{d['slug']}").status_code == 404
+        assert pub.get(f"/p/{d['slug']}").status_code == 404
 
     # edit draft items (recalculates total)
     r = admin.post(
-        "/admin/studio/proposals/{d['id']}",
+        f"/admin/studio/proposals/{d['id']}",
         data={
             "title": d["title"],
             "intro": "Hi Dana",
@@ -1210,13 +1215,13 @@ def test_proposal_lifecycle(admin):
 
     # mark sent — locks editing, advances project
     db.run("UPDATE projects SET status='inquiry_received' WHERE id=?", (p["id"],))
-    r = admin.post("/admin/studio/proposals/{d['id']}/send", follow_redirects=False)
+    r = admin.post(f"/admin/studio/proposals/{d['id']}/send", follow_redirects=False)
     assert r.status_code == 303
     d = db.one("SELECT * FROM proposals WHERE id=?", (d["id"],))
     assert d["status"] == "sent" and d["sent_at"]
     assert db.one("SELECT status FROM projects WHERE id=?", (p["id"],))["status"] == "proposal_sent"
     r = admin.post(
-        "/admin/studio/proposals/{d['id']}", data={"title": "nope"}, follow_redirects=False
+        f"/admin/studio/proposals/{d['id']}", data={"title": "nope"}, follow_redirects=False
     )
     assert r.status_code == 400
 
@@ -1224,10 +1229,10 @@ def test_proposal_lifecycle(admin):
     # advance the project (the pipeline advances on contract SIGN, not proposal
     # accept — there is no proposal_accepted stage in the 8-stage funnel)
     with TestClient(app) as pub:
-        assert pub.get("/p/{d['slug']}").status_code == 200
+        assert pub.get(f"/p/{d['slug']}").status_code == 200
         d = db.one("SELECT * FROM proposals WHERE id=?", (d["id"],))
         assert d["status"] == "viewed" and d["viewed_at"]
-        r = pub.post("/p/{d['slug']}/accept", follow_redirects=False)
+        r = pub.post(f"/p/{d['slug']}/accept", follow_redirects=False)
         assert r.status_code == 303
         d = db.one("SELECT * FROM proposals WHERE id=?", (d["id"],))
         assert d["status"] == "accepted" and d["accepted_at"]
@@ -1236,7 +1241,7 @@ def test_proposal_lifecycle(admin):
             == "proposal_sent"
         )
         # accepted proposals can't be re-actioned
-        assert pub.post("/p/{d['slug']}/decline", follow_redirects=False).status_code == 400
+        assert pub.post(f"/p/{d['slug']}/decline", follow_redirects=False).status_code == 400
 
 
 def test_contract_lifecycle(admin):
@@ -1245,33 +1250,33 @@ def test_contract_lifecycle(admin):
     p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
 
     # create — merge fields pull from project + accepted proposal total
-    r = admin.post("/admin/studio/projects/{p['id']}/contracts", follow_redirects=False)
+    r = admin.post(f"/admin/studio/projects/{p['id']}/contracts", follow_redirects=False)
     assert r.status_code == 303
     d = db.one("SELECT * FROM contracts ORDER BY id DESC LIMIT 1")
-    assert d["status"] == "draft" and "Dana Che" in d["body"]
+    assert d["status"] == "draft" and "Dana Chef" in d["body"]
     assert "$1151.00" in d["body"]  # accepted proposal total merged in
-    page = admin.get("/admin/studio/contracts/{d['id']}")
+    page = admin.get(f"/admin/studio/contracts/{d['id']}")
     assert page.status_code == 200
     assert "Copy link</button>" in page.text  # macro w/ pin=None
     assert f'data-copy="{config.BASE_URL}/c/{d["slug"]}"' in page.text
 
     # draft hidden from public; editable
     with TestClient(app) as pub:
-        assert pub.get("/c/{d['slug']}").status_code == 404
+        assert pub.get(f"/c/{d['slug']}").status_code == 404
     r = admin.post(
-        "/admin/studio/contracts/{d['id']}",
+        f"/admin/studio/contracts/{d['id']}",
         data={"title": d["title"], "body": d["body"] + "\n8. EXTRA — Test clause."},
         follow_redirects=False,
     )
     assert r.status_code == 303
 
     # send locks body and records hash
-    r = admin.post("/admin/studio/contracts/{d['id']}/send", follow_redirects=False)
+    r = admin.post(f"/admin/studio/contracts/{d['id']}/send", follow_redirects=False)
     assert r.status_code == 303
     d = db.one("SELECT * FROM contracts WHERE id=?", (d["id"],))
     assert d["status"] == "sent" and len(d["body_sha256"]) == 64
     r = admin.post(
-        "/admin/studio/contracts/{d['id']}",
+        f"/admin/studio/contracts/{d['id']}",
         data={"title": "x", "body": "tampered"},
         follow_redirects=False,
     )
@@ -1279,14 +1284,14 @@ def test_contract_lifecycle(admin):
 
     with TestClient(app) as pub:
         # view flips sent → viewed
-        assert pub.get("/c/{d['slug']}").status_code == 200
+        assert pub.get(f"/c/{d['slug']}").status_code == 200
         assert db.one("SELECT status FROM contracts WHERE id=?", (d["id"],))["status"] == "viewed"
 
         # tampered body refuses signature (integrity check)
         db.run("UPDATE contracts SET body=body||' ' WHERE id=?", (d["id"],))
         r = pub.post(
-            "/c/{d['slug']}/sign",
-            data={"signer_name": "Dana Che", "agree": "yes"},
+            f"/c/{d['slug']}/sign",
+            data={"signer_name": "Dana Chef", "agree": "yes"},
             follow_redirects=False,
         )
         assert r.status_code == 409
@@ -1294,8 +1299,8 @@ def test_contract_lifecycle(admin):
 
         # sign records name/ip/timestamp, advances project to contract_signed
         r = pub.post(
-            "/c/{d['slug']}/sign",
-            data={"signer_name": "Dana Che", "agree": "yes"},
+            f"/c/{d['slug']}/sign",
+            data={"signer_name": "Dana Chef", "agree": "yes"},
             follow_redirects=False,
         )
         assert r.status_code == 303
@@ -1311,10 +1316,10 @@ def test_contract_lifecycle(admin):
             == "contract_signed"
         )
         # signed contract renders the signature record, can't be re-signed
-        assert "Signed by Dana Che" in pub.get(f"/c/{d['slug']}").text
+        assert "Signed by Dana Chef" in pub.get(f"/c/{d['slug']}").text
         assert (
             pub.post(
-                "/c/{d['slug']}/sign",
+                f"/c/{d['slug']}/sign",
                 data={"signer_name": "X", "agree": "yes"},
                 follow_redirects=False,
             ).status_code
@@ -1329,7 +1334,7 @@ def _stripe_sig(payload: bytes, secret: str) -> str:
 
     t = int(_t.time())
     mac = _hmac.new(secret.encode(), f"{t}.".encode() + payload, _hl.sha256).hexdigest()
-    return "t={t},v1={mac}"
+    return f"t={t},v1={mac}"
 
 
 def _checkout_event(event_id, invoice_id, kind, amount):
@@ -1343,7 +1348,7 @@ def _checkout_event(event_id, invoice_id, kind, amount):
             "type": "checkout.session.completed",
             "data": {
                 "object": {
-                    "id": "cs_{event_id}",
+                    "id": f"cs_{event_id}",
                     "object": "checkout.session",
                     "payment_status": "paid",
                     "amount_total": amount,
@@ -1360,16 +1365,16 @@ def test_invoice_lifecycle(admin, monkeypatch):
     p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
 
     # create — seeds items/total from the accepted proposal
-    r = admin.post("/admin/studio/projects/{p['id']}/invoices", follow_redirects=False)
+    r = admin.post(f"/admin/studio/projects/{p['id']}/invoices", follow_redirects=False)
     assert r.status_code == 303
     d = db.one("SELECT * FROM invoices ORDER BY id DESC LIMIT 1")
     assert d["status"] == "draft" and d["total_cents"] == 115100
-    page = admin.get("/admin/studio/invoices/{d['id']}")
+    page = admin.get(f"/admin/studio/invoices/{d['id']}")
     assert page.status_code == 200
     assert "Copy link</button>" in page.text  # macro w/ pin=None
     assert f'data-copy="{config.BASE_URL}/i/{d["slug"]}"' in page.text
     with TestClient(app) as pub:
-        assert pub.get("/i/{d['slug']}").status_code == 404
+        assert pub.get(f"/i/{d['slug']}").status_code == 404
 
     # deposit above total rejected; valid deposit + due date saved
     base = {
@@ -1379,11 +1384,11 @@ def test_invoice_lifecycle(admin, monkeypatch):
         "item_price_0": "1151",
     }
     r = admin.post(
-        "/admin/studio/invoices/{d['id']}", data=base | {"deposit": "2000"}, follow_redirects=False
+        f"/admin/studio/invoices/{d['id']}", data=base | {"deposit": "2000"}, follow_redirects=False
     )
     assert r.status_code == 400
     r = admin.post(
-        "/admin/studio/invoices/{d['id']}",
+        f"/admin/studio/invoices/{d['id']}",
         data=base | {"deposit": "500", "due_date": "2026-07-01"},
         follow_redirects=False,
     )
@@ -1392,14 +1397,14 @@ def test_invoice_lifecycle(admin, monkeypatch):
     assert d["deposit_cents"] == 50000 and d["due_date"] == "2026-07-01"
 
     # send locks it; public view flips sent → viewed
-    r = admin.post("/admin/studio/invoices/{d['id']}/send", follow_redirects=False)
+    r = admin.post(f"/admin/studio/invoices/{d['id']}/send", follow_redirects=False)
     assert r.status_code == 303
     with TestClient(app) as pub:
-        page = pub.get("/i/{d['slug']}")
+        page = pub.get(f"/i/{d['slug']}")
         assert page.status_code == 200 and "$500.00" in page.text
         assert db.one("SELECT status FROM invoices WHERE id=?", (d["id"],))["status"] == "viewed"
         # payments not configured → pay degrades, webhook refuses
-        assert pub.post("/i/{d['slug']}/pay", follow_redirects=False).status_code == 503
+        assert pub.post(f"/i/{d['slug']}/pay", follow_redirects=False).status_code == 503
         assert pub.post("/webhooks/stripe", content=b"{}").status_code == 503
 
         # webhook with signature verification
@@ -1439,7 +1444,7 @@ def test_invoice_lifecycle(admin, monkeypatch):
         assert r.status_code == 200
         d = db.one("SELECT * FROM invoices WHERE id=?", (d["id"],))
         assert d["status"] == "paid" and d["paid_at"]
-        assert "Paid in full" in pub.get("/i/{d['slug']}").text
+        assert "Paid in full" in pub.get(f"/i/{d['slug']}").text
 
 
 def test_reports_top_clients(admin):
@@ -1462,20 +1467,20 @@ def test_reports_top_clients(admin):
     pids, iids = [], []
     for n, cents in (("Spring tasting", 600000), ("Autumn tasting", 400000)):
         admin.post(
-            "/admin/studio/clients/{c['id']}/projects", data={"title": n}, follow_redirects=False
+            f"/admin/studio/clients/{c['id']}/projects", data={"title": n}, follow_redirects=False
         )
         p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
         pids.append(p["id"])
         iid = db.run(
             """INSERT INTO invoices (project_id, slug, title, line_items, total_cents)
                         VALUES (?,?,?,?,?)""",
-            (p["id"], "inv-{p['id']}", "Invoice", "[]", cents),
+            (p["id"], f"inv-{p['id']}", "Invoice", "[]", cents),
         )
         iids.append(iid)
         db.run(
             """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
                   amount_cents, kind) VALUES (?,?,?,?,?)""",
-            (iid, "evt_{iid}", "cs_{iid}", cents, "full"),
+            (iid, f"evt_{iid}", f"cs_{iid}", cents, "full"),
         )
 
     page = admin.get("/admin/reports").text
@@ -1492,7 +1497,7 @@ def test_reports_top_clients(admin):
         db.run("DELETE FROM payments WHERE invoice_id=?", (iid,))
         db.run("DELETE FROM invoices WHERE id=?", (iid,))
     r = admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert r.status_code == 303
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
@@ -1509,7 +1514,7 @@ def test_reports_range_toggle(admin):
         ("ytd", "YTD"),
         ("lastyear", "Last year"),
     ):
-        page = admin.get("/admin/reports?range={key}").text
+        page = admin.get(f"/admin/reports?range={key}").text
         assert "fin-range-pill" in page
         assert f'href="/admin/reports?range={key}"' in page
         # the active pill carries fin-range-on next to its own key
@@ -1579,7 +1584,7 @@ def test_invoice_receipt(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Menu refresh"},
         follow_redirects=False,
     )
@@ -1596,17 +1601,17 @@ def test_invoice_receipt(admin):
         db.run(
             """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
                   amount_cents, kind) VALUES (?,?,?,?,?)""",
-            (iid, "evt_{kind}_{iid}", "cs_{kind}_{iid}", cents, kind),
+            (iid, f"evt_{kind}_{iid}", f"cs_{kind}_{iid}", cents, kind),
         )
 
-    r = admin.get("/i/{inv['slug']}/receipt")
+    r = admin.get(f"/i/{inv['slug']}/receipt")
     assert r.status_code == 200
     assert "Deposit" in r.text and "Balance" in r.text
     assert "$2000.00" in r.text and "$3000.00" in r.text
     assert "$5000.00" in r.text  # total paid
     assert "Paid in full" in r.text
     # The invoice page links to the receipt once a payment exists.
-    assert "/i/{inv['slug']}/receipt" in admin.get("/i/{inv['slug']}").text
+    assert f"/i/{inv['slug']}/receipt" in admin.get(f"/i/{inv['slug']}").text
 
     # An invoice with no payments has no receipt.
     jid = db.run(
@@ -1620,7 +1625,7 @@ def test_invoice_receipt(admin):
     db.run("DELETE FROM payments WHERE invoice_id=?", (iid,))
     db.run("DELETE FROM invoices WHERE id IN (?,?)", (iid, jid))
     admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
 
@@ -1643,7 +1648,7 @@ def test_proposal_convert(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Dinner service shoot"},
         follow_redirects=False,
     )
@@ -1657,13 +1662,13 @@ def test_proposal_convert(admin):
     )
 
     # the accepted proposal page offers the convert action
-    page = admin.get("/admin/studio/proposals/{pid}")
+    page = admin.get(f"/admin/studio/proposals/{pid}")
     assert page.status_code == 200
-    assert "/admin/studio/proposals/{pid}/convert" in page.text
+    assert f"/admin/studio/proposals/{pid}/convert" in page.text
 
-    r = admin.post("/admin/studio/proposals/{pid}/convert", follow_redirects=False)
+    r = admin.post(f"/admin/studio/proposals/{pid}/convert", follow_redirects=False)
     assert r.status_code == 303
-    assert r.headers["location"] == "/admin/studio/projects/{p['id']}"
+    assert r.headers["location"] == f"/admin/studio/projects/{p['id']}"
 
     ct = db.one("SELECT * FROM contracts WHERE project_id=? ORDER BY id DESC LIMIT 1", (p["id"],))
     inv = db.one("SELECT * FROM invoices WHERE project_id=? ORDER BY id DESC LIMIT 1", (p["id"],))
@@ -1680,7 +1685,7 @@ def test_proposal_convert(admin):
         (p["id"], "conv-draft", "Draft proposal", items, 180000, "sent"),
     )
     assert (
-        admin.post("/admin/studio/proposals/{qid}/convert", follow_redirects=False).status_code
+        admin.post(f"/admin/studio/proposals/{qid}/convert", follow_redirects=False).status_code
         == 400
     )
 
@@ -1688,7 +1693,7 @@ def test_proposal_convert(admin):
     db.run("DELETE FROM invoices WHERE id=?", (inv["id"],))
     db.run("DELETE FROM proposals WHERE id IN (?,?)", (pid, qid))
     admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
 
@@ -1710,7 +1715,7 @@ def test_proposal_duplicate(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Brunch menu shoot"},
         follow_redirects=False,
     )
@@ -1724,10 +1729,10 @@ def test_proposal_duplicate(admin):
     )
 
     # the locked proposal page offers the duplicate action
-    page = admin.get("/admin/studio/proposals/{src}")
-    assert "/admin/studio/proposals/{src}/duplicate" in page.text
+    page = admin.get(f"/admin/studio/proposals/{src}")
+    assert f"/admin/studio/proposals/{src}/duplicate" in page.text
 
-    r = admin.post("/admin/studio/proposals/{src}/duplicate", follow_redirects=False)
+    r = admin.post(f"/admin/studio/proposals/{src}/duplicate", follow_redirects=False)
     assert r.status_code == 303
     new_id = int(r.headers["location"].rsplit("/", 1)[1])
     assert new_id != src
@@ -1744,7 +1749,7 @@ def test_proposal_duplicate(admin):
 
     db.run("DELETE FROM proposals WHERE id IN (?,?)", (src, new_id))
     admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
 
@@ -1764,7 +1769,7 @@ def test_contract_duplicate(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Cookbook shoot"},
         follow_redirects=False,
     )
@@ -1785,9 +1790,9 @@ def test_contract_duplicate(admin):
         ),
     )
 
-    page = admin.get("/admin/studio/contracts/{src}")
-    assert "/admin/studio/contracts/{src}/duplicate" in page.text
-    r = admin.post("/admin/studio/contracts/{src}/duplicate", follow_redirects=False)
+    page = admin.get(f"/admin/studio/contracts/{src}")
+    assert f"/admin/studio/contracts/{src}/duplicate" in page.text
+    r = admin.post(f"/admin/studio/contracts/{src}/duplicate", follow_redirects=False)
     assert r.status_code == 303
     new_id = int(r.headers["location"].rsplit("/", 1)[1])
     new = db.one("SELECT * FROM contracts WHERE id=?", (new_id,))
@@ -1798,7 +1803,7 @@ def test_contract_duplicate(admin):
 
     db.run("DELETE FROM contracts WHERE id IN (?,?)", (src, new_id))
     admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
 
 
@@ -1818,7 +1823,7 @@ def test_invoice_duplicate(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Lunch service shoot"},
         follow_redirects=False,
     )
@@ -1846,9 +1851,9 @@ def test_invoice_duplicate(admin):
         (src, "evt_idup", "cs_idup", 90000, "full"),
     )
 
-    page = admin.get("/admin/studio/invoices/{src}")
-    assert "/admin/studio/invoices/{src}/duplicate" in page.text
-    r = admin.post("/admin/studio/invoices/{src}/duplicate", follow_redirects=False)
+    page = admin.get(f"/admin/studio/invoices/{src}")
+    assert f"/admin/studio/invoices/{src}/duplicate" in page.text
+    r = admin.post(f"/admin/studio/invoices/{src}/duplicate", follow_redirects=False)
     assert r.status_code == 303
     new_id = int(r.headers["location"].rsplit("/", 1)[1])
     new = db.one("SELECT * FROM invoices WHERE id=?", (new_id,))
@@ -1869,7 +1874,7 @@ def test_invoice_duplicate(admin):
     db.run("DELETE FROM payments WHERE invoice_id=?", (src,))
     db.run("DELETE FROM invoices WHERE id IN (?,?)", (src, new_id))
     admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
 
 
@@ -1889,7 +1894,7 @@ def test_contract_countersign(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Tasting menu shoot"},
         follow_redirects=False,
     )
@@ -1911,19 +1916,19 @@ def test_contract_countersign(admin):
     )
 
     # the countersign form shows on a signed-but-not-countersigned contract
-    page = admin.get("/admin/studio/contracts/{src}")
-    assert "/admin/studio/contracts/{src}/countersign" in page.text
+    page = admin.get(f"/admin/studio/contracts/{src}")
+    assert f"/admin/studio/contracts/{src}/countersign" in page.text
 
     # blank name is rejected
     bad = admin.post(
-        "/admin/studio/contracts/{src}/countersign",
+        f"/admin/studio/contracts/{src}/countersign",
         data={"countersigner_name": "   "},
         follow_redirects=False,
     )
     assert bad.status_code == 400
 
     r = admin.post(
-        "/admin/studio/contracts/{src}/countersign",
+        f"/admin/studio/contracts/{src}/countersign",
         data={"countersigner_name": "Kevin Lee"},
         follow_redirects=False,
     )
@@ -1934,7 +1939,7 @@ def test_contract_countersign(admin):
 
     # second countersign is refused
     dup = admin.post(
-        "/admin/studio/contracts/{src}/countersign",
+        f"/admin/studio/contracts/{src}/countersign",
         data={"countersigner_name": "Kevin Lee"},
         follow_redirects=False,
     )
@@ -1947,7 +1952,7 @@ def test_contract_countersign(admin):
         (p["id"], "csign-draft", "Draft", "X"),
     )
     nope = admin.post(
-        "/admin/studio/contracts/{draft}/countersign",
+        f"/admin/studio/contracts/{draft}/countersign",
         data={"countersigner_name": "Kevin Lee"},
         follow_redirects=False,
     )
@@ -1955,7 +1960,7 @@ def test_contract_countersign(admin):
 
     db.run("DELETE FROM contracts WHERE id IN (?,?)", (src, draft))
     admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
 
 
@@ -1976,7 +1981,7 @@ def test_admin_global_search(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Zarzuela tasting menu shoot"},
         follow_redirects=False,
     )
@@ -1986,7 +1991,7 @@ def test_admin_global_search(admin):
     assert "Zarzuela Cantina" in page
     assert f"/admin/studio/clients/{c['id']}" in page
     assert "Zarzuela tasting menu shoot" in page
-    assert "/admin/studio/projects/{p['id']}" in page
+    assert f"/admin/studio/projects/{p['id']}" in page
 
     # Nonsense query → no matches, not a 500.
     miss = admin.get("/admin/search", params={"q": "qzxnomatchqzx"})
@@ -1997,7 +2002,7 @@ def test_admin_global_search(admin):
     assert "Zarzuela Cantina" not in wild
 
     admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
 
@@ -2020,7 +2025,7 @@ def test_testimonial_self_submit(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Dinner menu shoot"},
         follow_redirects=False,
     )
@@ -2028,20 +2033,20 @@ def test_testimonial_self_submit(admin):
 
     # Admin raises the request link; the project page surfaces it.
     admin.post(
-        "/admin/studio/projects/{p['id']}/testimonial-request",
+        f"/admin/studio/projects/{p['id']}/testimonial-request",
         data={"gallery_id": ""},
         follow_redirects=False,
     )
     req = db.one("SELECT * FROM testimonial_requests ORDER BY id DESC LIMIT 1")
     assert req["project_id"] == p["id"] and req["submitted_at"] is None
-    page = admin.get("/admin/studio/projects/{p['id']}").text
-    assert "/t/{req['slug']}" in page and "awaiting client" in page
+    page = admin.get(f"/admin/studio/projects/{p['id']}").text
+    assert f"/t/{req['slug']}" in page and "awaiting client" in page
 
     # Client opens the form (greeted by name) and submits.
-    form = admin.get("/t/{req['slug']}").text
+    form = admin.get(f"/t/{req['slug']}").text
     assert "Trattoria Rossi" in form and "Share your experience" in form
     r = admin.post(
-        "/t/{req['slug']}",
+        f"/t/{req['slug']}",
         data={
             "quote": "Marco's plates have never looked better.",
             "attribution_name": "Marco Rossi",
@@ -2057,10 +2062,10 @@ def test_testimonial_self_submit(admin):
     assert req["submitted_at"] and req["testimonial_id"] == t["id"]
 
     # Thank-you state, and a re-POST does not create a second testimonial.
-    assert "your words have been received" in admin.get("/t/{req['slug']}").text.lower()
+    assert "your words have been received" in admin.get(f"/t/{req['slug']}").text.lower()
     n_before = db.one("SELECT COUNT(*) AS n FROM testimonials")["n"]
     admin.post(
-        "/t/{req['slug']}",
+        f"/t/{req['slug']}",
         data={"quote": "second", "attribution_name": "x", "business": ""},
         follow_redirects=False,
     )
@@ -2080,7 +2085,7 @@ def test_testimonial_self_submit(admin):
     db.run("DELETE FROM testimonials WHERE id=?", (t["id"],))
     db.run("DELETE FROM testimonial_requests WHERE id=?", (req["id"],))
     admin.post(
-        "/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is None
 
@@ -2096,7 +2101,7 @@ def test_email_send(admin, monkeypatch):
     }
 
     # not configured → 503, nothing logged
-    r = admin.post("/admin/studio/invoices/{inv['id']}/email", data=data, follow_redirects=False)
+    r = admin.post(f"/admin/studio/invoices/{inv['id']}/email", data=data, follow_redirects=False)
     assert r.status_code == 503
 
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
@@ -2105,13 +2110,13 @@ def test_email_send(admin, monkeypatch):
     monkeypatch.setattr(mailer, "send", lambda to, subject, body: sent.append((to, subject, body)))
 
     # drafts can't be emailed (client link would 404)
-    r = admin.post("/admin/studio/projects/{inv['project_id']}/invoices", follow_redirects=False)
+    r = admin.post(f"/admin/studio/projects/{inv['project_id']}/invoices", follow_redirects=False)
     draft = db.one("SELECT * FROM invoices ORDER BY id DESC LIMIT 1")
-    r = admin.post("/admin/studio/invoices/{draft['id']}/email", data=data, follow_redirects=False)
+    r = admin.post(f"/admin/studio/invoices/{draft['id']}/email", data=data, follow_redirects=False)
     assert r.status_code == 400 and not sent
 
     # real send is logged with project linkage
-    r = admin.post("/admin/studio/invoices/{inv['id']}/email", data=data, follow_redirects=False)
+    r = admin.post(f"/admin/studio/invoices/{inv['id']}/email", data=data, follow_redirects=False)
     assert r.status_code == 303 and len(sent) == 1
     assert sent[0][0] == "dana@bistro.com"
     e = db.one("SELECT * FROM emails_log ORDER BY id DESC LIMIT 1")
@@ -2125,7 +2130,7 @@ def test_email_send(admin, monkeypatch):
     # bogus kind 404s, SMTP failure surfaces as 502 and is not logged
     assert (
         admin.post(
-            "/admin/studio/payments/{inv['id']}/email", data=data, follow_redirects=False
+            f"/admin/studio/payments/{inv['id']}/email", data=data, follow_redirects=False
         ).status_code
         == 404
     )
@@ -2135,7 +2140,7 @@ def test_email_send(admin, monkeypatch):
         raise OSError("smtp down")
 
     monkeypatch.setattr(mailer, "send", boom)
-    r = admin.post("/admin/studio/invoices/{inv['id']}/email", data=data, follow_redirects=False)
+    r = admin.post(f"/admin/studio/invoices/{inv['id']}/email", data=data, follow_redirects=False)
     assert r.status_code == 502
     assert db.one("SELECT COUNT(*) AS n FROM emails_log")["n"] == n_before
 
@@ -2184,15 +2189,15 @@ def test_gallery_delivery_email(admin, monkeypatch):
     data = {
         "to": "owner@bistro.com",
         "subject": "Your photos are ready — Tasting Menu",
-        "message": "link {config.BASE_URL}/g/DeliveryMail01 PIN 5678",
+        "message": f"link {config.BASE_URL}/g/DeliveryMail01 PIN 5678",
     }
 
     # unpublished: no form on the page, send refused (link would 404)
-    assert "Send delivery email" not in admin.get("/admin/galleries/{gid}").text
-    assert admin.post("/admin/galleries/{gid}/email", data=data).status_code == 400
+    assert "Send delivery email" not in admin.get(f"/admin/galleries/{gid}").text
+    assert admin.post(f"/admin/galleries/{gid}/email", data=data).status_code == 400
 
     db.run("UPDATE galleries SET published=1 WHERE id=?", (gid,))
-    page = admin.get("/admin/galleries/{gid}").text
+    page = admin.get(f"/admin/galleries/{gid}").text
     assert "Send delivery email" in page
     assert "/g/DeliveryMail01" in page and "PIN: 5678" in page
     # "Copy link + PIN" button carries the URL + PIN as a data-copy payload
@@ -2212,7 +2217,7 @@ def test_gallery_delivery_email(admin, monkeypatch):
 
     # not configured → 503, nothing logged
     monkeypatch.setattr(mailer, "configured", lambda: False)
-    assert admin.post("/admin/galleries/{gid}/email", data=data).status_code == 503
+    assert admin.post(f"/admin/galleries/{gid}/email", data=data).status_code == 503
 
     # configured → sends and logs (doc_kind 'other' — the schema's catch-all)
     sent = []
@@ -2220,7 +2225,7 @@ def test_gallery_delivery_email(admin, monkeypatch):
     monkeypatch.setattr(
         mailer, "send", lambda to, subject, body, reply_to="": sent.append((to, subject, body))
     )
-    r = admin.post("/admin/galleries/{gid}/email", data=data, follow_redirects=False)
+    r = admin.post(f"/admin/galleries/{gid}/email", data=data, follow_redirects=False)
     assert r.status_code == 303
     assert sent[0][0] == "owner@bistro.com" and "PIN 5678" in sent[0][2]
     row = db.one("SELECT * FROM emails_log WHERE doc_kind='other' AND doc_id=?", (gid,))
@@ -2231,7 +2236,7 @@ def test_gallery_delivery_email(admin, monkeypatch):
         raise OSError("smtp down")
 
     monkeypatch.setattr(mailer, "send", boom)
-    assert admin.post("/admin/galleries/{gid}/email", data=data).status_code == 502
+    assert admin.post(f"/admin/galleries/{gid}/email", data=data).status_code == 502
     assert (
         db.one("SELECT COUNT(*) AS n FROM emails_log WHERE doc_kind='other' AND doc_id=?", (gid,))[
             "n"
@@ -2360,7 +2365,7 @@ def test_gallery_expiry_reminder_rearms_on_date_change(admin):
     new_exp = (today + dt.timedelta(days=40)).isoformat()
     base = {"title": "Rearm", "pin": "4444", "published": "true"}
     r = admin.post(
-        "/admin/galleries/{gid}/settings",
+        f"/admin/galleries/{gid}/settings",
         data={**base, "expires_at": new_exp},
         follow_redirects=False,
     )
@@ -2369,7 +2374,7 @@ def test_gallery_expiry_reminder_rearms_on_date_change(admin):
 
     db.run("UPDATE galleries SET reminded_expiry=1 WHERE id=?", (gid,))
     admin.post(
-        "/admin/galleries/{gid}/settings",
+        f"/admin/galleries/{gid}/settings",
         data={**base, "expires_at": new_exp},
         follow_redirects=False,
     )
@@ -2398,7 +2403,7 @@ def test_contract_unsigned_nudge(client, monkeypatch):
             """INSERT INTO contracts (project_id, slug, title, body, status, sent_at,
                                       nudged_unsigned)
                VALUES (?,?,?,?,?,datetime('now', ?),?)""",
-            (pid, slug, "Services Agreement", "body", status, "-{days_ago} days", nudged),
+            (pid, slug, "Services Agreement", "body", status, f"-{days_ago} days", nudged),
         )
 
     overdue = mk("CtOverdue1", "sent", 5)
@@ -2413,7 +2418,7 @@ def test_contract_unsigned_nudge(client, monkeypatch):
     assert flag(fresh) == 0 and flag(signed) == 0
     joined = " ".join(sent)
     assert "/admin/studio/contracts/" in joined and "Bistro Verde" in joined
-    assert "/admin/studio/contracts/{fresh}" not in joined
+    assert f"/admin/studio/contracts/{fresh}" not in joined
     assert len(sent) == 2  # overdue + viewed only
 
     # idempotent: a second sweep nudges nothing new
@@ -2531,7 +2536,7 @@ def test_postshoot_reminder_sweep(monkeypatch):
 
     postshoot_reminders.sweep()
     flag = lambda i: db.one("SELECT armed_postshoot a FROM bookings WHERE id=?", (i,))["a"]
-    assert armed == ["postshoot:{just_done}"]
+    assert armed == [f"postshoot:{just_done}"]
     assert flag(just_done) == 1
     assert flag(future) == 0 and flag(ancient) == 0 and flag(cancelled) == 0
 
@@ -2548,7 +2553,7 @@ def test_postshoot_reminder_sweep(monkeypatch):
     assert flag(retry) == 0
     monkeypatch.setattr(hermes_arm, "arm", lambda key, text, when: armed.append(key) or True)
     postshoot_reminders.sweep()
-    assert armed == ["postshoot:{retry}"] and flag(retry) == 1
+    assert armed == [f"postshoot:{retry}"] and flag(retry) == 1
 
     # net unconfigured → whole sweep no-ops, sets no flags
     armed.clear()
@@ -2589,7 +2594,7 @@ def test_final_email_auto_advances_project(admin, monkeypatch):
 
     # kind=delivery (default) → status unchanged
     r = admin.post(
-        "/admin/galleries/{gid}/email",
+        f"/admin/galleries/{gid}/email",
         data={**data, "email_kind": "delivery"},
         follow_redirects=False,
     )
@@ -2598,7 +2603,7 @@ def test_final_email_auto_advances_project(admin, monkeypatch):
 
     # kind=proofing → status unchanged (proofing is a prompt, not a hand-off)
     admin.post(
-        "/admin/galleries/{gid}/email",
+        f"/admin/galleries/{gid}/email",
         data={**data, "email_kind": "proofing"},
         follow_redirects=False,
     )
@@ -2606,13 +2611,17 @@ def test_final_email_auto_advances_project(admin, monkeypatch):
 
     # kind=final + project in pre-delivered state → auto-advance to 'project_closed'
     admin.post(
-        "/admin/galleries/{gid}/email", data={**data, "email_kind": "final"}, follow_redirects=False
+        f"/admin/galleries/{gid}/email",
+        data={**data, "email_kind": "final"},
+        follow_redirects=False,
     )
     assert db.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "project_closed"
 
     # already-'project_closed' → no churn (idempotent re-sends are fine)
     admin.post(
-        "/admin/galleries/{gid}/email", data={**data, "email_kind": "final"}, follow_redirects=False
+        f"/admin/galleries/{gid}/email",
+        data={**data, "email_kind": "final"},
+        follow_redirects=False,
     )
     assert db.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "project_closed"
 
@@ -2620,7 +2629,9 @@ def test_final_email_auto_advances_project(admin, monkeypatch):
     # signal is intentional and should survive a re-fire of the hand-off email.
     db.run("UPDATE projects SET status='archived' WHERE id=?", (pid,))
     admin.post(
-        "/admin/galleries/{gid}/email", data={**data, "email_kind": "final"}, follow_redirects=False
+        f"/admin/galleries/{gid}/email",
+        data={**data, "email_kind": "final"},
+        follow_redirects=False,
     )
     assert db.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "archived"
 
@@ -2630,7 +2641,7 @@ def test_final_email_auto_advances_project(admin, monkeypatch):
         ("FinalNoProj001", "Loose", "1234"),
     )
     r = admin.post(
-        "/admin/galleries/{gid2}/email",
+        f"/admin/galleries/{gid2}/email",
         data={**data, "email_kind": "final"},
         follow_redirects=False,
     )
@@ -2649,7 +2660,7 @@ def test_gallery_notion_writeback(admin, monkeypatch):
 
     def save(published=True, project_id=project["id"]):
         return admin.post(
-            "/admin/galleries/{gid}/settings",
+            f"/admin/galleries/{gid}/settings",
             data={
                 "title": "Writeback",
                 "pin": "1234",
@@ -2686,7 +2697,7 @@ def test_gallery_notion_writeback(admin, monkeypatch):
         (
             "sess42",
             {
-                "Gallery URL": {"url": "{config.BASE_URL}/g/WritebackSlug1"},
+                "Gallery URL": {"url": f"{config.BASE_URL}/g/WritebackSlug1"},
                 "Status": {"select": {"name": "Delivered"}},
             },
         )
@@ -2702,7 +2713,7 @@ def test_gallery_notion_writeback(admin, monkeypatch):
     )
     calls.clear()
     notion_sync.sync_gallery(gid)
-    assert len(armed) == 1 and armed[0][0] == "review-check:{gid}"
+    assert len(armed) == 1 and armed[0][0] == f"review-check:{gid}"
 
     # unpublishing later → clean skip, no HTTP and no arm
     calls.clear()
@@ -3091,7 +3102,7 @@ def test_marketing_site(admin):
         from app import config as cfg
 
         for path in ("/", "/portfolio", "/about", "/contact", "/book", "/work", "/services"):
-            assert "<loc>{cfg.BASE_URL}{path}</loc>" in r.text
+            assert f"<loc>{cfg.BASE_URL}{path}</loc>" in r.text
         assert "/g/" not in r.text and "/admin" not in r.text
 
         # OG card present, but no og:image while nothing is starred
@@ -3100,10 +3111,10 @@ def test_marketing_site(admin):
         assert 'content="summary"' in r.text
 
         # portfolio gating: unflagged asset is not served publicly
-        assert pub.get("/site/img/{a['id']}").status_code == 404
-        admin.post("/admin/galleries/{g['id']}/assets/{a['id']}/portfolio", follow_redirects=False)
+        assert pub.get(f"/site/img/{a['id']}").status_code == 404
+        admin.post(f"/admin/galleries/{g['id']}/assets/{a['id']}/portfolio", follow_redirects=False)
         assert db.one("SELECT portfolio FROM assets WHERE id=?", (a["id"],))["portfolio"] == 1
-        assert pub.get("/site/img/{a['id']}").status_code == 200
+        assert pub.get(f"/site/img/{a['id']}").status_code == 200
         # tiles carry data-web for the lightbox, and the overlay ships with the page
         r = pub.get("/portfolio")
         assert f'data-web="/site/img/{a["id"]}"' in r.text
@@ -3117,8 +3128,8 @@ def test_marketing_site(admin):
         assert f'property="og:image" content="{cfg.BASE_URL}/site/img/{a["id"]}"' in r.text
         assert 'content="summary_large_image"' in r.text
         # toggle off hides it again
-        admin.post("/admin/galleries/{g['id']}/assets/{a['id']}/portfolio", follow_redirects=False)
-        assert pub.get("/site/img/{a['id']}").status_code == 404
+        admin.post(f"/admin/galleries/{g['id']}/assets/{a['id']}/portfolio", follow_redirects=False)
+        assert pub.get(f"/site/img/{a['id']}").status_code == 404
 
 
 def test_inquiry_form(monkeypatch):
@@ -3190,14 +3201,14 @@ def test_inquiries_admin_view(admin):
 
     # the inquiry surfaces in the unified inbox; selecting it shows the business
     # as the thread name, the contact name beneath, and the real convert action.
-    r = admin.get("/admin/inbox?sel={iid}")
+    r = admin.get(f"/admin/inbox?sel={iid}")
     assert r.status_code == 200
     assert "Bistro Vert" in r.text and "Robin Che" in r.text and "Spring menu?" in r.text
     assert f'action="/admin/studio/inquiries/{iid}/client"' in r.text
     assert "Create client &amp; project" in r.text
 
     # one click creates a client carrying the inquiry context
-    r = admin.post("/admin/studio/inquiries/{iid}/client", follow_redirects=False)
+    r = admin.post(f"/admin/studio/inquiries/{iid}/client", follow_redirects=False)
     assert r.status_code == 303
     c = db.one("SELECT * FROM clients WHERE email='robin@bistro.com'")
     assert c["name"] == "Robin Che" and c["company"] == "Bistro Vert"
@@ -3213,19 +3224,19 @@ def test_inquiries_admin_view(admin):
     # converted inquiries leave the default inbox and land in the archived tab,
     # where the context pane links straight to the spawned client record
     assert "Bistro Vert" not in admin.get("/admin/inbox").text
-    page = admin.get("/admin/inbox?tab=archived&sel={iid}").text
+    page = admin.get(f"/admin/inbox?tab=archived&sel={iid}").text
     assert "Open converted record" in page
     assert f'href="/admin/studio/clients/{c["id"]}"' in page
 
     # idempotent: same email → redirect to the existing client, no duplicate
-    r = admin.post("/admin/studio/inquiries/{iid}/client", follow_redirects=False)
+    r = admin.post(f"/admin/studio/inquiries/{iid}/client", follow_redirects=False)
     assert r.headers["location"] == f"/admin/studio/clients/{c['id']}"
     assert db.one("SELECT COUNT(*) AS n FROM clients WHERE email='robin@bistro.com'")["n"] == 1
 
     # undo: clears the conversion stamps but LEAVES the spawned client alone
     # (it may already carry edits, brand assets, projects by the time Kevin
     # realizes the misclick).
-    r = admin.post("/admin/studio/inquiries/{iid}/unconvert", follow_redirects=False)
+    r = admin.post(f"/admin/studio/inquiries/{iid}/unconvert", follow_redirects=False)
     assert r.status_code == 303
     conv = db.one(
         "SELECT converted_at, converted_client_id, converted_project_id FROM inquiries WHERE id=?",
@@ -3236,7 +3247,7 @@ def test_inquiries_admin_view(admin):
     # client still exists — the unconvert is NOT a cascade delete
     assert db.one("SELECT id FROM clients WHERE id=?", (c["id"],)) is not None
     # the inquiry re-appears in the default inbox as actionable again
-    page = admin.get("/admin/inbox?sel={iid}").text
+    page = admin.get(f"/admin/inbox?sel={iid}").text
     assert "Bistro Vert" in page
     assert "Create client &amp; project" in page
 
@@ -3448,12 +3459,12 @@ def test_dashboard_unlinked_warning(admin):
     # the orphan picker strip is the single place orphans surface now — the
     # per-card warning glyph was dropped in the strict-1:1 grid (prototype card
     # has no warn icon). The strip lists this gallery with an inline link picker.
-    assert "/admin/galleries/{gid_draft}/link-client" in page
+    assert f"/admin/galleries/{gid_draft}/link-client" in page
 
     # use the inline picker to link to a client — count drops back, strip clears
     cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Linker Co",))
     r = admin.post(
-        "/admin/galleries/{gid_draft}/link-client",
+        f"/admin/galleries/{gid_draft}/link-client",
         data={"client_id": str(cid)},
         follow_redirects=False,
     )
@@ -3461,10 +3472,10 @@ def test_dashboard_unlinked_warning(admin):
     assert db.one("SELECT client_id FROM galleries WHERE id=?", (gid_draft,))["client_id"] == cid
     assert n_warned() == baseline
     page = admin.get("/admin/home").text
-    assert "/admin/galleries/{gid_draft}/link-client" not in page
+    assert f"/admin/galleries/{gid_draft}/link-client" not in page
     # link-client refuses bogus client_id; the gallery's client_id isn't touched
     r = admin.post(
-        "/admin/galleries/{gid_draft}/link-client",
+        f"/admin/galleries/{gid_draft}/link-client",
         data={"client_id": "999999"},
         follow_redirects=False,
     )
@@ -3472,7 +3483,7 @@ def test_dashboard_unlinked_warning(admin):
     assert db.one("SELECT client_id FROM galleries WHERE id=?", (gid_draft,))["client_id"] == cid
 
     # ship #53's force-delete of a client unlinks galleries → count returns
-    admin.post("/admin/studio/clients/{cid}/delete", data={"force": "1"}, follow_redirects=False)
+    admin.post(f"/admin/studio/clients/{cid}/delete", data={"force": "1"}, follow_redirects=False)
     assert db.one("SELECT client_id FROM galleries WHERE id=?", (gid_draft,))["client_id"] is None
     assert n_warned() == baseline + 1
 
@@ -3485,7 +3496,7 @@ def test_client_delete_safety(admin):
 
     # empty client: deletes cleanly without force
     cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Empty Co",))
-    r = admin.post("/admin/studio/clients/{cid}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/studio/clients/{cid}/delete", follow_redirects=False)
     assert r.status_code == 303
     assert db.one("SELECT id FROM clients WHERE id=?", (cid,)) is None
 
@@ -3499,12 +3510,12 @@ def test_client_delete_safety(admin):
         "INSERT INTO brand_assets (client_id, filename, stored, bytes) VALUES (?,?,?,?)",
         (cid2, "logo.png", "logo.png", 1),
     )
-    r = admin.post("/admin/studio/clients/{cid2}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/studio/clients/{cid2}/delete", follow_redirects=False)
     assert r.status_code == 400
     assert "brand asset" in r.json()["detail"]
     assert db.one("SELECT id FROM clients WHERE id=?", (cid2,)) is not None
     r = admin.post(
-        "/admin/studio/clients/{cid2}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{cid2}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert r.status_code == 303
     assert db.one("SELECT id FROM clients WHERE id=?", (cid2,)) is None
@@ -3517,10 +3528,10 @@ def test_client_delete_safety(admin):
         "INSERT INTO galleries (slug, title, pin, client_id) VALUES (?,?,?,?)",
         ("client-del-glink", "Linked", "1234", cid3),
     )
-    r = admin.post("/admin/studio/clients/{cid3}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/studio/clients/{cid3}/delete", follow_redirects=False)
     assert r.status_code == 400 and "linked galler" in r.json()["detail"]
     r = admin.post(
-        "/admin/studio/clients/{cid3}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{cid3}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert r.status_code == 303
     assert db.one("SELECT id FROM clients WHERE id=?", (cid3,)) is None
@@ -3535,14 +3546,14 @@ def test_client_delete_safety(admin):
         "INSERT INTO portals (client_id, slug, pin, visits) VALUES (?,?,?,5)",
         (cid4, "client-del-portal", "1234"),
     )
-    r = admin.post("/admin/studio/clients/{cid4}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/studio/clients/{cid4}/delete", follow_redirects=False)
     assert r.status_code == 400 and "portal with 5 visits" in r.json()["detail"]
     # client detail page shows the same blockers + a button that carries force
-    page = admin.get("/admin/studio/clients/{cid4}").text
+    page = admin.get(f"/admin/studio/clients/{cid4}").text
     assert "portal with 5 visits" in page
     assert 'name="force" value="1"' in page
     # cleanup
-    admin.post("/admin/studio/clients/{cid4}/delete", data={"force": "1"}, follow_redirects=False)
+    admin.post(f"/admin/studio/clients/{cid4}/delete", data={"force": "1"}, follow_redirects=False)
 
     # client with favorites in a linked gallery
     cid5 = db.run("INSERT INTO clients (name) VALUES (?)", ("Faved Co",))
@@ -3556,7 +3567,7 @@ def test_client_delete_safety(admin):
     )
     vid5 = db.run("INSERT INTO visitors (gallery_id, token) VALUES (?,?)", (gid5, "vtok-cldel"))
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (vid5, aid5))
-    r = admin.post("/admin/studio/clients/{cid5}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/studio/clients/{cid5}/delete", follow_redirects=False)
     assert r.status_code == 400 and "favorite" in r.json()["detail"]
     db.run("DELETE FROM galleries WHERE id=?", (gid5,))
     db.run("DELETE FROM clients WHERE id=?", (cid5,))
@@ -3587,7 +3598,7 @@ def test_gallery_delete(admin):
     db.run("UPDATE galleries SET published=1 WHERE id=?", (g["id"],))
     assert "Delete gallery" not in admin.get(f"/admin/galleries/{g['id']}").text
     assert (
-        admin.post("/admin/galleries/{g['id']}/delete", follow_redirects=False).status_code == 400
+        admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False).status_code == 400
     )
     db.run("UPDATE galleries SET published=0 WHERE id=?", (g["id"],))
 
@@ -3598,19 +3609,19 @@ def test_gallery_delete(admin):
         db.one("SELECT cover_asset_id FROM galleries WHERE id=?", (g["id"],))["cover_asset_id"]
         == a["id"]
     )
-    admin.post("/admin/galleries/{g['id']}/assets/{a['id']}/delete")
+    admin.post(f"/admin/galleries/{g['id']}/assets/{a['id']}/delete")
     assert (
         db.one("SELECT cover_asset_id FROM galleries WHERE id=?", (g["id"],))["cover_asset_id"]
         is None
     )
 
-    r = admin.post("/admin/galleries/{g['id']}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False)
     assert r.status_code == 303
     assert not db.one("SELECT 1 AS x FROM galleries WHERE id=?", (g["id"],))
     assert not db.one("SELECT 1 AS x FROM assets WHERE gallery_id=?", (g["id"],))
     assert not media_dir.exists()
     assert (
-        admin.post("/admin/galleries/{g['id']}/delete", follow_redirects=False).status_code == 404
+        admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False).status_code == 404
     )
 
     # portal-favorites safety: an unpublished gallery linked to a client with
@@ -3623,7 +3634,7 @@ def test_gallery_delete(admin):
     )
     g2 = db.one("SELECT * FROM galleries WHERE title='PortalSafetyTest'")
     admin.post(
-        "/admin/galleries/{g2['id']}/upload",
+        f"/admin/galleries/{g2['id']}/upload",
         files=[("files", ("safe.jpg", _jpeg_bytes(), "image/jpeg"))],
     )
     a2 = db.one("SELECT id FROM assets WHERE gallery_id=?", (g2["id"],))
@@ -3638,10 +3649,10 @@ def test_gallery_delete(admin):
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (vid, a2["id"]))
 
     # gallery admin page surfaces the portal-fav count + safety copy
-    page = admin.get("/admin/galleries/{g2['id']}").text
+    page = admin.get(f"/admin/galleries/{g2['id']}").text
     assert "with 1 portal fav" in page
     # plain delete refused with explanatory 400
-    r = admin.post("/admin/galleries/{g2['id']}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/galleries/{g2['id']}/delete", follow_redirects=False)
     assert r.status_code == 400
     assert "social-crops" in r.json()["detail"] or "social-crops" in r.text
     # gallery still exists after the refused delete
@@ -3649,7 +3660,7 @@ def test_gallery_delete(admin):
 
     # force=1 lets it through
     r = admin.post(
-        "/admin/galleries/{g2['id']}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/galleries/{g2['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert r.status_code == 303
     assert not db.one("SELECT 1 AS x FROM galleries WHERE id=?", (g2["id"],))
@@ -3662,7 +3673,7 @@ def test_asset_reorder(admin):
     g = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
     admin.post(
         f"/admin/galleries/{g['id']}/upload",
-        files=[("files", ("{n}.jpg", _jpeg_bytes(), "image/jpeg")) for n in "abc"],
+        files=[("files", (f"{n}.jpg", _jpeg_bytes(), "image/jpeg")) for n in "abc"],
     )
 
     def order():  # same ORDER BY the public gallery uses — this IS the client-facing order
@@ -3676,19 +3687,19 @@ def test_asset_reorder(admin):
     a1, a2, a3 = order()
     # move last one earlier; whole section gets renumbered from the legacy all-zero state
     r = admin.post(
-        "/admin/galleries/{g['id']}/assets/{a3}/move", data={"dir": "left"}, follow_redirects=False
+        f"/admin/galleries/{g['id']}/assets/{a3}/move", data={"dir": "left"}, follow_redirects=False
     )
     assert r.status_code == 303
     assert order() == [a1, a3, a2]
     # edge is a no-op, not an error
-    admin.post("/admin/galleries/{g['id']}/assets/{a1}/move", data={"dir": "left"})
+    admin.post(f"/admin/galleries/{g['id']}/assets/{a1}/move", data={"dir": "left"})
     assert order() == [a1, a3, a2]
-    admin.post("/admin/galleries/{g['id']}/assets/{a1}/move", data={"dir": "right"})
+    admin.post(f"/admin/galleries/{g['id']}/assets/{a1}/move", data={"dir": "right"})
     assert order() == [a3, a1, a2]
     # bad direction 400s, unknown asset 404s
     assert (
         admin.post(
-            "/admin/galleries/{g['id']}/assets/{a1}/move",
+            f"/admin/galleries/{g['id']}/assets/{a1}/move",
             data={"dir": "up"},
             follow_redirects=False,
         ).status_code
@@ -3696,7 +3707,7 @@ def test_asset_reorder(admin):
     )
     assert (
         admin.post(
-            "/admin/galleries/{g['id']}/assets/999999/move",
+            f"/admin/galleries/{g['id']}/assets/999999/move",
             data={"dir": "left"},
             follow_redirects=False,
         ).status_code
@@ -3712,7 +3723,7 @@ def test_asset_reorder(admin):
     )["id"]
     s = db.one("SELECT id FROM sections WHERE gallery_id=? AND name='Drinks'", (g["id"],))
     r = admin.post(
-        "/admin/galleries/{g['id']}/assets/bulk-section",
+        f"/admin/galleries/{g['id']}/assets/bulk-section",
         data={"section_id": str(s["id"]), "asset_ids": [str(a1), str(a2)]},
         follow_redirects=False,
     )
@@ -3724,14 +3735,14 @@ def test_asset_reorder(admin):
     assert secs[a1] == s["id"] and secs[a2] == s["id"] and secs[a3] == default_sec
     # empty section_id moves back to (none)
     admin.post(
-        "/admin/galleries/{g['id']}/assets/bulk-section",
+        f"/admin/galleries/{g['id']}/assets/bulk-section",
         data={"section_id": "", "asset_ids": [str(a1)]},
     )
     assert db.one("SELECT section_id FROM assets WHERE id=?", (a1,))["section_id"] is None
     # a section the gallery doesn't own is rejected
     assert (
         admin.post(
-            "/admin/galleries/{g['id']}/assets/bulk-section",
+            f"/admin/galleries/{g['id']}/assets/bulk-section",
             data={"section_id": "999999", "asset_ids": [str(a1)]},
             follow_redirects=False,
         ).status_code
@@ -3759,7 +3770,7 @@ def test_section_rename_reorder(admin):
 
     # rename keeps assets attached (no delete/re-add dance)
     r = admin.post(
-        "/admin/galleries/{g['id']}/sections/{first['id']}/rename",
+        f"/admin/galleries/{g['id']}/sections/{first['id']}/rename",
         data={"name": "Signature Dishes"},
         follow_redirects=False,
     )
@@ -3767,7 +3778,7 @@ def test_section_rename_reorder(admin):
     assert order()[0] == "Signature Dishes"
     assert (
         admin.post(
-            "/admin/galleries/{g['id']}/sections/{first['id']}/rename",
+            f"/admin/galleries/{g['id']}/sections/{first['id']}/rename",
             data={"name": "  "},
             follow_redirects=False,
         ).status_code
@@ -3775,18 +3786,18 @@ def test_section_rename_reorder(admin):
     )
 
     # move down swaps with the neighbor; edge moves no-op
-    admin.post("/admin/galleries/{g['id']}/sections/{first['id']}/move", data={"dir": "down"})
+    admin.post(f"/admin/galleries/{g['id']}/sections/{first['id']}/move", data={"dir": "down"})
     assert order()[1] == "Signature Dishes"
-    admin.post("/admin/galleries/{g['id']}/sections/{first['id']}/move", data={"dir": "up"})
+    admin.post(f"/admin/galleries/{g['id']}/sections/{first['id']}/move", data={"dir": "up"})
     admin.post(
-        "/admin/galleries/{g['id']}/sections/{first['id']}/move", data={"dir": "up"}
+        f"/admin/galleries/{g['id']}/sections/{first['id']}/move", data={"dir": "up"}
     )  # already first — no-op
     assert order()[0] == "Signature Dishes"
 
     # bad input
     assert (
         admin.post(
-            "/admin/galleries/{g['id']}/sections/{first['id']}/move",
+            f"/admin/galleries/{g['id']}/sections/{first['id']}/move",
             data={"dir": "sideways"},
             follow_redirects=False,
         ).status_code
@@ -3794,7 +3805,7 @@ def test_section_rename_reorder(admin):
     )
     assert (
         admin.post(
-            "/admin/galleries/{g['id']}/sections/999999/move",
+            f"/admin/galleries/{g['id']}/sections/999999/move",
             data={"dir": "up"},
             follow_redirects=False,
         ).status_code
@@ -3827,7 +3838,7 @@ def test_upload_defaults_to_first_section(admin):
 
     # an explicit section_id is honored, not overridden by the default
     admin.post(
-        "/admin/galleries/{g['id']}/upload?section_id={secs[1]['id']}",
+        f"/admin/galleries/{g['id']}/upload?section_id={secs[1]['id']}",
         files=[("files", ("interior.jpg", _jpeg_bytes(), "image/jpeg"))],
     )
     a = db.one(
@@ -3857,7 +3868,7 @@ def test_section_jump_nav(admin):
     with TestClient(app):  # fresh lifespan: job pool may have been stopped upstream
         admin.post(
             f"/admin/galleries/{g['id']}/upload",
-            files=[("files", ("{n}.jpg", _jpeg_bytes(), "image/jpeg")) for n in "ab"],
+            files=[("files", (f"{n}.jpg", _jpeg_bytes(), "image/jpeg")) for n in "ab"],
         )
         for _ in range(50):
             rows = db.all_("SELECT status FROM assets WHERE gallery_id=?", (g["id"],))
@@ -3871,12 +3882,12 @@ def test_section_jump_nav(admin):
     ]
     hero = db.one("SELECT id FROM sections WHERE gallery_id=? AND name='Hero Dishes'", (g["id"],))
     admin.post(
-        "/admin/galleries/{g['id']}/assets/{a1}/section", data={"section_id": str(hero["id"])}
+        f"/admin/galleries/{g['id']}/assets/{a1}/section", data={"section_id": str(hero["id"])}
     )
     # a2 to the unsectioned "More" bucket so we have one section + More = 2 targets
     # (uploads now default into the first section, so push it back out)
     admin.post(
-        "/admin/galleries/{g['id']}/assets/bulk-section",
+        f"/admin/galleries/{g['id']}/assets/bulk-section",
         data={"section_id": "", "asset_ids": [str(a2)]},
     )
     admin.post(
@@ -3893,10 +3904,10 @@ def test_section_jump_nav(admin):
 
         # per-section ZIP: heading carries ↓, email gate first, then exact bundle
         assert f"/g/{g['slug']}/download/section/{hero['id']}" in r.text
-        r2 = pub.get("/g/{g['slug']}/download/section/{hero['id']}", follow_redirects=False)
+        r2 = pub.get(f"/g/{g['slug']}/download/section/{hero['id']}", follow_redirects=False)
         assert r2.status_code == 303  # no email yet → gate
         # /download?section=N must render the gate (catches decorator-misplacement)
-        gate = pub.get("/g/{g['slug']}/download?section={hero['id']}")
+        gate = pub.get(f"/g/{g['slug']}/download?section={hero['id']}")
         assert gate.status_code == 200 and 'name="section"' in gate.text
         assert f'value="{hero["id"]}"' in gate.text
         pub.post(
@@ -3904,17 +3915,17 @@ def test_section_jump_nav(admin):
             data={"email": "nav@bistro.com", "section": str(hero["id"])},
             follow_redirects=False,
         )
-        r2 = pub.get("/g/{g['slug']}/download/section/{hero['id']}")
+        r2 = pub.get(f"/g/{g['slug']}/download/section/{hero['id']}")
         assert r2.headers["content-type"] == "application/zip"
         assert zipfile.ZipFile(io.BytesIO(r2.content)).namelist() == ["a.jpg"]
         # empty and foreign sections refuse
         empty = db.one("SELECT id FROM sections WHERE gallery_id=? AND name='Drinks'", (g["id"],))
-        assert pub.get("/g/{g['slug']}/download/section/{empty['id']}").status_code == 404
-        assert pub.get("/g/{g['slug']}/download/section/999999").status_code == 404
+        assert pub.get(f"/g/{g['slug']}/download/section/{empty['id']}").status_code == 404
+        assert pub.get(f"/g/{g['slug']}/download/section/999999").status_code == 404
 
         # collapse everything into one chapter → nav disappears (nothing to jump between)
         admin.post(
-            "/admin/galleries/{g['id']}/assets/{a2}/section", data={"section_id": str(hero["id"])}
+            f"/admin/galleries/{g['id']}/assets/{a2}/section", data={"section_id": str(hero["id"])}
         )
         r = pub.get(f"/g/{g['slug']}")
         assert "section-nav" not in r.text and f'id="sec-{hero["id"]}"' in r.text
@@ -3922,9 +3933,9 @@ def test_section_jump_nav(admin):
         # section content changed → new content-keyed bundle, old rev pruned
         from app import config
 
-        r2 = pub.get("/g/{g['slug']}/download/section/{hero['id']}")
+        r2 = pub.get(f"/g/{g['slug']}/download/section/{hero['id']}")
         assert sorted(zipfile.ZipFile(io.BytesIO(r2.content)).namelist()) == ["a.jpg", "b.jpg"]
-        assert len(list(config.ZIP_DIR.glob("g{g['id']}-s{hero['id']}-*.zip"))) == 1
+        assert len(list(config.ZIP_DIR.glob(f"g{g['id']}-s{hero['id']}-*.zip"))) == 1
 
 
 def test_jobs_admin_view(admin):
@@ -3943,12 +3954,12 @@ def test_jobs_admin_view(admin):
     page = admin.get("/admin/jobs")
     assert page.status_code == 200
     assert "social_crops" in page.text and "boom" in page.text
-    assert "/admin/jobs/{jid}/retry" in page.text
+    assert f"/admin/jobs/{jid}/retry" in page.text
 
     # retry requeues, resets attempts, and the job runs to done
     # (fresh lifespan: earlier tests' nested TestClient exits stop the pool)
     with TestClient(app):
-        r = admin.post("/admin/jobs/{jid}/retry", follow_redirects=False)
+        r = admin.post(f"/admin/jobs/{jid}/retry", follow_redirects=False)
         assert r.status_code == 303
         for _ in range(50):
             if db.one("SELECT status FROM jobs WHERE id=?", (jid,))["status"] == "done":
@@ -3958,7 +3969,7 @@ def test_jobs_admin_view(admin):
     assert j["status"] == "done" and j["error"] is None and j["attempts"] == 1
 
     # only failed jobs are retryable
-    assert admin.post("/admin/jobs/{jid}/retry", follow_redirects=False).status_code == 404
+    assert admin.post(f"/admin/jobs/{jid}/retry", follow_redirects=False).status_code == 404
 
 
 def test_case_studies(admin):
@@ -3970,13 +3981,13 @@ def test_case_studies(admin):
         # before publishing: /work is empty, /work/{slug} 404s, sitemap silent
         r = pub.get("/work")
         assert r.status_code == 200 and "New work is being curated" in r.text
-        assert pub.get("/work/{g['slug']}").status_code == 404
+        assert pub.get(f"/work/{g['slug']}").status_code == 404
         sm = pub.get("/sitemap.xml").text
-        assert "/work/{g['slug']}" not in sm
+        assert f"/work/{g['slug']}" not in sm
 
         # star a photo + fill case-study fields via the admin settings form
         admin.post(
-            "/admin/galleries/{g['id']}/assets/{photos[0]['id']}/portfolio", follow_redirects=False
+            f"/admin/galleries/{g['id']}/assets/{photos[0]['id']}/portfolio", follow_redirects=False
         )
         admin.post(
             f"/admin/galleries/{g['id']}/settings",
@@ -3989,7 +4000,7 @@ def test_case_studies(admin):
                 "captions": "",
                 "cs_published": "true",
                 "cs_tagline": "Spring menu for Café Lune",
-                "cs_brie": "A 40-dish refresh shot over two days.",
+                "cs_brief": "A 40-dish refresh shot over two days.",
                 "cs_credits": "Chef: Mara Sun\nStylist: Lou Mendez",
                 "cs_location": "Cleveland, OH",
             },
@@ -4003,12 +4014,14 @@ def test_case_studies(admin):
         assert 'content="index, follow"' in r.text and "x-robots-tag" not in r.headers
 
         # /work/{slug} renders brief, credits, location, photo, and OG/SEO meta
-        r = pub.get("/work/{g['slug']}")
+        r = pub.get(f"/work/{g['slug']}")
         assert r.status_code == 200
         assert "x-robots-tag" not in r.headers
         assert "Spring menu for Café Lune" in r.text
         assert "40-dish refresh" in r.text
-        assert "Chef: Mara Sun" in r.text and "Stylist: Lou Mendez" in r.text
+        # credits render as a label/value grid ("Chef: Mara Sun" is split on the colon)
+        assert "work-credit-label" in r.text
+        assert "Mara Sun" in r.text and "Lou Mendez" in r.text
         assert "Cleveland, OH" in r.text
         from app import config as cfg
 
@@ -4022,8 +4035,8 @@ def test_case_studies(admin):
 
         # sitemap now lists the case study; robots.txt unchanged (no exclusion needed)
         sm = pub.get("/sitemap.xml").text
-        assert "<loc>{cfg.BASE_URL}/work/{g['slug']}</loc>" in sm
-        assert "<loc>{cfg.BASE_URL}/work</loc>" in sm
+        assert f"<loc>{cfg.BASE_URL}/work/{g['slug']}</loc>" in sm
+        assert f"<loc>{cfg.BASE_URL}/work</loc>" in sm
 
         # noindex on a non-/work prefix stays noindex (middleware is path-prefixed)
         assert "x-robots-tag" in pub.get(f"/g/{g['slug']}").headers
@@ -4039,12 +4052,12 @@ def test_case_studies(admin):
                 "published": "true",
                 "captions": "",
                 "cs_tagline": "",
-                "cs_brie": "",
+                "cs_brief": "",
                 "cs_credits": "",
                 "cs_location": "",
             },
         )
-        assert pub.get("/work/{g['slug']}").status_code == 404
+        assert pub.get(f"/work/{g['slug']}").status_code == 404
         assert "New work is being curated" in pub.get("/work").text
         # client gallery still serves — the case-study flag is independent
         assert pub.get(f"/g/{g['slug']}").status_code == 200
@@ -4060,7 +4073,7 @@ def test_share_debugger(admin):
     assert "Marketing pages" in r.text
     # all marketing-page paths present
     for path in ("/", "/portfolio", "/work", "/services", "/about", "/book", "/contact"):
-        assert "{config.BASE_URL}{path}" in r.text, path
+        assert f"{config.BASE_URL}{path}" in r.text, path
     # per-row debugger links (Facebook + LinkedIn + OpenGraph.xyz)
     assert "developers.facebook.com/tools/debug" in r.text
     assert "linkedin.com/post-inspector" in r.text
@@ -4089,7 +4102,7 @@ def test_share_debugger(admin):
             "captions": "",
             "cs_published": "true",
             "cs_tagline": "Spring dish series",
-            "cs_brie": "A two-day shoot covering the spring menu refresh.",
+            "cs_brief": "A two-day shoot covering the spring menu refresh.",
             "cs_credits": "",
             "cs_location": "Asheville, NC",
         },
@@ -4102,7 +4115,7 @@ def test_share_debugger(admin):
     assert saved["cs_tagline"] == "Spring dish series"
     r = admin.get("/admin/share")
     assert "Case studies" in r.text
-    assert "/work/{g['slug']}" in r.text
+    assert f"/work/{g['slug']}" in r.text
     assert "Spring dish series" in r.text  # cs_tagline became og:title
     assert "spring menu refresh" in r.text  # cs_brief became description
     # Jinja escapes the comma differently? No — just look for Asheville
@@ -4124,7 +4137,7 @@ def test_share_debugger(admin):
             "published": "true",
             "captions": "",
             "cs_tagline": "",
-            "cs_brie": "",
+            "cs_brief": "",
             "cs_credits": "",
             "cs_location": "",
         },
@@ -4156,7 +4169,7 @@ def test_section_captions(admin):
 
     # admin sets a caption
     admin.post(
-        "/admin/galleries/{g['id']}/sections/{sec['id']}/caption",
+        f"/admin/galleries/{g['id']}/sections/{sec['id']}/caption",
         data={"caption": "Hero dishes from the spring menu."},
         follow_redirects=False,
     )
@@ -4183,7 +4196,7 @@ def test_section_captions(admin):
 
     # clearing caption (empty string) → NULL → not rendered
     admin.post(
-        "/admin/galleries/{g['id']}/sections/{sec['id']}/caption",
+        f"/admin/galleries/{g['id']}/sections/{sec['id']}/caption",
         data={"caption": ""},
         follow_redirects=False,
     )
@@ -4196,7 +4209,7 @@ def test_section_captions(admin):
 
     # whitespace-only collapses to NULL too
     admin.post(
-        "/admin/galleries/{g['id']}/sections/{sec['id']}/caption",
+        f"/admin/galleries/{g['id']}/sections/{sec['id']}/caption",
         data={"caption": "   "},
         follow_redirects=False,
     )
@@ -4211,7 +4224,7 @@ def test_portfolio_tag_filter(admin):
         aid = db.run(
             "INSERT INTO assets (gallery_id, kind, filename, stored, "
             "status, portfolio) VALUES (?,?,?,?,?,?)",
-            (g["id"], "photo", "p{i}.jpg", "feedface0{i}feedface.jpg", "ready", 1),
+            (g["id"], "photo", f"p{i}.jpg", f"feedface0{i}feedface.jpg", "ready", 1),
         )
         ids.append(aid)
 
@@ -4230,17 +4243,17 @@ def test_portfolio_tag_filter(admin):
 
     # admin sets tags via the tag endpoint
     admin.post(
-        "/admin/galleries/{g['id']}/assets/{ids[0]}/tag",
+        f"/admin/galleries/{g['id']}/assets/{ids[0]}/tag",
         data={"portfolio_tag": "Dishes"},
         follow_redirects=False,
     )
     admin.post(
-        "/admin/galleries/{g['id']}/assets/{ids[1]}/tag",
+        f"/admin/galleries/{g['id']}/assets/{ids[1]}/tag",
         data={"portfolio_tag": "Dishes"},
         follow_redirects=False,
     )
     admin.post(
-        "/admin/galleries/{g['id']}/assets/{ids[2]}/tag",
+        f"/admin/galleries/{g['id']}/assets/{ids[2]}/tag",
         data={"portfolio_tag": "Drinks"},
         follow_redirects=False,
     )
@@ -4276,7 +4289,7 @@ def test_portfolio_tag_filter(admin):
 
     # clearing a tag (empty string) → DB stores NULL, chip count drops
     admin.post(
-        "/admin/galleries/{g['id']}/assets/{ids[1]}/tag",
+        f"/admin/galleries/{g['id']}/assets/{ids[1]}/tag",
         data={"portfolio_tag": ""},
         follow_redirects=False,
     )
@@ -4287,7 +4300,7 @@ def test_portfolio_tag_filter(admin):
         assert ">Drinks" in r.text and "(1)" in r.text
 
     # unstarring a photo removes it from the public count (and the grid)
-    admin.post("/admin/galleries/{g['id']}/assets/{ids[0]}/portfolio", follow_redirects=False)
+    admin.post(f"/admin/galleries/{g['id']}/assets/{ids[0]}/portfolio", follow_redirects=False)
     with TestClient(app) as pub:
         r = pub.get("/portfolio")
         # Dishes tag now has nothing → chip gone (we only show tags actually in use)
@@ -4313,7 +4326,7 @@ def test_proofing_mode(admin):
         db.run(
             "INSERT INTO assets (gallery_id, section_id, kind, filename, "
             "stored, status) VALUES (?,?,?,?,?,?)",
-            (g["id"], sec["id"], "photo", "d{i}.jpg", "deadbeef0{i}deadbeef.jpg", "ready"),
+            (g["id"], sec["id"], "photo", f"d{i}.jpg", f"deadbeef0{i}deadbeef.jpg", "ready"),
         )
     assets = db.all_(
         "SELECT id FROM assets WHERE gallery_id=? AND section_id=? ORDER BY id",
@@ -4322,7 +4335,7 @@ def test_proofing_mode(admin):
 
     # admin sets proof_target=2
     admin.post(
-        "/admin/galleries/{g['id']}/sections/{sec['id']}/proof",
+        f"/admin/galleries/{g['id']}/sections/{sec['id']}/proof",
         data={"proof_target": "2"},
         follow_redirects=False,
     )
@@ -4343,18 +4356,18 @@ def test_proofing_mode(admin):
         assert f'data-section="{sec["id"]}"' in r.text
 
         # pick 1 → 200 + heart updated + OOB progress jumps to 1 of 2
-        r = pub.post("/g/{g['slug']}/fav/{assets[0]['id']}")
+        r = pub.post(f"/g/{g['slug']}/fav/{assets[0]['id']}")
         assert r.status_code == 200
         assert "fav-btn faved" in r.text
         assert f'id="proof-{sec["id"]}"' in r.text and "1 of 2 picked" in r.text
 
         # pick 2 → at target, label flips to ok class
-        r = pub.post("/g/{g['slug']}/fav/{assets[1]['id']}")
+        r = pub.post(f"/g/{g['slug']}/fav/{assets[1]['id']}")
         assert r.status_code == 200
         assert "2 of 2 picked" in r.text and "proof-progress ok" in r.text
 
         # 3rd pick → REFUSED with 409 + HX-Trigger toast event; not stored
-        r = pub.post("/g/{g['slug']}/fav/{assets[2]['id']}")
+        r = pub.post(f"/g/{g['slug']}/fav/{assets[2]['id']}")
         assert r.status_code == 409
         assert "proof-cap" in r.headers["hx-trigger"]
         assert '"target":2' in r.headers["hx-trigger"]
@@ -4370,9 +4383,9 @@ def test_proofing_mode(admin):
         )
 
         # unfav one → progress drops to 1 of 2; can now pick the 3rd
-        r = pub.post("/g/{g['slug']}/fav/{assets[0]['id']}")
+        r = pub.post(f"/g/{g['slug']}/fav/{assets[0]['id']}")
         assert r.status_code == 200 and "1 of 2 picked" in r.text
-        r = pub.post("/g/{g['slug']}/fav/{assets[2]['id']}")
+        r = pub.post(f"/g/{g['slug']}/fav/{assets[2]['id']}")
         assert r.status_code == 200 and "2 of 2 picked" in r.text
 
     # admin badge flips to "ready" once the target is hit
@@ -4381,7 +4394,7 @@ def test_proofing_mode(admin):
 
     # clearing the target unblocks unlimited faves and removes the label
     admin.post(
-        "/admin/galleries/{g['id']}/sections/{sec['id']}/proof",
+        f"/admin/galleries/{g['id']}/sections/{sec['id']}/proof",
         data={"proof_target": ""},
         follow_redirects=False,
     )
@@ -4391,7 +4404,7 @@ def test_proofing_mode(admin):
     with TestClient(app) as pub:
         pub.post(f"/g/{g['slug']}/pin", data={"pin": g["pin"]}, follow_redirects=False)
         # now we can fav the leftover asset[0] without trouble — target is gone
-        r = pub.post("/g/{g['slug']}/fav/{assets[0]['id']}")
+        r = pub.post(f"/g/{g['slug']}/fav/{assets[0]['id']}")
         assert r.status_code == 200
         # the response has no OOB progress fragment (no proof_target)
         assert 'id="proof-' not in r.text
@@ -4402,7 +4415,7 @@ def test_proofing_mode(admin):
     # bad input: non-numeric target → 400
     assert (
         admin.post(
-            "/admin/galleries/{g['id']}/sections/{sec['id']}/proof",
+            f"/admin/galleries/{g['id']}/sections/{sec['id']}/proof",
             data={"proof_target": "twelve"},
             follow_redirects=False,
         ).status_code
@@ -4495,7 +4508,7 @@ def test_sent_emails_log(admin):
 
     # the same rows surface on the project detail page's Email activity section,
     # filtered to this project, with the same kind badges + cross-link
-    proj_page = admin.get("/admin/studio/projects/{pid}").text
+    proj_page = admin.get(f"/admin/studio/projects/{pid}").text
     assert "Email activity" in proj_page
     assert "Your proposal — Spring shoot" in proj_page
     assert "Sign here — Spring shoot" in proj_page
@@ -4531,7 +4544,7 @@ def test_sent_emails_log(admin):
         db.run(
             "INSERT INTO emails_log (project_id, doc_kind, doc_id, to_email, "
             "subject) VALUES (?,?,?,?,?)",
-            (pid, "other", i, "sl@cafe.com", "Page subject {i}"),
+            (pid, "other", i, "sl@cafe.com", f"Page subject {i}"),
         )
     r = admin.get("/admin/sent")
     assert "Older" in r.text
@@ -4564,8 +4577,8 @@ def test_inquiry_form_rate_limit(monkeypatch):
     import datetime as dt
 
     contact_data = lambda i: {
-        "name": "User{i}",
-        "email": "u{i}@cafe.com",
+        "name": f"User{i}",
+        "email": f"u{i}@cafe.com",
         "business": "Cafe",
         "message": "hello",
     }
@@ -4611,8 +4624,8 @@ def test_inquiry_form_rate_limit(monkeypatch):
             r = pub.post(
                 "/book/rl-book",
                 data={
-                    "name": "User{i}",
-                    "email": "u{i}@cafe.com",
+                    "name": f"User{i}",
+                    "email": f"u{i}@cafe.com",
                     "start": _slots[i]["utc"],
                     "tz": "America/New_York",
                 },
@@ -4788,7 +4801,7 @@ def test_dashboard_proofing_status(admin):
         # anchor on the grid card (last href — the orphan picker may list it
         # earlier) and read to the card's closing </a>
         page = admin.get("/admin/galleries").text
-        start = page.rindex("/admin/galleries/{gid}")
+        start = page.rindex(f"/admin/galleries/{gid}")
         return page[start : page.index("</a>", start)]
 
     # no proofing sections at all → nothing pending → Delivered
@@ -4803,7 +4816,7 @@ def test_dashboard_proofing_status(admin):
         db.run(
             "INSERT INTO assets (gallery_id, section_id, kind, filename, "
             "stored, status) VALUES (?,?,?,?,?,?)",
-            (gid, sid, "photo", "p{i}.jpg", "selbadge0{i}.jpg", "ready"),
+            (gid, sid, "photo", f"p{i}.jpg", f"selbadge0{i}.jpg", "ready"),
         )
         for i in range(3)
     ]
@@ -4998,7 +5011,7 @@ def test_studio_proofing_waiting(admin):
             db.run(
                 "INSERT INTO assets (gallery_id, section_id, kind, filename, "
                 "stored, status) VALUES (?,?,?,?,?,?)",
-                (gid, sid, "photo", "d{i}.jpg", "deadbeef0{i}deadbeef.jpg", "ready"),
+                (gid, sid, "photo", f"d{i}.jpg", f"deadbeef0{i}deadbeef.jpg", "ready"),
             )
         )
     # one visitor faved one photo → 1 of 3 picked, 2 remaining
@@ -5112,7 +5125,7 @@ def test_studio_upcoming_strip(admin):
     for title, _, _, label, in_strip in plans:
         if in_strip:
             assert title in strip, title
-            assert label in strip, "{title}: missing '{label}'"
+            assert label in strip, f"{title}: missing '{label}'"
         else:
             assert title not in strip, title
 
@@ -5201,7 +5214,7 @@ def test_studio_booking_conflicts(admin):
     db.run(
         "INSERT INTO inquiries (name, email, message, kind, shoot_date, service) "
         "VALUES (?,?,?,?,?,?)",
-        ("Drop-in che", "chef@x.com", "Need photos", "booking", d_inq, "Photography"),
+        ("Drop-in chef", "chef@x.com", "Need photos", "booking", d_inq, "Photography"),
     )
     # converted inquiry on the SAME date → ignored (already accounted for as a project elsewhere)
     db.run(
@@ -5222,7 +5235,7 @@ def test_studio_booking_conflicts(admin):
 def test_client_lifetime_rollup(admin):
     # a brand-new client with no invoices and no delivered shoots → strip absent
     cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Rollup Cafe",))
-    r = admin.get("/admin/studio/clients/{cid}")
+    r = admin.get(f"/admin/studio/clients/{cid}")
     assert r.status_code == 200
     # rollup now lives in the .pgtop topbar subtitle; absent when there's no money/delivery
     assert "paid lifetime" not in r.text
@@ -5258,7 +5271,7 @@ def test_client_lifetime_rollup(admin):
         (iid, 40000, "deposit"),
     )
 
-    r = admin.get("/admin/studio/clients/{cid}")
+    r = admin.get(f"/admin/studio/clients/{cid}")
     s_start = r.text.index('class="pgtop-sub"')
     sec = r.text[s_start : r.text.index("</p>", s_start)]
     assert "$400.00</b> paid lifetime" in sec
@@ -5329,8 +5342,8 @@ def test_testimonials(admin):
 
     # publish the case study + verify the gallery-scoped testimonial shows there
     admin.post(
-        "/admin/galleries/{g['id']}/assets/"
-        "{db.one('SELECT id FROM assets WHERE gallery_id=? AND kind=' + chr(34) + 'photo' + chr(34), (g['id'],))['id']}"
+        f"/admin/galleries/{g['id']}/assets/"
+        f"{db.one('SELECT id FROM assets WHERE gallery_id=? AND kind=' + chr(34) + 'photo' + chr(34), (g['id'],))['id']}"
         "/portfolio",
         follow_redirects=False,
     )
@@ -5345,19 +5358,20 @@ def test_testimonials(admin):
             "captions": "",
             "cs_published": "true",
             "cs_tagline": "Test case study",
-            "cs_brie": "Brief.",
+            "cs_brief": "Brief.",
             "cs_credits": "",
             "cs_location": "",
         },
     )
     with TestClient(app) as pub:
-        r = pub.get("/work/{g['slug']}")
+        r = pub.get(f"/work/{g['slug']}")
         assert "Spring shoot felt effortless" in r.text
         assert "Lou Mendez" in r.text
         # The general testimonial does NOT appear on the case-study page
         assert "captured our menu better" not in r.text
-        # heading is gallery-scoped
-        assert "From" in r.text  # "From {client or 'this project'}"
+        # the gallery-scoped testimonial renders as the editorial pull-quote,
+        # full attribution (name · business) — proves the right one is scoped here
+        assert "Bistro Vert" in r.text
 
     # admin list + update + delete flow
     r = admin.get("/admin/studio/testimonials")
@@ -5365,7 +5379,7 @@ def test_testimonials(admin):
     assert "Mara Sun" in r.text and "Lou Mendez" in r.text and "Sam Draft" in r.text
     sam = db.one("SELECT id FROM testimonials WHERE attribution_name='Sam Draft'")
     admin.post(
-        "/admin/studio/testimonials/{sam['id']}",
+        f"/admin/studio/testimonials/{sam['id']}",
         data={
             "quote": "Now published.",
             "attribution_name": "Sam Drafted",
@@ -5378,7 +5392,7 @@ def test_testimonials(admin):
     )
     row = db.one("SELECT * FROM testimonials WHERE id=?", (sam["id"],))
     assert row["published"] == 1 and row["attribution_name"] == "Sam Drafted"
-    admin.post("/admin/studio/testimonials/{sam['id']}/delete", follow_redirects=False)
+    admin.post(f"/admin/studio/testimonials/{sam['id']}/delete", follow_redirects=False)
     assert db.one("SELECT id FROM testimonials WHERE id=?", (sam["id"],)) is None
 
     # deleting a gallery unbinds testimonials (FK ON DELETE SET NULL)
@@ -5394,12 +5408,12 @@ def test_testimonials(admin):
             "captions": "",
             "cs_published": "",
             "cs_tagline": "",
-            "cs_brie": "",
+            "cs_brief": "",
             "cs_credits": "",
             "cs_location": "",
         },
     )
-    admin.post("/admin/galleries/{g['id']}/delete", follow_redirects=False)
+    admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False)
     lou = db.one("SELECT gallery_id FROM testimonials WHERE attribution_name='Lou Mendez'")
     assert lou is not None and lou["gallery_id"] is None
 
@@ -5437,26 +5451,30 @@ def test_services_page():
 
 
 def test_faq_block():
-    from app.public.site import FAQS
+    # /book and /contact each carry their OWN FAQ set (split 2026-06; book = booking
+    # logistics, contact = pricing/ownership). Same accordion + FAQPage JSON-LD, but
+    # the content differs, so spot-check a distinctive question from each set — that
+    # proves the right set is wired to the right page, not just that *some* FAQ renders.
+    from app.public.site import BOOK_FAQS, CONTACT_FAQS
 
+    pages = {
+        "/book": (BOOK_FAQS, "How far in advance should I book?"),
+        "/contact": (CONTACT_FAQS, "What does a typical project cost?"),
+    }
     with TestClient(app) as pub:
-        # both /book and /contact carry the same accordion + JSON-LD schema
-        for path in ("/book", "/contact"):
+        for path, (faqs, spot) in pages.items():
             r = pub.get(path)
             assert r.status_code == 200
-            # every Q renders as one <details>; spot-check distinctive substrings
-            # (Jinja escapes apostrophes in the rendered HTML so don't full-match)
-            assert r.text.count('<details class="faq-item">') == len(FAQS), path
-            assert "turnaround on edited images" in r.text, path
-            assert "7&#8211;10 business days" in r.text or "7–10 business days" in r.text
-            assert "food stylist" in r.text and "usage rights" in r.text
-            # FAQPage structured data for Google rich results — apostrophes are
-            # JSON-escaped (raw ' or literal), not HTML-escaped, inside <script>
-            assert '"@type": "FAQPage"' in r.text
-            assert '"@type": "Question"' in r.text
-            assert '"acceptedAnswer"' in r.text
+            # every Q renders as one <details>
+            assert r.text.count('<details class="faq-item">') == len(faqs), path
+            # distinctive question text proves the right set is wired to this page
+            assert spot in r.text, path
+            # FAQPage structured data for Google rich results
+            assert '"@type": "FAQPage"' in r.text, path
+            assert '"@type": "Question"' in r.text, path
+            assert '"acceptedAnswer"' in r.text, path
             # links to /contact (so visitors can escalate beyond the FAQ)
-            assert 'href="/contact"' in r.text
+            assert 'href="/contact"' in r.text, path
         # other marketing pages don't carry the FAQ (different intent)
         assert '"@type": "FAQPage"' not in pub.get("/portfolio").text
         assert '"@type": "FAQPage"' not in pub.get("/").text
@@ -5475,7 +5493,7 @@ def test_license_lifecycle(admin):
 
     # create a license → one 'create' audit row
     r = admin.post(
-        "/admin/studio/clients/{c['id']}/licenses",
+        f"/admin/studio/clients/{c['id']}/licenses",
         data={"title": "Spring menu — social"},
         follow_redirects=False,
     )
@@ -5492,11 +5510,11 @@ def test_license_lifecycle(admin):
     assert len(created) == 1
 
     # detail page renders
-    assert admin.get("/admin/studio/licenses/{lic['id']}").status_code == 200
+    assert admin.get(f"/admin/studio/licenses/{lic['id']}").status_code == 200
 
     # update with a real change → 'update' audit row carries the diff
     r = admin.post(
-        "/admin/studio/licenses/{lic['id']}",
+        f"/admin/studio/licenses/{lic['id']}",
         data={
             "title": "Spring menu — social + web",
             "usage_tier": "extended",
@@ -5531,7 +5549,7 @@ def test_license_lifecycle(admin):
         (lic["id"],),
     )["n"]
     admin.post(
-        "/admin/studio/licenses/{lic['id']}",
+        f"/admin/studio/licenses/{lic['id']}",
         data={
             "title": lic["title"],
             "usage_tier": "extended",
@@ -5554,7 +5572,7 @@ def test_license_lifecycle(admin):
 
     # status change → its own audit row + status persisted
     admin.post(
-        "/admin/studio/licenses/{lic['id']}/status",
+        f"/admin/studio/licenses/{lic['id']}/status",
         data={"status": "active"},
         follow_redirects=False,
     )
@@ -5569,7 +5587,7 @@ def test_license_lifecycle(admin):
     # bad status rejected
     assert (
         admin.post(
-            "/admin/studio/licenses/{lic['id']}/status",
+            f"/admin/studio/licenses/{lic['id']}/status",
             data={"status": "bogus"},
             follow_redirects=False,
         ).status_code
@@ -5584,7 +5602,7 @@ def test_license_lifecycle(admin):
     # 'specific' coverage syncs the join table inside the same tx
     other = db.run("INSERT INTO clients (name) VALUES (?)", ("Sister Venue",))
     admin.post(
-        "/admin/studio/licenses/{lic['id']}",
+        f"/admin/studio/licenses/{lic['id']}",
         data={
             "title": lic["title"],
             "usage_tier": "extended",
@@ -5606,10 +5624,10 @@ def test_license_lifecycle(admin):
                                WHERE entity_type='license' AND entity_id=?""",
         (lic["id"],),
     )["n"]
-    r = admin.post("/admin/studio/licenses/{lic['id']}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/studio/licenses/{lic['id']}/delete", follow_redirects=False)
     assert r.status_code == 303
     assert db.one("SELECT deleted_at FROM licenses WHERE id=?", (lic["id"],))["deleted_at"]
-    assert admin.get("/admin/studio/licenses/{lic['id']}").status_code == 404
+    assert admin.get(f"/admin/studio/licenses/{lic['id']}").status_code == 404
     assert lic["title"] not in admin.get("/admin/studio/licenses").text
     n_audit_after = db.one(
         """SELECT COUNT(*) AS n FROM audit_log
@@ -5648,7 +5666,7 @@ def test_license_holder_and_descendants_cascade(admin):
     venue = db.run("INSERT INTO clients (name, parent_id) VALUES (?,?)", ("Harbor Venue", region))
 
     r = admin.post(
-        "/admin/studio/clients/{group}/licenses",
+        f"/admin/studio/clients/{group}/licenses",
         data={"title": "Group brand grant"},
         follow_redirects=False,
     )
@@ -5659,26 +5677,26 @@ def test_license_holder_and_descendants_cascade(admin):
 
     # schema default holder_only → only the holder is reached
     assert effective_coverage(db.one("SELECT * FROM licenses WHERE id=?", (lic["id"],))) == [group]
-    page = admin.get("/admin/studio/licenses/{lic['id']}").text
+    page = admin.get(f"/admin/studio/licenses/{lic['id']}").text
     assert "1 client reached" in page
     assert "Harbor Venue" not in _cov_block(page)  # descendant not yet reached
 
     # flip to holder_and_descendants → holder first, then descendants top-down
     admin.post(
-        "/admin/studio/licenses/{lic['id']}",
+        f"/admin/studio/licenses/{lic['id']}",
         data={"title": lic["title"], "coverage_scope": "holder_and_descendants"},
         follow_redirects=False,
     )
     row = db.one("SELECT * FROM licenses WHERE id=?", (lic["id"],))
     assert effective_coverage(row) == [group, region, venue]
-    page = admin.get("/admin/studio/licenses/{lic['id']}").text
+    page = admin.get(f"/admin/studio/licenses/{lic['id']}").text
     assert "3 clients reached" in page
     block = _cov_block(page)
     assert "Harbor Venue" in block and "West Region" in block  # cascade is VISIBLE
 
     # 'specific' is explicit-only — the descendant venue is NOT auto-included
     admin.post(
-        "/admin/studio/licenses/{lic['id']}",
+        f"/admin/studio/licenses/{lic['id']}",
         data={
             "title": lic["title"],
             "coverage_scope": "specific",
@@ -5688,7 +5706,7 @@ def test_license_holder_and_descendants_cascade(admin):
     )
     row = db.one("SELECT * FROM licenses WHERE id=?", (lic["id"],))
     assert effective_coverage(row) == [group, region]  # venue NOT pulled in
-    assert "Harbor Venue" not in _cov_block(admin.get("/admin/studio/licenses/{lic['id']}").text)
+    assert "Harbor Venue" not in _cov_block(admin.get(f"/admin/studio/licenses/{lic['id']}").text)
 
 
 def test_pricing_suggestion_math():
@@ -5780,25 +5798,25 @@ def test_license_suggestion_follows_client_market(admin):
     cli = db.run("INSERT INTO clients (name) VALUES (?)", ("Charlotte Bistro",))
     # Move the client to Charlotte via the editor route (validates the vocab).
     r = admin.post(
-        "/admin/studio/clients/{cli}",
+        f"/admin/studio/clients/{cli}",
         data={"name": "Charlotte Bistro", "market": "charlotte"},
         follow_redirects=False,
     )
     assert r.status_code == 303
     assert db.one("SELECT market FROM clients WHERE id=?", (cli,))["market"] == "charlotte"
     admin.post(
-        "/admin/studio/clients/{cli}/licenses",
+        f"/admin/studio/clients/{cli}/licenses",
         data={"title": "Bistro web license"},
         follow_redirects=False,
     )
     lic = db.one(
         "SELECT id FROM licenses WHERE holder_client_id=? ORDER BY id DESC LIMIT 1", (cli,)
     )
-    page = admin.get("/admin/studio/licenses/{lic['id']}").text
+    page = admin.get(f"/admin/studio/licenses/{lic['id']}").text
     assert "Suggested (charlotte rate card)" in page
     # An unknown market is rejected at the editor, not silently stored.
     bad = admin.post(
-        "/admin/studio/clients/{cli}",
+        f"/admin/studio/clients/{cli}",
         data={"name": "Charlotte Bistro", "market": "atlantis"},
         follow_redirects=False,
     )
@@ -5813,16 +5831,16 @@ def test_license_suggested_fee_is_advisory(admin):
     it does not set them)."""
     cli = db.run("INSERT INTO clients (name) VALUES (?)", ("Asheville Cafe",))
     r = admin.post(
-        "/admin/studio/clients/{cli}/licenses",
+        f"/admin/studio/clients/{cli}/licenses",
         data={"title": "Cafe web license"},
         follow_redirects=False,
     )
     assert r.status_code == 303
     lic = db.one("SELECT * FROM licenses WHERE holder_client_id=? ORDER BY id DESC LIMIT 1", (cli,))
-    page = admin.get("/admin/studio/licenses/{lic['id']}").text
+    page = admin.get(f"/admin/studio/licenses/{lic['id']}").text
     assert "Suggested (asheville rate card)" in page
     admin.post(
-        "/admin/studio/licenses/{lic['id']}",
+        f"/admin/studio/licenses/{lic['id']}",
         data={"title": lic["title"], "usage_tier": "standard", "fee": "123.45"},
         follow_redirects=False,
     )
@@ -5849,32 +5867,32 @@ def test_license_reverse_lookup_on_covered_client(admin):
     ven = db.run("INSERT INTO clients (name, parent_id) VALUES (?,?)", ("Reverse Venue", reg))
 
     admin.post(
-        "/admin/studio/clients/{grp}/licenses",
+        f"/admin/studio/clients/{grp}/licenses",
         data={"title": "RL group grant"},
         follow_redirects=False,
     )
     lic = db.one("SELECT * FROM licenses WHERE holder_client_id=? ORDER BY id DESC LIMIT 1", (grp,))
 
     # holder_only (create default) reaches nobody below → venue page shows nothing
-    assert "RL group grant" not in _covered(admin.get("/admin/studio/clients/{ven}").text)
+    assert "RL group grant" not in _covered(admin.get(f"/admin/studio/clients/{ven}").text)
 
     # flip to holder_and_descendants → cascades down; venue shows it as a group grant
     admin.post(
-        "/admin/studio/licenses/{lic['id']}",
+        f"/admin/studio/licenses/{lic['id']}",
         data={"title": lic["title"], "coverage_scope": "holder_and_descendants"},
         follow_redirects=False,
     )
-    block = _covered(admin.get("/admin/studio/clients/{ven}").text)
+    block = _covered(admin.get(f"/admin/studio/clients/{ven}").text)
     assert "RL group grant" in block  # the license itself
     assert "Reverse Group" in block  # holder named + linked
     assert "group cascade" in block  # relationship labelled
     # the HOLDER's own page does not list it under 'covered by' — it HOLDS it
-    assert "RL group grant" not in _covered(admin.get("/admin/studio/clients/{grp}").text)
+    assert "RL group grant" not in _covered(admin.get(f"/admin/studio/clients/{grp}").text)
 
     # an explicit 'specific' grant held elsewhere, listing the venue → 'added explicitly'
     other = db.run("INSERT INTO clients (name) VALUES (?)", ("Other Holder",))
     admin.post(
-        "/admin/studio/clients/{other}/licenses",
+        f"/admin/studio/clients/{other}/licenses",
         data={"title": "RL specific grant"},
         follow_redirects=False,
     )
@@ -5882,11 +5900,11 @@ def test_license_reverse_lookup_on_covered_client(admin):
         "SELECT * FROM licenses WHERE holder_client_id=? ORDER BY id DESC LIMIT 1", (other,)
     )
     admin.post(
-        "/admin/studio/licenses/{lic2['id']}",
+        f"/admin/studio/licenses/{lic2['id']}",
         data={"title": lic2["title"], "coverage_scope": "specific", "cover_client_ids": [str(ven)]},
         follow_redirects=False,
     )
-    block = _covered(admin.get("/admin/studio/clients/{ven}").text)
+    block = _covered(admin.get(f"/admin/studio/clients/{ven}").text)
     assert "RL specific grant" in block and "added explicitly" in block
 
 
@@ -5902,17 +5920,17 @@ def test_license_expiry_cue_on_detail(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/licenses",
+        f"/admin/studio/clients/{c['id']}/licenses",
         data={"title": "Expiry cue license"},
         follow_redirects=False,
     )
     lic = db.one("SELECT * FROM licenses ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/licenses/{lic['id']}/status",
+        f"/admin/studio/licenses/{lic['id']}/status",
         data={"status": "active"},
         follow_redirects=False,
     )
-    url = "/admin/studio/licenses/{lic['id']}"
+    url = f"/admin/studio/licenses/{lic['id']}"
 
     # within threshold (active, dated, not perpetual) → the cue renders
     db.run(
@@ -5948,14 +5966,14 @@ def test_audit_diff_renders_as_chips(admin):
     admin.post("/admin/studio/clients", data={"name": "Audit Chips Co"}, follow_redirects=False)
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/licenses",
+        f"/admin/studio/clients/{c['id']}/licenses",
         data={"title": "Chips license"},
         follow_redirects=False,
     )
     lic = db.one("SELECT * FROM licenses ORDER BY id DESC LIMIT 1")
     # update with multi-value territory + channels → diff stores JSON-array strings
     admin.post(
-        "/admin/studio/licenses/{lic['id']}",
+        f"/admin/studio/licenses/{lic['id']}",
         data={
             "title": "Chips license",
             "usage_tier": "standard",
@@ -5979,7 +5997,7 @@ def test_audit_diff_renders_as_chips(admin):
     assert _json.loads(stored["territory"][1]) == ["US", "worldwide"]
 
     # the VIEW renders chips, not the bracketed/escaped JSON string
-    body = admin.get("/admin/studio/licenses/{lic['id']}").text
+    body = admin.get(f"/admin/studio/licenses/{lic['id']}").text
     assert '<span class="diff-chip">US</span>' in body
     assert '<span class="diff-chip">worldwide</span>' in body
     assert '<span class="diff-chip">website</span>' in body
@@ -6159,7 +6177,7 @@ def test_brand_kit_admin(admin):
 
     # non-raster logo rejected (EPS can't composite onto a JPEG)
     r = admin.post(
-        "/admin/studio/clients/{cid}/kits",
+        f"/admin/studio/clients/{cid}/kits",
         files={"logo": ("logo.eps", b"%!PS", "application/postscript")},
         data={"position": "br", "opacity": 100, "scale_pct": 22, "margin_pct": 4},
         follow_redirects=False,
@@ -6168,7 +6186,7 @@ def test_brand_kit_admin(admin):
 
     # PNG accepted with placement params
     r = admin.post(
-        "/admin/studio/clients/{cid}/kits",
+        f"/admin/studio/clients/{cid}/kits",
         files={"logo": ("logo.png", _logo_png(120, 60), "image/png")},
         data={
             "label": "Primary",
@@ -6189,12 +6207,12 @@ def test_brand_kit_admin(admin):
     assert os.path.isfile(spec["path"])
 
     # scoped serve: right client 200, wrong client 404
-    assert admin.get("/admin/studio/clients/{cid}/kits/{kit['id']}/logo").status_code == 200
-    assert admin.get("/admin/studio/clients/{cid + 9999}/kits/{kit['id']}/logo").status_code == 404
+    assert admin.get(f"/admin/studio/clients/{cid}/kits/{kit['id']}/logo").status_code == 200
+    assert admin.get(f"/admin/studio/clients/{cid + 9999}/kits/{kit['id']}/logo").status_code == 404
 
     # deactivate → resolver returns None (additive, never required)
     admin.post(
-        "/admin/studio/clients/{cid}/kits/{kit['id']}",
+        f"/admin/studio/clients/{cid}/kits/{kit['id']}",
         data={"position": "tl", "opacity": 80, "scale_pct": 30, "margin_pct": 6, "active": 0},
         follow_redirects=False,
     )
@@ -6211,20 +6229,20 @@ def test_client_tree_cycle_guards(admin):
 
     # A->A: a client cannot be its own parent (422; DB CHECK is the backstop)
     r = admin.post(
-        "/admin/studio/clients/{a}/parent", data={"parent_id": str(a)}, follow_redirects=False
+        f"/admin/studio/clients/{a}/parent", data={"parent_id": str(a)}, follow_redirects=False
     )
     assert r.status_code == 422
 
     # legitimate: B under A
     r = admin.post(
-        "/admin/studio/clients/{b}/parent", data={"parent_id": str(a)}, follow_redirects=False
+        f"/admin/studio/clients/{b}/parent", data={"parent_id": str(a)}, follow_redirects=False
     )
     assert r.status_code == 303
     assert db.one("SELECT parent_id FROM clients WHERE id=?", (b,))["parent_id"] == a
 
     # A->B->A: A cannot adopt B as parent now that B is A's descendant (422)
     r = admin.post(
-        "/admin/studio/clients/{a}/parent", data={"parent_id": str(b)}, follow_redirects=False
+        f"/admin/studio/clients/{a}/parent", data={"parent_id": str(b)}, follow_redirects=False
     )
     assert r.status_code == 422
     assert db.one("SELECT parent_id FROM clients WHERE id=?", (a,))["parent_id"] is None
@@ -6235,7 +6253,7 @@ def test_client_tree_cycle_guards(admin):
 
     # detach (empty parent_id clears it)
     r = admin.post(
-        "/admin/studio/clients/{b}/parent", data={"parent_id": ""}, follow_redirects=False
+        f"/admin/studio/clients/{b}/parent", data={"parent_id": ""}, follow_redirects=False
     )
     assert r.status_code == 303
     assert db.one("SELECT parent_id FROM clients WHERE id=?", (b,))["parent_id"] is None
@@ -6248,20 +6266,20 @@ def test_client_delete_child_blocker(admin):
     child = db.run("INSERT INTO clients (name, parent_id) VALUES (?,?)", ("Del Venue", parent))
 
     # plain delete refused
-    r = admin.post("/admin/studio/clients/{parent}/delete", data={}, follow_redirects=False)
+    r = admin.post(f"/admin/studio/clients/{parent}/delete", data={}, follow_redirects=False)
     assert r.status_code == 400
     # force=1 STILL refused (hard blocker)
     r = admin.post(
-        "/admin/studio/clients/{parent}/delete", data={"force": "1"}, follow_redirects=False
+        f"/admin/studio/clients/{parent}/delete", data={"force": "1"}, follow_redirects=False
     )
     assert r.status_code == 400
     assert db.one("SELECT id FROM clients WHERE id=?", (parent,)) is not None
 
     # detach the child, then the parent deletes cleanly
     admin.post(
-        "/admin/studio/clients/{child}/parent", data={"parent_id": ""}, follow_redirects=False
+        f"/admin/studio/clients/{child}/parent", data={"parent_id": ""}, follow_redirects=False
     )
-    r = admin.post("/admin/studio/clients/{parent}/delete", data={}, follow_redirects=False)
+    r = admin.post(f"/admin/studio/clients/{parent}/delete", data={}, follow_redirects=False)
     assert r.status_code == 303
     assert db.one("SELECT id FROM clients WHERE id=?", (parent,)) is None
 
@@ -6278,13 +6296,13 @@ def test_brand_kit_cascade_nearest_ancestor(admin):
 
     # group kit at top-left, region kit at bottom-right; venue has none
     admin.post(
-        "/admin/studio/clients/{group}/kits",
+        f"/admin/studio/clients/{group}/kits",
         files={"logo": ("g.png", _logo_png(100, 50), "image/png")},
         data={"position": "tl", "opacity": 100, "scale_pct": 20, "margin_pct": 4},
         follow_redirects=False,
     )
     admin.post(
-        "/admin/studio/clients/{region}/kits",
+        f"/admin/studio/clients/{region}/kits",
         files={"logo": ("r.png", _logo_png(100, 50), "image/png")},
         data={"position": "br", "opacity": 100, "scale_pct": 20, "margin_pct": 4},
         follow_redirects=False,
@@ -6293,29 +6311,29 @@ def test_brand_kit_cascade_nearest_ancestor(admin):
     # venue resolves the REGION kit (nearest), not the group's
     spec = bk.overlay_for_client(venue)
     assert spec is not None and spec["position"] == "br"
-    assert "/{region}/" in spec["path"]  # file resolved under the owning client
+    assert f"/{region}/" in spec["path"]  # file resolved under the owning client
 
     # deactivate region's kit → venue falls back to the GROUP kit (next ancestor)
     rk = db.one("SELECT id FROM brand_kits WHERE client_id=?", (region,))
     admin.post(
-        "/admin/studio/clients/{region}/kits/{rk['id']}",
+        f"/admin/studio/clients/{region}/kits/{rk['id']}",
         data={"position": "br", "opacity": 100, "scale_pct": 20, "margin_pct": 4, "active": 0},
         follow_redirects=False,
     )
     spec = bk.overlay_for_client(venue)
     assert spec is not None and spec["position"] == "tl"
-    assert "/{group}/" in spec["path"]
+    assert f"/{group}/" in spec["path"]
 
     # a venue with its OWN active kit prefers it over any ancestor
     admin.post(
-        "/admin/studio/clients/{venue}/kits",
+        f"/admin/studio/clients/{venue}/kits",
         files={"logo": ("v.png", _logo_png(100, 50), "image/png")},
         data={"position": "c", "opacity": 100, "scale_pct": 20, "margin_pct": 4},
         follow_redirects=False,
     )
     spec = bk.overlay_for_client(venue)
     assert spec is not None and spec["position"] == "c"
-    assert "/{venue}/" in spec["path"]
+    assert f"/{venue}/" in spec["path"]
 
 
 def test_delete_confirm_onsubmit_well_formed(admin):
@@ -6349,12 +6367,12 @@ def test_delete_confirm_onsubmit_well_formed(admin):
         assert 'onsubmit="return confirm("' not in page
 
     # no blocker → "Delete <name>? This is final." (name carries the nasty chars)
-    page = admin.get("/admin/studio/clients/{cid}").text
+    page = admin.get(f"/admin/studio/clients/{cid}").text
     assert_intact(page, "This is final.")
 
     # with a child blocker → the WARNING summary, still well-formed
     child = db.run("INSERT INTO clients (name, parent_id) VALUES (?,?)", ("Child Venue", cid))
-    page = admin.get("/admin/studio/clients/{cid}").text
+    page = admin.get(f"/admin/studio/clients/{cid}").text
     assert_intact(page, "child client")
     assert 'name="force" value="1"' in page
 
@@ -6416,7 +6434,7 @@ def test_crop_preset_admin(admin):
             data={"slug": s, "name": "x", "ratio_label": "1:1", "width": "100", "height": "100"},
             follow_redirects=False,
         )
-        assert rr.status_code == 400, "slug {s!r} must be rejected"
+        assert rr.status_code == 400, f"slug {s!r} must be rejected"
     assert not db.one("SELECT 1 FROM crop_presets WHERE slug='../etc'")
 
     # duplicate slug → clean 400, not a raw IntegrityError 500
@@ -6461,7 +6479,7 @@ def test_crop_preset_admin(admin):
     # edit with a real change → 'update' audit row with the diff; slug immutable
     # even if a slug field is smuggled into the form.
     r = admin.post(
-        "/admin/studio/presets/{ps['id']}",
+        f"/admin/studio/presets/{ps['id']}",
         data={
             "slug": "hacked",
             "name": "Tall portrait",
@@ -6496,7 +6514,7 @@ def test_crop_preset_admin(admin):
         (ps["id"],),
     )["n"]
     admin.post(
-        "/admin/studio/presets/{ps['id']}",
+        f"/admin/studio/presets/{ps['id']}",
         data={
             "name": "Tall portrait",
             "ratio_label": "3:4",
@@ -6517,7 +6535,7 @@ def test_crop_preset_admin(admin):
     assert after == before
 
     # overlay toggle flips the flag + lands its own audit row with the diff
-    admin.post("/admin/studio/presets/{ps['id']}/overlay", follow_redirects=False)
+    admin.post(f"/admin/studio/presets/{ps['id']}/overlay", follow_redirects=False)
     assert (
         db.one("SELECT brand_overlay FROM crop_presets WHERE id=?", (ps["id"],))["brand_overlay"]
         == 1
@@ -6530,7 +6548,7 @@ def test_crop_preset_admin(admin):
     assert _json.loads(ov["diff_json"])["brand_overlay"] == [0, 1]
 
     # active toggle flips + audit row; the trail (with the action) renders on the page
-    admin.post("/admin/studio/presets/{ps['id']}/active", follow_redirects=False)
+    admin.post(f"/admin/studio/presets/{ps['id']}/active", follow_redirects=False)
     assert db.one("SELECT active FROM crop_presets WHERE id=?", (ps["id"],))["active"] == 0
     assert "active_change" in admin.get("/admin/studio/presets").text
 
@@ -6561,7 +6579,7 @@ def test_preset_deactivate_via_admin_holds_public_invariant(admin):
     stem = "cropinvariant0001"
     aid = db.run(
         "INSERT INTO assets (gallery_id, kind, filename, stored, status) VALUES (?,?,?,?,?)",
-        (gid, "photo", "plate.jpg", "{stem}.jpg", "ready"),
+        (gid, "photo", "plate.jpg", f"{stem}.jpg", "ready"),
     )
     vid = db.run(
         "INSERT INTO visitors (gallery_id, token) VALUES (?,?)", (gid, "vtoken-crop-invariant")
@@ -6580,36 +6598,36 @@ def test_preset_deactivate_via_admin_holds_public_invariant(admin):
     active = presets.active()
     assert len(active) >= 2, "need >=2 active presets to prove surgical exclusion"
     for ps in active:
-        (crops / "{stem}_{ps['slug']}.jpg").write_bytes(_jpeg_bytes(64, 64))
+        (crops / f"{stem}_{ps['slug']}.jpg").write_bytes(_jpeg_bytes(64, 64))
     target = active[0]
     slug = target["slug"]
 
     with TestClient(app) as pub:
-        pub.post("/portal/{p['slug']}/pin", data={"pin": p["pin"]}, follow_redirects=False)
+        pub.post(f"/portal/{p['slug']}/pin", data={"pin": p["pin"]}, follow_redirects=False)
         # active: the crop resolves and the zip bundles it
-        assert pub.get("/portal/{p['slug']}/crop/{a['id']}/{slug}").status_code == 200
-        z = pub.get("/portal/{p['slug']}/crops.zip")
+        assert pub.get(f"/portal/{p['slug']}/crop/{a['id']}/{slug}").status_code == 200
+        z = pub.get(f"/portal/{p['slug']}/crops.zip")
         assert z.status_code == 200
         before = zipfile.ZipFile(io.BytesIO(z.content)).namelist()
-        assert any(n.endswith("_{slug}.jpg") for n in before)
+        assert any(n.endswith(f"_{slug}.jpg") for n in before)
 
         # deactivate THROUGH THE ADMIN ROUTE (not a db.run UPDATE)
-        r = admin.post("/admin/studio/presets/{target['id']}/active", follow_redirects=False)
+        r = admin.post(f"/admin/studio/presets/{target['id']}/active", follow_redirects=False)
         assert r.status_code == 303
         assert db.one("SELECT active FROM crop_presets WHERE id=?", (target["id"],))["active"] == 0
 
         # public path now refuses the slug cleanly and drops it from the zip,
         # while other active presets stay bundled (surgical, not all-or-nothing)
-        assert pub.get("/portal/{p['slug']}/crop/{a['id']}/{slug}").status_code == 404
-        z2 = pub.get("/portal/{p['slug']}/crops.zip")
+        assert pub.get(f"/portal/{p['slug']}/crop/{a['id']}/{slug}").status_code == 404
+        z2 = pub.get(f"/portal/{p['slug']}/crops.zip")
         assert z2.status_code == 200
         after = zipfile.ZipFile(io.BytesIO(z2.content)).namelist()
-        assert not any(n.endswith("_{slug}.jpg") for n in after)
+        assert not any(n.endswith(f"_{slug}.jpg") for n in after)
         assert after, "other active presets should still bundle"
 
         # reactivate via admin → resolves again; no destructive state was created
-        admin.post("/admin/studio/presets/{target['id']}/active", follow_redirects=False)
-        assert pub.get("/portal/{p['slug']}/crop/{a['id']}/{slug}").status_code == 200
+        admin.post(f"/admin/studio/presets/{target['id']}/active", follow_redirects=False)
+        assert pub.get(f"/portal/{p['slug']}/crop/{a['id']}/{slug}").status_code == 200
 
 
 def test_client_children_roster(admin):
@@ -6626,7 +6644,7 @@ def test_client_children_roster(admin):
     lone = db.run("INSERT INTO clients (name) VALUES (?)", ("Roster Solo",))
 
     # the group's page lists BOTH descendants (region + grandchild venue)
-    page = admin.get("/admin/studio/clients/{group}").text
+    page = admin.get(f"/admin/studio/clients/{group}").text
     assert "Venues under this group" in page
     assert "Roster West" in page and "West Co" in page
     assert "Roster Bistro" in page
@@ -6634,11 +6652,11 @@ def test_client_children_roster(admin):
     assert f'href="/admin/studio/clients/{venue}"' in page
 
     # a childless client renders no roster block whatsoever (clean empty state)
-    solo = admin.get("/admin/studio/clients/{lone}").text
+    solo = admin.get(f"/admin/studio/clients/{lone}").text
     assert "Venues under this group" not in solo
 
     # the leaf venue is also childless → no roster, even though it HAS a parent
-    leaf = admin.get("/admin/studio/clients/{venue}").text
+    leaf = admin.get(f"/admin/studio/clients/{venue}").text
     assert "Venues under this group" not in leaf
 
 
@@ -6729,7 +6747,7 @@ def test_recurring_plan_draft_generation(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Brand partner retainer"},
         follow_redirects=False,
     )
@@ -6737,7 +6755,7 @@ def test_recurring_plan_draft_generation(admin):
 
     # create plan from the project page form
     r = admin.post(
-        "/admin/studio/projects/{proj['id']}/recurring",
+        f"/admin/studio/projects/{proj['id']}/recurring",
         data={"title": "Monthly content retainer"},
         follow_redirects=False,
     )
@@ -6747,15 +6765,15 @@ def test_recurring_plan_draft_generation(admin):
     assert plan["total_cents"] == 0 and plan["last_run_period"] is None
 
     # project page lists the plan
-    assert "Monthly content retainer" in admin.get("/admin/studio/projects/{proj['id']}").text
+    assert "Monthly content retainer" in admin.get(f"/admin/studio/projects/{proj['id']}").text
 
     # generating with a zero total is refused (nothing to bill)
-    r = admin.post("/admin/studio/recurring/{plan['id']}/generate", follow_redirects=False)
+    r = admin.post(f"/admin/studio/recurring/{plan['id']}/generate", follow_redirects=False)
     assert r.status_code == 400
 
     # edit: line items + anchor day; total recalculates from the rows
     r = admin.post(
-        "/admin/studio/recurring/{plan['id']}",
+        f"/admin/studio/recurring/{plan['id']}",
         data={
             "title": "Monthly content retainer",
             "item_label_0": "Content day",
@@ -6776,7 +6794,7 @@ def test_recurring_plan_draft_generation(admin):
     # anchor day outside 1–28 is rejected
     assert (
         admin.post(
-            "/admin/studio/recurring/{plan['id']}",
+            f"/admin/studio/recurring/{plan['id']}",
             data={"title": "x", "anchor_day": "31"},
             follow_redirects=False,
         ).status_code
@@ -6785,7 +6803,7 @@ def test_recurring_plan_draft_generation(admin):
 
     # generate → a DRAFT invoice linked to the plan, period stamped
     period = _period()
-    r = admin.post("/admin/studio/recurring/{plan['id']}/generate", follow_redirects=False)
+    r = admin.post(f"/admin/studio/recurring/{plan['id']}/generate", follow_redirects=False)
     assert r.status_code == 303
     inv = db.one(
         "SELECT * FROM invoices WHERE recurring_plan_id=? ORDER BY id DESC LIMIT 1", (plan["id"],)
@@ -6802,7 +6820,7 @@ def test_recurring_plan_draft_generation(admin):
     )
 
     # second generate in the same period is a dedupe no-op (400), no new invoice
-    r = admin.post("/admin/studio/recurring/{plan['id']}/generate", follow_redirects=False)
+    r = admin.post(f"/admin/studio/recurring/{plan['id']}/generate", follow_redirects=False)
     assert r.status_code == 400
     assert (
         db.one("SELECT COUNT(*) AS n FROM invoices WHERE recurring_plan_id=?", (plan["id"],))["n"]
@@ -6813,13 +6831,13 @@ def test_recurring_plan_draft_generation(admin):
     db.run("UPDATE recurring_plans SET active=0, last_run_period=NULL WHERE id=?", (plan["id"],))
     assert (
         admin.post(
-            "/admin/studio/recurring/{plan['id']}/generate", follow_redirects=False
+            f"/admin/studio/recurring/{plan['id']}/generate", follow_redirects=False
         ).status_code
         == 400
     )
 
     # soft-delete drops it from the project page but keeps the generated invoice
-    r = admin.post("/admin/studio/recurring/{plan['id']}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/studio/recurring/{plan['id']}/delete", follow_redirects=False)
     assert r.status_code == 303
     assert (
         db.one("SELECT deleted_at FROM recurring_plans WHERE id=?", (plan["id"],))["deleted_at"]
@@ -6828,8 +6846,8 @@ def test_recurring_plan_draft_generation(admin):
     # the plan's own row link is gone (its name lingers only in the kept
     # invoice's title, which is expected — generated invoices survive)
     assert (
-        "/admin/studio/recurring/{plan['id']}"
-        not in admin.get("/admin/studio/projects/{proj['id']}").text
+        f"/admin/studio/recurring/{plan['id']}"
+        not in admin.get(f"/admin/studio/projects/{proj['id']}").text
     )
     assert (
         db.one("SELECT COUNT(*) AS n FROM invoices WHERE recurring_plan_id=?", (plan["id"],))["n"]
@@ -6854,19 +6872,19 @@ def test_recurring_scheduler_sweep(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Retainer"},
         follow_redirects=False,
     )
     proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/projects/{proj['id']}/recurring",
+        f"/admin/studio/projects/{proj['id']}/recurring",
         data={"title": "Sweep retainer"},
         follow_redirects=False,
     )
     plan = db.one("SELECT * FROM recurring_plans ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/recurring/{plan['id']}",
+        f"/admin/studio/recurring/{plan['id']}",
         data={
             "title": "Sweep retainer",
             "item_label_0": "Content day",
@@ -6954,19 +6972,19 @@ def test_retainer_draft_waiting_strip(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Retainer"},
         follow_redirects=False,
     )
     proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/projects/{proj['id']}/recurring",
+        f"/admin/studio/projects/{proj['id']}/recurring",
         data={"title": "Waiting retainer"},
         follow_redirects=False,
     )
     plan = db.one("SELECT * FROM recurring_plans ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/recurring/{plan['id']}",
+        f"/admin/studio/recurring/{plan['id']}",
         data={
             "title": "Waiting retainer",
             "item_label_0": "Content day",
@@ -6994,13 +7012,13 @@ def test_retainer_draft_waiting_strip(admin):
     assert inv["status"] == "draft"
     page = admin.get("/admin/studio/activity").text
     assert "Retainer drafts waiting to send" in page
-    assert "/admin/studio/invoices/{inv['id']}" in page
+    assert f"/admin/studio/invoices/{inv['id']}" in page
 
     # Kevin reviews and Sends it → it drops off the waiting strip
-    r = admin.post("/admin/studio/invoices/{inv['id']}/send", follow_redirects=False)
+    r = admin.post(f"/admin/studio/invoices/{inv['id']}/send", follow_redirects=False)
     assert r.status_code == 303
     page = admin.get("/admin/studio/activity").text
-    assert "/admin/studio/invoices/{inv['id']}" not in page
+    assert f"/admin/studio/invoices/{inv['id']}" not in page
 
     # leave no active plan lingering in the shared DB for later modules
     db.run("UPDATE recurring_plans SET deleted_at=datetime('now') WHERE id=?", (plan["id"],))
@@ -7025,13 +7043,13 @@ def test_retainer_deliverable_quota(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Brand partner retainer"},
         follow_redirects=False,
     )
     proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/projects/{proj['id']}/recurring",
+        f"/admin/studio/projects/{proj['id']}/recurring",
         data={"title": "Content retainer"},
         follow_redirects=False,
     )
@@ -7041,7 +7059,7 @@ def test_retainer_deliverable_quota(admin):
     # set the quota (labeled targets) alongside the billing line items; quota is
     # parsed independently and stored as JSON, leaving the invoice total alone.
     r = admin.post(
-        "/admin/studio/recurring/{plan['id']}",
+        f"/admin/studio/recurring/{plan['id']}",
         data={
             "title": "Content retainer",
             "item_label_0": "Content day",
@@ -7064,12 +7082,12 @@ def test_retainer_deliverable_quota(admin):
 
     period = _period()
     # nothing logged yet → full target outstanding
-    page = admin.get("/admin/studio/recurring/{plan['id']}").text
+    page = admin.get(f"/admin/studio/recurring/{plan['id']}").text
     assert "Hero images" in page and "20 to go" in page
 
     # log a partial delivery this period → progress reflects it
     r = admin.post(
-        "/admin/studio/recurring/{plan['id']}/deliveries",
+        f"/admin/studio/recurring/{plan['id']}/deliveries",
         data={"label": "Hero images", "qty": "5", "period": period, "note": "spring menu batch"},
         follow_redirects=False,
     )
@@ -7078,31 +7096,31 @@ def test_retainer_deliverable_quota(admin):
         db.one("SELECT COUNT(*) AS n FROM retainer_deliveries WHERE plan_id=?", (plan["id"],))["n"]
         == 1
     )
-    page = admin.get("/admin/studio/recurring/{plan['id']}").text
+    page = admin.get(f"/admin/studio/recurring/{plan['id']}").text
     assert "15 to go" in page  # 20 target − 5 delivered
 
     # a second entry sums with the first; hitting the target reads "met"
     admin.post(
-        "/admin/studio/recurring/{plan['id']}/deliveries",
+        f"/admin/studio/recurring/{plan['id']}/deliveries",
         data={"label": "Hero images", "qty": "15", "period": period},
         follow_redirects=False,
     )
-    page = admin.get("/admin/studio/recurring/{plan['id']}").text
+    page = admin.get(f"/admin/studio/recurring/{plan['id']}").text
     assert "met" in page
 
     # an un-targeted label still logs (quota is a plan, not a cap) → shows 'extra'
     admin.post(
-        "/admin/studio/recurring/{plan['id']}/deliveries",
+        f"/admin/studio/recurring/{plan['id']}/deliveries",
         data={"label": "Stories", "qty": "3", "period": period},
         follow_redirects=False,
     )
-    page = admin.get("/admin/studio/recurring/{plan['id']}").text
+    page = admin.get(f"/admin/studio/recurring/{plan['id']}").text
     assert "Stories" in page and "extra" in page
 
     # bad inputs are rejected, not silently coerced
     assert (
         admin.post(
-            "/admin/studio/recurring/{plan['id']}/deliveries",
+            f"/admin/studio/recurring/{plan['id']}/deliveries",
             data={"label": "Hero images", "qty": "0", "period": period},
             follow_redirects=False,
         ).status_code
@@ -7110,7 +7128,7 @@ def test_retainer_deliverable_quota(admin):
     )
     assert (
         admin.post(
-            "/admin/studio/recurring/{plan['id']}/deliveries",
+            f"/admin/studio/recurring/{plan['id']}/deliveries",
             data={"label": "Hero images", "qty": "1", "period": "nope"},
             follow_redirects=False,
         ).status_code
@@ -7122,7 +7140,7 @@ def test_retainer_deliverable_quota(admin):
         "SELECT id FROM retainer_deliveries WHERE plan_id=? AND label='Stories'", (plan["id"],)
     )
     r = admin.post(
-        "/admin/studio/recurring/{plan['id']}/deliveries/{e['id']}/delete", follow_redirects=False
+        f"/admin/studio/recurring/{plan['id']}/deliveries/{e['id']}/delete", follow_redirects=False
     )
     assert r.status_code == 303
     assert (
@@ -7160,19 +7178,19 @@ def test_retainer_behind_quota_strip(admin):
         )
         c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
         admin.post(
-            "/admin/studio/clients/{c['id']}/projects",
+            f"/admin/studio/clients/{c['id']}/projects",
             data={"title": "Retainer"},
             follow_redirects=False,
         )
         proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
         admin.post(
-            "/admin/studio/projects/{proj['id']}/recurring",
+            f"/admin/studio/projects/{proj['id']}/recurring",
             data={"title": plan_title},
             follow_redirects=False,
         )
         plan = db.one("SELECT * FROM recurring_plans ORDER BY id DESC LIMIT 1")
         admin.post(
-            "/admin/studio/recurring/{plan['id']}",
+            f"/admin/studio/recurring/{plan['id']}",
             data={
                 "title": plan_title,
                 "item_label_0": "Content day",
@@ -7192,7 +7210,7 @@ def test_retainer_behind_quota_strip(admin):
     ontrack_id = mk_plan("Ontrack Oyster", "Ontrack retainer", "Reels", 4)
     # fully deliver the on-track plan's quota → never behind pace, any day
     admin.post(
-        "/admin/studio/recurring/{ontrack_id}/deliveries",
+        f"/admin/studio/recurring/{ontrack_id}/deliveries",
         data={"label": "Reels", "qty": "4", "period": period},
         follow_redirects=False,
     )
@@ -7200,27 +7218,27 @@ def test_retainer_behind_quota_strip(admin):
     page = admin.get("/admin/studio/activity").text
     assert "Retainers behind quota" in page
     # the un-delivered retainer is on the strip with its worst-label gap
-    assert "/admin/studio/recurring/{behind_id}" in page
+    assert f"/admin/studio/recurring/{behind_id}" in page
     assert "Hero images" in page and "20 to go" in page
     # the fully-delivered retainer is NOT (met its pace)
-    assert "/admin/studio/recurring/{ontrack_id}" not in page
+    assert f"/admin/studio/recurring/{ontrack_id}" not in page
 
     # delivering enough to clear the run-rate drops it off the strip. On the last
     # day of the month elapsed==1.0, so only a FULL delivery is guaranteed to clear
     # pace on every possible run date — deliver the whole target.
     admin.post(
-        "/admin/studio/recurring/{behind_id}/deliveries",
+        f"/admin/studio/recurring/{behind_id}/deliveries",
         data={"label": "Hero images", "qty": "20", "period": period},
         follow_redirects=False,
     )
     page = admin.get("/admin/studio/activity").text
-    assert "/admin/studio/recurring/{behind_id}" not in page
+    assert f"/admin/studio/recurring/{behind_id}" not in page
 
     # a PAUSED behind plan never nags (you chose to stop the retainer)
     paused_id = mk_plan("Paused Pub", "Paused retainer", "Stories", 10)
     db.run("UPDATE recurring_plans SET active=0 WHERE id=?", (paused_id,))
     page = admin.get("/admin/studio/activity").text
-    assert "/admin/studio/recurring/{paused_id}" not in page
+    assert f"/admin/studio/recurring/{paused_id}" not in page
 
     # clean up: hard-delete the plans so no active quota plan lingers for later modules
     for pid in (behind_id, ontrack_id, paused_id):
@@ -7244,13 +7262,13 @@ def test_retainer_content_calendar(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Retainer"},
         follow_redirects=False,
     )
     proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/projects/{proj['id']}/recurring",
+        f"/admin/studio/projects/{proj['id']}/recurring",
         data={"title": "Content retainer"},
         follow_redirects=False,
     )
@@ -7258,11 +7276,11 @@ def test_retainer_content_calendar(admin):
     pid = plan["id"]
 
     period = _period()  # 'YYYY-MM'
-    this_period_date = "{period}-15"
+    this_period_date = f"{period}-15"
 
     # add a slot in the current period → it renders on the calendar
     r = admin.post(
-        "/admin/studio/recurring/{pid}/calendar",
+        f"/admin/studio/recurring/{pid}/calendar",
         data={
             "slot_date": this_period_date,
             "label": "Hero images",
@@ -7274,21 +7292,21 @@ def test_retainer_content_calendar(admin):
     assert r.status_code == 303
     slot = db.one("SELECT * FROM content_calendar WHERE plan_id=? ORDER BY id DESC LIMIT 1", (pid,))
     assert slot["status"] == "planned"  # default
-    page = admin.get("/admin/studio/recurring/{pid}").text
+    page = admin.get(f"/admin/studio/recurring/{pid}").text
     assert "Spring menu hero" in page and this_period_date in page
 
     # a slot dated outside this period is NOT shown on the period view
     admin.post(
-        "/admin/studio/recurring/{pid}/calendar",
+        f"/admin/studio/recurring/{pid}/calendar",
         data={"slot_date": "2099-01-10", "label": "Reels"},
         follow_redirects=False,
     )
-    page = admin.get("/admin/studio/recurring/{pid}").text
+    page = admin.get(f"/admin/studio/recurring/{pid}").text
     assert "2099-01-10" not in page
 
     # advance status → reflected, and the delivery log is UNTOUCHED (decoupled)
     r = admin.post(
-        "/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
+        f"/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
         data={"status": "delivered"},
         follow_redirects=False,
     )
@@ -7304,7 +7322,7 @@ def test_retainer_content_calendar(admin):
     # bad inputs rejected, not coerced
     assert (
         admin.post(
-            "/admin/studio/recurring/{pid}/calendar",
+            f"/admin/studio/recurring/{pid}/calendar",
             data={"slot_date": "nope", "label": "Hero images"},
             follow_redirects=False,
         ).status_code
@@ -7312,7 +7330,7 @@ def test_retainer_content_calendar(admin):
     )
     assert (
         admin.post(
-            "/admin/studio/recurring/{pid}/calendar",
+            f"/admin/studio/recurring/{pid}/calendar",
             data={"slot_date": this_period_date, "label": "  "},
             follow_redirects=False,
         ).status_code
@@ -7320,7 +7338,7 @@ def test_retainer_content_calendar(admin):
     )
     assert (
         admin.post(
-            "/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
+            f"/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
             data={"status": "shipped"},
             follow_redirects=False,
         ).status_code
@@ -7329,7 +7347,7 @@ def test_retainer_content_calendar(admin):
 
     # delete a slot → it leaves the calendar
     r = admin.post(
-        "/admin/studio/recurring/{pid}/calendar/{slot['id']}/delete", follow_redirects=False
+        f"/admin/studio/recurring/{pid}/calendar/{slot['id']}/delete", follow_redirects=False
     )
     assert r.status_code == 303
     assert db.one("SELECT COUNT(*) AS n FROM content_calendar WHERE id=?", (slot["id"],))["n"] == 0
@@ -7360,13 +7378,13 @@ def test_retainer_assisted_credit_prefill(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Retainer"},
         follow_redirects=False,
     )
     proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/projects/{proj['id']}/recurring",
+        f"/admin/studio/projects/{proj['id']}/recurring",
         data={"title": "Content retainer"},
         follow_redirects=False,
     )
@@ -7374,9 +7392,9 @@ def test_retainer_assisted_credit_prefill(admin):
     pid = plan["id"]
 
     period = _period()  # 'YYYY-MM'
-    slot_date = "{period}-09"
+    slot_date = f"{period}-09"
     admin.post(
-        "/admin/studio/recurring/{pid}/calendar",
+        f"/admin/studio/recurring/{pid}/calendar",
         data={"slot_date": slot_date, "label": "Hero images"},
         follow_redirects=False,
     )
@@ -7384,7 +7402,7 @@ def test_retainer_assisted_credit_prefill(admin):
 
     # flip planned → delivered: 303 redirect carries the pre-fill query params
     r = admin.post(
-        "/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
+        f"/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
         data={"status": "delivered"},
         follow_redirects=False,
     )
@@ -7399,7 +7417,7 @@ def test_retainer_assisted_credit_prefill(admin):
     # INVARIANT (b): rendering the pre-filled page injects the values as form
     # DEFAULTS and still writes nothing on its own
     page = admin.get(
-        "/admin/studio/recurring/{pid}",
+        f"/admin/studio/recurring/{pid}",
         params={"credit_label": "Hero images", "credit_qty": "1", "credit_period": period},
     ).text
     assert 'value="Hero images"' in page  # label seeded
@@ -7411,19 +7429,19 @@ def test_retainer_assisted_credit_prefill(admin):
     # the pre-fill fires ONLY on a transition into delivered, not on a re-save:
     # delivered → delivered carries no credit params
     r2 = admin.post(
-        "/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
+        f"/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
         data={"status": "delivered"},
         follow_redirects=False,
     )
     assert "credit_label" not in r2.headers["location"]
     # nor on a non-delivered transition (planned/shot)
     admin.post(
-        "/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
+        f"/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
         data={"status": "shot"},
         follow_redirects=False,
     )
     r3 = admin.post(
-        "/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
+        f"/admin/studio/recurring/{pid}/calendar/{slot['id']}/status",
         data={"status": "shot"},
         follow_redirects=False,
     )
@@ -7431,7 +7449,7 @@ def test_retainer_assisted_credit_prefill(admin):
 
     # the human submit is the ONLY thing that writes the count
     admin.post(
-        "/admin/studio/recurring/{pid}/deliveries",
+        f"/admin/studio/recurring/{pid}/deliveries",
         data={"label": "Hero images", "qty": "1", "period": period},
         follow_redirects=False,
     )
@@ -7477,19 +7495,19 @@ def test_content_due_strip(admin, monkeypatch):
         )
         c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
         admin.post(
-            "/admin/studio/clients/{c['id']}/projects",
+            f"/admin/studio/clients/{c['id']}/projects",
             data={"title": "Retainer"},
             follow_redirects=False,
         )
         proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
         admin.post(
-            "/admin/studio/projects/{proj['id']}/recurring",
+            f"/admin/studio/projects/{proj['id']}/recurring",
             data={"title": client_name + " retainer"},
             follow_redirects=False,
         )
         plan = db.one("SELECT * FROM recurring_plans ORDER BY id DESC LIMIT 1")
         admin.post(
-            "/admin/studio/recurring/{plan['id']}/calendar",
+            f"/admin/studio/recurring/{plan['id']}/calendar",
             data={"slot_date": slot_date, "label": "Hero images"},
             follow_redirects=False,
         )
@@ -7498,33 +7516,33 @@ def test_content_due_strip(admin, monkeypatch):
         )
         if status != "planned":
             admin.post(
-                "/admin/studio/recurring/{plan['id']}/calendar/{slot['id']}/status",
+                f"/admin/studio/recurring/{plan['id']}/calendar/{slot['id']}/status",
                 data={"status": status},
                 follow_redirects=False,
             )
         return plan["id"]
 
     # future in-period (not overdue), overdue (past in-period), delivered (dropped)
-    due_id = mk_plan("Due Diner", "{period}-25")
-    overdue_id = mk_plan("Overdue Oven", "{period}-05")
-    delivered_id = mk_plan("Done Deli", "{period}-20", status="delivered")
+    due_id = mk_plan("Due Diner", f"{period}-25")
+    overdue_id = mk_plan("Overdue Oven", f"{period}-05")
+    delivered_id = mk_plan("Done Deli", f"{period}-20", status="delivered")
 
     page = admin.get("/admin/studio/activity").text
     assert "Content due" in page
     # planned/shot in-period slots appear, linking to the plan's #calendar anchor
-    assert "/admin/studio/recurring/{due_id}#calendar" in page
-    assert "/admin/studio/recurring/{overdue_id}#calendar" in page
+    assert f"/admin/studio/recurring/{due_id}#calendar" in page
+    assert f"/admin/studio/recurring/{overdue_id}#calendar" in page
     # the overdue chip is flagged overdue in its when-label (specific to the chip
     # text, not the upcoming-overdue CSS class)
     assert ">overdue</span>" in page
     # a delivered slot drops off the strip (composes with slice-4 assisted credit)
-    assert "/admin/studio/recurring/{delivered_id}#calendar" not in page
+    assert f"/admin/studio/recurring/{delivered_id}#calendar" not in page
 
     # marking the remaining slots delivered empties the strip → it goes silent
     for pid_ in (due_id, overdue_id):
         s = db.one("SELECT id FROM content_calendar WHERE plan_id=? ORDER BY id LIMIT 1", (pid_,))
         admin.post(
-            "/admin/studio/recurring/{pid_}/calendar/{s['id']}/status",
+            f"/admin/studio/recurring/{pid_}/calendar/{s['id']}/status",
             data={"status": "delivered"},
             follow_redirects=False,
         )
@@ -7571,19 +7589,19 @@ def test_content_due_carries_overdue_across_period_rollover(admin, monkeypatch):
         )
         c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
         admin.post(
-            "/admin/studio/clients/{c['id']}/projects",
+            f"/admin/studio/clients/{c['id']}/projects",
             data={"title": "Retainer"},
             follow_redirects=False,
         )
         proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
         admin.post(
-            "/admin/studio/projects/{proj['id']}/recurring",
+            f"/admin/studio/projects/{proj['id']}/recurring",
             data={"title": client_name + " retainer"},
             follow_redirects=False,
         )
         plan = db.one("SELECT * FROM recurring_plans ORDER BY id DESC LIMIT 1")
         admin.post(
-            "/admin/studio/recurring/{plan['id']}/calendar",
+            f"/admin/studio/recurring/{plan['id']}/calendar",
             data={"slot_date": slot_date, "label": "Hero images"},
             follow_redirects=False,
         )
@@ -7593,7 +7611,7 @@ def test_content_due_carries_overdue_across_period_rollover(admin, monkeypatch):
                 (plan["id"],),
             )
             admin.post(
-                "/admin/studio/recurring/{plan['id']}/calendar/{slot['id']}/status",
+                f"/admin/studio/recurring/{plan['id']}/calendar/{slot['id']}/status",
                 data={"status": status},
                 follow_redirects=False,
             )
@@ -7606,21 +7624,21 @@ def test_content_due_carries_overdue_across_period_rollover(admin, monkeypatch):
 
     page = admin.get("/admin/studio/activity").text
     # the carried-over prior-period slot STAYS visible (this is the fix) and reads overdue
-    assert "/admin/studio/recurring/{carry_id}#calendar" in page
+    assert f"/admin/studio/recurring/{carry_id}#calendar" in page
     # current-period slot still shows (unchanged behavior)
-    assert "/admin/studio/recurring/{current_id}#calendar" in page
+    assert f"/admin/studio/recurring/{current_id}#calendar" in page
     # future-period slot stays hidden — carryover didn't widen the look-ahead window
-    assert "/admin/studio/recurring/{future_id}#calendar" not in page
+    assert f"/admin/studio/recurring/{future_id}#calendar" not in page
 
     # delivering the carried-over slot clears it from the strip (status leaves planned/shot)
     s = db.one("SELECT id FROM content_calendar WHERE plan_id=? ORDER BY id LIMIT 1", (carry_id,))
     admin.post(
-        "/admin/studio/recurring/{carry_id}/calendar/{s['id']}/status",
+        f"/admin/studio/recurring/{carry_id}/calendar/{s['id']}/status",
         data={"status": "delivered"},
         follow_redirects=False,
     )
     page = admin.get("/admin/studio/activity").text
-    assert "/admin/studio/recurring/{carry_id}#calendar" not in page
+    assert f"/admin/studio/recurring/{carry_id}#calendar" not in page
 
     # clean up: hard-delete the plans (cascades their calendar slots)
     for pid_ in (carry_id, current_id, future_id):
@@ -7647,13 +7665,13 @@ def test_retainer_caption_pack(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Retainer"},
         follow_redirects=False,
     )
     proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/projects/{proj['id']}/recurring",
+        f"/admin/studio/projects/{proj['id']}/recurring",
         data={"title": "Content retainer"},
         follow_redirects=False,
     )
@@ -7664,7 +7682,7 @@ def test_retainer_caption_pack(admin):
 
     # create a caption → it renders this period; writes NO delivery row (decoupled)
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions",
+        f"/admin/studio/recurring/{pid}/captions",
         data={"label": "Hero images", "body": "Golden hour pasta, fresh basil.", "period": period},
         follow_redirects=False,
     )
@@ -7672,12 +7690,12 @@ def test_retainer_caption_pack(admin):
     cap = db.one("SELECT * FROM retainer_captions WHERE plan_id=? ORDER BY id DESC LIMIT 1", (pid,))
     assert cap["status"] == "draft"  # default
     assert db.one("SELECT COUNT(*) AS n FROM retainer_deliveries WHERE plan_id=?", (pid,))["n"] == 0
-    page = admin.get("/admin/studio/recurring/{pid}").text
+    page = admin.get(f"/admin/studio/recurring/{pid}").text
     assert "Golden hour pasta, fresh basil." in page
 
     # edit the caption text → persists, still NO delivery row
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cap['id']}",
+        f"/admin/studio/recurring/{pid}/captions/{cap['id']}",
         data={"label": "Hero images", "body": "Edited: smoked brisket, slaw."},
         follow_redirects=False,
     )
@@ -7690,16 +7708,16 @@ def test_retainer_caption_pack(admin):
 
     # a caption in another period is NOT shown on the current-period view
     admin.post(
-        "/admin/studio/recurring/{pid}/captions",
+        f"/admin/studio/recurring/{pid}/captions",
         data={"label": "Reels", "body": "Next-quarter teaser.", "period": "2099-01"},
         follow_redirects=False,
     )
-    page = admin.get("/admin/studio/recurring/{pid}").text
+    page = admin.get(f"/admin/studio/recurring/{pid}").text
     assert "Next-quarter teaser." not in page
 
     # approve: draft→approved redirects with assisted-credit prefill; NO write here
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cap['id']}/status",
+        f"/admin/studio/recurring/{pid}/captions/{cap['id']}/status",
         data={"status": "approved"},
         follow_redirects=False,
     )
@@ -7714,7 +7732,7 @@ def test_retainer_caption_pack(admin):
 
     # the prefill fires ONLY on the transition into approved, not on a re-save
     r2 = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cap['id']}/status",
+        f"/admin/studio/recurring/{pid}/captions/{cap['id']}/status",
         data={"status": "approved"},
         follow_redirects=False,
     )
@@ -7722,7 +7740,7 @@ def test_retainer_caption_pack(admin):
 
     # the human submit of the existing /deliveries route is the ONLY thing that counts
     admin.post(
-        "/admin/studio/recurring/{pid}/deliveries",
+        f"/admin/studio/recurring/{pid}/deliveries",
         data={"label": "Hero images", "qty": "1", "period": period},
         follow_redirects=False,
     )
@@ -7731,7 +7749,7 @@ def test_retainer_caption_pack(admin):
     # bad inputs rejected, not coerced
     assert (
         admin.post(
-            "/admin/studio/recurring/{pid}/captions",
+            f"/admin/studio/recurring/{pid}/captions",
             data={"label": "Hero images", "body": "   ", "period": period},
             follow_redirects=False,
         ).status_code
@@ -7739,7 +7757,7 @@ def test_retainer_caption_pack(admin):
     )
     assert (
         admin.post(
-            "/admin/studio/recurring/{pid}/captions",
+            f"/admin/studio/recurring/{pid}/captions",
             data={"label": "Hero images", "body": "ok", "period": "nope"},
             follow_redirects=False,
         ).status_code
@@ -7747,7 +7765,7 @@ def test_retainer_caption_pack(admin):
     )
     assert (
         admin.post(
-            "/admin/studio/recurring/{pid}/captions/{cap['id']}/status",
+            f"/admin/studio/recurring/{pid}/captions/{cap['id']}/status",
             data={"status": "published"},
             follow_redirects=False,
         ).status_code
@@ -7756,7 +7774,7 @@ def test_retainer_caption_pack(admin):
 
     # delete a caption → it leaves the list
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cap['id']}/delete", follow_redirects=False
+        f"/admin/studio/recurring/{pid}/captions/{cap['id']}/delete", follow_redirects=False
     )
     assert r.status_code == 303
     assert db.one("SELECT COUNT(*) AS n FROM retainer_captions WHERE id=?", (cap["id"],))["n"] == 0
@@ -7790,13 +7808,13 @@ def test_caption_ai_draft(admin, monkeypatch):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Retainer"},
         follow_redirects=False,
     )
     proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/projects/{proj['id']}/recurring",
+        f"/admin/studio/projects/{proj['id']}/recurring",
         data={"title": "Content retainer"},
         follow_redirects=False,
     )
@@ -7806,7 +7824,7 @@ def test_caption_ai_draft(admin, monkeypatch):
 
     # a caption seeded with HUMAN text
     admin.post(
-        "/admin/studio/recurring/{pid}/captions",
+        f"/admin/studio/recurring/{pid}/captions",
         data={"label": "Hero images", "body": "my own words", "period": period},
         follow_redirects=False,
     )
@@ -7825,7 +7843,7 @@ def test_caption_ai_draft(admin, monkeypatch):
     # (d) no-clobber: drafting over HUMAN body without replace is refused — the mesh
     # is never even called, and the human's words survive untouched
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cid}/draft", data={}, follow_redirects=False
+        f"/admin/studio/recurring/{pid}/captions/{cid}/draft", data={}, follow_redirects=False
     )
     assert r.status_code == 303
     assert "caption_error" in r.headers["location"]
@@ -7836,7 +7854,7 @@ def test_caption_ai_draft(admin, monkeypatch):
     # (a) with explicit replace: the draft lands in body as a SUGGESTION — status
     # stays draft, provenance recorded, ZERO delivery rows (never generates+credits)
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cid}/draft",
+        f"/admin/studio/recurring/{pid}/captions/{cid}/draft",
         data={"replace": "1"},
         follow_redirects=False,
     )
@@ -7856,7 +7874,7 @@ def test_caption_ai_draft(admin, monkeypatch):
 
     # (b) a human edits the draft → body changes but the ORIGINAL is still recoverable
     admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cid}",
+        f"/admin/studio/recurring/{pid}/captions/{cid}",
         data={"label": "Hero images", "body": AI_TEXT + " — tightened by hand"},
         follow_redirects=False,
     )
@@ -7867,7 +7885,7 @@ def test_caption_ai_draft(admin, monkeypatch):
 
     # post-edit, body is human-edited again → a re-draft without replace is refused
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cid}/draft", data={}, follow_redirects=False
+        f"/admin/studio/recurring/{pid}/captions/{cid}/draft", data={}, follow_redirects=False
     )
     assert "caption_error" in r.headers["location"]
 
@@ -7878,7 +7896,7 @@ def test_caption_ai_draft(admin, monkeypatch):
     monkeypatch.setattr(caption_ai, "draft_caption", fake_fail)
     before = db.one("SELECT * FROM retainer_captions WHERE id=?", (cid,))
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cid}/draft",
+        f"/admin/studio/recurring/{pid}/captions/{cid}/draft",
         data={"replace": "1"},
         follow_redirects=False,
     )
@@ -7892,7 +7910,7 @@ def test_caption_ai_draft(admin, monkeypatch):
     # (e) the slice-6a credit path is unchanged: human approve→delivered carries the
     # prefill with 0 writes; only the /deliveries POST moves the count
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cid}/status",
+        f"/admin/studio/recurring/{pid}/captions/{cid}/status",
         data={"status": "approved"},
         follow_redirects=False,
     )
@@ -7902,7 +7920,7 @@ def test_caption_ai_draft(admin, monkeypatch):
     assert q["credit_period"] == [period]
     assert db.one("SELECT COUNT(*) AS n FROM retainer_deliveries WHERE plan_id=?", (pid,))["n"] == 0
     admin.post(
-        "/admin/studio/recurring/{pid}/deliveries",
+        f"/admin/studio/recurring/{pid}/deliveries",
         data={"label": "Hero images", "qty": "1", "period": period},
         follow_redirects=False,
     )
@@ -7983,7 +8001,7 @@ def test_caption_ai_live_wiring(admin, monkeypatch):
     out = caption_ai.draft_caption({"label": "Hero", "client": "Wire Co", "period": "x"})
     assert out == {"caption": AI_TEXT, "model": SERVED}
     assert captured["url"] == URL
-    assert captured["auth"] == "Bearer {TOKEN}"
+    assert captured["auth"] == f"Bearer {TOKEN}"
     assert captured["body"]["label"] == "Hero" and captured["body"]["client"] == "Wire Co"
     assert captured["timeout"] == config.ODYSSEUS_TIMEOUT
 
@@ -7994,13 +8012,13 @@ def test_caption_ai_live_wiring(admin, monkeypatch):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "Retainer"},
         follow_redirects=False,
     )
     proj = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/projects/{proj['id']}/recurring",
+        f"/admin/studio/projects/{proj['id']}/recurring",
         data={"title": "Content retainer"},
         follow_redirects=False,
     )
@@ -8008,7 +8026,7 @@ def test_caption_ai_live_wiring(admin, monkeypatch):
     pid = plan["id"]
     period = _period()
     admin.post(
-        "/admin/studio/recurring/{pid}/captions",
+        f"/admin/studio/recurring/{pid}/captions",
         data={"label": "Hero images", "body": "placeholder", "period": period},
         follow_redirects=False,
     )
@@ -8018,7 +8036,7 @@ def test_caption_ai_live_wiring(admin, monkeypatch):
     # (b) through the route, a stubbed 200 lands as a SUGGESTION: body populated, status
     # still draft, provenance = the SERVED model, and ZERO delivery rows written
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cid}/draft",
+        f"/admin/studio/recurring/{pid}/captions/{cid}/draft",
         data={"replace": "1"},
         follow_redirects=False,
     )
@@ -8035,7 +8053,7 @@ def test_caption_ai_live_wiring(admin, monkeypatch):
     # (d) no-clobber: a caption with HUMAN body refuses a no-replace draft, and the
     # network seam is NEVER touched
     admin.post(
-        "/admin/studio/recurring/{pid}/captions",
+        f"/admin/studio/recurring/{pid}/captions",
         data={"label": "Interiors", "body": "chef's own caption", "period": period},
         follow_redirects=False,
     )
@@ -8047,7 +8065,9 @@ def test_caption_ai_live_wiring(admin, monkeypatch):
     tripped = []
     monkeypatch.setattr(caption_ai.urllib.request, "urlopen", lambda *a, **k: tripped.append(1))
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{hcap['id']}/draft", data={}, follow_redirects=False
+        f"/admin/studio/recurring/{pid}/captions/{hcap['id']}/draft",
+        data={},
+        follow_redirects=False,
     )
     assert "caption_error" in r.headers["location"]
     assert tripped == []
@@ -8064,7 +8084,7 @@ def test_caption_ai_live_wiring(admin, monkeypatch):
 
     monkeypatch.setattr(caption_ai.urllib.request, "urlopen", fake_502)
     r = admin.post(
-        "/admin/studio/recurring/{pid}/captions/{cid}/draft",
+        f"/admin/studio/recurring/{pid}/captions/{cid}/draft",
         data={"replace": "1"},
         follow_redirects=False,
     )
@@ -8084,7 +8104,7 @@ def test_caption_ai_live_wiring(admin, monkeypatch):
         monkeypatch.setattr(caption_ai.urllib.request, "urlopen", fake_err)
         try:
             caption_ai.draft_caption({"label": "x"})
-            assert False, "expected CaptionDraftError on HTTP {code}"
+            assert False, f"expected CaptionDraftError on HTTP {code}"
         except caption_ai.CaptionDraftError:
             pass
 
@@ -8173,7 +8193,7 @@ def test_press_for_license_seam(admin):
     )
     # a license on that gallery granting the 'print' channel, published flag OFF
     admin.post(
-        "/admin/studio/clients/{c['id']}/licenses",
+        f"/admin/studio/clients/{c['id']}/licenses",
         data={"title": "Seam license"},
         follow_redirects=False,
     )
@@ -8252,13 +8272,13 @@ def test_channels_extraction_no_regression(admin):
     # licenses still validate + store channels exactly as before the move
     cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Vocab Chef",))
     admin.post(
-        "/admin/studio/clients/{cid}/licenses",
+        f"/admin/studio/clients/{cid}/licenses",
         data={"title": "Vocab license"},
         follow_redirects=False,
     )
     lid = db.one("SELECT id FROM licenses ORDER BY id DESC LIMIT 1")["id"]
     admin.post(
-        "/admin/studio/licenses/{lid}",
+        f"/admin/studio/licenses/{lid}",
         data={"title": "Vocab license", "channels": ["print", "bogus_channel"]},
         follow_redirects=False,
     )
@@ -8301,11 +8321,11 @@ def _seam_license_with_gallery(admin, name, company, slug):
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     gid = db.run(
         "INSERT INTO galleries (client_id, title, slug, pin) VALUES (?,?,?,?)",
-        (c["id"], "{name} Gallery", slug, "0000"),
+        (c["id"], f"{name} Gallery", slug, "0000"),
     )
     admin.post(
-        "/admin/studio/clients/{c['id']}/licenses",
-        data={"title": "{name} license"},
+        f"/admin/studio/clients/{c['id']}/licenses",
+        data={"title": f"{name} license"},
         follow_redirects=False,
     )
     lic_id = db.one("SELECT id FROM licenses ORDER BY id DESC LIMIT 1")["id"]
@@ -8329,7 +8349,7 @@ def test_press_evidence_renders_with_cue(admin):
               VALUES (?,?,?,?,?)""",
         (gid, "Bon Appetit", "print", "2021-03-01", "https://example.com/run"),
     )
-    body = admin.get("/admin/studio/licenses/{lic_id}").text
+    body = admin.get(f"/admin/studio/licenses/{lic_id}").text
     assert "Press evidence" in body
     assert "Bon Appetit" in body
     assert "review the evidence below and confirm published" in body
@@ -8351,7 +8371,7 @@ def test_press_evidence_silent_when_no_match(admin):
               VALUES (?,?,?,?)""",
         (other, "Unrelated Weekly", "print", "2021-03-01"),
     )
-    r = admin.get("/admin/studio/licenses/{lic_id}")
+    r = admin.get(f"/admin/studio/licenses/{lic_id}")
     assert r.status_code == 200
     assert "Press evidence" not in r.text
     assert "review the evidence below" not in r.text
@@ -8385,7 +8405,7 @@ def test_press_evidence_gate_holds_at_render(admin):
               VALUES (?,?,?,?)""",
         (other, "Hidden Unlinked Mag", "print", "2020-02-02"),
     )
-    body = admin.get("/admin/studio/licenses/{lic_id}").text
+    body = admin.get(f"/admin/studio/licenses/{lic_id}").text
     assert "Shown Past Mag" in body
     assert "Hidden Future Mag" not in body  # future-dated gated out
     assert "Hidden Unlinked Mag" not in body  # unlinked never matches
@@ -8404,7 +8424,7 @@ def test_press_evidence_render_writes_nothing(admin):
               VALUES (?,?,?,?)""",
         (gid, "Evidence Times", "print", "2021-01-01"),
     )
-    url = "/admin/studio/licenses/{lic_id}"
+    url = f"/admin/studio/licenses/{lic_id}"
 
     # GET the page several times — published must remain 0 (no auto-flip on view)
     for _ in range(3):
@@ -8464,10 +8484,10 @@ def test_press_confirm_strip_rolls_up_h3_cue(admin):
 
     body = admin.get("/admin/studio/activity").text
     assert "Press evidence — confirm published" in body  # strip rendered
-    assert "/admin/studio/licenses/{on_id}" in body  # the actionable one
-    assert "/admin/studio/licenses/{none_id}" not in body  # no evidence → silent
-    assert "/admin/studio/licenses/{done_id}" not in body  # confirmed → dropped
-    assert "/admin/studio/licenses/{draft_id}" not in body  # not active → quiet
+    assert f"/admin/studio/licenses/{on_id}" in body  # the actionable one
+    assert f"/admin/studio/licenses/{none_id}" not in body  # no evidence → silent
+    assert f"/admin/studio/licenses/{done_id}" not in body  # confirmed → dropped
+    assert f"/admin/studio/licenses/{draft_id}" not in body  # not active → quiet
 
     # read-only: repeated renders never flip the matched license's published bit,
     # and the strip writes no audit row against it.
@@ -8509,7 +8529,7 @@ def test_press_show_on_site_flag_roundtrips_and_audits(admin):
     assert db.one("SELECT show_on_site FROM press WHERE id=?", (pid2,))["show_on_site"] == 0
     # un-featuring later (checkbox now absent) flips it back to 0 and is audited
     admin.post(
-        "/admin/studio/press/{pid}",
+        f"/admin/studio/press/{pid}",
         data={"outlet": "Bon Appétit", "publish_date": "2021-03-01"},
         follow_redirects=False,
     )
@@ -8609,7 +8629,7 @@ def test_shot_list_crud_and_audit(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "FBQ shoot production project"},
         follow_redirects=False,
     )
@@ -8617,7 +8637,7 @@ def test_shot_list_crud_and_audit(admin):
 
     # create — priority omitted defaults to 'want'
     r = admin.post(
-        "/admin/studio/projects/{p['id']}/shots",
+        f"/admin/studio/projects/{p['id']}/shots",
         data={"title": "Plated hero FBQ three-quarter", "category": "Hero Dish", "sort_order": "5"},
         follow_redirects=False,
     )
@@ -8636,7 +8656,7 @@ def test_shot_list_crud_and_audit(admin):
     # vocab gate — bad category and bad priority both 400 (no row written)
     assert (
         admin.post(
-            "/admin/studio/projects/{p['id']}/shots",
+            f"/admin/studio/projects/{p['id']}/shots",
             data={"title": "x", "category": "NotARealCategory"},
             follow_redirects=False,
         ).status_code
@@ -8644,7 +8664,7 @@ def test_shot_list_crud_and_audit(admin):
     )
     assert (
         admin.post(
-            "/admin/studio/projects/{p['id']}/shots",
+            f"/admin/studio/projects/{p['id']}/shots",
             data={"title": "x", "priority": "urgent"},
             follow_redirects=False,
         ).status_code
@@ -8653,14 +8673,14 @@ def test_shot_list_crud_and_audit(admin):
     # title required
     assert (
         admin.post(
-            "/admin/studio/projects/{p['id']}/shots", data={"title": "   "}, follow_redirects=False
+            f"/admin/studio/projects/{p['id']}/shots", data={"title": "   "}, follow_redirects=False
         ).status_code
         == 400
     )
 
     # update — change priority + note; diff audit row written
     r = admin.post(
-        "/admin/studio/shots/{s['id']}",
+        f"/admin/studio/shots/{s['id']}",
         data={
             "title": s["title"],
             "category": "Hero Dish",
@@ -8681,13 +8701,15 @@ def test_shot_list_crud_and_audit(admin):
     assert len(upd) == 1
 
     # renders on the project page
-    assert "Plated hero FBQ three-quarter" in admin.get("/admin/studio/projects/{p['id']}").text
+    assert "Plated hero FBQ three-quarter" in admin.get(f"/admin/studio/projects/{p['id']}").text
 
     # soft-delete — deleted_at set, vanishes from page and inline query
-    r = admin.post("/admin/studio/shots/{s['id']}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/studio/shots/{s['id']}/delete", follow_redirects=False)
     assert r.status_code == 303
     assert db.one("SELECT deleted_at FROM shot_list WHERE id=?", (s["id"],))["deleted_at"]
-    assert "Plated hero FBQ three-quarter" not in admin.get("/admin/studio/projects/{p['id']}").text
+    assert (
+        "Plated hero FBQ three-quarter" not in admin.get(f"/admin/studio/projects/{p['id']}").text
+    )
     assert (
         db.one(
             """SELECT COUNT(*) n FROM shot_list
@@ -8725,7 +8747,7 @@ def test_shots_read_api(admin):
     )
     c = db.one("SELECT * FROM clients ORDER BY id DESC LIMIT 1")
     admin.post(
-        "/admin/studio/clients/{c['id']}/projects",
+        f"/admin/studio/clients/{c['id']}/projects",
         data={"title": "ReadAPI shoot project"},
         follow_redirects=False,
     )
@@ -8734,12 +8756,12 @@ def test_shots_read_api(admin):
 
     # two shots out of insert order + one soft-deleted, to prove ordering + exclusion
     admin.post(
-        "/admin/studio/projects/{p['id']}/shots",
+        f"/admin/studio/projects/{p['id']}/shots",
         data={"title": "RAPI second", "category": "Detail", "priority": "want", "sort_order": "20"},
         follow_redirects=False,
     )
     admin.post(
-        "/admin/studio/projects/{p['id']}/shots",
+        f"/admin/studio/projects/{p['id']}/shots",
         data={
             "title": "RAPI first",
             "category": "Hero Dish",
@@ -8749,14 +8771,14 @@ def test_shots_read_api(admin):
         follow_redirects=False,
     )
     admin.post(
-        "/admin/studio/projects/{p['id']}/shots",
+        f"/admin/studio/projects/{p['id']}/shots",
         data={"title": "RAPI gone", "priority": "if-time", "sort_order": "5"},
         follow_redirects=False,
     )
     gone = db.one("SELECT id FROM shot_list WHERE title='RAPI gone'")
-    admin.post("/admin/studio/shots/{gone['id']}/delete", follow_redirects=False)
+    admin.post(f"/admin/studio/shots/{gone['id']}/delete", follow_redirects=False)
 
-    url = "/api/shots?session={sess}"
+    url = f"/api/shots?session={sess}"
     saved = config.SHOTS_TOKEN
     try:
         # disarmed -> 503 even with a bearer present
@@ -8821,7 +8843,7 @@ def test_inbox_reply_sends_logs_and_marks_emailed(admin):
         mock.patch.object(mailer, "send") as send,
     ):
         r = admin.post(
-            "/admin/inbox/{iid}/reply",
+            f"/admin/inbox/{iid}/reply",
             data={
                 "tab": "all",
                 "subject": "Re: your inquiry",
@@ -8831,7 +8853,7 @@ def test_inbox_reply_sends_logs_and_marks_emailed(admin):
         )
 
     assert r.status_code == 303
-    assert r.headers["location"] == "/admin/inbox?tab=all&sel={iid}"
+    assert r.headers["location"] == f"/admin/inbox?tab=all&sel={iid}"
     send.assert_called_once()
     to, subject, body = send.call_args.args[:3]
     assert to == "ana@bistro.test"
@@ -8860,7 +8882,7 @@ def test_inbox_reply_blocked_without_email(admin):
         mock.patch.object(mailer, "send") as send,
     ):
         r = admin.post(
-            "/admin/inbox/{iid}/reply",
+            f"/admin/inbox/{iid}/reply",
             data={"subject": "Re", "message": "x"},
             follow_redirects=False,
         )
@@ -8891,7 +8913,7 @@ def test_expense_create_and_delete(admin):
     page = admin.get("/admin/financials/expenses")
     assert page.status_code == 200 and "Expense log" in page.text
 
-    r = admin.post("/admin/financials/expenses/{row['id']}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/financials/expenses/{row['id']}/delete", follow_redirects=False)
     assert r.status_code == 303
     assert db.one("SELECT id FROM expenses WHERE id=?", (row["id"],)) is None
 
@@ -8923,7 +8945,7 @@ def test_receipt_upload_links_and_serves(admin):
     rc = db.one("SELECT * FROM receipts WHERE expense_id=?", (eid,))
     assert rc is not None and rc["filename"] == "adobe.png"
 
-    served = admin.get("/admin/financials/receipts/{rc['id']}/file")
+    served = admin.get(f"/admin/financials/receipts/{rc['id']}/file")
     assert served.status_code == 200 and served.content == png
 
     # the linked expense now shows a receipt pill
@@ -8931,7 +8953,7 @@ def test_receipt_upload_links_and_serves(admin):
     assert "Receipt" in page.text
 
     # deleting the expense leaves the receipt (unlinked), not destroyed
-    admin.post("/admin/financials/expenses/{eid}/delete", follow_redirects=False)
+    admin.post(f"/admin/financials/expenses/{eid}/delete", follow_redirects=False)
     still = db.one("SELECT expense_id FROM receipts WHERE id=?", (rc["id"],))
     assert still is not None and still["expense_id"] is None
 
@@ -8969,7 +8991,7 @@ def test_mileage_create_deduction_and_delete(admin):
     # 8.4 mi × 70¢ = $5.88
     assert page.status_code == 200 and "$5.88" in page.text
 
-    r = admin.post("/admin/financials/mileage/{trip['id']}/delete", follow_redirects=False)
+    r = admin.post(f"/admin/financials/mileage/{trip['id']}/delete", follow_redirects=False)
     assert r.status_code == 303
     assert db.one("SELECT id FROM mileage WHERE id=?", (trip["id"],)) is None
 
@@ -8983,7 +9005,7 @@ def test_dashboard_nudge_dismiss_clears_for_today(admin):
         "VALUES (?,?,?,?, datetime('now','-5 days'))",
         ("Nudge Test Co", "Nudge Bistro", "nudge@example.com", "test msg"),
     )
-    key = "inq_reply:{iid}"
+    key = f"inq_reply:{iid}"
     try:
         # the stale inquiry surfaces as a checkable nudge
         assert key in admin.get("/admin/home").text
@@ -9014,7 +9036,7 @@ def _quo_sig(secret_b64: str, raw: bytes, ts: str = "1700000000") -> str:
     sig = base64.b64encode(
         hmac.new(key, ts.encode() + b"." + raw, hashlib.sha256).digest()
     ).decode()
-    return "hmac;1;{ts};{sig}"
+    return f"hmac;1;{ts};{sig}"
 
 
 def test_quo_webhook_inert_without_secret(client, monkeypatch):
@@ -9100,7 +9122,7 @@ def test_inbox_sms_reply_logs_outbound(admin, monkeypatch):
     monkeypatch.setattr(sms, "send", lambda to, body: sent.update(to=to, body=body) or "QUO_OUT_1")
     try:
         r = admin.post(
-            "/admin/inbox/{iid}/reply",
+            f"/admin/inbox/{iid}/reply",
             data={"channel": "sms", "message": "Yes! Let's talk."},
             follow_redirects=False,
         )
@@ -9110,7 +9132,7 @@ def test_inbox_sms_reply_logs_outbound(admin, monkeypatch):
         assert out is not None and out["channel"] == "sms" and out["provider_msg_id"] == "QUO_OUT_1"
 
         # the conversation now shows both the inbound seed and the outbound reply
-        page = admin.get("/admin/inbox?sel={iid}")
+        page = admin.get(f"/admin/inbox?sel={iid}")
         assert "Yes! Let&#39;s talk." in page.text or "Yes! Let's talk." in page.text
     finally:
         db.run("DELETE FROM messages WHERE inquiry_id=?", (iid,))
@@ -9170,9 +9192,9 @@ def test_inquiry_dismiss_returns_to_inbox_when_asked(admin):
         ("Triage Lead", "t@x.com", "hi", "contact"),
     )
     try:
-        back = "/admin/inbox?tab=all&sel={iid}"
+        back = f"/admin/inbox?tab=all&sel={iid}"
         r = admin.post(
-            "/admin/studio/inquiries/{iid}/dismiss",
+            f"/admin/studio/inquiries/{iid}/dismiss",
             data={"return_to": back},
             follow_redirects=False,
         )
@@ -9180,7 +9202,7 @@ def test_inquiry_dismiss_returns_to_inbox_when_asked(admin):
 
         # open-redirect guard: a non-/admin/ target is ignored
         r2 = admin.post(
-            "/admin/studio/inquiries/{iid}/undismiss",
+            f"/admin/studio/inquiries/{iid}/undismiss",
             data={"return_to": "https://evil.example.com"},
             follow_redirects=False,
         )
