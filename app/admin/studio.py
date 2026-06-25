@@ -517,10 +517,12 @@ def _studio_context(request: Request) -> dict:
     as one assembler so the "X needs action" badge on the board and the strips it
     links to can never drift out of sync — each strip is one _ctx_* helper.
 
-    Two clocks: the financial overdue boundary uses _today() (the monkeypatchable
-    canonical studio clock); the activity/calendar strips use dt.date.today()."""
-    today_iso = _today().isoformat()
-    today = dt.date.today()
+    One clock: every strip — the financial overdue boundary and the
+    activity/calendar strips alike — reads _today(), the monkeypatchable
+    canonical studio wall-clock, so a pinned 'today' moves the whole board
+    coherently and nothing silently falls back to an unpinnable dt.date.today()."""
+    today = _today()
+    today_iso = today.isoformat()
     return {
         "statuses": PROJECT_STATUSES,
         "stale_days": STALE_DAYS,
