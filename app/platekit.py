@@ -1,9 +1,6 @@
-"""Read-only client for Platekit/Dionysus content packs.
+"""Platekit/Dionysus bridge — Mise operator service (no public SaaS signup).
 
-Mise stays the photography operating system; Platekit owns campaign-pack
-generation and approval. This bridge only reads approved/exported packs for a
-client-like organization slug and degrades to an empty admin panel when disabled
-or unreachable.
+Reads approved packs and triggers argus-pack drafts after Argus vision completes.
 """
 
 import json
@@ -38,19 +35,6 @@ def slug_for_client(client) -> str:
     return normalize_slug(base)
 
 
-def signup_url(client) -> str:
-    company = client["company"] or client["name"] or ""
-    params = urllib.parse.urlencode(
-        {
-            "company": company,
-            "name": client["name"] or "",
-            "email": client["email"] or "",
-            "audience": "restaurant",
-        }
-    )
-    return f"https://platekit.kleephotography.com/?{params}#signup"
-
-
 def _empty(*, slug: str, status: str, message: str, enabled: bool | None = None) -> dict:
     return {
         "enabled": is_enabled() if enabled is None else enabled,
@@ -58,27 +42,46 @@ def _empty(*, slug: str, status: str, message: str, enabled: bool | None = None)
         "status": status,
         "message": message,
         "packs": [],
-        "signup_url": "",
     }
+
+
+def _record(
+    gallery_id: int,
+    *,
+    status: str,
+    job_id: str | None = None,
+    pack_id: int | None = None,
+    error: str | None = None,
+) -> None:
+    db.run(
+        """UPDATE galleries SET platekit_last_job_id=?, platekit_last_pack_id=?,
+              platekit_last_status=?, platekit_last_error=?, platekit_last_at=datetime('now')
+              WHERE id=?""",
+        (
+            job_id,
+            pack_id,
+            status,
+            (error or None)[:500] if error else None,
+            gallery_id,
+        ),
+    )
 
 
 def packs_for_client(client, *, include_drafts: bool = False) -> dict:
     slug = slug_for_client(client)
     if not is_enabled():
-        state = _empty(
+        return _empty(
             slug=slug,
             status="not_configured",
-            message="Platekit bridge is not configured",
+            message="Platekit service is not configured",
             enabled=False,
         )
-        state["signup_url"] = signup_url(client)
-        return state
     if not slug:
-        state = _empty(
-            slug=slug, status="missing_slug", message="Client does not have a usable Platekit slug"
+        return _empty(
+            slug=slug,
+            status="missing_slug",
+            message="Set a Platekit slug on this client (e.g. blue-plate)",
         )
-        state["signup_url"] = signup_url(client)
-        return state
 
     base = config.PLATEKIT_API_BASE.rstrip("/")
     qs = urllib.parse.urlencode({"include_drafts": "true"}) if include_drafts else ""
@@ -97,26 +100,20 @@ def packs_for_client(client, *, include_drafts: bool = False) -> dict:
             payload = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            state = _empty(
-                slug=slug, status="not_found", message="No matching Platekit organization"
+            return _empty(
+                slug=slug,
+                status="not_found",
+                message=f"No Platekit org '{slug}' — run seed-demo on Dionysus",
             )
-            state["signup_url"] = signup_url(client)
-            return state
         log.warning("Platekit returned HTTP %s for slug=%s", e.code, slug)
-        state = _empty(slug=slug, status="error", message=f"Platekit returned HTTP {e.code}")
-        state["signup_url"] = signup_url(client)
-        return state
+        return _empty(slug=slug, status="error", message=f"Platekit returned HTTP {e.code}")
     except (urllib.error.URLError, TimeoutError) as e:
         log.warning("Platekit unreachable for slug=%s: %s", slug, e)
-        state = _empty(slug=slug, status="error", message="Platekit is unreachable")
-        state["signup_url"] = signup_url(client)
-        return state
+        return _empty(slug=slug, status="error", message="Platekit is unreachable")
     except (ValueError, json.JSONDecodeError):
-        state = _empty(
+        return _empty(
             slug=slug, status="error", message="Platekit returned an unreadable response"
         )
-        state["signup_url"] = signup_url(client)
-        return state
 
     return {
         "enabled": True,
@@ -124,7 +121,6 @@ def packs_for_client(client, *, include_drafts: bool = False) -> dict:
         "status": "ok",
         "message": "",
         "packs": payload.get("packs") or [],
-        "signup_url": signup_url(client),
     }
 
 
@@ -153,6 +149,11 @@ def notify_argus_complete(gallery_id: int, run_id: int) -> None:
             }
         )
     if not slug:
+        _record(
+            gallery_id,
+            status="skipped",
+            error="no client Platekit slug",
+        )
         log.info("platekit hook skipped for gallery %s (no client slug)", gallery_id)
         return
 
@@ -184,6 +185,8 @@ def notify_argus_complete(gallery_id: int, run_id: int) -> None:
             detail = e.read().decode()[:200]
         except Exception:
             pass
+        msg = f"HTTP {e.code}" + (f": {detail}" if detail else "")
+        _record(gallery_id, status="error", error=msg)
         log.warning(
             "platekit argus hook HTTP %s for gallery %s slug=%s%s",
             e.code,
@@ -193,17 +196,32 @@ def notify_argus_complete(gallery_id: int, run_id: int) -> None:
         )
         return
     except (urllib.error.URLError, TimeoutError) as e:
+        _record(gallery_id, status="error", error=str(e)[:200])
         log.warning("platekit argus hook unreachable for gallery %s: %s", gallery_id, e)
         return
     except (ValueError, json.JSONDecodeError):
+        _record(gallery_id, status="error", error="unreadable response")
         log.warning("platekit argus hook unreadable response for gallery %s", gallery_id)
         return
 
-    pack_id = payload.get("pack_id") if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        _record(gallery_id, status="error", error="unexpected response")
+        return
+
+    job_id = payload.get("job_id")
+    pack_id = payload.get("pack_id")
+    job_status = (payload.get("job_status") or "queued").strip()
+    _record(
+        gallery_id,
+        status="done" if job_status == "done" else "queued",
+        job_id=str(job_id) if job_id else None,
+        pack_id=int(pack_id) if pack_id is not None else None,
+    )
     log.info(
-        "platekit argus hook gallery %s run %s slug=%s -> pack %s",
+        "platekit argus hook gallery %s run %s slug=%s -> job %s pack %s",
         gallery_id,
         run_id,
         slug,
+        job_id,
         pack_id,
     )

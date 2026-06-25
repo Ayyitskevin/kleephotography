@@ -41,14 +41,10 @@
       {% endfor %}
     </table>
     {% else %}
-    <p class="muted">No approved Platekit packs matched this client yet.
-      {% if platekit.signup_url %}<a href="{{ platekit.signup_url }}" target="_blank" rel="noopener">Create in Platekit</a>{% endif %}
-    </p>
+    <p class="muted">No approved Platekit packs yet. Link a <code>platekit_slug</code> below and publish a gallery — Argus vision queues a draft pack automatically.</p>
     {% endif %}
   {% else %}
-    <p class="muted">Platekit bridge is not configured.
-      {% if platekit.signup_url %}<a href="{{ platekit.signup_url }}" target="_blank" rel="noopener">Open Platekit signup</a>{% endif %}
-    </p>
+    <p class="muted">Platekit service is not configured. Set <code>MISE_PLATEKIT_API_BASE</code> and token on flow.</p>
   {% endif %}
 
   <form method="post" action="/admin/studio/clients/{{ c.id }}" class="stack-form">

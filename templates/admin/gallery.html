@@ -247,7 +247,7 @@
         </a>
       </section>
 
-      {% if (argus_enabled or plutus_enabled) and g.published and not is_drop %}
+      {% if (argus_enabled or plutus_enabled or platekit_enabled) and g.published and not is_drop %}
       <section class="gd-studio-pipeline">
         <div class="gd-proof-head">
           <h3>Studio pipeline</h3>
@@ -316,6 +316,28 @@
             <form method="post" action="/admin/galleries/{{ g.id }}/plutus-recommend" class="inline">
               <button type="submit" class="link">Recommend prints now</button>
             </form>
+          </li>
+          {% endif %}
+          {% if platekit_enabled %}
+          {% set pk_step = 1 + (1 if argus_enabled else 0) + (1 if plutus_enabled else 0) %}
+          {% set pk_cls = 'is-error' if g.platekit_last_status == 'error' else ('is-done' if g.platekit_last_status in ('done', 'queued') else ('is-pending' if g.platekit_last_status == 'skipped' else 'is-pending')) %}
+          <li class="gd-pipeline-step {{ pk_cls }}">
+            <div class="gd-pipeline-step-head">
+              <span class="gd-pipeline-step-n">{{ pk_step }}</span>
+              <span class="gd-pipeline-step-title">Campaign pack</span>
+              {% if g.platekit_last_status %}<span class="gd-pipeline-badge">{{ g.platekit_last_status }}</span>{% endif %}
+            </div>
+            {% if g.platekit_last_status == 'error' and g.platekit_last_error %}
+            <p class="gd-pipeline-detail gd-pipeline-err">{{ g.platekit_last_error }}{% if g.platekit_last_at %} · {{ g.platekit_last_at }}{% endif %}</p>
+            {% elif g.platekit_last_at %}
+            <p class="gd-pipeline-detail muted">
+              {{ g.platekit_last_at }}
+              {% if g.platekit_last_job_id %} · job {{ g.platekit_last_job_id[:8] }}{% endif %}
+            </p>
+            <p class="gd-pipeline-detail muted">Runs after Argus vision when the gallery client has a Platekit slug.</p>
+            {% else %}
+            <p class="gd-pipeline-detail muted">Runs after Argus when client has a <code>platekit_slug</code>.</p>
+            {% endif %}
           </li>
           {% endif %}
         </ol>

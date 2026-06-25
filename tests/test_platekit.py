@@ -17,9 +17,6 @@ def test_platekit_slug_falls_back_to_company_or_name():
     )
 
 
-def test_platekit_signup_url_prefills_client_fields():
-    url = platekit.signup_url({"name": "Avery", "company": "Blue Plate", "email": "a@example.com"})
-    assert url.startswith("https://platekit.kleephotography.com/?")
-    assert url.endswith("#signup")
-    assert "company=Blue+Plate" in url
-    assert "email=a%40example.com" in url
+def test_platekit_disabled_has_no_signup_url():
+    state = platekit.packs_for_client({"name": "Avery", "company": "Blue Plate"})
+    assert "signup_url" not in state

@@ -9,6 +9,7 @@ echo "==> Rsync studio modules to ${FLOW_HOST}:${FLOW_ROOT}"
 rsync -avz \
   "$SRC/app/plutus_recommend.py" \
   "$SRC/app/argus_analyze.py" \
+  "$SRC/app/platekit.py" \
   "${FLOW_HOST}:${FLOW_ROOT}/app/"
 rsync -avz "$SRC/templates/admin/gallery.html" "${FLOW_HOST}:${FLOW_ROOT}/templates/admin/"
 rsync -avz "$SRC/static/mise.css" "${FLOW_HOST}:${FLOW_ROOT}/static/"

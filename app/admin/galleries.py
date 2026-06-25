@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from .. import argus_analyze, audit, config, db, jobs, mailer, plutus_recommend, security
+from .. import argus_analyze, audit, config, db, jobs, mailer, platekit, plutus_recommend, security
 from ..public.gallery import _cascade_status, resolve_comment_parent
 from ..render import templates
 from . import common
@@ -338,6 +338,8 @@ async def gallery_detail(request: Request, gallery_id: int):
             "argus_url": config.ARGUS_URL,
             "plutus_enabled": plutus_recommend.is_enabled(),
             "plutus_url": config.PLUTUS_URL,
+            "platekit_enabled": platekit.is_enabled(),
+            "platekit_url": config.PLATEKIT_API_BASE,
         },
     )
 
