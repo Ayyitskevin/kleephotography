@@ -1,14 +1,13 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Studio · Mise{% endblock %}
-{% macro usd(cents) %}${{ "{:,.0f}".format((cents or 0) / 100) }}{% endmacro %}
 {% block topbar %}
 {% set na_count = (licenses_expiring or [])|length + (press_confirm or [])|length + (retainer_drafts or [])|length + (quota_behind or [])|length + (content_due or [])|length + (conflicts or [])|length + (proofing_waiting or [])|length %}
 <header class="admin-topbar pgtop">
   <div class="pgtop-lead">
     <h1>Studio</h1>
     <p class="pgtop-sub">
-      <b>{{ usd(pipeline_value_total) }}</b> in open pipeline ·
-      <b class="pos">{{ usd(booked_value) }}</b> booked
+      <b>${{ pipeline_value_total|usd0 }}</b> in open pipeline ·
+      <b class="pos">${{ booked_value|usd0 }}</b> booked
       {% if na_count %}· <b class="neg">{{ na_count }} need{{ "s" if na_count == 1 }} action</b>{% endif %}
     </p>
   </div>
@@ -55,7 +54,7 @@
             <span class="stu-col-dot" style="background: {{ dot.get(s, '#5C6A5E') }};"></span>
             <span class="stu-col-name">{{ stage_label.get(s, s) }}</span>
             <span class="stu-col-count">{{ counts.get(s, 0) }}</span>
-            <span class="stu-col-sum">{{ usd(stage_value[s]) if stage_value.get(s) else "—" }}</span>
+            <span class="stu-col-sum">{{ ("$" ~ (stage_value[s]|usd0)) if stage_value.get(s) else "—" }}</span>
           </div>
           <div class="stu-col-body" data-stage="{{ s }}">
           {% for p in projects if p.status == s %}
@@ -69,7 +68,7 @@
                    onclick="if(!window.__stuDragged)location.href='/admin/studio/projects/{{ p.id }}'">
             <div class="stu-card-top">
               <span class="stu-card-co">{{ p.company or p.client_name }}</span>
-              <span class="stu-card-val{% if won %} is-won{% elif not p.value_cents %} is-none{% endif %}">{{ usd(p.value_cents) if p.value_cents else "—" }}</span>
+              <span class="stu-card-val{% if won %} is-won{% elif not p.value_cents %} is-none{% endif %}">{{ ("$" ~ (p.value_cents|usd0)) if p.value_cents else "—" }}</span>
             </div>
             <div class="stu-card-proj">{{ p.title }}</div>
             <div class="stu-card-foot">
@@ -117,7 +116,7 @@
         <td><span class="studio-list-stage">{{ stage_label.get(p.status, p.status) }}</span></td>
         <td>{{ p.shoot_date or "—" }}</td>
         <td class="{% if is_stale %}warn{% endif %}">{% if p.status != 'project_closed' %}{{ p.days_in_stage }}d{% if is_stale %} · stalled{% endif %}{% else %}—{% endif %}</td>
-        <td class="num">{% if p.value_cents %}{{ usd(p.value_cents) }}{% else %}—{% endif %}</td>
+        <td class="num">{% if p.value_cents %}${{ p.value_cents|usd0 }}{% else %}—{% endif %}</td>
       </tr>
       {% endfor %}
       </tbody>

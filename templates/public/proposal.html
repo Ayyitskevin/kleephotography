@@ -42,8 +42,8 @@
         <tr>
           <td><strong>{{ i.label }}</strong>{% if i.desc %}<br><small>{{ i.desc }}</small>{% endif %}</td>
           <td class="doc-r">{{ i.qty }}</td>
-          <td class="doc-r">{% if i.unit_cents %}${{ "%.2f" % (i.unit_cents / 100) }}{% else %}Included{% endif %}</td>
-          <td class="doc-r">{% if i.unit_cents %}${{ "%.2f" % (i.qty * i.unit_cents / 100) }}{% else %}Included{% endif %}</td>
+          <td class="doc-r">{% if i.unit_cents %}${{ i.unit_cents|usd }}{% else %}Included{% endif %}</td>
+          <td class="doc-r">{% if i.unit_cents %}${{ (i.qty * i.unit_cents)|usd }}{% else %}Included{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -51,7 +51,7 @@
     </div>
 
     <div class="client-doc-totals">
-      <div class="client-doc-due"><span>Total proposal</span><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></div>
+      <div class="client-doc-due"><span>Total proposal</span><strong>${{ d.total_cents|usd }}</strong></div>
     </div>
 
     {% if d.status == 'accepted' %}

@@ -1,6 +1,5 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Activity · Studio · Mise{% endblock %}
-{% macro usd(cents) %}${{ "{:,.0f}".format((cents or 0) / 100) }}{% endmacro %}
 {% set stage_label = {"inquiry_received": "Inquiry Received",
     "consultation_call": "Consultation Call", "proposal_sent": "Proposal Sent",
     "contract_signed": "Contract Signed", "retainer_paid": "Retainer Paid",
@@ -82,7 +81,7 @@
           {% if r.age_days is not none and r.age_days > 0 %}sat {{ r.age_days }}d{% else %}new{% endif %}</span>
         <a href="/admin/studio/invoices/{{ r.id }}" title="Review and Send this auto-generated retainer draft">
           <strong>{{ r.title }}</strong>
-          <span class="muted">{{ r.company or r.client_name }} · ${{ "%.2f" % (r.total_cents / 100) }} · draft</span>
+          <span class="muted">{{ r.company or r.client_name }} · ${{ r.total_cents|usd }} · draft</span>
         </a>
       </li>
       {% endfor %}
@@ -181,11 +180,11 @@
     <span class="pipeline-step{% if counts.get(s) %} active{% endif %}">
       {{ stage_label.get(s, s) }} <strong>{{ counts.get(s, 0) }}</strong>{% if overdue_by_stage.get(s) %}
       <span class="warn pipeline-overdue">({{ overdue_by_stage[s] }} overdue)</span>{% endif %}{% if stage_value.get(s) %}
-      <span class="pipeline-step-val">{{ usd(stage_value[s]) }}</span>{% endif %}</span>
+      <span class="pipeline-step-val">${{ stage_value[s]|usd0 }}</span>{% endif %}</span>
     {% if not loop.last %}<span class="muted">→</span>{% endif %}
     {% endfor %}
     <span class="pipeline-money">
-      {% if outstanding.n %}${{ "%.2f" % (outstanding.cents / 100) }} outstanding
+      {% if outstanding.n %}${{ outstanding.cents|usd }} outstanding
       across {{ outstanding.n }} open invoice{{ "s" if outstanding.n != 1 }}
       {% else %}nothing outstanding{% endif %}
       {% set n_overdue = projects|sum(attribute="n_overdue") %}

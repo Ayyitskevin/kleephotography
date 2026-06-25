@@ -13,7 +13,7 @@
     <p class="pgtop-eyebrow">Studio · Invoice</p>
     <h1>{{ d.title }}</h1>
     <p class="pgtop-sub">
-      {{ d.status|replace('_', ' ')|title }} · <b>${{ "%.2f" % (d.total_cents / 100) }}</b>
+      {{ d.status|replace('_', ' ')|title }} · <b>${{ d.total_cents|usd }}</b>
       {% if d.paid_at %}· <span class="pos">paid {{ d.paid_at[:10] }}</span>
       {% elif d.sent_at %}· sent {{ d.sent_at[:10] }}{% endif %}
     </p>
@@ -87,15 +87,15 @@
           <tr>
             <td><input class="inv-in" type="text" name="item_label_{{ loop.index0 }}" value="{{ row.label or '' }}" placeholder="Line item"></td>
             <td><input class="inv-in inv-num" type="number" name="item_qty_{{ loop.index0 }}" min="1" value="{{ qty }}"></td>
-            <td><input class="inv-in inv-num" type="number" name="item_price_{{ loop.index0 }}" min="0" step="0.01" value="{{ '%.2f' % (unit_cents / 100) if unit_cents else '' }}" placeholder="0.00"></td>
-            <td class="inv-num">${{ "%.2f" % ((qty * unit_cents) / 100) }}</td>
+            <td><input class="inv-in inv-num" type="number" name="item_price_{{ loop.index0 }}" min="0" step="0.01" value="{{ unit_cents|usd if unit_cents else '' }}" placeholder="0.00"></td>
+            <td class="inv-num">${{ (qty * unit_cents)|usd }}</td>
           </tr>
           {% elif row.label %}
           <tr>
             <td><strong>{{ row.label }}</strong></td>
             <td class="inv-num">{{ qty }}</td>
-            <td class="inv-num">${{ "%.2f" % (unit_cents / 100) }}</td>
-            <td class="inv-num">${{ "%.2f" % ((qty * unit_cents) / 100) }}</td>
+            <td class="inv-num">${{ unit_cents|usd }}</td>
+            <td class="inv-num">${{ (qty * unit_cents)|usd }}</td>
           </tr>
           {% endif %}
           {% endfor %}
@@ -104,14 +104,14 @@
       </div>
 
       <div class="inv-totalbox">
-        <div><span>Subtotal</span><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></div>
+        <div><span>Subtotal</span><strong>${{ d.total_cents|usd }}</strong></div>
         {% if d.deposit_cents %}
-        <div><span>Deposit</span><strong>${{ "%.2f" % (d.deposit_cents / 100) }}</strong></div>
+        <div><span>Deposit</span><strong>${{ d.deposit_cents|usd }}</strong></div>
         {% endif %}
         {% if paid.cents %}
-        <div><span>Paid</span><strong>${{ "%.2f" % (paid.cents / 100) }}</strong></div>
+        <div><span>Paid</span><strong>${{ paid.cents|usd }}</strong></div>
         {% endif %}
-        <div class="inv-grand"><span>{{ "Amount due" if not is_draft else "Total" }}</span><strong>${{ "%.2f" % ((balance_cents if not is_draft else d.total_cents) / 100) }}</strong></div>
+        <div class="inv-grand"><span>{{ "Amount due" if not is_draft else "Total" }}</span><strong>${{ (balance_cents if not is_draft else d.total_cents)|usd }}</strong></div>
       </div>
 
       {% if d.terms and not is_draft %}
@@ -143,7 +143,7 @@
       <section class="inv-card inv-draft-controls">
         <span class="inv-label">Payment setup</span>
         <label>Deposit
-          <input type="number" name="deposit" min="0" step="0.01" value="{{ '%.2f' % (d.deposit_cents / 100) }}">
+          <input type="number" name="deposit" min="0" step="0.01" value="{{ d.deposit_cents|usd }}">
         </label>
         <label>Due date
           <input type="date" name="due_date" value="{{ d.due_date or '' }}">
@@ -161,13 +161,13 @@
       <section class="inv-card">
         <span class="inv-label">Stripe payments</span>
         <div class="inv-pay-summary">
-          <div><span>Paid</span><strong>${{ "%.2f" % (paid.cents / 100) }}</strong></div>
-          <div><span>Balance</span><strong>${{ "%.2f" % (balance_cents / 100) }}</strong></div>
+          <div><span>Paid</span><strong>${{ paid.cents|usd }}</strong></div>
+          <div><span>Balance</span><strong>${{ balance_cents|usd }}</strong></div>
         </div>
         {% if payments %}
         <ul class="inv-payments">
           {% for pay in payments %}
-          <li><span>{{ pay.kind|replace('_', ' ')|title }}<small>{{ pay.created_at }}</small></span><strong>${{ "%.2f" % (pay.amount_cents / 100) }}</strong></li>
+          <li><span>{{ pay.kind|replace('_', ' ')|title }}<small>{{ pay.created_at }}</small></span><strong>${{ pay.amount_cents|usd }}</strong></li>
           {% endfor %}
         </ul>
         {% else %}

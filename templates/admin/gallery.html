@@ -297,7 +297,7 @@
               · {{ g.plutus_last_bundle_count }} bundle{{ '' if g.plutus_last_bundle_count == 1 else 's' }}
               {% endif %}
               {% if g.plutus_last_estimated_cents %}
-              · est. ${{ '%.2f'|format(g.plutus_last_estimated_cents / 100) }}
+              · est. ${{ g.plutus_last_estimated_cents|usd }}
               {% endif %}
             </p>
             <p class="gd-pipeline-links">

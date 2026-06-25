@@ -39,7 +39,7 @@
         </div>
         <div class="rev-chart">
           {% for m in chart %}
-          <div class="rev-bar-wrap" title="{{ m.label }}: ${{ '%.2f' % (m.cents / 100) }}">
+          <div class="rev-bar-wrap" title="{{ m.label }}: ${{ m.cents|usd }}">
             <span class="rev-val">{% if m.cents %}${{ (m.cents / 100)|round|int }}{% endif %}</span>
             <div class="rev-bar{% if loop.last %} rev-bar-now{% endif %}" style="height:{{ (100 * m.cents / chart_max)|round(1) }}%"></div>
             <span class="rev-label">{{ m.label }}</span>

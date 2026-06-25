@@ -6,7 +6,7 @@
   <div class="pgtop-lead">
     <h1>{{ d.title }}</h1>
     <p class="pgtop-sub">
-      Proposal · {{ d.status }} · <b>${{ "%.2f" % (d.total_cents / 100) }}</b>
+      Proposal · {{ d.status }} · <b>${{ d.total_cents|usd }}</b>
       {% if d.accepted_at %}· <span class="pos">accepted {{ d.accepted_at[:10] }}</span>
       {% elif d.sent_at %}· sent {{ d.sent_at[:10] }}{% endif %}
     </p>
@@ -38,12 +38,12 @@
         <td><input type="number" name="item_qty_{{ loop.index0 }}" min="1"
                    value="{{ row.qty or 1 }}" style="width:4.5em"></td>
         <td><input type="number" name="item_price_{{ loop.index0 }}" min="0" step="0.01"
-                   value="{{ '%.2f' % (row.unit_cents / 100) if row.unit_cents is defined else '' }}"
+                   value="{{ row.unit_cents|usd if row.unit_cents is defined else '' }}"
                    style="width:7em"></td>
       </tr>
       {% endfor %}
     </table>
-    <p><strong>Total: ${{ "%.2f" % (d.total_cents / 100) }}</strong>
+    <p><strong>Total: ${{ d.total_cents|usd }}</strong>
        <span class="muted">(recalculated on save)</span></p>
     <button type="submit">Save draft</button>
   </form>
@@ -64,12 +64,12 @@
     <tr>
       <td>{{ row.label }}</td>
       <td class="num">{{ row.qty }}</td>
-      <td class="num">${{ "%.2f" % (row.unit_cents / 100) }}</td>
-      <td class="num">${{ "%.2f" % (row.qty * row.unit_cents / 100) }}</td>
+      <td class="num">${{ row.unit_cents|usd }}</td>
+      <td class="num">${{ (row.qty * row.unit_cents)|usd }}</td>
     </tr>
     {% endfor %}
     <tr><td colspan="3"><strong>Total</strong></td>
-        <td class="num"><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></td></tr>
+        <td class="num"><strong>${{ d.total_cents|usd }}</strong></td></tr>
   </table>
 
   {% if d.status == 'accepted' %}

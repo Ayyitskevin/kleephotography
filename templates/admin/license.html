@@ -53,10 +53,10 @@
       </label>
       <label>Licensing fee ($)
         <input type="number" step="0.01" name="fee"
-               value="{{ '%.2f' % (d.fee_cents / 100) }}"></label>
+               value="{{ d.fee_cents|usd }}"></label>
     </div>
     <p class="muted">Suggested ({{ suggested.market }} rate card):
-      <strong>${{ '%.2f' % (suggested.total_cents / 100) }}</strong> — base
+      <strong>${{ suggested.total_cents|usd }}</strong> — base
       ${{ '%.0f' % (suggested.base_cents / 100) }}
       &times; {{ '%.2f' % suggested.territory_mult }} territory
       &times; {{ '%.2f' % suggested.channel_mult }} channels

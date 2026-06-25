@@ -105,6 +105,21 @@ def _localtime(utc_str, fmt="%a %b %-d · %-I:%M %p"):
 templates.env.filters["localtime"] = _localtime
 
 
+def _usd(cents) -> str:
+    """Cents → '1234.56' for client documents (invoices/proposals/receipts).
+    No leading '$' — templates own the currency glyph so '-$' etc. stay literal."""
+    return f"{(cents or 0) / 100:.2f}"
+
+
+def _usd0(cents) -> str:
+    """Cents → '1,234' (whole dollars) for the studio dashboard's glanceable KPIs."""
+    return f"{(cents or 0) / 100:,.0f}"
+
+
+templates.env.filters["usd"] = _usd
+templates.env.filters["usd0"] = _usd0
+
+
 def _field(row, key: str) -> str:
     """Read a column from a sqlite3.Row OR a plain dict, tolerating absent keys.
     The gallery delivery-email form passes a synthetic dict that only carries

@@ -8,10 +8,10 @@
     <p class="pgtop-sub">
       {% if c.company %}{{ c.company }}{% endif %}
       {% if money.n_invoices or money.n_delivered %}
-      {% if c.company %}· {% endif %}<b>${{ "%.2f" % (money.paid_cents / 100) }}</b> paid lifetime
-      {% if money.invoiced_cents %}of ${{ "%.2f" % (money.invoiced_cents / 100) }} invoiced
+      {% if c.company %}· {% endif %}<b>${{ money.paid_cents|usd }}</b> paid lifetime
+      {% if money.invoiced_cents %}of ${{ money.invoiced_cents|usd }} invoiced
         across {{ money.n_invoices }} invoice{{ "s" if money.n_invoices != 1 }}{% endif %}
-      {% if money.outstanding_cents %}· <span class="neg">${{ "%.2f" % (money.outstanding_cents / 100) }} outstanding</span>{% endif %}
+      {% if money.outstanding_cents %}· <span class="neg">${{ money.outstanding_cents|usd }} outstanding</span>{% endif %}
       · <b>{{ money.n_delivered }}</b> shoot{{ "s" if money.n_delivered != 1 }} delivered
       {% endif %}
     </p>
@@ -278,7 +278,7 @@
               {% else %}<span class="warn">({{ l.days_left }}d)</span>{% endif %}
             {% endif %}
           {% else %}—{% endif %}</td>
-      <td class="num">{% if l.fee_cents %}${{ "%.2f" % (l.fee_cents / 100) }}{% else %}—{% endif %}</td>
+      <td class="num">{% if l.fee_cents %}${{ l.fee_cents|usd }}{% else %}—{% endif %}</td>
       <td>{{ l.status }}</td>
     </tr>
     {% endfor %}

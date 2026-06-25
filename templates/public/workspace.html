@@ -14,7 +14,7 @@
     {% for d in proposals %}
     <a class="ws-card" href="/p/{{ d.slug }}">
       <span class="ws-card-title">{{ d.title }}</span>
-      <span class="ws-card-meta">${{ "%.2f" % (d.total_cents / 100) }}</span>
+      <span class="ws-card-meta">${{ d.total_cents|usd }}</span>
       <span class="kind-badge kind-proposal">{{ d.status }}</span>
     </a>
     {% endfor %}
@@ -39,7 +39,7 @@
     {% for d in invoices %}
     <a class="ws-card" href="/i/{{ d.slug }}">
       <span class="ws-card-title">{{ d.title }}</span>
-      <span class="ws-card-meta">${{ "%.2f" % (d.total_cents / 100) }}
+      <span class="ws-card-meta">${{ d.total_cents|usd }}
         {% if d.due_date %}· due {{ d.due_date }}{% endif %}</span>
       <span class="kind-badge kind-invoice">{{ d.status }}</span>
     </a>

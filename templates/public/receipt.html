@@ -15,21 +15,21 @@
     <tr>
       <td>{{ p.created_at[:10] }}</td>
       <td>{{ {"deposit": "Deposit", "balance": "Balance", "full": "Payment"}.get(p.kind, p.kind) }}</td>
-      <td>${{ "%.2f" % (p.amount_cents / 100) }}</td>
+      <td>${{ p.amount_cents|usd }}</td>
     </tr>
     {% endfor %}
     <tr><td colspan="2"><strong>Total paid</strong></td>
-        <td><strong>${{ "%.2f" % (paid_cents / 100) }}</strong></td></tr>
+        <td><strong>${{ paid_cents|usd }}</strong></td></tr>
     {% if remaining_cents %}
     <tr><td colspan="2">Remaining balance</td>
-        <td>${{ "%.2f" % (remaining_cents / 100) }}</td></tr>
+        <td>${{ remaining_cents|usd }}</td></tr>
     {% endif %}
   </table>
 
   {% if not remaining_cents %}
   <p class="doc-accepted">✓ Paid in full — thank you!</p>
   {% endif %}
-  <p class="muted">Invoice total ${{ "%.2f" % (d.total_cents / 100) }}.
+  <p class="muted">Invoice total ${{ d.total_cents|usd }}.
     Payments processed securely by Stripe.</p>
 
   <div class="doc-actions no-print">

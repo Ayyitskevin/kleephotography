@@ -38,7 +38,7 @@
         <tr>
           <td><strong>{{ i.label }}</strong>{% if i.desc %}<br><small>{{ i.desc }}</small>{% endif %}</td>
           <td class="doc-r">{{ i.qty }}</td>
-          <td class="doc-r">{% if i.unit_cents %}${{ "%.2f" % (i.qty * i.unit_cents / 100) }}{% else %}Included{% endif %}</td>
+          <td class="doc-r">{% if i.unit_cents %}${{ (i.qty * i.unit_cents)|usd }}{% else %}Included{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -46,13 +46,13 @@
     </div>
 
     <div class="client-doc-totals">
-      <div><span>Subtotal</span><strong>${{ "%.2f" % (d.total_cents / 100) }}</strong></div>
+      <div><span>Subtotal</span><strong>${{ d.total_cents|usd }}</strong></div>
       {% if paid_total %}
-      <div><span>Paid</span><strong>-${{ "%.2f" % (paid_total / 100) }}</strong></div>
+      <div><span>Paid</span><strong>-${{ paid_total|usd }}</strong></div>
       {% elif d.deposit_cents %}
-      <div><span>Deposit to reserve your date</span><strong>${{ "%.2f" % (d.deposit_cents / 100) }}</strong></div>
+      <div><span>Deposit to reserve your date</span><strong>${{ d.deposit_cents|usd }}</strong></div>
       {% endif %}
-      <div class="client-doc-due"><span>{{ "Amount due" if amount_due else "Balance" }}</span><strong>${{ "%.2f" % ((amount_due or balance_cents) / 100) }}</strong></div>
+      <div class="client-doc-due"><span>{{ "Amount due" if amount_due else "Balance" }}</span><strong>${{ (amount_due or balance_cents)|usd }}</strong></div>
     </div>
 
     {% if d.terms %}
@@ -71,7 +71,7 @@
       {% if payments_on %}
       <div class="client-doc-actions no-print">
         <form method="post" action="/i/{{ d.slug }}/pay">
-          <button type="submit" class="client-pay-btn">Pay {{ "deposit" if pay_kind == "deposit" else ("balance" if pay_kind == "balance" else "now") }} — ${{ "%.2f" % (amount_due / 100) }}</button>
+          <button type="submit" class="client-pay-btn">Pay {{ "deposit" if pay_kind == "deposit" else ("balance" if pay_kind == "balance" else "now") }} — ${{ amount_due|usd }}</button>
         </form>
         <button type="button" onclick="window.print()" class="client-secondary-btn">Print / save as PDF</button>
       </div>

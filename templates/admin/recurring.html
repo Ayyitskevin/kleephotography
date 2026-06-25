@@ -31,7 +31,7 @@
         <td><input type="number" name="item_qty_{{ loop.index0 }}" min="1"
                    value="{{ row.qty or 1 }}" style="width:4.5em"></td>
         <td><input type="number" name="item_price_{{ loop.index0 }}" min="0" step="0.01"
-                   value="{{ '%.2f' % (row.unit_cents / 100) if row.unit_cents is defined else '' }}"
+                   value="{{ row.unit_cents|usd if row.unit_cents is defined else '' }}"
                    style="width:7em"></td>
       </tr>
       {% endfor %}
@@ -61,7 +61,7 @@
     <p class="muted">Cadence: monthly. Day 1–28 (kept clear of short months). On
       that day each month Mise auto-generates this period's <strong>draft</strong>
       — you still review and Send it. You can also generate on demand below.</p>
-    <p><strong>Total: ${{ "%.2f" % (d.total_cents / 100) }}</strong>
+    <p><strong>Total: ${{ d.total_cents|usd }}</strong>
        <span class="muted">(recalculated on save)</span></p>
     <label>Notes <textarea name="notes" rows="2">{{ d.notes or '' }}</textarea></label>
     <button type="submit">Save plan</button>
@@ -271,7 +271,7 @@
     {% for inv in invoices %}
     <tr>
       <td><a href="/admin/studio/invoices/{{ inv.id }}">{{ inv.title }}</a></td>
-      <td class="num">${{ "%.2f" % (inv.total_cents / 100) }}</td>
+      <td class="num">${{ inv.total_cents|usd }}</td>
       <td>{{ inv.status }}</td>
       <td class="muted">{{ inv.created_at[:10] }}</td>
     </tr>

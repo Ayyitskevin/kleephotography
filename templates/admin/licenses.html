@@ -59,7 +59,7 @@
       <td>{% if l.perpetual %}perpetual
           {% elif l.ends_on %}{{ l.starts_on or '?' }} → {{ l.ends_on }}
           {% else %}—{% endif %}</td>
-      <td class="num">{% if l.fee_cents %}${{ "%.2f" % (l.fee_cents / 100) }}{% else %}—{% endif %}</td>
+      <td class="num">{% if l.fee_cents %}${{ l.fee_cents|usd }}{% else %}—{% endif %}</td>
       <td><span class="status-{{ l.status }}">{{ l.status }}</span></td>
     </tr>
     {% endfor %}
