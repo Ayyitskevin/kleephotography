@@ -365,12 +365,15 @@ async def mark_proposal_sent(proposal_id: int):
     d = get_proposal(proposal_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="already sent")
-    db.run("UPDATE proposals SET status='sent', sent_at=datetime('now') WHERE id=?", (proposal_id,))
-    db.run(
-        "UPDATE projects SET status='proposal_sent', "
-        "stage_changed_at=datetime('now') WHERE id=? "
-        "AND status IN ('inquiry_received','consultation_call')",
-        (d["project_id"],),
-    )
+    with db.tx() as con:
+        con.execute(
+            "UPDATE proposals SET status='sent', sent_at=datetime('now') WHERE id=?", (proposal_id,)
+        )
+        con.execute(
+            "UPDATE projects SET status='proposal_sent', "
+            "stage_changed_at=datetime('now') WHERE id=? "
+            "AND status IN ('inquiry_received','consultation_call')",
+            (d["project_id"],),
+        )
     log.info("proposal %s marked sent", proposal_id)
     return RedirectResponse(f"/admin/studio/proposals/{proposal_id}", status_code=303)

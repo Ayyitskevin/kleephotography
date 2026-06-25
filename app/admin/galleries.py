@@ -612,8 +612,9 @@ async def reorder_section(gallery_id: int, section_id: int, dir: str = Form(...)
     j = i - 1 if dir == "up" else i + 1
     if 0 <= j < len(ids):
         ids[i], ids[j] = ids[j], ids[i]
-        for pos, sid in enumerate(ids):
-            db.run("UPDATE sections SET position=? WHERE id=?", (pos, sid))
+        with db.tx() as con:
+            for pos, sid in enumerate(ids):
+                con.execute("UPDATE sections SET position=? WHERE id=?", (pos, sid))
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
@@ -642,11 +643,12 @@ async def bulk_move_assets(request: Request, gallery_id: int):
         "SELECT id FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id)
     ):
         raise HTTPException(status_code=400, detail="unknown section")
-    for v in form.getlist("asset_ids"):
-        db.run(
-            "UPDATE assets SET section_id=? WHERE id=? AND gallery_id=?",
-            (section_id, int(v), gallery_id),
-        )
+    with db.tx() as con:
+        for v in form.getlist("asset_ids"):
+            con.execute(
+                "UPDATE assets SET section_id=? WHERE id=? AND gallery_id=?",
+                (section_id, int(v), gallery_id),
+            )
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
@@ -668,8 +670,9 @@ async def reorder_asset(gallery_id: int, asset_id: int, dir: str = Form(...)):
     if 0 <= j < len(ids):
         ids[i], ids[j] = ids[j], ids[i]
         # renumber the whole section — also normalizes legacy all-zero positions
-        for pos, aid in enumerate(ids):
-            db.run("UPDATE assets SET position=? WHERE id=?", (pos, aid))
+        with db.tx() as con:
+            for pos, aid in enumerate(ids):
+                con.execute("UPDATE assets SET position=? WHERE id=?", (pos, aid))
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
@@ -740,8 +743,9 @@ async def delete_gallery(gallery_id: int, force: bool = Form(False)):
                 f"lost — the client's social-crops view depends on them. "
                 f"Re-submit with force=1 if you really mean it.",
             )
-    db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))  # FKs cascade the rest
-    db.run("DELETE FROM pin_attempts WHERE gallery_id=?", (gallery_id,))
+    with db.tx() as con:
+        con.execute("DELETE FROM galleries WHERE id=?", (gallery_id,))  # FKs cascade the rest
+        con.execute("DELETE FROM pin_attempts WHERE gallery_id=?", (gallery_id,))
     shutil.rmtree(config.MEDIA_DIR / str(gallery_id), ignore_errors=True)
     for z in config.ZIP_DIR.glob(f"g{gallery_id}-r*.zip"):
         z.unlink(missing_ok=True)
@@ -763,13 +767,14 @@ async def delete_asset(gallery_id: int, asset_id: int):
         for sub in ("original", "web", "thumb", "crops"):
             for f in (base / sub).glob(f"{stem}*"):
                 f.unlink(missing_ok=True)
-        db.run("DELETE FROM assets WHERE id=?", (asset_id,))
-        db.run(
-            "UPDATE galleries SET content_rev=content_rev+1, "
-            "cover_asset_id=CASE WHEN cover_asset_id=? THEN NULL ELSE cover_asset_id END "
-            "WHERE id=?",
-            (asset_id, gallery_id),
-        )
+        with db.tx() as con:
+            con.execute("DELETE FROM assets WHERE id=?", (asset_id,))
+            con.execute(
+                "UPDATE galleries SET content_rev=content_rev+1, "
+                "cover_asset_id=CASE WHEN cover_asset_id=? THEN NULL ELSE cover_asset_id END "
+                "WHERE id=?",
+                (asset_id, gallery_id),
+            )
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
