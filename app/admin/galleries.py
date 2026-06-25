@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -314,6 +315,14 @@ async def gallery_detail(request: Request, gallery_id: int):
         for a in assets
         if a["kind"] == "video"
     }
+    hero_asset_ids: set[int] = set()
+    raw_heroes = g["argus_hero_asset_ids"]
+    if raw_heroes:
+        try:
+            hero_asset_ids = {int(x) for x in json.loads(raw_heroes)}
+        except (json.JSONDecodeError, TypeError, ValueError):
+            hero_asset_ids = set()
+
     return templates.TemplateResponse(
         request,
         "admin/gallery.html",
@@ -321,6 +330,7 @@ async def gallery_detail(request: Request, gallery_id: int):
             "g": g,
             "sections": sections,
             "assets": assets,
+            "hero_asset_ids": hero_asset_ids,
             "section_picks": section_picks,
             "clients": clients,
             "projects": projects,
@@ -405,13 +415,22 @@ async def update_gallery(
     )
     if published and project_id and (not old["published"] or old["project_id"] != project_id):
         jobs.enqueue("notion_sync_gallery", {"gallery_id": gallery_id})
-    if (
+    argus_reanalyze = (
         argus_analyze.is_enabled()
         and published
         and old["type"] != "drop"
-        and (not old["published"] or old["project_id"] != project_id)
-    ):
-        jobs.enqueue("argus_analyze_gallery", {"gallery_id": gallery_id})
+        and (
+            not old["published"]
+            or old["project_id"] != project_id
+            or argus_analyze.media_count_changed(gallery_id)
+        )
+    )
+    if argus_reanalyze:
+        skip_dedup = bool(old["published"] and old["project_id"] == project_id)
+        jobs.enqueue(
+            "argus_analyze_gallery",
+            {"gallery_id": gallery_id, "skip_dedup": skip_dedup},
+        )
     # elif, not if: when Argus runs, it chains Plutus on completion (argus_analyze
     # apply_callback) so Plutus can use the vision tags. Plutus only fires directly
     # here when Argus is off — making this an `if` would double-enqueue Plutus.

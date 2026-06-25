@@ -12,7 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import config, db, platekit, plutus_recommend
+from . import argus_writeback, config, db, platekit, plutus_recommend
 
 log = logging.getLogger("mise.argus")
 
@@ -55,6 +55,8 @@ def apply_callback(gallery_id: int, payload: dict) -> None:
                 platekit.notify_argus_complete(gallery_id, int(run_id))
             except Exception:
                 log.exception("platekit argus hook failed for gallery %s", gallery_id)
+        if run_id:
+            _enqueue_writeback(gallery_id, int(run_id))
         if plutus_recommend.is_enabled():
             from . import jobs
 
@@ -71,6 +73,27 @@ def apply_callback(gallery_id: int, payload: dict) -> None:
         )
     else:
         log.info("argus callback ignored for gallery %s status=%s", gallery_id, status)
+
+
+def _enqueue_writeback(gallery_id: int, run_id: int) -> None:
+    if not argus_writeback.is_enabled():
+        return
+    from . import jobs
+
+    jobs.enqueue("argus_writeback_gallery", {"gallery_id": gallery_id, "run_id": run_id})
+
+
+def media_count_changed(gallery_id: int) -> bool:
+    """True when ready photo count differs from the last Argus writeback."""
+    row = db.one("SELECT argus_analyzed_count FROM galleries WHERE id=?", (gallery_id,))
+    if not row or row["argus_analyzed_count"] is None:
+        return False
+    current = db.one(
+        """SELECT COUNT(*) AS n FROM assets
+           WHERE gallery_id=? AND kind='photo' AND status='ready'""",
+        (gallery_id,),
+    )["n"]
+    return int(current) != int(row["argus_analyzed_count"])
 
 
 def _record(
@@ -205,6 +228,8 @@ def run_for_gallery(gallery_id: int, *, skip_dedup: bool = False) -> None:
         job_id=job_id,
         review_url=_review_url_from_result(result),
     )
+    if status == "done" and run_id:
+        _enqueue_writeback(gallery_id, int(run_id))
     if status == "done" and plutus_recommend.is_enabled():
         from . import jobs
 

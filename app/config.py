@@ -115,7 +115,7 @@ ODYSSEUS_TIMEOUT = int(os.environ.get("MISE_ODYSSEUS_TIMEOUT", "210"))
 ARGUS_URL = os.environ.get("MISE_ARGUS_URL", "").rstrip("/")
 ARGUS_TOKEN = os.environ.get("MISE_ARGUS_TOKEN", "")
 ARGUS_TIMEOUT = int(os.environ.get("MISE_ARGUS_TIMEOUT", "30"))
-ARGUS_ANALYZE_LIMIT = int(os.environ.get("MISE_ARGUS_ANALYZE_LIMIT", "20"))
+ARGUS_ANALYZE_LIMIT = int(os.environ.get("MISE_ARGUS_ANALYZE_LIMIT", "0"))
 
 # Plutus print upsell (Phase 1). BOTH url+token arm post-Argus recommend hooks.
 PLUTUS_URL = os.environ.get("MISE_PLUTUS_URL", "").rstrip("/")

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from . import (
     argus_analyze,
+    argus_writeback,
     brand_kits,
     config,
     db,
@@ -146,6 +147,9 @@ HANDLERS = {
     "notion_sync_gallery": lambda p: notion_sync.sync_gallery(p["gallery_id"]),
     "argus_analyze_gallery": lambda p: argus_analyze.run_for_gallery(
         p["gallery_id"], skip_dedup=bool(p.get("skip_dedup"))
+    ),
+    "argus_writeback_gallery": lambda p: argus_writeback.run_for_gallery(
+        p["gallery_id"], int(p["run_id"])
     ),
     "plutus_recommend_gallery": lambda p: plutus_recommend.run_for_gallery(p["gallery_id"]),
 }
