@@ -125,6 +125,3 @@ def _clients_with_hints() -> tuple[list, dict]:
                 hint = last.date().isoformat()
             hints[c["id"]] = ("ok", f"👁 {hint}")
     return clients, hints
-
-
-# moved from studio

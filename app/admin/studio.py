@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from .. import clients, config, db, jobs, platekit, pricing, security, usage_vocab
 from ..render import templates
+from . import common
 
 log = logging.getLogger("mise.admin.studio")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])
@@ -92,45 +93,6 @@ def _spark_series(table: str, today: dt.date, window: int) -> tuple[list[int], i
     return series, sum(series)
 
 
-def _clients_with_hints() -> tuple[list, dict]:
-    """Clients with per-client project counts + portal engagement, plus a friendly
-    "visited Xh ago" / "never visited" hint keyed by client id so the template
-    stays declarative. Portal engagement (Phase 2) is otherwise invisible from the
-    studio. last_visit is stored UTC; compared against a UTC 'now' here."""
-    clients = db.all_("""SELECT c.*,
-                         (SELECT COUNT(*) FROM projects p WHERE p.client_id=c.id) AS n_projects,
-                         (SELECT po.published FROM portals po WHERE po.client_id=c.id) AS portal_published,
-                         (SELECT po.visits FROM portals po WHERE po.client_id=c.id) AS portal_visits,
-                         (SELECT po.last_visit FROM portals po WHERE po.client_id=c.id) AS portal_last_visit
-                         FROM clients c ORDER BY c.name""")
-    now = dt.datetime.now(dt.UTC).replace(tzinfo=None)
-    hints = {}
-    for c in clients:
-        if c["portal_published"] is None:
-            hints[c["id"]] = ("muted", "no portal")
-        elif not c["portal_last_visit"]:
-            hints[c["id"]] = ("muted", "never visited")
-        else:
-            try:
-                last = dt.datetime.fromisoformat(c["portal_last_visit"])
-            except ValueError:
-                hints[c["id"]] = ("muted", "visited (date unknown)")
-                continue
-            delta = now - last
-            if delta.total_seconds() < 60:
-                hint = "just now"
-            elif delta.total_seconds() < 3600:
-                hint = f"{int(delta.total_seconds() // 60)}m ago"
-            elif delta.total_seconds() < 86400:
-                hint = f"{int(delta.total_seconds() // 3600)}h ago"
-            elif delta.days < 30:
-                hint = f"{delta.days}d ago"
-            else:
-                hint = last.date().isoformat()
-            hints[c["id"]] = ("ok", f"👁 {hint}")
-    return clients, hints
-
-
 @router.get("/playbook", response_class=HTMLResponse)
 async def studio_playbook(request: Request):
     return templates.TemplateResponse(request, "admin/studio_playbook.html", {})
@@ -138,7 +100,7 @@ async def studio_playbook(request: Request):
 
 @router.get("/clients", response_class=HTMLResponse)
 async def studio_clients(request: Request):
-    clients, client_portal_hints = _clients_with_hints()
+    clients, client_portal_hints = common._clients_with_hints()
     return templates.TemplateResponse(
         request,
         "admin/studio_clients.html",
