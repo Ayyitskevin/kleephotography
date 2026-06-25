@@ -415,6 +415,9 @@ async def update_gallery(
         and (not old["published"] or old["project_id"] != project_id)
     ):
         jobs.enqueue("argus_analyze_gallery", {"gallery_id": gallery_id})
+    # elif, not if: when Argus runs, it chains Plutus on completion (argus_analyze
+    # apply_callback) so Plutus can use the vision tags. Plutus only fires directly
+    # here when Argus is off — making this an `if` would double-enqueue Plutus.
     elif (
         plutus_recommend.is_enabled()
         and published
