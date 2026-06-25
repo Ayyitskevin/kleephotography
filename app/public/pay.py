@@ -155,31 +155,37 @@ async def stripe_webhook(request: Request):
     if not d:
         log.error("stripe webhook for unknown invoice %s", invoice_id)
         raise HTTPException(status_code=404)
+    # Record the payment and advance invoice + project state as one atomic unit:
+    # a crash between these writes would otherwise leave the payment logged but the
+    # invoice unpaid, and Stripe's retry would short-circuit on the duplicate event
+    # id (below) without ever repairing it. The INSERT runs first, so a duplicate
+    # event rolls the whole tx back with nothing else written.
     try:
-        db.run(
-            """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
-                  amount_cents, kind) VALUES (?,?,?,?,?)""",
-            (invoice_id, event["id"], session["id"], session["amount_total"], kind),
-        )
+        with db.tx() as con:
+            con.execute(
+                """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
+                      amount_cents, kind) VALUES (?,?,?,?,?)""",
+                (invoice_id, event["id"], session["id"], session["amount_total"], kind),
+            )
+            if kind == "deposit":
+                con.execute("UPDATE invoices SET status='deposit_paid' WHERE id=?", (invoice_id,))
+            else:
+                con.execute(
+                    "UPDATE invoices SET status='paid', paid_at=datetime('now') WHERE id=?",
+                    (invoice_id,),
+                )
+            # Payment landed → advance the project to Retainer Paid (the funnel's
+            # money gate). Only moves forward from pre-payment stages; never rewinds
+            # a project already at session planning / closed / archived.
+            con.execute(
+                """UPDATE projects SET status='retainer_paid',
+                      stage_changed_at=datetime('now') WHERE id=?
+                      AND status IN ('inquiry_received','consultation_call',
+                                     'proposal_sent','contract_signed')""",
+                (d["project_id"],),
+            )
     except db.sqlite3.IntegrityError:
         return {"ok": True, "duplicate": True}  # Stripe retries — idempotent by event id
-
-    if kind == "deposit":
-        db.run("UPDATE invoices SET status='deposit_paid' WHERE id=?", (invoice_id,))
-    else:
-        db.run(
-            "UPDATE invoices SET status='paid', paid_at=datetime('now') WHERE id=?", (invoice_id,)
-        )
-    # Payment landed → advance the project to Retainer Paid (the funnel's money
-    # gate). Only moves forward from pre-payment stages; never rewinds a project
-    # already at session planning / closed / archived.
-    db.run(
-        """UPDATE projects SET status='retainer_paid',
-              stage_changed_at=datetime('now') WHERE id=?
-              AND status IN ('inquiry_received','consultation_call',
-                             'proposal_sent','contract_signed')""",
-        (d["project_id"],),
-    )
     jobs.enqueue("notion_sync_invoice", {"invoice_id": invoice_id})
     log.info(
         "invoice %s payment recorded: %s %s cents (event %s)",
