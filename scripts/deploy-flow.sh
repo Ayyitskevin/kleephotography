@@ -11,6 +11,8 @@ rsync -avz \
   "$SRC/app/argus_analyze.py" \
   "${FLOW_HOST}:${FLOW_ROOT}/app/"
 rsync -avz "$SRC/templates/admin/gallery.html" "${FLOW_HOST}:${FLOW_ROOT}/templates/admin/"
+rsync -avz "$SRC/static/mise.css" "${FLOW_HOST}:${FLOW_ROOT}/static/"
+rsync -avz "$SRC/migrations/" "${FLOW_HOST}:${FLOW_ROOT}/migrations/"
 
 ssh -o ConnectTimeout=15 "$FLOW_HOST" bash -s <<REMOTE
 set -euo pipefail
