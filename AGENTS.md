@@ -24,7 +24,7 @@ You don't need a human for any of this. Make the change, prove it green (gates b
 
 These are irreversible, money/legal, or schema-shaped. Do the work on a
 `claude/<topic>` branch, push it, open a PR with the risk spelled out, and **do not
-self-merge**. A human presses the button (R16).
+self-merge**. A human presses the button (R11).
 
 - **Money path** — anything under `app/public/pay.py`, Stripe Checkout/webhook logic,
   invoice/payment/deposit/balance math, `payments`/`invoices` state transitions.
@@ -40,7 +40,7 @@ self-merge**. A human presses the button (R16).
 When unsure which side a change sits on, treat it as red. The cost of a needless PR is
 minutes; the cost of an unattended money/schema mistake is an incident.
 
-## Gates — a commit is not "done" until all pass (R12, R21)
+## Gates — a commit is not "done" until all pass (R4)
 
 ```sh
 source .venv/bin/activate
@@ -58,7 +58,7 @@ locally before pushing — CI runs the same on `main` and on PRs.
 
 ## Conventions that bite if you miss them
 
-- **Conform, don't reinvent** (R11). Match the surrounding style even where you'd choose
+- **Conform, don't reinvent** (R8). Match the surrounding style even where you'd choose
   differently. Surface a harmful convention; never silently fork it.
 - **Surgical changes** (R3). Touch only what the task needs. No drive-by cleanup of
   adjacent code in the same commit.
