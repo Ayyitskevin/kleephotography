@@ -156,6 +156,10 @@
     } else {
       const img = document.createElement("img");
       img.src = t.dataset.web;
+      // Carry the tile's alt onto the enlarged image so screen-reader users
+      // get the same description in the viewer as in the grid.
+      const srcImg = t.querySelector("img");
+      img.alt = (srcImg && srcImg.alt) || "";
       stage.appendChild(img);
       activeVideo = null;
       activeAsset = null;
@@ -163,16 +167,44 @@
     }
   }
 
-  function open(i) { render(i); lb.hidden = false; document.body.style.overflow = "hidden"; }
+  // Return focus to whatever opened the lightbox when it closes.
+  let lastFocused = null;
+  const closeBtn = lb.querySelector(".lb-close");
+
+  function open(i) {
+    lastFocused = document.activeElement;
+    render(i);
+    lb.hidden = false;
+    document.body.style.overflow = "hidden";
+    if (closeBtn) closeBtn.focus();
+  }
   function close() {
     stopShow();
     lb.hidden = true; stage.innerHTML = ""; document.body.style.overflow = "";
     activeVideo = null; activeAsset = null;
     if (cWrap) { cWrap.hidden = true; if (cList) cList.innerHTML = ""; clearReply(); }
+    if (lastFocused && lastFocused.focus) lastFocused.focus();
+    lastFocused = null;
   }
 
+  // Each tile image opens the lightbox. It's a real control, so make it
+  // keyboard-reachable (Tab) and operable (Enter/Space), not just a click
+  // target — the figure itself stays a plain container.
   tiles.forEach((t, i) => {
-    t.querySelector("img").addEventListener("click", () => open(i));
+    const img = t.querySelector("img");
+    if (!img) return;
+    img.setAttribute("tabindex", "0");
+    img.setAttribute("role", "button");
+    if (!img.getAttribute("aria-label")) {
+      img.setAttribute("aria-label", (img.alt || "Photo") + " — view larger");
+    }
+    img.addEventListener("click", () => open(i));
+    img.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+        open(i);
+      }
+    });
   });
   // Shared fav trigger — used by both the ♥ button and the double-tap gesture.
   // Routes through htmx.ajax so OOB section-progress swap + HX-Trigger
@@ -230,6 +262,22 @@
     if (e.key === "Escape") close();
     if (e.key === "ArrowLeft") { stopShow(); render(idx - 1); }
     if (e.key === "ArrowRight") { stopShow(); render(idx + 1); }
+    // Keep Tab inside the modal so focus can't wander back to the muted grid.
+    if (e.key === "Tab") {
+      const focusable = Array.from(
+        lb.querySelectorAll('button, a[href], input, textarea, [tabindex]:not([tabindex="-1"])')
+      ).filter((el) => !el.hidden && el.getClientRects().length > 0);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
   });
 
   // Touch gestures: horizontal swipe → navigate, double-tap on the image →
