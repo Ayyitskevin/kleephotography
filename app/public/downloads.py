@@ -209,4 +209,14 @@ async def download_zip(request: Request, slug: str):
 @router.get("/{slug}/download/zip/status")
 async def zip_status(slug: str):
     g = get_live_gallery(slug)
-    return {"ready": jobs.zip_path(g["id"], g["content_rev"]).is_file()}
+    if jobs.zip_path(g["id"], g["content_rev"]).is_file():
+        return {"ready": True, "failed": False}
+    # Surface a build that exhausted its retries so the wait page can stop
+    # spinning and offer a retry instead of polling forever.
+    failed = db.one(
+        """SELECT 1 AS x FROM jobs WHERE kind='zip_build' AND status='failed'
+                        AND json_extract(payload,'$.gallery_id')=?
+                        AND json_extract(payload,'$.rev')=?""",
+        (g["id"], g["content_rev"]),
+    )
+    return {"ready": False, "failed": bool(failed)}

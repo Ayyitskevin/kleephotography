@@ -3677,6 +3677,34 @@ def test_reels_never_expose_non_portfolio_videos(admin):
         db.run("DELETE FROM galleries WHERE id=?", (gid,))
 
 
+def test_zip_wait_reports_failed_build(admin):
+    # The wait page polls /download/zip/status; a zip_build that exhausted its
+    # retries must be reported as failed so the page stops spinning forever and
+    # offers a retry instead.
+    import json as _json
+
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("zip-fail-01", "Zip Fail", "1234"),
+    )
+    g = db.one("SELECT id, content_rev FROM galleries WHERE id=?", (gid,))
+    try:
+        with TestClient(app) as pub:
+            # nothing built yet, no failed job → still waiting
+            s = pub.get("/g/zip-fail-01/download/zip/status").json()
+            assert s["ready"] is False and s["failed"] is False
+            # a build that hit MAX_ATTEMPTS is marked failed → status surfaces it
+            db.run(
+                "INSERT INTO jobs (kind, payload, status) VALUES ('zip_build', ?, 'failed')",
+                (_json.dumps({"gallery_id": g["id"], "rev": g["content_rev"]}),),
+            )
+            s = pub.get("/g/zip-fail-01/download/zip/status").json()
+            assert s["ready"] is False and s["failed"] is True
+    finally:
+        db.run("DELETE FROM jobs WHERE json_extract(payload,'$.gallery_id')=?", (gid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
 def test_gallery_delete(admin):
     from app import config as cfg
 

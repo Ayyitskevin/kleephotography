@@ -2,18 +2,41 @@
 {% block title %}Preparing download · {{ g.title }}{% endblock %}
 {% block content %}
 <main class="center-card">
-  <h1>Packing your gallery&hellip;</h1>
-  <p class="muted">This can take a minute for large galleries. The download will start
-     automatically.</p>
-  <div class="spinner"></div>
+  <div data-zip-working>
+    <h1>Packing your gallery&hellip;</h1>
+    <p class="muted">This can take a minute for large galleries. The download will start
+       automatically.</p>
+    <div class="spinner"></div>
+  </div>
+  <div data-zip-error hidden>
+    <h1>This is taking longer than expected</h1>
+    <p class="muted">Something went wrong packing your download. Please try again — or
+       get in touch and I'll send it over directly.</p>
+    <p>
+      <a class="button" href="/g/{{ g.slug }}/download/zip">Try again</a>
+      <a class="button-ghost" href="/contact">Get in touch</a>
+    </p>
+  </div>
 </main>
 <script>
-(function poll() {
-  fetch("/g/{{ g.slug }}/download/zip/status")
-    .then(r => r.json())
-    .then(d => { if (d.ready) { window.location = "/g/{{ g.slug }}/download/zip"; }
-                 else { setTimeout(poll, 3000); } })
-    .catch(() => setTimeout(poll, 5000));
+(function () {
+  var working = document.querySelector("[data-zip-working]");
+  var errBox = document.querySelector("[data-zip-error]");
+  var tries = 0;
+  // Generous backstop (~5 min) in case a build wedges without ever being
+  // marked failed — better a retry prompt than an eternal spinner.
+  var MAX_TRIES = 100;
+  function fail() { working.hidden = true; errBox.hidden = false; }
+  (function poll() {
+    fetch("/g/{{ g.slug }}/download/zip/status")
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ready) { window.location = "/g/{{ g.slug }}/download/zip"; }
+        else if (d.failed || ++tries >= MAX_TRIES) { fail(); }
+        else { setTimeout(poll, 3000); }
+      })
+      .catch(function () { if (++tries >= MAX_TRIES) { fail(); } else { setTimeout(poll, 5000); } });
+  })();
 })();
 </script>
 {% endblock %}
