@@ -3787,6 +3787,40 @@ def test_booking_manage_shows_client_timezone(admin):
         db.run("DELETE FROM event_types WHERE id=?", (eid,))
 
 
+def test_upload_all_rejected_reports_zero_accepted(admin):
+    # Every unsupported file → route reports accepted=0 (the admin upload JS
+    # reads this to avoid a false "Uploaded — processing…" message + reload) and
+    # stores nothing.
+    admin.post(
+        "/admin/galleries", data={"title": "Reject Test", "client_name": ""}, follow_redirects=False
+    )
+    g = db.one("SELECT * FROM galleries WHERE title='Reject Test' ORDER BY id DESC LIMIT 1")
+    try:
+        with TestClient(app):
+            r = admin.post(
+                f"/admin/galleries/{g['id']}/upload",
+                files=[("files", ("notes.txt", b"not an image", "text/plain"))],
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["accepted"] == 0 and "notes.txt" in body["rejected"]
+        assert db.one("SELECT COUNT(*) AS n FROM assets WHERE gallery_id=?", (g["id"],))["n"] == 0
+        # the section 'remove' control carries a confirm guard against accidental
+        # destruction of curation
+        admin.post(f"/admin/galleries/{g['id']}/sections", data={"name": "Mains"})
+        page = admin.get(f"/admin/galleries/{g['id']}").text
+        assert "sections/" in page and 'onsubmit="return confirm(' in page
+    finally:
+        db.run("DELETE FROM sections WHERE gallery_id=?", (g["id"],))
+        db.run("DELETE FROM galleries WHERE id=?", (g["id"],))
+
+
+def test_gallery_activity_404_on_missing_gallery(admin):
+    # a deleted/nonexistent gallery must 404, not ghost-render the activity page
+    # with an empty title and empty lists
+    assert admin.get("/admin/galleries/999999/activity").status_code == 404
+
+
 def test_gallery_delete(admin):
     from app import config as cfg
 

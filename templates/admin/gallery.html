@@ -555,7 +555,8 @@
             <button class="link">caption</button>
           </form>
           <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/delete"
-                class="inline"><button class="link danger">remove</button></form>
+                class="inline"
+                onsubmit="return confirm('Remove this section? Its photos move back to unsorted.')"><button class="link danger">remove</button></form>
         </li>
         {% endfor %}
       </ul>
@@ -633,7 +634,21 @@ document.getElementById("upform").addEventListener("submit", function (e) {
   bar.hidden = false;
   xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) bar.value = 100 * ev.loaded / ev.total; };
   xhr.onload = () => {
-    if (xhr.status === 200) { msg.textContent = "Uploaded — processing…"; setTimeout(() => location.reload(), 1500); }
+    if (xhr.status === 200) {
+      let r = {};
+      try { r = JSON.parse(xhr.responseText); } catch (e) {}
+      const acc = r.accepted || 0, rej = (r.rejected || []).length;
+      if (acc === 0) {
+        // every file was an unsupported type — don't claim success or reload
+        msg.textContent = rej
+          ? "Nothing uploaded — " + rej + " file" + (rej === 1 ? "" : "s") + " skipped (unsupported type)."
+          : "Nothing uploaded.";
+        bar.hidden = true;
+      } else {
+        msg.textContent = "Uploaded " + acc + (rej ? " · " + rej + " skipped (unsupported)" : "") + " — processing…";
+        setTimeout(() => location.reload(), 1500);
+      }
+    }
     else { msg.textContent = "Upload failed (" + xhr.status + ")"; bar.hidden = true; }
   };
   xhr.onerror = () => { msg.textContent = "Upload failed (network)"; bar.hidden = true; };
