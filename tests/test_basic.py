@@ -70,6 +70,48 @@ def test_cookie_secure_default_fails_safe_for_https():
 
 
 @pytest.mark.unit
+def test_admin_logout_revokes_session(client):
+    from app import config, db, security
+
+    client.cookies.clear()
+    r = client.post(
+        "/admin/login", data={"password": config.ADMIN_PASSWORD}, follow_redirects=False
+    )
+    assert r.status_code == 303
+    raw = r.cookies.get(security.ADMIN_COOKIE)
+    token = security.unsign(raw)
+    assert token and db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (token,))
+    # authenticated request passes the require_admin gate
+    assert client.get("/admin/home", follow_redirects=False).status_code == 200
+    # logout deletes the server-side row → real revocation
+    assert client.post("/admin/logout", follow_redirects=False).status_code == 303
+    assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (token,)) is None
+    # replaying the OLD signed cookie is now dead — bounced to login, not admitted
+    client.cookies.clear()
+    client.cookies.set(security.ADMIN_COOKIE, raw)
+    r = client.get("/admin/home", follow_redirects=False)
+    assert r.status_code == 303 and "/admin/login" in r.headers.get("location", "")
+    client.cookies.clear()
+
+
+@pytest.mark.unit
+def test_admin_sign_out_everywhere_kills_all_sessions(client):
+    from app import config, db, security
+
+    # a second, independent session (another device) plus this browser's login
+    other = security.create_admin_session()
+    client.cookies.clear()
+    client.post("/admin/login", data={"password": config.ADMIN_PASSWORD}, follow_redirects=False)
+    assert db.one("SELECT COUNT(*) AS n FROM admin_sessions")["n"] >= 2
+    # "sign out everywhere" revokes ALL sessions, including the other device's
+    r = client.post("/admin/logout", data={"everywhere": "1"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert db.one("SELECT COUNT(*) AS n FROM admin_sessions")["n"] == 0
+    assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (other,)) is None
+    client.cookies.clear()
+
+
+@pytest.mark.unit
 def test_portal_pin_bucket_avoids_throttle_sentinels():
     from app import security
     from app.public.portal import _pin_bucket
@@ -241,7 +283,10 @@ def test_access_routes_use_shared_session_cookie_policy(client, monkeypatch):
         "/admin/login", data={"password": config.ADMIN_PASSWORD}, follow_redirects=False
     )
     assert admin.status_code == 303
-    assert security.unsign(assert_session_cookie(admin, security.ADMIN_COOKIE).value) == "admin"
+    # the admin cookie now carries a per-login server-side session token (not a
+    # signed constant); it must resolve to a live row in admin_sessions
+    admin_token = security.unsign(assert_session_cookie(admin, security.ADMIN_COOKIE).value)
+    assert admin_token and db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (admin_token,))
 
     db.run(
         "INSERT INTO galleries (slug,title,pin,published) VALUES (?,?,?,1)",

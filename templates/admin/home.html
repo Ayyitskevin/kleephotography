@@ -31,6 +31,9 @@
   <div class="dash-top-actions">
     <form method="post" action="/admin/logout">
       <button class="dash-signout" type="submit">Sign out</button>
+      <button class="dash-signout" type="submit" name="everywhere" value="1"
+              title="Revoke every admin session on all devices"
+              onclick="return confirm('Sign out of ALL devices? Any other logged-in session (including a leaked cookie) is revoked immediately.')">Sign out everywhere</button>
     </form>
     <details class="qc dash-qc" id="quick-create">
       <summary class="dash-new" aria-haspopup="menu">
