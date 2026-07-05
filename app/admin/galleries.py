@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from .. import argus_analyze, audit, config, db, jobs, mailer, platekit, plutus_recommend, security
-from ..public.gallery import _cascade_status, resolve_comment_parent
+from ..public.gallery import _cascade_status, resolve_comment_parent, video_comment_thread
 from ..render import templates
 from . import common
 
@@ -305,15 +305,10 @@ async def gallery_detail(request: Request, gallery_id: int):
         "n"
     ]
     # Visible review-comment threads per video asset (flat, nested in the template).
+    # Single source of truth for "the visible thread" — the same helper the client
+    # gallery uses, so the visibility rule can never drift between the two views.
     video_comments = {
-        a["id"]: db.all_(
-            """SELECT id, parent_id, timecode, body, author_role, status, created_at
-                            FROM video_comments WHERE asset_id=? AND deleted_at IS NULL
-                            ORDER BY timecode, created_at, id""",
-            (a["id"],),
-        )
-        for a in assets
-        if a["kind"] == "video"
+        a["id"]: video_comment_thread(a["id"]) for a in assets if a["kind"] == "video"
     }
     hero_asset_ids: set[int] = set()
     raw_heroes = g["argus_hero_asset_ids"]

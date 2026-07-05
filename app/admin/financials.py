@@ -582,12 +582,7 @@ async def receipt_upload(file: UploadFile = File(...), expense_id: int | None = 
         raise HTTPException(status_code=400, detail="unknown expense")
     config.RECEIPTS_DIR.mkdir(parents=True, exist_ok=True)
     stored = f"{uuid.uuid4().hex}{ext}"
-    dest = config.RECEIPTS_DIR / stored
-    size = 0
-    with dest.open("wb") as out:
-        while chunk := await file.read(1 << 20):
-            out.write(chunk)
-            size += len(chunk)
+    size = await common.save_upload(file, config.RECEIPTS_DIR / stored)
     db.run(
         """INSERT INTO receipts (filename, stored, content_type, size_bytes, expense_id)
               VALUES (?,?,?,?,?)""",

@@ -622,27 +622,32 @@ async def inquiry_undismiss(inquiry_id: int, return_to: str = Form("")):
     return _redirect(return_to, "/admin/studio")
 
 
-@router.post("/inquiries/{inquiry_id}/client")
-async def inquiry_to_client(inquiry_id: int, return_to: str = Form("")):
+def _inquiry_and_client(inquiry_id: int) -> "tuple[db.sqlite3.Row, int]":
+    """Load an inquiry (404 if gone) and find-or-create its client by email.
+    Shared verbatim by the inquiry→client and inquiry→quote convert routes —
+    one copy so the client-seeding fields can't drift between them."""
     inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
     if not inq:
         raise HTTPException(status_code=404)
     existing = db.one("SELECT id FROM clients WHERE email=?", (inq["email"],))
-    cid = (
-        existing["id"]
-        if existing
-        else db.run(
-            "INSERT INTO clients (name, company, email, notes) VALUES (?,?,?,?)",
-            (
-                inq["name"],
-                inq["business"],
-                inq["email"],
-                f"From inquiry {inq['created_at'][:10]}:\n{inq['message']}",
-            ),
-        )
+    if existing:
+        return inq, existing["id"]
+    cid = db.run(
+        "INSERT INTO clients (name, company, email, notes) VALUES (?,?,?,?)",
+        (
+            inq["name"],
+            inq["business"],
+            inq["email"],
+            f"From inquiry {inq['created_at'][:10]}:\n{inq['message']}",
+        ),
     )
-    if not existing:
-        log.info("client %s created from inquiry %s", cid, inquiry_id)
+    log.info("client %s created from inquiry %s", cid, inquiry_id)
+    return inq, cid
+
+
+@router.post("/inquiries/{inquiry_id}/client")
+async def inquiry_to_client(inquiry_id: int, return_to: str = Form("")):
+    inq, cid = _inquiry_and_client(inquiry_id)
     pid = None
     # Bookings carry a date + service → lift straight into an 'inquiry_received' project so
     # Kevin can spawn a proposal without re-typing the date.
@@ -672,25 +677,7 @@ async def inquiry_to_quote(inquiry_id: int, return_to: str = Form("")):
     with the inquiry brief as the intro. Quoting-first flow — Kevin fills the
     line items (no auto-pricing; the catalog floor numbers live in proposals
     PRESETS and are applied by hand per client)."""
-    inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
-    existing = db.one("SELECT id FROM clients WHERE email=?", (inq["email"],))
-    cid = (
-        existing["id"]
-        if existing
-        else db.run(
-            "INSERT INTO clients (name, company, email, notes) VALUES (?,?,?,?)",
-            (
-                inq["name"],
-                inq["business"],
-                inq["email"],
-                f"From inquiry {inq['created_at'][:10]}:\n{inq['message']}",
-            ),
-        )
-    )
-    if not existing:
-        log.info("client %s created from inquiry %s (quote)", cid, inquiry_id)
+    inq, cid = _inquiry_and_client(inquiry_id)
     title = f"{inq['service'] or 'Shoot'}"
     if inq["shoot_date"]:
         title += f" — {inq['shoot_date']}"
@@ -1069,11 +1056,7 @@ async def upload_brand(client_id: int, files: list[UploadFile]):
             rejected.append(name)
             continue
         stored = f"{uuid.uuid4().hex}{ext}"
-        size = 0
-        with (dest_dir / stored).open("wb") as out:
-            while chunk := await f.read(1 << 20):
-                out.write(chunk)
-                size += len(chunk)
+        size = await common.save_upload(f, dest_dir / stored)
         db.run(
             "INSERT INTO brand_assets (client_id, filename, stored, bytes) VALUES (?,?,?,?)",
             (client_id, name, stored, size),
@@ -1133,11 +1116,7 @@ async def upload_kit(
     dest_dir = config.BRAND_DIR / str(client_id)
     dest_dir.mkdir(parents=True, exist_ok=True)
     stored = f"kit_{uuid.uuid4().hex}{ext}"
-    size = 0
-    with (dest_dir / stored).open("wb") as out:
-        while chunk := await logo.read(1 << 20):
-            out.write(chunk)
-            size += len(chunk)
+    size = await common.save_upload(logo, dest_dir / stored)
     db.run(
         "INSERT INTO brand_kits (client_id, label, stored, bytes, position, "
         "opacity, scale_pct, margin_pct) VALUES (?,?,?,?,?,?,?,?)",
