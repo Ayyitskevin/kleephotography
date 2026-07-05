@@ -188,9 +188,44 @@ def delete_session_cookie(response: Response, name: str, *, path: str = "/") -> 
 ADMIN_COOKIE = "mise_admin"
 
 
+def create_admin_session() -> str:
+    """Mint a server-side admin session; return its opaque token to sign into the
+    cookie. This row is what makes the session real — deleting it (logout / kill
+    switch) revokes the cookie immediately, without rotating MISE_SECRET_KEY. Also
+    prunes sessions past SESSION_MAX_AGE so the table stays small (the cookie
+    signature expires at the same age, so those rows are already dead)."""
+    token = secrets.token_urlsafe(24)
+    db.run("INSERT INTO admin_sessions (token) VALUES (?)", (token,))
+    cutoff = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(time.time() - config.SESSION_MAX_AGE))
+    db.run("DELETE FROM admin_sessions WHERE created_at < ?", (cutoff,))
+    return token
+
+
 def is_admin(request: Request) -> bool:
     raw = request.cookies.get(ADMIN_COOKIE)
-    return bool(raw) and unsign(raw) == "admin"
+    if not raw:
+        return False  # no cookie → public traffic never touches the DB
+    token = unsign(raw)  # None on a bad/expired signature (enforces SESSION_MAX_AGE)
+    if not token:
+        return False
+    return db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (token,)) is not None
+
+
+def destroy_admin_session(request: Request) -> None:
+    """Revoke the current admin session (real logout): delete its server-side row
+    so the cookie is dead even if it was copied elsewhere before logout."""
+    raw = request.cookies.get(ADMIN_COOKIE)
+    if not raw:
+        return
+    token = unsign(raw)
+    if token:
+        db.run("DELETE FROM admin_sessions WHERE token=?", (token,))
+
+
+def destroy_all_admin_sessions() -> None:
+    """Emergency kill switch — revoke every admin session everywhere at once
+    (e.g. a cookie is known leaked and you can't reach the device it's on)."""
+    db.run("DELETE FROM admin_sessions", ())
 
 
 def require_admin(request: Request) -> None:
