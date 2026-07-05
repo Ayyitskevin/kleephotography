@@ -1,183 +1,209 @@
-# HANDOFF — Klee Photography / Mise refactor session
+# HANDOFF — Klee Photography / Mise refactor (retirement notes)
 
-**Purpose of this file:** if the current agent session is cut off, a successor agent
-(Opus/Sonnet/any) must be able to resume from here with zero other context. Read this
-top-to-bottom, then continue from the first unchecked item in [Progress log](#progress-log).
-Update this file as you complete work — it is the single source of truth for this effort.
+**For the successor agent (Opus 4.8 / Sonnet 5 / any):** the previous agent (Fable 5)
+retired mid-effort. This file is the single source of truth. Read it top-to-bottom,
+then continue from [§7 What remains](#7-what-remains-ordered-work-queue). Update this
+file as you work. **All prior context you need is here — do not assume chat history.**
 
 ---
 
-## 0. Mission
+## 1. Mission & ground rules
 
-Refactor and improve the whole codebase, then leave the repo ready to ship a safer,
-cleaner, faster, more polished kleephotography.com — **without breaking** client
-galleries, admin workflows, contracts, invoices, Stripe payments, uploads, or SEO.
+Refactor/improve the whole codebase and leave kleephotography.com ready to ship —
+without breaking galleries, admin, contracts, invoices, Stripe, uploads, or SEO.
 
-## 1. Ground rules (read AGENTS.md first — it overrides everything)
-
-- This is **live production** with real clients and real Stripe money.
-- `AGENTS.md` defines **green-light** (fix autonomously) vs **red-light** (branch + PR,
-  human merges). Digest:
-  - **Green:** refactors, dead code, tests, UI/templates/CSS/HTMX, public copy,
-    non-money admin features (galleries, proofing, shotlist, presets, press, licenses),
-    tooling/docs, dep bumps that pass the suite.
-  - **Red (DO NOT change without PR approval):** `app/public/pay.py` + Stripe/webhook/
-    invoice/payment math & state; `migrations/` + any schema change; deploy
-    (`scripts/deploy-flow.sh`, `mise.service`, `ops/backup.sh`, flow tree, systemd);
-    `app/security.py`, `app/admin/auth.py`, CSRF/session/cookie, rate-limit/lockout,
-    secrets; proposal/contract generation & e-sign.
-  - When unsure, treat as red.
-- **Session-specific override:** this session's platform contract designates branch
-  `claude/klee-photography-refactor-y9tr5g` and forbids pushing to any other branch.
-  So (deviating from AGENTS.md's "push green to main"): **all work — green and red — is
-  committed to `claude/klee-photography-refactor-y9tr5g`**, pushed there, and delivered
-  via ONE draft PR that Kevin reviews and merges. Keep red-light changes OUT of the
-  diff entirely: red-light findings are *documented* (below + PR body), not implemented,
-  unless they are tests/docs-only.
-- Never commit secrets, .env, client media, DB dumps. Never scratch-edit `/opt/mise`
-  (production host `flow` — not reachable from this environment anyway).
-- SQL: bound `?` placeholders only. Date logic: `studio._today()`, not `date.today()`.
-- Style: conform to the existing codebase; surgical one-logical-change commits;
-  no speculative abstractions; keep FastAPI + Jinja + HTMX; **no JS build**.
+- **Read `AGENTS.md` first. It overrides everything**, including this file.
+- Green-light (fix autonomously): templates/CSS/HTMX, public copy, non-money admin
+  features, tests, docs, surgical refactors, dep bumps that pass the suite.
+- Red-light (document; PR for Kevin; NEVER self-merge): `app/public/pay.py`/Stripe/
+  invoice-payment math+state; `migrations/`+schema; deploy files (`scripts/deploy-flow.sh`,
+  `mise.service`, `ops/backup.sh`, flow tree); `app/security.py`, `app/admin/auth.py`,
+  CSRF/session/cookie/rate-limit/lockout/secrets; contracts/e-sign. Unsure ⇒ red.
+- **Session override:** all work goes to branch `claude/klee-photography-refactor-y9tr5g`
+  (platform constraint; do not push to main or any other branch). Delivered via
+  **draft PR #2** (https://github.com/Ayyitskevin/kleephotography/pull/2) — Kevin merges.
+  Keep red-light *changes* out of the diff; they are documented in §6 and the PR body.
+- SQL: bound `?` placeholders only. Studio date logic: `studio._today()`. Conform to
+  existing style. One logical change per commit (`area: what — why`). No JS build.
+- Never commit secrets/.env/client media/dumps. Never touch `/opt/mise` (unreachable
+  here anyway). No model IDs in commits/PR bodies.
 
 ## 2. Environment setup (fresh container)
 
 ```sh
-cd /home/user/kleephotography          # or wherever the repo is cloned
-git checkout claude/klee-photography-refactor-y9tr5g
+cd /home/user/kleephotography && git checkout claude/klee-photography-refactor-y9tr5g
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt pytest ruff httpx
-# smoke video tests need ffmpeg:
-apt-get update -q; apt-get install -y ffmpeg
+apt-get update -q; apt-get install -y ffmpeg     # REQUIRED for video smoke tests
 ```
 
-## 3. Gates — run ALL before every commit; never push red
+## 3. Gates — ALL must pass before EVERY commit
 
 ```sh
 source .venv/bin/activate
-python -m pytest tests/ --ignore=tests/test_smoke.py -q -m unit          # gate 1
+python -m pytest tests/ --ignore=tests/test_smoke.py -q -m unit
 MISE_DATA_DIR=$(mktemp -d) MISE_SECRET_KEY=test MISE_ADMIN_PASSWORD=pw \
-  python -m pytest tests/test_smoke.py -q                                # gate 2
-ruff check . && ruff format --check .                                    # gate 3
+  python -m pytest tests/test_smoke.py -q
+ruff check . && ruff format --check .
 ```
 
-Baseline recorded 2026-07-05 (commit 0b72e6b): **36 unit passed · 158 smoke passed ·
-ruff clean**. If gates fail before you changed anything, it's the environment
-(usually missing ffmpeg), not the code.
+Current state (2026-07-05, commit 5ffee23): **37 unit / 158 smoke / ruff clean.**
+CI (`.github/workflows/ci.yml`) runs the same on the PR. If smoke fails fresh with
+FileNotFoundError on video tests ⇒ ffmpeg missing, not a code bug.
 
-## 4. Codebase map (30-second orientation)
+Manual verification harness (already used, reuse it): scratchpad dir has a Playwright
+setup — `cd <scratchpad>/ && npm install playwright --no-save`, launch chromium with
+`executablePath: '/opt/pw-browsers/chromium'`; run uvicorn with
+`MISE_DATA_DIR=<tmp> MISE_SECRET_KEY=devtest MISE_ADMIN_PASSWORD=pw` (showcase
+auto-seeds demo data on first boot).
 
-- `app/main.py` — app wiring, CSP + security-header middleware, branded error pages.
-- `app/db.py` — SQLite helpers (`one`, `all_`, `run`, `get_or_404`, `migrate`).
-- `app/security.py` (RED) — cookies, PIN lockout, admin session. `app/csrf.py` (RED) —
-  same-origin check middleware. `app/ratelimit.py` (RED).
-- `app/public/` — public routes: `site.py` (marketing pages), `gallery.py` (PIN'd client
-  galleries), `portal.py`, `media.py` (image serving), `downloads.py` (ZIPs), `pay.py`
-  (RED — Stripe), `docs.py` (public invoice/contract/proposal views), `forms.py`,
-  `scheduling.py` (booking), `workspace.py`, `sms_webhook.py`.
-- `app/admin/` — back office, one router per feature; `common.py` shared helpers.
-  Biggest: `studio.py` (1499), `galleries.py` (889), `activity.py` (829).
-- `templates/site/` marketing · `templates/public/` client-facing · `templates/admin/`
-  back office. Base layouts: `site/base_site.html`, `base_cream.html`,
-  `admin/base_admin.html`.
-- `static/` — `mise.css` (single stylesheet), `site.js`, `lightbox.js`, `htmx.min.js`,
-  self-hosted fonts.
-- `tests/` — `-m unit` fast tests + `test_smoke.py` full e2e (needs env vars + ffmpeg).
-- `migrations/` (RED) — forward-only SQL, run against live DB.
+## 4. Codebase map
 
-## 5. The plan, beginning to end
+- `app/main.py` wiring/CSP/error pages · `app/db.py` SQLite helpers (`one`,`all_`,`run`,
+  `get_or_404`,`tx`) · `app/render.py` Jinja env+filters (`portfolio_alt`,`localtime`,`usd`).
+- `app/public/`: `site.py` marketing (+robots/sitemap/favicon), `gallery.py` PIN'd
+  galleries+proofing+video comments, `portal.py`, `media.py`, `downloads.py` (ZIPs),
+  `docs.py` (public invoice/contract/proposal), `pay.py` (RED Stripe), `scheduling.py`
+  booking, `workspace.py`, `forms.py`, `sms_webhook.py`.
+- `app/admin/`: one router per feature; `common.py` shared. Biggest: `studio.py` 1499,
+  `galleries.py` 889, `activity.py` 829 lines.
+- `templates/site/` marketing (base: `site/base_site.html` — has `meta_description`
+  and `og` blocks; pages override them) · `templates/public/` client-facing (base:
+  `base.html`/`base_cream.html`, noindex by default) · `templates/admin/`.
+- `static/mise.css` (single 305KB sheet — includes admin), `site.js`, `lightbox.js`.
+- Jinja gotcha that already bit once: `{% set %}` inside a block is INVISIBLE to
+  sibling blocks — set page-level vars at template top level.
 
-Work in **passes**; each pass = several small commits; gates before every commit;
-push after each pass so nothing is lost. Update the [Progress log](#progress-log)
-as you go.
+## 5. Work completed (all gates green at each commit)
 
-### Pass 0 — setup & audit  ✅ done except where noted
-1. Read AGENTS.md, map repo, set up venv, record gate baseline. ✅
-2. Run a comprehensive audit (security / public UI+SEO / client flows / admin UX /
-   code quality / performance / features / tests). ✅ — **verified findings are
-   recorded in section 6 below**; implement from that list.
-3. Commit this HANDOFF.md, push branch, open draft PR early (durability). ✅
+| Commit | What |
+|---|---|
+| d9793d2 | HANDOFF.md v1 |
+| c12cfa0 | **Bug fix:** `/work/{slug}` overrode whole head block → lost fonts/site.js (dead mobile menu)/dark-mode/Plausible/JSON-LD **and** hero photo never rendered (block-scoped `{% set %}`). Restructured `base_site.html` head: new `meta_description` + `og` blocks, canonical link, og:title/desc now mirror each page. Smoke test pins regression. |
+| b1e2098 | Per-page meta descriptions on all indexable pages (home, portfolio, work, services, about, contact, reels, press, book, book_event). |
+| bd73d1d | Favicon: `static/favicon.svg`+`.ico`+`apple-touch-icon.png` (serif K + terracotta dot on cream), links in `base.html`, `/favicon.ico` route in site.py, unit test. |
+| 5ffee23 | A11y: skip-link → `#main` wrapper (flex-preserving), hamburger `aria-expanded`/`aria-controls`, Escape closes + refocuses. Chromium-verified. |
 
-### Pass 1 — safety & correctness (green-light only)
-Fix verified correctness bugs from the audit findings (section 6) that sit in
-green-light territory: template escaping bugs, broken routes/templates, unhandled
-None/404 paths, HTMX endpoints that fail silently, upload-validation gaps *outside*
-`app/security.py`, error-state gaps. Each fix gets/adjusts a test where meaningful.
+An 8-dimension multi-agent audit ran (security, public-UI/SEO, client-flows, admin-UX,
+code-quality complete; **performance, features, tests audits DID NOT RUN** — usage
+limits). Findings below. Verification status: CONFIRMED = adversarially verified;
+UNVERIFIED = single-auditor claim, re-verify the code before fixing.
 
-### Pass 2 — UI/UX + accessibility (green-light)
-Public marketing site + client-facing templates: mobile nav, form labels +
-validation feedback, focus states, alt text, heading hierarchy, skip links,
-keyboard paths (lightbox, menus), empty states, 404/500 polish, favicon/icons.
+## 6. Audit findings
 
-### Pass 3 — feature polish + SEO/social + performance (green-light)
-Titles/meta descriptions/canonical/OpenGraph/Twitter cards, robots + sitemap,
-structured data, `loading=lazy` + width/height on images, font preload, cache
-headers on static/media where safe (code-level, not schema), copy polish,
-perceived-speed (HTMX indicators).
+### 6a. RED-LIGHT — document in PR only; Kevin decides (NO code changes)
 
-### Pass 4 — code cleanup + tests (green-light)
-Dead code removal, duplication collapse *with real payoff only*, import hygiene,
-DB-helper adoption (`get_or_404` etc.) where clearly intended, flaky/ordering test
-fixes (e.g. `test_pin_lockout` depends on newest-gallery state from earlier tests),
-new coverage for anything touched above.
+1. **[CONFIRMED·med] Portal PIN-lockout buckets collide with inquiry-throttle sentinels**
+   `app/public/portal.py:151` uses bucket `-p["id"]`; portals 2/3/4 collide with
+   `security.py:94-96` sentinels −2/−3/−4 (contact/book/forms throttles). 3 portal-PIN
+   typos ⇒ /contact 429s for that IP; successful portal login wipes contact throttle;
+   spurious Telegram alerts. Fix pattern exists: `workspace.py:24` PIN_OFFSET=2_000_000.
+2. **[CONFIRMED·med] Admin session = irrevocable signed constant, 90 days**
+   `security.py:191`; logout deletes only the browser cookie; revocation requires
+   rotating MISE_SECRET_KEY (kills all client cookies too). Fix: server-side session
+   token table (also needs migration ⇒ doubly red).
+3. **[UNVERIFIED·med] COOKIE_SECURE defaults false** `app/config.py:243` + `.env.example`
+   ships false; live site is HTTPS. Fix: default true or derive from BASE_URL. **Also:
+   Kevin should check flow's `.env` has `MISE_COOKIE_SECURE=true` today.**
+4. **[UNVERIFIED·med] No per-target (cross-IP) PIN attempt cap** `security.py:54` —
+   distributed guessing of 4-digit PINs is unbounded; alerting is per-IP only.
+5. **[UNVERIFIED·high] Stripe success return ignored** `app/public/pay.py:123` sets
+   `success_url=/i/{slug}?thanks=1` but `view_invoice` never reads `thanks`; client
+   returns from Checkout to a stale invoice with a live Pay button until the webhook
+   lands (days for ACH) — can double-open Checkout sessions.
+6. **[minor·red] Rate limiter exempts `/c/`, `/w/`, `/t/`** `app/ratelimit.py:34`.
+7. **[minor·red] `check_admin_password` TypeError→500 on non-ASCII password**
+   `security.py:204` — compare `.encode()` bytes; also skips lockout bookkeeping.
 
-### Pass 5 — red-light documentation (no code changes)
-For every red-light finding in section 6: write it up in the PR body with severity,
-evidence (file:line), proposed fix, risk, and rollback. Tests/docs-only additions
-for red-light areas are allowed (they don't change behavior).
+### 6b. GREEN — open, high value first (verify code, fix, test, gate, commit)
 
-### Pass 6 — finalize
-1. Re-run all gates on the final tree.
-2. `git push -u origin claude/klee-photography-refactor-y9tr5g` (retry w/ backoff on
-   network errors).
-3. Ensure the ONE draft PR exists and its body contains: summary; green-light change
-   list; red-light findings needing Kevin's decision; tests run + output summary;
-   manual verification notes; rollback plan (`git revert` of the merge, plus nightly
-   DB snapshot chain per `ops/BACKUP.md`); deploy checklist (below).
-4. Final report to Kevin in chat (executive summary, what changed, findings, deploy
-   status, rollback, red-light items).
+- **[CONFIRMED·med] Contact form wipes all input on validation/throttle error**
+  `app/public/site.py` error branches (~495-519) don't echo values; template only
+  restores prefill.business/message/service. Reachable: `me@gmail` passes browser
+  check, fails server dot-check. Echo submitted values back + template `value=` attrs.
+- **[CONFIRMED·med] Lightbox not keyboard-openable** `static/lightbox.js:174-176`
+  binds click on `<img>` in non-focusable `<figure>` (portfolio/home/work_detail/
+  public gallery). Add tabindex/role=button/Enter+Space, or real `<button>` wrapper.
+- **[CONFIRMED·med] Lightbox missing dialog semantics/focus mgmt/alt**
+  `templates/site/_lightbox.html:1` no role=dialog/aria-modal; `open()` doesn't move
+  focus, `close()` doesn't restore; `render()` sets no alt (copy from tile img).
+- **[UNVERIFIED·med] Reels fallback leaks client-private video IDs as broken players**
+  `app/public/site.py:279` `_portfolio_reels()` falls back to non-portfolio videos
+  whose /site/vid+poster routes 404 ⇒ black players on / and /reels. Delete fallback,
+  return [] (templates already have empty states). *Caution: check smoke tests that
+  may rely on the fallback for the reels layout.*
+- **[UNVERIFIED·med] Booking confirmation shows studio TZ, funnel sold visitor TZ**
+  `booking_manage.html:19` + `public/scheduling.py:209` — render in `b.tz` when set.
+- **[UNVERIFIED·med] Portals/workspaces link expired galleries → 410**
+  `portal.py:62`, `workspace.py:74` — pass expired flag; unlink + "expired — get in touch".
+- **[UNVERIFIED·med] ZIP wait page spins forever on failed build**
+  `downloads.py:209` status only reports ready; report `failed` from jobs table;
+  zip_wait.html show retry/contact message.
+- **[UNVERIFIED·med] Fav toggle/video notes fail silently on expired cookie**
+  add `htmx:responseError` 403→reload in gallery.html; error branch in lightbox.js post.
+- **[minor·green·quick]** poster route missing expiry+ready gate `media.py:44-59`
+  (mirror `_resolve`) · drop-gallery favorites/section download redirect loop
+  `downloads.py:128,157` (use `_email_required(g) and not visitor["email"]`) ·
+  `toggle_fav` works on expired galleries `gallery.py:142` · portal crop 404 while
+  processing `portal.py:205` · masonry imgs lack width/height (CLS) `portfolio.html:32`
+  (assets table has width/height cols) · lightbox arrows page through filtered-out
+  tiles + chips lack aria-pressed `portfolio.html:75` · static files lack
+  Cache-Control despite ?v= busting (`main.py` middleware: `/static/` →
+  `public, max-age=31536000, immutable`) · press marquee 2nd loop needs
+  aria-hidden `home.html:43` · about h1→h3 skip `about.html:44` · raw UTC timestamps
+  on invoice/proposal (`invoice.html:66` use `|localtime`; contract.html is red-adjacent,
+  leave) · internal pitch copy in client doc footers (`invoice.html:92`, proposal) ·
+  book_index copy contradiction (instant vs follow-up) `book_index.html:8` ·
+  expired.html says "get in touch" with no link.
+- **Admin (all UNVERIFIED, verify first):** financials CSV "Include Paid" checkbox
+  can't uncheck (`financials.py:210` — likely missing unchecked-checkbox handling) ·
+  scheduling date-override backend has no UI (`admin/scheduling.html:75`) · gallery
+  section "remove" has no confirm (`admin/gallery.html:557`) · upload UI says success
+  when all files rejected (`admin/gallery.html:635`) · activity page ghost-renders
+  missing gallery (`activity.py:535` — add get_or_404) · inbox 100-thread cap,
+  ?sel deep-link mismatch (`inbox.py:208`) · gallery delete lands on Home not
+  library (`galleries.py:757`) · studio Archived column always 0 (`studio.html:51`) ·
+  galleries.py:81 computes context the template never renders (dead code) ·
+  /admin/emails unpaginated (`activity.py:427`) · "Photos" tile counts all assets
+  (`admin/gallery.html:53`).
+- **Code quality (UNVERIFIED):** financial/report date boundaries bypass `_today()`
+  (`financials.py:60`, reports) · `admin/common.today()` dead — remove after grep ·
+  inquiry→client find-or-create duplicated (`studio.py:675` ×2) · video-comment
+  thread query duplicated (`galleries.py:308` vs `gallery.video_comment_thread`) ·
+  dead feature flags (`features.py:38`) · chunked upload-save loop ×4
+  (`uploads.py:58`) · hand-rolled one()+404 sites → `db.get_or_404`
+  (`admin/scheduling.py:77` etc).
 
-### Deploy (BLOCKED from this environment — leave instructions only)
-This container has no access to the production host (`flow:/opt/mise`). Deploy is
-Kevin's step after merging the PR, using the repo's established process
-(`scripts/deploy-flow.sh` — DO NOT modify it). Post-deploy verification for Kevin:
-```sh
-curl -s https://kleephotography.com/healthz          # {"ok": true, ...}
-# spot-check: / , /work , /services , /about , /contact , /book
-# admin: /admin -> redirects to /admin/login
-# one gallery PIN page loads (no client data changes)
-```
-Rollback: `git revert` the merge commit on main, redeploy via the same script;
-data is recoverable to the last nightly snapshot (see ops/BACKUP.md) — but nothing
-in this effort should touch data or schema.
+### 6c. Not audited (agents never ran)
 
-## 6. Audit findings (fill in / consume as work proceeds)
+Performance, features-completeness, and tests dimensions. If capacity allows, sweep:
+imaging/jobs hot paths, N+1s in admin lists/studio dashboard, `test_pin_lockout`-style
+ordering brittleness in test_smoke.py (it reads `ORDER BY id DESC LIMIT 1` galleries
+created by earlier tests), TODO/FIXME grep, mailer/gcal/notion failure modes.
 
-> Populated from the verified multi-agent audit. Status: ☐ open · ☑ fixed (commit) ·
-> ✗ rejected (why) · ⚠ red-light (document only).
+## 7. What remains (ordered work queue)
 
-*(pending — audit workflow was still running when this file was first committed;
-successor: if this section is still empty, re-run the audit or proceed with manual
-inspection using the pass structure above)*
+1. **Green fixes from §6b, top-down** (confirmed first, then verify-and-fix the
+   unverified ones). Small commits; add/extend a test per meaningful fix; gates every time.
+2. Push after every 2-3 commits: `git push -u origin claude/klee-photography-refactor-y9tr5g`.
+3. **Keep PR #2 body current**: red-light table (§6a), change list, tests run.
+4. §6c sweeps if capacity remains.
+5. Finalize: gates → push → PR body final (summary, risk, tests, manual verification,
+   rollback, red-light list) → flip PR from draft only when Kevin asks.
+6. **Deploy is BLOCKED from this environment** (no access to flow). Kevin deploys
+   after merge via existing `scripts/deploy-flow.sh` (do not modify). Post-deploy
+   checks: `curl https://kleephotography.com/healthz` · spot / , /work , /work/{slug}
+   (fonts+menu+hero now load there — verify!), /services, /contact, /book · /admin
+   303→login · one gallery PIN page. Rollback: revert merge on main, redeploy;
+   nightly DB snapshots per ops/BACKUP.md (untouched by this work).
 
-## 7. Progress log
+## 8. Operational notes
 
-- [x] 2026-07-05 — AGENTS.md read; repo mapped; venv built; ffmpeg installed.
-- [x] 2026-07-05 — Baseline gates green: 36 unit / 158 smoke / ruff clean @ 0b72e6b.
-- [x] 2026-07-05 — 8-dimension audit workflow launched (results → section 6).
-- [ ] HANDOFF.md committed; branch pushed; draft PR opened.
-- [ ] Pass 1 — safety & correctness.
-- [ ] Pass 2 — UI/UX + accessibility.
-- [ ] Pass 3 — SEO/social/meta + performance polish.
-- [ ] Pass 4 — code cleanup + tests.
-- [ ] Pass 5 — red-light write-ups in PR body.
-- [ ] Pass 6 — final gates, push, PR finalized, report delivered.
-
-## 8. Commit conventions
-
-- One logical change per commit; message = `area: what — why` (match existing log,
-  e.g. `admin: make multi-write delete/reorder/mark-sent routes atomic`).
-- No model IDs in commit messages/PR bodies. Do not add Generated-by trailers beyond
-  what the platform requires.
-- Never `git push --force`. Never push to any branch other than
-  `claude/klee-photography-refactor-y9tr5g`.
+- PR #2 has an activity subscription: CI failures/review comments arrive as webhook
+  events — investigate, fix if small+clear, ask Kevin if ambiguous. A `send_later`
+  self check-in re-arms hourly; re-arm silently if nothing changed; stop when merged/closed.
+- Usage limits were hitting at retirement (subagent fan-outs failed). Prefer inline
+  work over multi-agent workflows until limits reset.
+- Task list state: #1 audit done · #2 pass-1 partially done (work_detail fix) ·
+  #3 partially (nav a11y done; lightbox a11y open) · #4 partially (meta/canonical/
+  favicon done; caching/CLS open) · #5 open · #6 open.
