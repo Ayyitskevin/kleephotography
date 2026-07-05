@@ -8,7 +8,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
 from .. import config, db, mailer, security
-from ..render import templates
+from ..render import ROOT, templates
 
 log = logging.getLogger("mise.public.site")
 router = APIRouter()
@@ -664,6 +664,17 @@ async def portfolio_video_poster(asset_id: int):
         raise HTTPException(status_code=404)
     return FileResponse(
         path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"}
+    )
+
+
+@router.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Old crawlers and share scrapers request /favicon.ico directly, ignoring
+    the <link rel=icon> tags — serve the real file instead of a 404."""
+    return FileResponse(
+        ROOT / "static" / "favicon.ico",
+        media_type="image/x-icon",
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 

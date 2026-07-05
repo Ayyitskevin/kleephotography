@@ -692,6 +692,16 @@ progress { width: 100%; }
   transition: color 0.3s ease, border-color 0.3s ease; }
 .btn-ghost:hover { color: var(--accent); border-color: var(--accent); }
 
+/* ---- skip link (keyboard users jump past the fixed nav) ---- */
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 60;
+  padding: 0.8em 1.4em; background: var(--ink); color: var(--cream);
+  font: 600 0.9rem/1 var(--sans); text-decoration: none; }
+.skip-link:focus { left: 12px; top: 12px; }
+/* skip-link target wraps every page's content; it must keep behaving like the
+   flex children it replaced (.site-body is a flex column, .site-main grows) */
+#main { display: flex; flex-direction: column; flex: 1; }
+#main:focus { outline: none; }
+
 /* ---- fixed nav ---- */
 .site-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 40;
   display: flex; align-items: center; justify-content: space-between;

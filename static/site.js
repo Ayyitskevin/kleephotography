@@ -43,11 +43,18 @@
     var setMenu = function (open) {
       mobileMenu.classList.toggle("open", open);
       document.body.style.overflow = open ? "hidden" : "";
+      menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
     };
     menuBtn.addEventListener("click", function () {
       setMenu(!mobileMenu.classList.contains("open"));
     });
     mobileMenu.addEventListener("click", function () { setMenu(false); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && mobileMenu.classList.contains("open")) {
+        setMenu(false);
+        menuBtn.focus();
+      }
+    });
   }
 
   // --- scroll reveal ---
