@@ -142,6 +142,12 @@ def _progress_oob(g_id: int, section_id: int | None, visitor_id: int) -> str:
 @router.post("/{slug}/fav/{asset_id}", response_class=HTMLResponse)
 async def toggle_fav(request: Request, slug: str, asset_id: int):
     g = get_live_gallery(slug)
+    # Once a gallery expires it 410s everywhere else; without this a visitor
+    # holding a live cookie could keep changing their proofing picks after the
+    # selection window closed. The gallery.html htmx:responseError handler turns
+    # this 410 into a reload to the expired page.
+    if is_expired(g):
+        raise HTTPException(status_code=410)
     visitor = security.require_visitor(request, g["id"])
     a = db.one(
         """SELECT a.id, a.kind, a.status, a.section_id, s.proof_target

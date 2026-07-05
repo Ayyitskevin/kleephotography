@@ -243,15 +243,41 @@
     } else {
       fd.append("timecode", cTc.value || (activeVideo ? activeVideo.currentTime : 0));
     }
-    const res = await fetch("/g/" + slug + "/comments/" + activeAsset, { method: "POST", body: fd });
-    if (res.ok) {
+    let res;
+    try {
+      res = await fetch("/g/" + slug + "/comments/" + activeAsset, { method: "POST", body: fd });
+    } catch (err) {
+      res = null;
+    }
+    if (res && res.ok) {
       renderComments(await res.json());
       cBody.value = "";
       clearReply();
       cTc.value = "0";
       cAt.textContent = "Comment at 0:00";
+      vcError("");
+    } else if (res && (res.status === 403 || res.status === 410)) {
+      // session aged out or gallery expired mid-session — reload to the gate so
+      // the client re-unlocks rather than losing the typed note to a dead button
+      window.location.reload();
+    } else {
+      // keep the typed text; tell the client it didn't post instead of silently
+      // swallowing the failure
+      vcError("Couldn't post your note — refresh the page and try again.");
     }
   });
+
+  function vcError(msg) {
+    if (!cForm) return;
+    let el = cForm.querySelector(".vc-error");
+    if (!el) {
+      el = document.createElement("p");
+      el.className = "vc-error";
+      cForm.appendChild(el);
+    }
+    el.textContent = msg;
+    el.hidden = !msg;
+  }
   lb.querySelector(".lb-close").addEventListener("click", close);
   lb.querySelector(".lb-prev").addEventListener("click", () => { stopShow(); render(idx - 1); });
   lb.querySelector(".lb-next").addEventListener("click", () => { stopShow(); render(idx + 1); });

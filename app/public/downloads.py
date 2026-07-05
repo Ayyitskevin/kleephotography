@@ -125,7 +125,11 @@ async def download_asset(request: Request, slug: str, asset_id: int):
 @router.get("/{slug}/download/favorites")
 async def download_favorites(request: Request, slug: str):
     g, visitor = _gate(request, slug)
-    if not visitor["email"]:
+    # Match download_asset/download_zip: only email-gate when this gallery type
+    # actually requires it. A drop (transfer) skips the gate, and the plain
+    # `not email` check here made /download bounce to /download/favorites and
+    # back forever (download_page doesn't gate a drop either).
+    if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download?fav=1", status_code=303)
     assets = db.all_(
         """SELECT a.* FROM favorites f JOIN assets a ON a.id=f.asset_id
@@ -154,7 +158,7 @@ async def download_favorites(request: Request, slug: str):
 @router.get("/{slug}/download/section/{section_id}")
 async def download_section(request: Request, slug: str, section_id: int):
     g, visitor = _gate(request, slug)
-    if not visitor["email"]:
+    if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download?section={section_id}", status_code=303)
     s = db.one("SELECT * FROM sections WHERE id=? AND gallery_id=?", (section_id, g["id"]))
     if not s:
@@ -209,4 +213,14 @@ async def download_zip(request: Request, slug: str):
 @router.get("/{slug}/download/zip/status")
 async def zip_status(slug: str):
     g = get_live_gallery(slug)
-    return {"ready": jobs.zip_path(g["id"], g["content_rev"]).is_file()}
+    if jobs.zip_path(g["id"], g["content_rev"]).is_file():
+        return {"ready": True, "failed": False}
+    # Surface a build that exhausted its retries so the wait page can stop
+    # spinning and offer a retry instead of polling forever.
+    failed = db.one(
+        """SELECT 1 AS x FROM jobs WHERE kind='zip_build' AND status='failed'
+                        AND json_extract(payload,'$.gallery_id')=?
+                        AND json_extract(payload,'$.rev')=?""",
+        (g["id"], g["content_rev"]),
+    )
+    return {"ready": False, "failed": bool(failed)}

@@ -127,6 +127,12 @@ async def common_headers(request: Request, call_next):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "same-origin"
     resp.headers["Content-Security-Policy"] = CSP_POLICY
+    # Static assets are safe to cache forever: every /static URL carries a
+    # content-derived ?v={{ static_rev }} buster (see app/render.py), so a file
+    # change changes the URL. Without this the ~300KB stylesheet + fonts + JS
+    # get revalidated on every repeat navigation.
+    if p.startswith("/static/"):
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return resp
 
 

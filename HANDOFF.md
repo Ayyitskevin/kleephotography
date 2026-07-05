@@ -76,13 +76,30 @@ auto-seeds demo data on first boot).
 
 ## 5. Work completed (all gates green at each commit)
 
+**Round 1 — PR #2 (MERGED to main):**
 | Commit | What |
 |---|---|
-| d9793d2 | HANDOFF.md v1 |
-| c12cfa0 | **Bug fix:** `/work/{slug}` overrode whole head block → lost fonts/site.js (dead mobile menu)/dark-mode/Plausible/JSON-LD **and** hero photo never rendered (block-scoped `{% set %}`). Restructured `base_site.html` head: new `meta_description` + `og` blocks, canonical link, og:title/desc now mirror each page. Smoke test pins regression. |
-| b1e2098 | Per-page meta descriptions on all indexable pages (home, portfolio, work, services, about, contact, reels, press, book, book_event). |
-| bd73d1d | Favicon: `static/favicon.svg`+`.ico`+`apple-touch-icon.png` (serif K + terracotta dot on cream), links in `base.html`, `/favicon.ico` route in site.py, unit test. |
-| 5ffee23 | A11y: skip-link → `#main` wrapper (flex-preserving), hamburger `aria-expanded`/`aria-controls`, Escape closes + refocuses. Chromium-verified. |
+| c12cfa0 | **Bug fix:** `/work/{slug}` overrode whole head block → lost fonts/site.js (dead mobile menu)/dark-mode/Plausible/JSON-LD **and** hero photo never rendered (block-scoped `{% set %}`). Restructured `base_site.html` head: new `meta_description` + `og` blocks, canonical link, og:title/desc now mirror each page. |
+| b1e2098 | Per-page meta descriptions on all indexable pages. |
+| bd73d1d | Favicon: SVG+ICO+apple-touch-icon, links in `base.html`, `/favicon.ico` route, unit test. |
+| 5ffee23 | A11y: skip-link → `#main` wrapper, hamburger aria-expanded/controls, Escape closes+refocuses. |
+
+**Round 2 — PR #3 (MERGED to main):** contact-form value echo on error; lightbox keyboard
+access + dialog semantics + focus mgmt + alt; reels demo-fallback removal (was leaking
+client-private video IDs as broken players); portal/workspace expired-gallery unlinking.
+
+**Round 3+ — PR #4 (OPEN, draft):** ZIP-wait failed-build UX; fav/note silent-failure on
+expired session; booking confirmation in client TZ (`localtime` filter gained `tz` arg);
+expiry enforced on fav-toggle + video-poster routes; `/static` immutable caching;
+portfolio CLS width/height; press-marquee aria-hidden + about h1→h2; expired-gallery
+contact link + booking-copy contradiction fix; **drop-gallery favorites/section infinite
+redirect-loop fix**. All gate-green; smoke suite now 164 passed.
+
+**IMPORTANT for successor:** after each PR merges, `git fetch origin main` and
+`git checkout -B claude/klee-photography-refactor-y9tr5g origin/main` before continuing —
+follow-up work is a fresh change on a fresh base, delivered via a NEW draft PR (the
+merged PR is finished and must not be reused). Commit-msg tip: avoid backticks in
+`git commit -m` (shell eats them); use `-F -` heredoc for messages with code.
 
 An 8-dimension multi-agent audit ran (security, public-UI/SEO, client-flows, admin-UX,
 code-quality complete; **performance, features, tests audits DID NOT RUN** — usage
@@ -115,46 +132,28 @@ UNVERIFIED = single-auditor claim, re-verify the code before fixing.
 7. **[minor·red] `check_admin_password` TypeError→500 on non-ASCII password**
    `security.py:204` — compare `.encode()` bytes; also skips lockout bookkeeping.
 
-### 6b. GREEN — open, high value first (verify code, fix, test, gate, commit)
+### 6b. GREEN — ✅ DONE (rounds 2–4, PR #3 merged / PR #4 open)
 
-- **[CONFIRMED·med] Contact form wipes all input on validation/throttle error**
-  `app/public/site.py` error branches (~495-519) don't echo values; template only
-  restores prefill.business/message/service. Reachable: `me@gmail` passes browser
-  check, fails server dot-check. Echo submitted values back + template `value=` attrs.
-- **[CONFIRMED·med] Lightbox not keyboard-openable** `static/lightbox.js:174-176`
-  binds click on `<img>` in non-focusable `<figure>` (portfolio/home/work_detail/
-  public gallery). Add tabindex/role=button/Enter+Space, or real `<button>` wrapper.
-- **[CONFIRMED·med] Lightbox missing dialog semantics/focus mgmt/alt**
-  `templates/site/_lightbox.html:1` no role=dialog/aria-modal; `open()` doesn't move
-  focus, `close()` doesn't restore; `render()` sets no alt (copy from tile img).
-- **[UNVERIFIED·med] Reels fallback leaks client-private video IDs as broken players**
-  `app/public/site.py:279` `_portfolio_reels()` falls back to non-portfolio videos
-  whose /site/vid+poster routes 404 ⇒ black players on / and /reels. Delete fallback,
-  return [] (templates already have empty states). *Caution: check smoke tests that
-  may rely on the fallback for the reels layout.*
-- **[UNVERIFIED·med] Booking confirmation shows studio TZ, funnel sold visitor TZ**
-  `booking_manage.html:19` + `public/scheduling.py:209` — render in `b.tz` when set.
-- **[UNVERIFIED·med] Portals/workspaces link expired galleries → 410**
-  `portal.py:62`, `workspace.py:74` — pass expired flag; unlink + "expired — get in touch".
-- **[UNVERIFIED·med] ZIP wait page spins forever on failed build**
-  `downloads.py:209` status only reports ready; report `failed` from jobs table;
-  zip_wait.html show retry/contact message.
-- **[UNVERIFIED·med] Fav toggle/video notes fail silently on expired cookie**
-  add `htmx:responseError` 403→reload in gallery.html; error branch in lightbox.js post.
-- **[minor·green·quick]** poster route missing expiry+ready gate `media.py:44-59`
-  (mirror `_resolve`) · drop-gallery favorites/section download redirect loop
-  `downloads.py:128,157` (use `_email_required(g) and not visitor["email"]`) ·
-  `toggle_fav` works on expired galleries `gallery.py:142` · portal crop 404 while
-  processing `portal.py:205` · masonry imgs lack width/height (CLS) `portfolio.html:32`
-  (assets table has width/height cols) · lightbox arrows page through filtered-out
-  tiles + chips lack aria-pressed `portfolio.html:75` · static files lack
-  Cache-Control despite ?v= busting (`main.py` middleware: `/static/` →
-  `public, max-age=31536000, immutable`) · press marquee 2nd loop needs
-  aria-hidden `home.html:43` · about h1→h3 skip `about.html:44` · raw UTC timestamps
-  on invoice/proposal (`invoice.html:66` use `|localtime`; contract.html is red-adjacent,
-  leave) · internal pitch copy in client doc footers (`invoice.html:92`, proposal) ·
-  book_index copy contradiction (instant vs follow-up) `book_index.html:8` ·
-  expired.html says "get in touch" with no link.
+Contact-form value echo · lightbox keyboard+dialog+focus+alt · reels fallback removal ·
+booking confirmation client-TZ · portal/workspace expired-gallery unlink · ZIP-wait
+failed-build UX · fav/note silent-failure on expired session · poster+fav expiry 410
+gate · drop-gallery favorites/section redirect-loop · `/static` immutable caching ·
+portfolio CLS width/height · press-marquee aria-hidden · about h1→h2 · expired.html
+contact link · book_index copy contradiction. Each has a smoke/unit test.
+
+### 6b-remaining. GREEN — still open (verify code, fix, test, gate, commit)
+
+- **[minor·green]** portal crop links 404 while the crop is still processing
+  `portal.py:205` — check crop file existence per asset, render unready ratios as a
+  muted "processing…" span (or return a friendlier "still preparing" from the route).
+- **[minor·green]** lightbox arrows page through filtered-out portfolio tiles + filter
+  chips lack `aria-pressed` `portfolio.html` — constrain the lightbox `tiles` array to
+  non-`.pf-hidden`, toggle aria-pressed in the chips' apply().
+- **[HELD — red-adjacent, do NOT auto-edit]** invoice/proposal client-document footer
+  copy ("no extra portal friction") + raw-UTC `paid_at`/`accepted_at` display
+  (`invoice.html:66,92`, `proposal.html:58,79`). Display-only and audit-classified
+  green, but they render on financial/legal client documents — recommend but leave to
+  Kevin (contract.html signed_at is firmly red-light). Documented in PR body.
 - **Admin (all UNVERIFIED, verify first):** financials CSV "Include Paid" checkbox
   can't uncheck (`financials.py:210` — likely missing unchecked-checkbox handling) ·
   scheduling date-override backend has no UI (`admin/scheduling.html:75`) · gallery
@@ -204,6 +203,14 @@ created by earlier tests), TODO/FIXME grep, mailer/gcal/notion failure modes.
   self check-in re-arms hourly; re-arm silently if nothing changed; stop when merged/closed.
 - Usage limits were hitting at retirement (subagent fan-outs failed). Prefer inline
   work over multi-agent workflows until limits reset.
-- Task list state: #1 audit done · #2 pass-1 partially done (work_detail fix) ·
-  #3 partially (nav a11y done; lightbox a11y open) · #4 partially (meta/canonical/
-  favicon done; caching/CLS open) · #5 open · #6 open.
+- Progress: PR #2 merged (SEO/favicon/nav-a11y/work_detail bug). PR #3 merged
+  (contact echo, lightbox a11y, reels, portal/workspace expiry). PR #4 open with 9
+  commits (client-flow correctness + perf/a11y/copy). Full smoke suite: 164 passed.
+- Remaining green work: §6b-remaining (portal-crop-processing, portfolio filter+lightbox
+  aria-pressed), §6c sweeps (perf N+1s, test-ordering brittleness, features), and the
+  admin/code-quality UNVERIFIED lists (verify each before touching). The two
+  ordering-brittle tests (`test_expired_gallery`, `test_gallery_notion_writeback`) fail
+  under `-k` subsets because they read the newest gallery/project from earlier tests —
+  a good §6c test-hardening target (make them self-sufficient).
+- Deploy remains BLOCKED from this env (no flow access) — Kevin deploys merged main via
+  `scripts/deploy-flow.sh`; post-deploy spot-check `/work/{slug}` (fonts+menu+hero).

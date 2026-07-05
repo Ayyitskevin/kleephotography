@@ -33,6 +33,7 @@
       <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
            srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
            sizes="(max-width: 700px) 100vw, 300px"
+           {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
            alt="{{ a|portfolio_alt }}">
       {% if a.portfolio_tag %}
       <figcaption class="portfolio-cap">{{ a.portfolio_tag|capitalize }}{% if a.client_name %}

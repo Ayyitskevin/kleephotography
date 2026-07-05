@@ -130,6 +130,7 @@ button.link.ok { color: #2e8b57; }
 .vc-body { width: 100%; resize: vertical; min-height: 2.4rem; font: inherit;
   border-radius: 6px; border: 1px solid rgba(255,255,255,0.2);
   background: rgba(0,0,0,0.3); color: #fff; padding: 0.4rem; }
+.vc-error { color: #f0b8ab; font-size: 0.8rem; margin: 0.2rem 0 0; }
 .sec-dl { font-size: 0.85em; color: var(--muted); text-decoration: none; margin-left: 0.4rem; }
 .sec-dl:hover { color: var(--ink); }
 
@@ -960,6 +961,9 @@ progress { width: 100%; }
 .ab-proc { padding: clamp(64px, 9vw, 120px) clamp(20px, 6vw, 88px); max-width: 1320px;
   margin: 0 auto; }
 .ab-proc .eyebrow { margin: 0 0 clamp(28px, 4vw, 48px); }
+/* The section label is a real <h2> for heading order, but must keep the eyebrow
+   look — override the more-specific .site-body h2 serif/weight/tracking rule. */
+.ab-proc h2.eyebrow { font-family: var(--sans); font-weight: 600; letter-spacing: 0.26em; }
 .proc-grid { display: grid; gap: 18px;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
 .proc-card { background: var(--card); border: 1px solid #e3dacb; border-radius: 14px;

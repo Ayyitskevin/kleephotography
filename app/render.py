@@ -86,16 +86,23 @@ def _diff_tokens(value):
 templates.env.filters["diff_tokens"] = _diff_tokens
 
 
-def _localtime(utc_str, fmt="%a %b %-d · %-I:%M %p"):
-    """Format a stored 'YYYY-MM-DD HH:MM:SS' UTC instant in the business timezone.
-    Scheduler bookings store UTC; admin/manage views read in Kevin's local time."""
+def _localtime(utc_str, fmt="%a %b %-d · %-I:%M %p", tz=None):
+    """Format a stored 'YYYY-MM-DD HH:MM:SS' UTC instant in a display timezone.
+    Defaults to the business timezone (admin/manage views read in Kevin's local
+    time); pass tz=<IANA name> to render in the visitor's zone — e.g. a booking
+    confirmation shown in the same zone the client picked the slot in. An
+    invalid/empty tz falls back to the business timezone."""
     if not utc_str:
         return ""
+    try:
+        zone = ZoneInfo(tz) if tz else ZoneInfo(config.TIMEZONE)
+    except Exception:
+        zone = ZoneInfo(config.TIMEZONE)
     try:
         d = (
             dt.datetime.strptime(utc_str, "%Y-%m-%d %H:%M:%S")
             .replace(tzinfo=dt.UTC)
-            .astimezone(ZoneInfo(config.TIMEZONE))
+            .astimezone(zone)
         )
     except (ValueError, TypeError):
         return utc_str

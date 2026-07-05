@@ -108,5 +108,15 @@
     clearTimeout(window._proofToastTimer);
     window._proofToastTimer = setTimeout(() => t.hidden = true, 3500);
   });
+
+  // A favorite hx-post that comes back 403 (or 410) means the visitor's signed
+  // session cookie aged out or the gallery expired mid-session — HTMX won't swap
+  // on a 4xx, so the heart would just silently do nothing. Reload instead: the
+  // server re-shows the PIN gate (403) or the expired page (410) so the client
+  // knows to unlock again rather than clicking a dead button.
+  document.body.addEventListener("htmx:responseError", e => {
+    const s = e.detail.xhr.status;
+    if (s === 403 || s === 410) window.location.reload();
+  });
 </script>
 {% endblock %}

@@ -41,7 +41,8 @@
 <section class="marquee" aria-label="As seen in">
   <div class="marquee-track">
     {% for p in press %}<span>{{ p.outlet }}</span>{% endfor %}
-    {% for p in press %}<span>{{ p.outlet }}</span>{% endfor %}
+    {# duplicate copy is purely visual (seamless scroll loop) — hide it from AT #}
+    {% for p in press %}<span aria-hidden="true">{{ p.outlet }}</span>{% endfor %}
   </div>
 </section>
 {% endif %}
