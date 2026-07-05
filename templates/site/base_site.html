@@ -43,6 +43,7 @@
 {% endblock %}
 {% block bodyclass %}site-body{% endblock %}
 {% block content %}
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="site-nav" data-nav>
   <a href="/" class="site-brand">
     <b>Kevin&nbsp;Lee</b>
@@ -57,10 +58,11 @@
     <a href="/book">Book a call</a>
     <a href="/contact" class="nav-cta">Request a quote</a>
   </nav>
-  <button class="nav-menu-btn" data-menu-btn aria-label="Menu"><span></span><span></span></button>
+  <button class="nav-menu-btn" data-menu-btn aria-label="Menu" aria-expanded="false"
+          aria-controls="site-mobile-menu"><span></span><span></span></button>
 </header>
 
-<div class="nav-mobile" data-mobile-menu>
+<div class="nav-mobile" id="site-mobile-menu" data-mobile-menu>
   <a href="/portfolio">Portfolio</a>
   <a href="/work">Work</a>
   <a href="/reels">Reels</a>
@@ -70,7 +72,9 @@
   <a href="/contact" class="nav-cta">Request a quote</a>
 </div>
 
+<div id="main" tabindex="-1">
 {% block site_content %}{% endblock %}
+</div>
 
 <footer class="site-footer">
   <div class="footer-grid">
