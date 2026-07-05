@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 <title>{% block title %}{{ site_name }}{% endblock %}</title>
+<link rel="icon" href="/static/favicon.ico?v={{ static_rev }}" sizes="32x32">
+<link rel="icon" href="/static/favicon.svg?v={{ static_rev }}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v={{ static_rev }}">
 <link rel="stylesheet" href="/static/mise.css?v={{ static_rev }}">
 <script src="/static/htmx.min.js?v={{ static_rev }}" defer></script>
 <script src="/static/copy_link.js?v={{ static_rev }}" defer></script>

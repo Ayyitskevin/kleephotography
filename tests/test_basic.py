@@ -242,6 +242,16 @@ def test_custom_forms_are_public_rate_limited():
 
 
 @pytest.mark.unit
+def test_favicon(client):
+    # legacy crawlers and share scrapers request /favicon.ico directly,
+    # ignoring the <link rel=icon> tags — it must not 404
+    r = client.get("/favicon.ico")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/x-icon"
+    home = client.get("/").text
+    assert 'rel="apple-touch-icon"' in home and "/static/favicon.svg" in home
+
+
+@pytest.mark.unit
 def test_branded_error_pages(client):
     # clients clicking bad links in a browser get a branded page, not raw JSON
     r = client.get("/g/nope12345678", headers={"accept": "text/html"})
