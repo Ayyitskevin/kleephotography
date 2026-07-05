@@ -16,7 +16,7 @@
   <dl class="book-manage-detail">
     <dt>What</dt><dd>{{ b.event_name }}{% if b.duration_min %}
       <span class="muted">· {{ b.duration_min }} min</span>{% endif %}</dd>
-    <dt>When</dt><dd>{{ b.start_utc | localtime }}
+    <dt>When</dt><dd>{{ b.start_utc | localtime(tz=b.tz) }}
       <span class="muted">({{ tz_name }})</span></dd>
     {% if b.location %}<dt>Where</dt><dd>{{ b.location }}</dd>{% endif %}
     <dt>Who</dt><dd>{{ b.name }}</dd>

@@ -205,8 +205,14 @@ async def manage(request: Request, token: str):
             start_utc=b["start_utc"],
             end_utc=b["end_utc"],
         )
+    # Show the time in the zone the client picked the slot in (bookings.tz),
+    # not the studio's — otherwise a Pacific client who chose "10:00 AM" is told
+    # "1:00 PM (America/New_York)" and misses the appointment.
+    tz_name = b["tz"] or config.TIMEZONE
     return templates.TemplateResponse(
-        request, "public/booking_manage.html", {"b": b, "gcal": gcal, "tz_name": config.TIMEZONE}
+        request,
+        "public/booking_manage.html",
+        {"b": b, "gcal": gcal, "tz_name": tz_name},
     )
 
 

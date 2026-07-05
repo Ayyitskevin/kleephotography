@@ -3705,6 +3705,41 @@ def test_zip_wait_reports_failed_build(admin):
         db.run("DELETE FROM galleries WHERE id=?", (gid,))
 
 
+def test_booking_manage_shows_client_timezone(admin):
+    # The confirmation page must show the time in the zone the client booked in
+    # (bookings.tz), not the studio's. 17:00 UTC is 10:00 AM in LA but 1:00 PM
+    # in the studio's Eastern zone — showing the latter is a missed-appointment
+    # trap since the picker sold the slot in the client's zone.
+    eid = db.run(
+        "INSERT INTO event_types (slug, name, duration_min, active) VALUES (?,?,?,1)",
+        ("tz-shoot", "TZ Shoot", 60),
+    )
+    bid = db.run(
+        """INSERT INTO bookings
+           (token, event_type_id, name, email, start_utc, end_utc, status, tz)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        (
+            "TzManage01",
+            eid,
+            "Pat",
+            "pat@x.com",
+            "2026-08-15 17:00:00",
+            "2026-08-15 18:00:00",
+            "confirmed",
+            "America/Los_Angeles",
+        ),
+    )
+    try:
+        with TestClient(app) as pub:
+            page = pub.get("/booking/TzManage01").text
+            assert "10:00 AM" in page  # client's LA zone
+            assert "1:00 PM" not in page  # NOT the studio's Eastern zone
+            assert "America/Los_Angeles" in page  # zone labelled
+    finally:
+        db.run("DELETE FROM bookings WHERE id=?", (bid,))
+        db.run("DELETE FROM event_types WHERE id=?", (eid,))
+
+
 def test_gallery_delete(admin):
     from app import config as cfg
 
