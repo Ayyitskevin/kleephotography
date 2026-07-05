@@ -1,5 +1,6 @@
 {% extends "site/base_site.html" %}
 {% block title %}{{ e.name }} — {{ site_name }}{% endblock %}
+{% block meta_description %}{{ e.description or 'Book ' ~ e.name ~ ' — pick a time and get an instant confirmation with a calendar invite.' }}{% endblock %}
 {% block site_content %}
 {# Detect the visitor's timezone once and reload with it, so slot times show in
    their local time. No tz param -> business timezone (graceful fallback). The
