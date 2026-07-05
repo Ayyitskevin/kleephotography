@@ -4034,6 +4034,14 @@ def test_case_studies(admin):
         assert 'name="description"' in r.text and "40-dish refresh" in r.text
         # brief in the og:description too (first 200 chars)
         assert 'property="og:description" content="A 40-dish refresh' in r.text
+        # the hero figure actually renders — hero is {% set %} at template top
+        # level; a set inside one block is invisible to sibling blocks, which
+        # silently dropped the first photo from the page entirely
+        assert 'class="work-detail-hero"' in r.text
+        assert f"/site/img/{photos[0]['id']}?variant=web" in r.text
+        # the og override must not eat the base head: fonts, site JS, canonical
+        assert "/static/fonts.css" in r.text and "/static/site.js" in r.text
+        assert f'rel="canonical" href="{cfg.BASE_URL}/work/{g["slug"]}"' in r.text
 
         # sitemap now lists the case study; robots.txt unchanged (no exclusion needed)
         sm = pub.get("/sitemap.xml").text

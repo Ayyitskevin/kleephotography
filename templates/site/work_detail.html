@@ -1,7 +1,10 @@
 {% extends "site/base_site.html" %}
-{% block title %}{{ g.cs_tagline or g.title }} — {{ site_name }}{% endblock %}
-{% block head %}
+{# Top-level so BOTH the og block and site_content see it — a {% set %} inside
+   one block is invisible to the others (Jinja block scoping). #}
 {% set hero = photos[0] if photos else None %}
+{% block title %}{{ g.cs_tagline or g.title }} — {{ site_name }}{% endblock %}
+{% block meta_description %}{{ (g.cs_brief or g.cs_tagline or g.title)[:200] }}{% endblock %}
+{% block og %}
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="{{ site_name }}">
 <meta property="og:title" content="{{ g.cs_tagline or g.title }} — {{ site_name }}">
@@ -9,7 +12,6 @@
 <meta property="og:url" content="{{ base_url }}/work/{{ g.slug }}">
 {% if hero %}<meta property="og:image" content="{{ base_url }}/site/img/{{ hero.id }}">{% endif %}
 <meta name="twitter:card" content="{{ 'summary_large_image' if hero else 'summary' }}">
-<meta name="description" content="{{ (g.cs_brief or g.cs_tagline or g.title)[:200] }}">
 {% endblock %}
 {% block site_content %}
 
