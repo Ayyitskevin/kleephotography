@@ -1026,38 +1026,45 @@ def test_pin_lockout(admin):
 def test_expired_gallery(admin):
     import datetime as dt
 
-    g = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
-    db.run("UPDATE galleries SET expires_at='2000-01-01', published=1 WHERE id=?", (g["id"],))
-    with TestClient(app) as pub:
-        assert pub.get(f"/g/{g['slug']}").status_code == 410
-
-    # the grid card derives an Expiring status from a real expiry so Kevin sees
-    # lockouts before clients do. Anchor on the grid card (last href occurrence —
-    # the orphan strip may mention it earlier) and read to the card's </a>.
-    def card_of(gid):
-        page = admin.get("/admin/galleries").text
-        start = page.rindex(f"/admin/galleries/{gid}")
-        return page[start : page.index("</a>", start)]
-
-    card = card_of(g["id"])
-    assert ">Expiring<" in card and "expired" in card  # past-due → dated "expired"
-
-    near = (dt.date.today() + dt.timedelta(days=3)).isoformat()
-    db.run("UPDATE galleries SET expires_at=? WHERE id=?", (near, g["id"]))
-    card = card_of(g["id"])
-    assert ">Expiring<" in card and "3 days" in card  # within the 7-day window
-
-    far = (dt.date.today() + dt.timedelta(days=60)).isoformat()
-    db.run("UPDATE galleries SET expires_at=? WHERE id=?", (far, g["id"]))
-    # far-future expiry isn't flagged Expiring on the card grid — only soon/expired
-    # are; the full date lives on the gallery detail page (checked below)
-    assert ">Expiring<" not in card_of(g["id"])
-
-    # delivery email prefill carries the expiry note (form renders when published)
-    assert f"Available until {far}" in admin.get(f"/admin/galleries/{g['id']}").text
-    db.run(
-        "UPDATE galleries SET expires_at=NULL, published=? WHERE id=?", (g["published"], g["id"])
+    # Self-contained: create the gallery this test needs rather than grabbing
+    # (and mutating) the newest one from an earlier test — that coupling made
+    # the test fail under -k subsets when no prior gallery existed.
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("expired-card-01", "Expiry Card", "1234"),
     )
+    g = db.one("SELECT * FROM galleries WHERE id=?", (gid,))
+    try:
+        db.run("UPDATE galleries SET expires_at='2000-01-01' WHERE id=?", (gid,))
+        with TestClient(app) as pub:
+            assert pub.get(f"/g/{g['slug']}").status_code == 410
+
+        # the grid card derives an Expiring status from a real expiry so Kevin sees
+        # lockouts before clients do. Anchor on the grid card (last href occurrence —
+        # the orphan strip may mention it earlier) and read to the card's </a>.
+        def card_of(gid_):
+            page = admin.get("/admin/galleries").text
+            start = page.rindex(f"/admin/galleries/{gid_}")
+            return page[start : page.index("</a>", start)]
+
+        card = card_of(gid)
+        assert ">Expiring<" in card and "expired" in card  # past-due → dated "expired"
+
+        near = (dt.date.today() + dt.timedelta(days=3)).isoformat()
+        db.run("UPDATE galleries SET expires_at=? WHERE id=?", (near, gid))
+        card = card_of(gid)
+        assert ">Expiring<" in card and "3 days" in card  # within the 7-day window
+
+        far = (dt.date.today() + dt.timedelta(days=60)).isoformat()
+        db.run("UPDATE galleries SET expires_at=? WHERE id=?", (far, gid))
+        # far-future expiry isn't flagged Expiring on the card grid — only soon/expired
+        # are; the full date lives on the gallery detail page (checked below)
+        assert ">Expiring<" not in card_of(gid)
+
+        # delivery email prefill carries the expiry note (form renders when published)
+        assert f"Available until {far}" in admin.get(f"/admin/galleries/{gid}").text
+    finally:
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
 
 
 def test_expired_gallery_blocks_fav_and_poster(admin):
@@ -2675,8 +2682,11 @@ def test_final_email_auto_advances_project(admin, monkeypatch):
 def test_gallery_notion_writeback(admin, monkeypatch):
     from app import config, notion_sync
 
-    project = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
-    assert project, "earlier test left a project"
+    # Self-contained: own client + project so the test doesn't depend on one an
+    # earlier test happened to leave (which failed it under -k subsets).
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Writeback Co",))
+    pid = db.run("INSERT INTO projects (client_id, title) VALUES (?,?)", (cid, "Writeback Project"))
+    project = db.one("SELECT * FROM projects WHERE id=?", (pid,))
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
         ("WritebackSlug1", "Writeback", "1234"),
@@ -2745,6 +2755,12 @@ def test_gallery_notion_writeback(admin, monkeypatch):
     db.run("UPDATE galleries SET published=0 WHERE id=?", (gid,))
     notion_sync.sync_gallery(gid)
     assert not calls and not armed
+
+    # tidy up this test's own rows (gallery, its notion_sync jobs, project, client)
+    db.run("DELETE FROM jobs WHERE json_extract(payload,'$.gallery_id')=?", (gid,))
+    db.run("DELETE FROM galleries WHERE id=?", (gid,))
+    db.run("DELETE FROM projects WHERE id=?", (pid,))
+    db.run("DELETE FROM clients WHERE id=?", (cid,))
 
 
 def test_portal_lifecycle(admin):
