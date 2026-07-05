@@ -532,7 +532,10 @@ async def sent_emails_view(request: Request, offset: int = 0):
 
 @router.get("/galleries/{gallery_id}/activity", response_class=HTMLResponse)
 async def activity(request: Request, gallery_id: int):
-    g = db.one("SELECT * FROM galleries WHERE id=?", (gallery_id,))
+    # 404 on a missing/deleted gallery instead of ghost-rendering the page with
+    # g=None (empty title, empty lists) — matches the get_or_404 pattern used
+    # across the admin lookups.
+    g = db.get_or_404("SELECT * FROM galleries WHERE id=?", (gallery_id,))
     visitors = db.all_(
         """SELECT v.*,
                           (SELECT COUNT(*) FROM downloads d WHERE d.visitor_id=v.id) AS n_dl,
