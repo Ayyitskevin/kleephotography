@@ -3727,6 +3727,31 @@ def test_zip_wait_reports_failed_build(admin):
         db.run("DELETE FROM galleries WHERE id=?", (gid,))
 
 
+def test_drop_gallery_favorites_no_redirect_loop(admin):
+    # A drop (transfer) gallery skips the email gate. download_favorites and
+    # download_section used to check `not email` unconditionally, so on a drop
+    # they 303'd to /download?fav=1, which 303'd back to /download/favorites —
+    # an infinite loop. With the gate fixed they fall through to the normal 404.
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published, type, require_pin) "
+        "VALUES (?,?,?,1,'drop',0)",
+        ("drop-dl-01", "Drop DL", "1234"),
+    )
+    try:
+        with TestClient(app) as pub:
+            # first view of a link-only drop mints a visitor cookie
+            assert pub.get("/g/drop-dl-01").status_code == 200
+            # no loop: favorites falls through to 404 (no favorites), not a 303
+            r = pub.get("/g/drop-dl-01/download/favorites", follow_redirects=False)
+            assert r.status_code == 404
+            # no loop: a missing section 404s rather than bouncing to the gate
+            r = pub.get("/g/drop-dl-01/download/section/999999", follow_redirects=False)
+            assert r.status_code == 404
+    finally:
+        db.run("DELETE FROM visitors WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
 def test_booking_manage_shows_client_timezone(admin):
     # The confirmation page must show the time in the zone the client booked in
     # (bookings.tz), not the studio's. 17:00 UTC is 10:00 AM in LA but 1:00 PM
