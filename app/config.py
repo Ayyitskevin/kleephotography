@@ -240,7 +240,18 @@ MONTHLY_GOAL_CENTS = int(os.environ.get("MISE_MONTHLY_GOAL", "0")) * 100
 
 SESSION_MAX_AGE = int(os.environ.get("MISE_SESSION_MAX_AGE", str(60 * 60 * 24 * 90)))
 
-COOKIE_SECURE = _b("MISE_COOKIE_SECURE", "false")  # true once behind the tunnel
+
+def _cookie_secure_default(base_url: str) -> str:
+    """Fail safe: an https BASE_URL means the site is served over TLS, so session
+    cookies must carry Secure — don't rely on remembering to flip an env flag.
+    Falls back to insecure only for a plain-http (dev/localhost) base. Still
+    overridable via MISE_COOKIE_SECURE for edge cases."""
+    return "true" if base_url.startswith("https://") else "false"
+
+
+# Secure cookies default ON whenever BASE_URL is https (production behind the
+# Cloudflare tunnel); MISE_COOKIE_SECURE still wins if set explicitly.
+COOKIE_SECURE = _b("MISE_COOKIE_SECURE", _cookie_secure_default(BASE_URL))
 
 
 def ensure_dirs() -> None:

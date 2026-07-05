@@ -201,7 +201,10 @@ def require_admin(request: Request) -> None:
 def check_admin_password(password: str) -> bool:
     if not config.ADMIN_PASSWORD:
         return False
-    return secrets.compare_digest(password, config.ADMIN_PASSWORD)
+    # Compare bytes: secrets.compare_digest raises TypeError on non-ASCII str
+    # input, which would 500 (and fire an alert, and skip the lockout counter)
+    # on any login attempt containing a non-ASCII character. Bytes accept anything.
+    return secrets.compare_digest(password.encode("utf-8"), config.ADMIN_PASSWORD.encode("utf-8"))
 
 
 def require_argus_token(request: Request) -> None:

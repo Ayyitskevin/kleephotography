@@ -31,7 +31,13 @@ def _bucket_for(path: str) -> str | None:
         return "download"
     if path.startswith("/admin"):
         return "admin"
-    if path.startswith(("/g/", "/portal/", "/i/", "/p/", "/contact", "/book", "/forms/")):
+    if path.startswith(
+        ("/g/", "/portal/", "/i/", "/p/", "/c/", "/w/", "/t/", "/contact", "/book", "/forms/")
+    ):
+        # /c/ contracts, /w/ workspace, /t/ testimonials were unmetered — the /c/
+        # GET even does a status write — so they could be flooded at full speed
+        # unlike every sibling public route. ("/work/" is exempted earlier, so
+        # "/w/" can't catch it.)
         return "public"
     return None
 
