@@ -130,6 +130,7 @@ button.link.ok { color: #2e8b57; }
 .vc-body { width: 100%; resize: vertical; min-height: 2.4rem; font: inherit;
   border-radius: 6px; border: 1px solid rgba(255,255,255,0.2);
   background: rgba(0,0,0,0.3); color: #fff; padding: 0.4rem; }
+.vc-error { color: #f0b8ab; font-size: 0.8rem; margin: 0.2rem 0 0; }
 .sec-dl { font-size: 0.85em; color: var(--muted); text-decoration: none; margin-left: 0.4rem; }
 .sec-dl:hover { color: var(--ink); }
 
