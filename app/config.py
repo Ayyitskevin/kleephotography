@@ -210,6 +210,15 @@ POSTSHOOT_CULL_DAYS = int(os.environ.get("MISE_POSTSHOOT_CULL_DAYS", "1"))
 PIN_MAX_FAILS = int(os.environ.get("MISE_PIN_MAX_FAILS", "5"))
 PIN_LOCKOUT_MIN = int(os.environ.get("MISE_PIN_LOCKOUT_MIN", "15"))
 
+# Per-TARGET circuit breaker on top of the per-IP lockout: a 4-digit gallery/portal
+# PIN is only ~10k keys, so an attacker rotating source IPs gets 5×N guesses/window
+# with no aggregate defense. If ONE target sees this many failed attempts across ALL
+# IPs within the window, lock it for everyone (and alert once). Generous — a real
+# client never approaches it. Admin login (bucket 0) is exempt (strong password, and
+# a global lock there would just be a DoS on Kevin).
+PIN_TARGET_MAX_FAILS = int(os.environ.get("MISE_PIN_TARGET_MAX_FAILS", "50"))
+PIN_TARGET_WINDOW_MIN = int(os.environ.get("MISE_PIN_TARGET_WINDOW_MIN", "60"))
+
 # Per-IP request rate limits (max requests / window seconds). Deliberately generous
 # — real galleries never approach these; the media/thumbnail grid is exempt entirely
 # (see ratelimit._bucket_for) and logged-in admins are exempt so deploys/testing

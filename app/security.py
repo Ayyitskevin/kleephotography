@@ -52,12 +52,26 @@ def client_ip(request: Request) -> str:
 
 
 def pin_locked(ip: str, gallery_id: int) -> bool:
+    # Per-IP lockout: this IP's own recent failures against this target.
     cutoff = time.time() - config.PIN_LOCKOUT_MIN * 60
     row = db.one(
         "SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
         (ip, gallery_id, cutoff),
     )
-    return row["n"] >= config.PIN_MAX_FAILS
+    if row["n"] >= config.PIN_MAX_FAILS:
+        return True
+    # Per-target circuit breaker: a flood of failures against ONE target from MANY
+    # IPs (distributed 4-digit-PIN guessing) locks that target for everyone. Admin
+    # login (bucket 0) is exempt — its password isn't brute-forceable like a PIN,
+    # and a global lock there would only DoS Kevin.
+    if gallery_id == 0:
+        return False
+    tcutoff = time.time() - config.PIN_TARGET_WINDOW_MIN * 60
+    total = db.one(
+        "SELECT COUNT(*) AS n FROM pin_attempts WHERE gallery_id=? AND ts>?",
+        (gallery_id, tcutoff),
+    )["n"]
+    return total >= config.PIN_TARGET_MAX_FAILS
 
 
 def pin_fail(ip: str, gallery_id: int) -> None:
@@ -80,6 +94,20 @@ def pin_fail(ip: str, gallery_id: int) -> None:
             f"{config.PIN_MAX_FAILS} failed {what} attempts from {ip} — "
             f"locked out {config.PIN_LOCKOUT_MIN}m"
         )
+    # Per-target circuit breaker crossed (distributed guessing from many IPs) —
+    # fire once, on the exact attempt that trips it, for real PIN targets only.
+    if gallery_id != 0:
+        tcutoff = time.time() - config.PIN_TARGET_WINDOW_MIN * 60
+        total = db.one(
+            "SELECT COUNT(*) AS n FROM pin_attempts WHERE gallery_id=? AND ts>?",
+            (gallery_id, tcutoff),
+        )["n"]
+        if total == config.PIN_TARGET_MAX_FAILS:
+            alerts.security_alert(
+                f"{config.PIN_TARGET_MAX_FAILS} failed PIN attempts on target "
+                f"{gallery_id} across many IPs in {config.PIN_TARGET_WINDOW_MIN}m — "
+                f"distributed guessing; target locked for everyone"
+            )
 
 
 def pin_clear(ip: str, gallery_id: int) -> None:
