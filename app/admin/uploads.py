@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from .. import config, db, jobs, security
 from ..imaging import PHOTO_EXTS, VIDEO_EXTS
+from . import common
 
 log = logging.getLogger("mise.admin.uploads")
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -53,12 +54,7 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
             rejected.append(name)
             continue
         stored = f"{uuid.uuid4().hex}{ext}"
-        dest = base / "original" / stored
-        size = 0
-        with dest.open("wb") as out:
-            while chunk := await f.read(1 << 20):
-                out.write(chunk)
-                size += len(chunk)
+        size = await common.save_upload(f, base / "original" / stored)
         asset_id = db.run(
             "INSERT INTO assets (gallery_id, section_id, kind, filename, stored, bytes) "
             "VALUES (?,?,?,?,?,?)",

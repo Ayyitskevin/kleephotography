@@ -581,6 +581,12 @@ def test_video_comments_flow(admin):
         got = pub.get(f"/g/{g['slug']}/comments/{vid['id']}").json()
         assert {c["id"] for c in got} == {top["id"], reply["id"]}
 
+        # the ADMIN gallery page renders the same visible thread through its comment
+        # macro — it now builds it from the shared video_comment_thread helper
+        # (dicts, not sqlite3.Rows), so this pins that render path
+        apage = admin.get(f"/admin/galleries/{g['id']}").text
+        assert "Tighten this cut" in apage and "agreed" in apage
+
         # gate: empty body 400, bogus reply target 400, photo/asset are not video → 404
         assert (
             pub.post(f"/g/{g['slug']}/comments/{vid['id']}", data={"body": "   "}).status_code

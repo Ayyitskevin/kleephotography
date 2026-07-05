@@ -5,6 +5,20 @@ from pathlib import Path
 
 from .. import db
 
+
+async def save_upload(file, dest: Path) -> int:
+    """Stream an UploadFile to `dest` in 1 MiB chunks; return bytes written.
+    The gallery, brand-asset, brand-kit-logo, and expense-receipt upload handlers
+    all repeated this exact loop — one implementation keeps the streaming + size
+    accounting in a single place."""
+    size = 0
+    with dest.open("wb") as out:
+        while chunk := await file.read(1 << 20):
+            out.write(chunk)
+            size += len(chunk)
+    return size
+
+
 _STATUS_STYLE = {
     "Delivered": ("#2f7d57", "#e1f2e9"),
     "Proofing": ("#9a7a2c", "#f7ecd2"),
