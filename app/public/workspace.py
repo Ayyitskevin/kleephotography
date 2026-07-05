@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, security
 from ..render import templates
+from . import gallery as public_gallery
 
 log = logging.getLogger("mise.public.workspace")
 router = APIRouter(prefix="/w")
@@ -72,10 +73,16 @@ async def view(request: Request, slug: str):
         (p["id"],),
     )
     gallery = None
+    gallery_expired = False
     if p["gallery_id"]:
         gallery = db.one(
-            "SELECT slug, title FROM galleries WHERE id=? AND published=1", (p["gallery_id"],)
+            "SELECT slug, title, expires_at FROM galleries WHERE id=? AND published=1",
+            (p["gallery_id"],),
         )
+        # An expired gallery 410s at /g/{slug}; render its card unlinked so the
+        # workspace never sends the client to a dead end.
+        if gallery:
+            gallery_expired = public_gallery.is_expired(gallery)
     biz = p["company"] or p["client_name"]
     share_subject = quote(f"Your project workspace — {biz}")
     share_body = quote(
@@ -94,6 +101,7 @@ async def view(request: Request, slug: str):
             "contracts": contracts,
             "invoices": invoices,
             "gallery": gallery,
+            "gallery_expired": gallery_expired,
             "share_href": share_href,
         },
     )

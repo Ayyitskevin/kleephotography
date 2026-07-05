@@ -2948,6 +2948,19 @@ def test_portal_lifecycle(admin):
         # remove the fresh gallery so the rest of the test sees a clean state
         db.run("DELETE FROM galleries WHERE id=?", (new_gid,))
 
+        # an expired gallery must not be a live link in the portal — /g/{slug}
+        # 410s, so the portal renders it unlinked with a "get in touch" note.
+        db.run("UPDATE galleries SET expires_at='2000-01-01' WHERE id=?", (g["id"],))
+        page = pub.get(f"/portal/{portal['slug']}").text
+        row_start = page.index(g["title"])
+        row = page[row_start : page.index("</li>", row_start)]
+        assert f'href="/g/{g["slug"]}"' not in row  # no live link
+        assert "expired 2000-01-01" in row and "get in touch" in row
+        db.run("UPDATE galleries SET expires_at=NULL WHERE id=?", (g["id"],))
+        # neutralize this check's extra portal view so the visit-count assertion
+        # below (== 5) still holds
+        db.run("UPDATE portals SET visits=visits-1 WHERE id=?", (portal["id"],))
+
         # crop + thumb + brand downloads
         assert pub.get(f"/portal/{portal['slug']}/thumb/{a['id']}").status_code == 200
         for ratio in crop_slugs:
@@ -3601,6 +3614,38 @@ def test_client_delete_safety(admin):
     assert (
         admin.post("/admin/studio/clients/99999/delete", follow_redirects=False).status_code == 404
     )
+
+
+def test_workspace_expired_gallery_unlinked(admin):
+    # The project workspace links the delivered gallery; an expired gallery
+    # 410s at /g/{slug}, so the workspace must render it unlinked with a
+    # "get in touch" note rather than sending the client to a dead end.
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("WS Client",))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, client_id, published) VALUES (?,?,?,?,1)",
+        ("ws-gallery-01", "Final Delivery", "1234", cid),
+    )
+    pid = db.run(
+        """INSERT INTO projects
+           (client_id, title, gallery_id, workspace_slug, workspace_pin, workspace_published)
+           VALUES (?,?,?,?,?,1)""",
+        (cid, "WS Project", gid, "ws-proj-01", "2468"),
+    )
+    try:
+        with TestClient(app) as pub:
+            pub.post("/w/ws-proj-01/pin", data={"pin": "2468"}, follow_redirects=False)
+            # live gallery → real link
+            page = pub.get("/w/ws-proj-01").text
+            assert 'href="/g/ws-gallery-01"' in page
+            # expire it → card is unlinked with the re-open note
+            db.run("UPDATE galleries SET expires_at='2000-01-01' WHERE id=?", (gid,))
+            page = pub.get("/w/ws-proj-01").text
+            assert 'href="/g/ws-gallery-01"' not in page
+            assert "Expired 2000-01-01" in page and "get in touch" in page
+    finally:
+        db.run("DELETE FROM projects WHERE id=?", (pid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))
 
 
 def test_reels_never_expose_non_portfolio_videos(admin):

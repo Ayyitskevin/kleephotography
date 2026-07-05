@@ -50,10 +50,17 @@
   {% if gallery %}
   <section class="ws-section">
     <h2>Gallery</h2>
+    {% if gallery_expired %}
+    <div class="ws-card ws-card-expired">
+      <span class="ws-card-title">{{ gallery.title }}</span>
+      <span class="ws-card-meta muted">Expired {{ gallery.expires_at }} — <a href="/contact?prefill=gallery_question&amp;gallery={{ gallery.title|urlencode }}">get in touch</a> to re-open</span>
+    </div>
+    {% else %}
     <a class="ws-card" href="/g/{{ gallery.slug }}">
       <span class="ws-card-title">{{ gallery.title }}</span>
       <span class="ws-card-meta">View &amp; download &rarr;</span>
     </a>
+    {% endif %}
   </section>
   {% endif %}
 
