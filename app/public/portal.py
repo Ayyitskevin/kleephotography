@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from .. import config, db, jobs, presets, security
 from ..render import templates
+from . import gallery
 
 log = logging.getLogger("mise.public.portal")
 router = APIRouter(prefix="/portal")
@@ -64,6 +65,10 @@ async def view(request: Request, slug: str):
                            ORDER BY created_at DESC""",
         (p["client_id"],),
     )
+    # A published-but-expired gallery 410s at /g/{slug}, so linking it here (the
+    # client's permanent hub) would dead-end them. Flag those so the template
+    # renders them unlinked with a "get in touch" note instead.
+    expired_gallery_ids = {g["id"] for g in galleries if gallery.is_expired(g)}
     crops = db.all_(
         """SELECT DISTINCT a.*, g.title AS gallery_title
                        FROM favorites f
@@ -133,6 +138,7 @@ async def view(request: Request, slug: str):
         {
             "p": p,
             "galleries": galleries,
+            "expired_gallery_ids": expired_gallery_ids,
             "crops": crops,
             "brand": brand,
             "ratios": [ps["slug"] for ps in presets.active()],

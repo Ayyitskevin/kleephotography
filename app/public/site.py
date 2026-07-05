@@ -269,16 +269,16 @@ def _parse_cs_credits(raw: str | None) -> list[dict]:
 
 def _portfolio_reels() -> list:
     """Portfolio-starred videos for the public /reels showcase — same explicit
-    portfolio=1 gate as photos, so nothing client-private is ever exposed."""
-    rows = db.all_("""SELECT * FROM assets
+    portfolio=1 gate as photos, so nothing client-private is ever exposed.
+
+    No demo fallback: the /site/vid and /site/poster serving routes also gate on
+    portfolio=1, so returning non-starred client videos here would render <video>
+    players whose src + poster both 404 (and leak private asset IDs into the
+    page). When nothing is starred we return [] and the templates fall back to
+    their empty states (home hides the motion band; /reels shows the empty copy)."""
+    return db.all_("""SELECT * FROM assets
                        WHERE portfolio=1 AND status='ready' AND kind='video'
                        ORDER BY id DESC""")
-    if rows:
-        return rows
-    # Demo fallback: one ready reel is enough to render the motion layout.
-    return db.all_("""SELECT * FROM assets
-                       WHERE status='ready' AND kind='video'
-                       ORDER BY id DESC LIMIT 5""")
 
 
 def _testimonials(gallery_id: int | None = None, limit: int | None = None) -> list:
@@ -486,37 +486,49 @@ async def submit_inquiry(
                 "faq_heading": "Good to know",
             },
         )
+
+    def _error(msg: str, status: int):
+        # Re-render with an error AND every submitted value echoed back, so a
+        # typo or throttle never wipes a visitor's typed quote request (the
+        # template reads these off `prefill`).
+        return templates.TemplateResponse(
+            request,
+            "site/contact.html",
+            {
+                "sent": False,
+                "error": msg,
+                "prefill": {
+                    "name": name.strip(),
+                    "email": email.strip(),
+                    "business": business.strip(),
+                    "message": message.strip(),
+                    "service": service.strip(),
+                    "shoot_date": shoot_date.strip(),
+                    "dish_count": dish_count.strip(),
+                    "usage": usage.strip(),
+                    "budget": budget.strip(),
+                },
+                "featured": _portfolio_assets()[:1],
+                "faqs": CONTACT_FAQS,
+                "faq_heading": "Good to know",
+            },
+            status_code=status,
+        )
+
     # Per-IP throttle: 3 inquiries / hour. Real visitors send 1; a determined
     # spammer's 4th submit hits this wall (honeypot kicks in earlier for naive
     # bots; this is for the ones smart enough to skip the trap).
     ip = security.client_ip(request)
     if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_CONTACT):
         log.warning("contact form throttled for ip=%s", ip)
-        return templates.TemplateResponse(
-            request,
-            "site/contact.html",
-            {
-                "sent": False,
-                "error": "You've sent a few inquiries recently — give me a chance to reply "
-                "before sending another one. If it's urgent, email me directly.",
-                "faqs": CONTACT_FAQS,
-                "faq_heading": "Good to know",
-            },
-            status_code=429,
+        return _error(
+            "You've sent a few inquiries recently — give me a chance to reply "
+            "before sending another one. If it's urgent, email me directly.",
+            429,
         )
     name, email, message = name.strip(), email.strip(), message.strip()
     if not (name and message and "@" in email and "." in email.rsplit("@", 1)[-1]):
-        return templates.TemplateResponse(
-            request,
-            "site/contact.html",
-            {
-                "sent": False,
-                "error": "Please add your name, a valid email, and a short message.",
-                "faqs": CONTACT_FAQS,
-                "faq_heading": "Good to know",
-            },
-            status_code=400,
-        )
+        return _error("Please add your name, a valid email, and a short message.", 400)
     # Optional scope fields from the quote-request form. service + target date
     # get their own inquiry columns (so the inquiry→quote button can lift them
     # into a project without re-typing); the rest fold into the message + email

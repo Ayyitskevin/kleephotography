@@ -33,9 +33,14 @@
   <ul class="portal-galleries">
     {% for g in galleries %}
     <li>
+      {% if g.id in expired_gallery_ids %}
+      <span class="portal-gallery-expired">{{ g.title }}</span>
+      <span class="muted"> · expired {{ g.expires_at }} — <a href="/contact?prefill=gallery_question&amp;gallery={{ g.title|urlencode }}">get in touch</a> to re-open</span>
+      {% else %}
       <a href="/g/{{ g.slug }}">{{ g.title }}</a>
       {% if prev_visit and g.created_at > prev_visit %}<span class="new-pill" title="Added since your last visit">NEW</span>{% endif %}
       {% if g.expires_at %}<span class="muted"> · available until {{ g.expires_at }}</span>{% endif %}
+      {% endif %}
       {% if g.captions %}
       <details class="captions">
         <summary>Caption drafts</summary>

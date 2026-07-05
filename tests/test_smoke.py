@@ -2948,6 +2948,19 @@ def test_portal_lifecycle(admin):
         # remove the fresh gallery so the rest of the test sees a clean state
         db.run("DELETE FROM galleries WHERE id=?", (new_gid,))
 
+        # an expired gallery must not be a live link in the portal — /g/{slug}
+        # 410s, so the portal renders it unlinked with a "get in touch" note.
+        db.run("UPDATE galleries SET expires_at='2000-01-01' WHERE id=?", (g["id"],))
+        page = pub.get(f"/portal/{portal['slug']}").text
+        row_start = page.index(g["title"])
+        row = page[row_start : page.index("</li>", row_start)]
+        assert f'href="/g/{g["slug"]}"' not in row  # no live link
+        assert "expired 2000-01-01" in row and "get in touch" in row
+        db.run("UPDATE galleries SET expires_at=NULL WHERE id=?", (g["id"],))
+        # neutralize this check's extra portal view so the visit-count assertion
+        # below (== 5) still holds
+        db.run("UPDATE portals SET visits=visits-1 WHERE id=?", (portal["id"],))
+
         # crop + thumb + brand downloads
         assert pub.get(f"/portal/{portal['slug']}/thumb/{a['id']}").status_code == 200
         for ratio in crop_slugs:
@@ -3160,9 +3173,32 @@ def test_inquiry_form(monkeypatch):
         assert r.status_code == 200 and "Thanks" in r.text
         assert db.one("SELECT COUNT(*) AS n FROM inquiries")["n"] == 0 and not sent
 
-        # bad email rejected
-        r = pub.post("/contact", data={"name": "Sam", "email": "not-an-email", "message": "hi"})
+        # bad email rejected — and every typed value is echoed back so the
+        # visitor never loses their quote request to a typo (dotless domain
+        # passes the browser's type=email check but fails the server's)
+        r = pub.post(
+            "/contact",
+            data={
+                "name": "Sam Owner",
+                "email": "sam@localhost",
+                "business": "Taqueria Luz",
+                "message": "Need a menu shoot in July.",
+                "service": "Photography",
+                "dish_count": "12 dishes",
+                "usage": "Not sure",
+                "budget": "Under $1,000",
+            },
+        )
         assert r.status_code == 400
+        assert 'value="Sam Owner"' in r.text and 'value="sam@localhost"' in r.text
+        assert 'value="Taqueria Luz"' in r.text and "Need a menu shoot in July." in r.text
+        assert 'value="12 dishes"' in r.text
+        # selects re-select the chosen option
+        assert '<option value="Photography" selected' in r.text
+        assert '<option value="Not sure" selected' in r.text
+        assert '<option value="Under $1,000" selected' in r.text
+        # nothing was stored for the rejected submission
+        assert db.one("SELECT COUNT(*) AS n FROM inquiries")["n"] == 0
 
         # real inquiry: stored + emailed to Kevin with Reply-To the visitor
         r = pub.post(
@@ -3578,6 +3614,67 @@ def test_client_delete_safety(admin):
     assert (
         admin.post("/admin/studio/clients/99999/delete", follow_redirects=False).status_code == 404
     )
+
+
+def test_workspace_expired_gallery_unlinked(admin):
+    # The project workspace links the delivered gallery; an expired gallery
+    # 410s at /g/{slug}, so the workspace must render it unlinked with a
+    # "get in touch" note rather than sending the client to a dead end.
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("WS Client",))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, client_id, published) VALUES (?,?,?,?,1)",
+        ("ws-gallery-01", "Final Delivery", "1234", cid),
+    )
+    pid = db.run(
+        """INSERT INTO projects
+           (client_id, title, gallery_id, workspace_slug, workspace_pin, workspace_published)
+           VALUES (?,?,?,?,?,1)""",
+        (cid, "WS Project", gid, "ws-proj-01", "2468"),
+    )
+    try:
+        with TestClient(app) as pub:
+            pub.post("/w/ws-proj-01/pin", data={"pin": "2468"}, follow_redirects=False)
+            # live gallery → real link
+            page = pub.get("/w/ws-proj-01").text
+            assert 'href="/g/ws-gallery-01"' in page
+            # expire it → card is unlinked with the re-open note
+            db.run("UPDATE galleries SET expires_at='2000-01-01' WHERE id=?", (gid,))
+            page = pub.get("/w/ws-proj-01").text
+            assert 'href="/g/ws-gallery-01"' not in page
+            assert "Expired 2000-01-01" in page and "get in touch" in page
+    finally:
+        db.run("DELETE FROM projects WHERE id=?", (pid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))
+
+
+def test_reels_never_expose_non_portfolio_videos(admin):
+    # A ready client video that is NOT portfolio-starred must never surface on the
+    # public /reels or home motion band: the /site/vid + /site/poster routes gate
+    # on portfolio=1, so rendering it would produce black players whose src+poster
+    # both 404 and leak the private asset id. _portfolio_reels() returns [] here.
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("reel-priv", "Private Reels", "1234"),
+    )
+    aid = db.run(
+        "INSERT INTO assets (gallery_id, kind, filename, stored, status, portfolio) "
+        "VALUES (?,?,?,?,?,0)",
+        (gid, "video", "client.mp4", "clientfile.mp4", "ready"),
+    )
+    try:
+        with TestClient(app) as pub:
+            reels = pub.get("/reels")
+            assert reels.status_code == 200
+            assert f"/site/vid/{aid}" not in reels.text
+            assert f"/site/poster/{aid}" not in reels.text
+            # /reels shows its empty state rather than a broken player
+            assert "motion-feature" not in reels.text
+            home = pub.get("/")
+            assert f"/site/vid/{aid}" not in home.text
+    finally:
+        db.run("DELETE FROM assets WHERE id=?", (aid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
 
 
 def test_gallery_delete(admin):
