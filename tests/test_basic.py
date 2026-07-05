@@ -70,6 +70,26 @@ def test_cookie_secure_default_fails_safe_for_https():
 
 
 @pytest.mark.unit
+def test_portal_pin_bucket_avoids_throttle_sentinels():
+    from app import security
+    from app.public.portal import _pin_bucket
+
+    # Portal lockout rows must never land on the inquiry-throttle sentinels
+    # (-2/-3/-4) — a bare -portal_id collided portals 2/3/4 with them, so a
+    # mistyped portal PIN could 429 that IP's contact form.
+    sentinels = {
+        security.INQUIRY_BUCKET_CONTACT,
+        security.INQUIRY_BUCKET_BOOK,
+        security.INQUIRY_BUCKET_FORM,
+    }
+    buckets = {_pin_bucket(i) for i in range(1, 1000)}
+    assert not (buckets & sentinels)  # disjoint from the throttle sentinels
+    assert all(b < -1_000_000 for b in buckets)  # distinct large-negative band
+    # and disjoint from gallery ids (positive) + admin login (0) + workspace (+2M)
+    assert all(b < 0 for b in buckets)
+
+
+@pytest.mark.unit
 def test_check_admin_password_handles_non_ascii(monkeypatch):
     from app import config, security
 
