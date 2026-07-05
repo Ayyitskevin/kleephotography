@@ -242,6 +242,17 @@ def test_custom_forms_are_public_rate_limited():
 
 
 @pytest.mark.unit
+def test_static_assets_cached_immutable(client):
+    # /static URLs are content-hash-busted (?v=), so they're safe to cache
+    # forever; the middleware must stamp the long-lived immutable header.
+    r = client.get("/static/mise.css")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "public, max-age=31536000, immutable"
+    # non-static responses must NOT get the immutable header
+    assert "immutable" not in client.get("/healthz").headers.get("cache-control", "")
+
+
+@pytest.mark.unit
 def test_favicon(client):
     # legacy crawlers and share scrapers request /favicon.ico directly,
     # ignoring the <link rel=icon> tags — it must not 404
