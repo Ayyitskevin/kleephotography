@@ -44,6 +44,44 @@ def test_security_headers(client):
 
 
 @pytest.mark.unit
+def test_hsts_tracks_cookie_secure(monkeypatch):
+    from app import config
+    from app.main import app
+
+    # HSTS ships only when the site knows it's on TLS (same signal as Secure
+    # cookies) — never for a plain-http dev origin, which would pin localhost.
+    monkeypatch.setattr(config, "COOKIE_SECURE", True)
+    with TestClient(app) as c:
+        h = c.get("/healthz").headers["strict-transport-security"]
+        assert "max-age=63072000" in h and "includeSubDomains" in h
+    monkeypatch.setattr(config, "COOKIE_SECURE", False)
+    with TestClient(app) as c:
+        assert "strict-transport-security" not in c.get("/healthz").headers
+
+
+@pytest.mark.unit
+def test_cookie_secure_default_fails_safe_for_https():
+    from app import config
+
+    # an https base auto-enables Secure cookies; plain-http (dev) stays off —
+    # so production can't silently ship insecure cookies by forgetting a flag
+    assert config._cookie_secure_default("https://kleephotography.com") == "true"
+    assert config._cookie_secure_default("http://localhost:8400") == "false"
+
+
+@pytest.mark.unit
+def test_check_admin_password_handles_non_ascii(monkeypatch):
+    from app import config, security
+
+    # a non-ASCII password attempt must return False, not raise TypeError (which
+    # would 500, fire an alert, and skip the login lockout counter)
+    monkeypatch.setattr(config, "ADMIN_PASSWORD", "correct-horse")
+    assert security.check_admin_password("pässwörd") is False
+    assert security.check_admin_password("correct-horse") is True
+    assert security.check_admin_password("naïve🔑") is False
+
+
+@pytest.mark.unit
 def test_csp_header(client):
     # Content-Security-Policy ships on every response as XSS/clickjacking
     # defense-in-depth (R18). script-src keeps 'unsafe-inline' for now because the
@@ -239,6 +277,13 @@ def test_custom_forms_are_public_rate_limited():
 
     assert ratelimit._bucket_for("/forms/wedding-lead") == "public"
     assert ratelimit._bucket_for("/static/mise.css") is None
+    # contracts, workspace, and testimonials are now metered like every sibling
+    # public route (they were unmetered)
+    assert ratelimit._bucket_for("/c/abc123def456") == "public"
+    assert ratelimit._bucket_for("/w/abc123def456") == "public"
+    assert ratelimit._bucket_for("/t/abc123def456") == "public"
+    # /work/ marketing pages stay exempt — "/w/" must not swallow them
+    assert ratelimit._bucket_for("/work/spring-menu") is None
 
 
 @pytest.mark.unit
