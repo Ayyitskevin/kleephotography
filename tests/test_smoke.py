@@ -3160,9 +3160,32 @@ def test_inquiry_form(monkeypatch):
         assert r.status_code == 200 and "Thanks" in r.text
         assert db.one("SELECT COUNT(*) AS n FROM inquiries")["n"] == 0 and not sent
 
-        # bad email rejected
-        r = pub.post("/contact", data={"name": "Sam", "email": "not-an-email", "message": "hi"})
+        # bad email rejected — and every typed value is echoed back so the
+        # visitor never loses their quote request to a typo (dotless domain
+        # passes the browser's type=email check but fails the server's)
+        r = pub.post(
+            "/contact",
+            data={
+                "name": "Sam Owner",
+                "email": "sam@localhost",
+                "business": "Taqueria Luz",
+                "message": "Need a menu shoot in July.",
+                "service": "Photography",
+                "dish_count": "12 dishes",
+                "usage": "Not sure",
+                "budget": "Under $1,000",
+            },
+        )
         assert r.status_code == 400
+        assert 'value="Sam Owner"' in r.text and 'value="sam@localhost"' in r.text
+        assert 'value="Taqueria Luz"' in r.text and "Need a menu shoot in July." in r.text
+        assert 'value="12 dishes"' in r.text
+        # selects re-select the chosen option
+        assert '<option value="Photography" selected' in r.text
+        assert '<option value="Not sure" selected' in r.text
+        assert '<option value="Under $1,000" selected' in r.text
+        # nothing was stored for the rejected submission
+        assert db.one("SELECT COUNT(*) AS n FROM inquiries")["n"] == 0
 
         # real inquiry: stored + emailed to Kevin with Reply-To the visitor
         r = pub.post(

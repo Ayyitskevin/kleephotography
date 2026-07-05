@@ -44,8 +44,10 @@
     </div>
     {% else %}
     <form method="post" action="/contact" class="stack-form contact-form">
-      <label>Name <input type="text" name="name" required></label>
-      <label>Email <input type="email" name="email" required></label>
+      <label>Name <input type="text" name="name" required
+             value="{{ prefill.name if prefill else '' }}"></label>
+      <label>Email <input type="email" name="email" required
+             value="{{ prefill.email if prefill else '' }}"></label>
       <label>Business <input type="text" name="business"
              value="{{ prefill.business if prefill else '' }}"
              placeholder="Restaurant / café / brand name"></label>
@@ -57,23 +59,25 @@
           <option value="Photography + Videography"{% if prefill and prefill.service == 'Photography + Videography' %} selected{% endif %}>Photography + Videography</option>
           <option value="Brand Partner (monthly retainer)"{% if prefill and prefill.service == 'Brand Partner (monthly retainer)' %} selected{% endif %}>Brand Partner (monthly retainer)</option>
         </select></label>
-      <label>Target date <input type="date" name="shoot_date"></label>
+      <label>Target date <input type="date" name="shoot_date"
+             value="{{ prefill.shoot_date if prefill else '' }}"></label>
       <label>How many dishes or setups? <input type="text" name="dish_count"
+             value="{{ prefill.dish_count if prefill else '' }}"
              placeholder="e.g. 12 dishes, 2 cocktails, full menu"></label>
       <label>Usage / licensing
         <select name="usage">
           <option value="">Standard — web &amp; social</option>
-          <option value="Extended — advertising / paid media">Extended — advertising / paid media</option>
-          <option value="Exclusive / talent release">Exclusive / talent release</option>
-          <option value="Not sure">Not sure</option>
+          <option value="Extended — advertising / paid media"{% if prefill and prefill.usage == 'Extended — advertising / paid media' %} selected{% endif %}>Extended — advertising / paid media</option>
+          <option value="Exclusive / talent release"{% if prefill and prefill.usage == 'Exclusive / talent release' %} selected{% endif %}>Exclusive / talent release</option>
+          <option value="Not sure"{% if prefill and prefill.usage == 'Not sure' %} selected{% endif %}>Not sure</option>
         </select></label>
       <label>Budget range
         <select name="budget">
           <option value="">Prefer to discuss</option>
-          <option value="Under $1,000">Under $1,000</option>
-          <option value="$1,000–$2,500">$1,000–$2,500</option>
-          <option value="$2,500–$5,000">$2,500–$5,000</option>
-          <option value="$5,000+">$5,000+</option>
+          <option value="Under $1,000"{% if prefill and prefill.budget == 'Under $1,000' %} selected{% endif %}>Under $1,000</option>
+          <option value="$1,000–$2,500"{% if prefill and prefill.budget == '$1,000–$2,500' %} selected{% endif %}>$1,000–$2,500</option>
+          <option value="$2,500–$5,000"{% if prefill and prefill.budget == '$2,500–$5,000' %} selected{% endif %}>$2,500–$5,000</option>
+          <option value="$5,000+"{% if prefill and prefill.budget == '$5,000+' %} selected{% endif %}>$5,000+</option>
         </select></label>
       <label>Message <textarea name="message" rows="6" required
              placeholder="What are we shooting?">{{ prefill.message if prefill else '' }}</textarea></label>
