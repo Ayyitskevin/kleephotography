@@ -269,16 +269,16 @@ def _parse_cs_credits(raw: str | None) -> list[dict]:
 
 def _portfolio_reels() -> list:
     """Portfolio-starred videos for the public /reels showcase — same explicit
-    portfolio=1 gate as photos, so nothing client-private is ever exposed."""
-    rows = db.all_("""SELECT * FROM assets
+    portfolio=1 gate as photos, so nothing client-private is ever exposed.
+
+    No demo fallback: the /site/vid and /site/poster serving routes also gate on
+    portfolio=1, so returning non-starred client videos here would render <video>
+    players whose src + poster both 404 (and leak private asset IDs into the
+    page). When nothing is starred we return [] and the templates fall back to
+    their empty states (home hides the motion band; /reels shows the empty copy)."""
+    return db.all_("""SELECT * FROM assets
                        WHERE portfolio=1 AND status='ready' AND kind='video'
                        ORDER BY id DESC""")
-    if rows:
-        return rows
-    # Demo fallback: one ready reel is enough to render the motion layout.
-    return db.all_("""SELECT * FROM assets
-                       WHERE status='ready' AND kind='video'
-                       ORDER BY id DESC LIMIT 5""")
 
 
 def _testimonials(gallery_id: int | None = None, limit: int | None = None) -> list:

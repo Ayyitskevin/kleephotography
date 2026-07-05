@@ -3603,6 +3603,35 @@ def test_client_delete_safety(admin):
     )
 
 
+def test_reels_never_expose_non_portfolio_videos(admin):
+    # A ready client video that is NOT portfolio-starred must never surface on the
+    # public /reels or home motion band: the /site/vid + /site/poster routes gate
+    # on portfolio=1, so rendering it would produce black players whose src+poster
+    # both 404 and leak the private asset id. _portfolio_reels() returns [] here.
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("reel-priv", "Private Reels", "1234"),
+    )
+    aid = db.run(
+        "INSERT INTO assets (gallery_id, kind, filename, stored, status, portfolio) "
+        "VALUES (?,?,?,?,?,0)",
+        (gid, "video", "client.mp4", "clientfile.mp4", "ready"),
+    )
+    try:
+        with TestClient(app) as pub:
+            reels = pub.get("/reels")
+            assert reels.status_code == 200
+            assert f"/site/vid/{aid}" not in reels.text
+            assert f"/site/poster/{aid}" not in reels.text
+            # /reels shows its empty state rather than a broken player
+            assert "motion-feature" not in reels.text
+            home = pub.get("/")
+            assert f"/site/vid/{aid}" not in home.text
+    finally:
+        db.run("DELETE FROM assets WHERE id=?", (aid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
 def test_gallery_delete(admin):
     from app import config as cfg
 
