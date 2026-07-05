@@ -6,9 +6,13 @@
   <aside class="book-aside" data-reveal>
     <p class="eyebrow">Book a shoot</p>
     <h1>Pick a date. <span class="it-accent">I'll handle the rest.</span></h1>
-    <p class="lede">Choose a starting service and a preferred date — I'll confirm
-       availability and follow up with a tailored proposal, usually within a
-       business day.</p>
+    <p class="lede">
+      {% if events %}Pick a time that works and you're booked on the spot — an
+         instant confirmation and calendar invite land in your inbox, and I'll
+         follow up with prep details before the shoot.
+      {% else %}Choose a starting service and a preferred date — I'll confirm
+         availability and follow up with a tailored proposal, usually within a
+         business day.{% endif %}</p>
     {% if book_photo %}
     <div class="book-aside-photo">
       <img src="/site/img/{{ book_photo.id }}?variant=web" loading="lazy" decoding="async"

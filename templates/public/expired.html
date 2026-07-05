@@ -2,6 +2,8 @@
 {% block content %}
 <main class="center-card">
   <h1>{{ g.title }}</h1>
-  <p>This gallery has expired. Contact {{ site_name }} to have it re-opened.</p>
+  <p>This gallery has expired.
+    {% if contact_email %}<a href="mailto:{{ contact_email }}">Get in touch</a>{% else %}<a href="/contact">Get in touch</a>{% endif %}
+    to have it re-opened.</p>
 </main>
 {% endblock %}
