@@ -1060,6 +1060,28 @@ def test_expired_gallery(admin):
     )
 
 
+def test_expired_gallery_blocks_fav_and_poster(admin):
+    # Every gated gallery surface 410s once expired; the fav toggle and the video
+    # poster route used to skip that check, letting a visitor with a live cookie
+    # keep changing proofing picks / pulling posters after the window closed.
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published, expires_at) "
+        "VALUES (?,?,?,1,'2000-01-01')",
+        ("expired-surfaces", "Expired Surfaces", "1234"),
+    )
+    aid = db.run(
+        "INSERT INTO assets (gallery_id, kind, filename, stored, status) VALUES (?,?,?,?,?)",
+        (gid, "video", "v.mp4", "vfile.mp4", "ready"),
+    )
+    try:
+        with TestClient(app) as pub:
+            assert pub.post(f"/g/expired-surfaces/fav/{aid}").status_code == 410
+            assert pub.get(f"/media/expired-surfaces/poster/{aid}").status_code == 410
+    finally:
+        db.run("DELETE FROM assets WHERE id=?", (aid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
 def test_studio_clients_projects(admin):
     # client
     r = admin.post(

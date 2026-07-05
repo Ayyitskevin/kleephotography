@@ -44,9 +44,14 @@ def _resolve(slug: str, variant: str, asset_id: int, request: Request):
 @router.get("/{slug}/poster/{asset_id}")
 async def poster(request: Request, slug: str, asset_id: int):
     g = get_live_gallery(slug)
+    # Mirror _resolve: an expired gallery is 410 everywhere, and only ready
+    # assets serve — the poster route skipped both of these gates.
+    if is_expired(g):
+        raise HTTPException(status_code=410)
     security.require_visitor(request, g["id"])
     a = db.one(
-        "SELECT * FROM assets WHERE id=? AND gallery_id=? AND kind='video'", (asset_id, g["id"])
+        "SELECT * FROM assets WHERE id=? AND gallery_id=? AND kind='video' AND status='ready'",
+        (asset_id, g["id"]),
     )
     if not a:
         raise HTTPException(status_code=404)
