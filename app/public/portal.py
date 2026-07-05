@@ -30,8 +30,19 @@ def get_live_portal(slug: str) -> "db.sqlite3.Row":
     return p
 
 
-# Portal auth piggybacks the gallery PIN machinery; portals use NEGATIVE ids
-# in pin_attempts so they never collide with gallery lockout rows.
+# Portal auth piggybacks the gallery PIN machinery. pin_attempts.gallery_id is a
+# shared namespace: galleries use positive ids, the admin login uses 0, the
+# inquiry throttles reserve the SMALL negatives -2/-3/-4 (security.INQUIRY_BUCKET_*),
+# and workspace uses +2_000_000. A bare -portal_id collided portals 2/3/4 with the
+# contact/book/forms throttle sentinels — a mistyped portal PIN could 429 that IP's
+# contact form (and vice-versa). Offset portal ids into a distinct large-negative
+# band that avoids every other bucket. Old bare-id rows self-expire within 24h
+# (pin_fail prunes), so no migration is needed.
+PIN_OFFSET = -1_000_000
+
+
+def _pin_bucket(portal_id: int) -> int:
+    return PIN_OFFSET - portal_id
 
 
 def _cookie_name(portal_id: int) -> str:
@@ -154,7 +165,8 @@ async def view(request: Request, slug: str):
 async def check_pin(request: Request, slug: str, pin: str = Form(...)):
     p = get_live_portal(slug)
     ip = security.client_ip(request)
-    if security.pin_locked(ip, -p["id"]):
+    bucket = _pin_bucket(p["id"])
+    if security.pin_locked(ip, bucket):
         return templates.TemplateResponse(
             request,
             "public/portal_pin.html",
@@ -162,11 +174,11 @@ async def check_pin(request: Request, slug: str, pin: str = Form(...)):
             status_code=429,
         )
     if pin.strip() != p["pin"]:
-        security.pin_fail(ip, -p["id"])
+        security.pin_fail(ip, bucket)
         return templates.TemplateResponse(
             request, "public/portal_pin.html", {"p": p, "error": "Wrong PIN."}, status_code=401
         )
-    security.pin_clear(ip, -p["id"])
+    security.pin_clear(ip, bucket)
     resp = RedirectResponse(f"/portal/{slug}", status_code=303)
     security.set_signed_session_cookie(resp, _cookie_name(p["id"]), f"portal:{p['id']}")
     return resp
