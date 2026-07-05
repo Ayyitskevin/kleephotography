@@ -132,6 +132,40 @@ def test_portal_pin_bucket_avoids_throttle_sentinels():
 
 
 @pytest.mark.unit
+def test_pin_target_circuit_breaker(client, monkeypatch):
+    from app import config, db, security
+
+    monkeypatch.setattr(config, "PIN_MAX_FAILS", 5)
+    monkeypatch.setattr(config, "PIN_TARGET_MAX_FAILS", 10)
+    monkeypatch.setattr(config, "PIN_TARGET_WINDOW_MIN", 60)
+
+    gid = 987654
+    db.run("DELETE FROM pin_attempts WHERE gallery_id IN (?, 0)", (gid,))
+    try:
+        # 10 failures spread across 10 distinct IPs — no single IP hits the
+        # per-IP cap of 5, so the old per-IP check alone would never lock this.
+        for i in range(10):
+            security.pin_fail(f"10.0.0.{i}", gid)
+        assert security.pin_locked("10.0.0.3", gid) is True  # a participating IP
+        # a brand-new IP that never guessed is ALSO locked — the distributed
+        # defense is the whole point
+        assert security.pin_locked("203.0.113.99", gid) is True
+        # below the target threshold, a fresh IP is NOT locked
+        db.run("DELETE FROM pin_attempts WHERE gallery_id=?", (gid,))
+        for i in range(9):
+            security.pin_fail(f"10.0.2.{i}", gid)
+        assert security.pin_locked("203.0.113.99", gid) is False
+
+        # admin login (bucket 0) is EXEMPT from the global cap — a strong password
+        # isn't PIN-brute-forceable and a global lock there would just DoS Kevin
+        for i in range(20):
+            security.pin_fail(f"10.0.3.{i}", 0)
+        assert security.pin_locked("203.0.113.99", 0) is False
+    finally:
+        db.run("DELETE FROM pin_attempts WHERE gallery_id IN (?, 0)", (gid,))
+
+
+@pytest.mark.unit
 def test_check_admin_password_handles_non_ascii(monkeypatch):
     from app import config, security
 
