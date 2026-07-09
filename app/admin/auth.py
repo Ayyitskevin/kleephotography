@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import security
@@ -37,7 +37,7 @@ async def login(request: Request, password: str = Form(...)):
     return resp
 
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[Depends(security.require_admin)])
 async def logout(request: Request, everywhere: str = Form("")):
     # Real revocation: delete this session's server-side row so the cookie is dead
     # even if it was copied elsewhere. `everywhere` kills ALL admin sessions (the

@@ -50,10 +50,11 @@ def test_hsts_tracks_cookie_secure(monkeypatch):
 
     # HSTS ships only when the site knows it's on TLS (same signal as Secure
     # cookies) — never for a plain-http dev origin, which would pin localhost.
+    # Keep the first production rollout short and root-only so it is reversible.
     monkeypatch.setattr(config, "COOKIE_SECURE", True)
     with TestClient(app) as c:
         h = c.get("/healthz").headers["strict-transport-security"]
-        assert "max-age=63072000" in h and "includeSubDomains" in h
+        assert h == "max-age=300"
     monkeypatch.setattr(config, "COOKIE_SECURE", False)
     with TestClient(app) as c:
         assert "strict-transport-security" not in c.get("/healthz").headers
@@ -92,6 +93,23 @@ def test_admin_logout_revokes_session(client):
     r = client.get("/admin/home", follow_redirects=False)
     assert r.status_code == 303 and "/admin/login" in r.headers.get("location", "")
     client.cookies.clear()
+
+
+@pytest.mark.unit
+def test_admin_sign_out_everywhere_requires_auth(client):
+    from app import db, security
+
+    other = security.create_admin_session()
+    client.cookies.clear()
+    try:
+        before = db.one("SELECT COUNT(*) AS n FROM admin_sessions")["n"]
+        r = client.post("/admin/logout", data={"everywhere": "1"}, follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers["location"] == "/admin/login"
+        assert db.one("SELECT COUNT(*) AS n FROM admin_sessions")["n"] == before
+        assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (other,))
+    finally:
+        db.run("DELETE FROM admin_sessions WHERE token=?", (other,))
 
 
 @pytest.mark.unit
