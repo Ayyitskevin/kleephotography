@@ -11,6 +11,8 @@ os.environ.setdefault("MISE_SECRET_KEY", "test-secret")
 os.environ.setdefault("MISE_ADMIN_PASSWORD", "test-pw")
 os.environ.setdefault("MISE_ENV_FILE", "/nonexistent")
 
+from datetime import UTC
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -213,6 +215,34 @@ def test_csp_header(client):
     assert "https://plausible.io" in csp
     # indexable marketing pages carry the policy too
     assert "content-security-policy" in client.get("/").headers
+
+
+@pytest.mark.unit
+def test_permissions_policy_header(client):
+    # unused browser features are switched off on every response; fullscreen and
+    # picture-in-picture are deliberately NOT restricted (native <video> controls
+    # in galleries/reels depend on them)
+    pp = client.get("/healthz").headers["permissions-policy"]
+    for feature in ("camera=()", "microphone=()", "geolocation=()", "payment=()"):
+        assert feature in pp, feature
+    for kept in ("fullscreen", "picture-in-picture", "autoplay"):
+        assert kept not in pp, kept
+    assert "permissions-policy" in client.get("/").headers
+
+
+@pytest.mark.unit
+def test_security_txt(client):
+    # RFC 9116: Contact + a not-yet-expired Expires, served as text/plain
+    r = client.get("/.well-known/security.txt")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/plain")
+    body = r.text
+    assert body.startswith("Contact: ")
+    expires = next(ln for ln in body.splitlines() if ln.startswith("Expires: "))
+    from datetime import datetime
+
+    exp = datetime.strptime(expires.removeprefix("Expires: "), "%Y-%m-%dT%H:%M:%SZ")
+    assert exp.replace(tzinfo=UTC) > datetime.now(UTC)
 
 
 @pytest.mark.unit
