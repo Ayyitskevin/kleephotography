@@ -685,13 +685,29 @@ progress { width: 100%; }
 .btn-pill { display: inline-flex; align-items: center; gap: 0.55em;
   padding: 1em 1.9em; background: var(--ink); color: var(--cream);
   border-radius: 999px; font: 600 0.9rem/1 var(--sans); letter-spacing: 0.02em;
-  text-decoration: none; transition: background 0.3s ease; }
-.btn-pill:hover { background: var(--accent); }
+  text-decoration: none;
+  transition: background 0.3s ease, transform 0.3s cubic-bezier(.2,.7,.2,1), box-shadow 0.3s ease; }
+.btn-pill:hover { background: var(--accent); transform: translateY(-2px);
+  box-shadow: 0 14px 26px -14px rgba(207,69,44,0.5); }
+.btn-pill span { transition: transform 0.3s cubic-bezier(.2,.7,.2,1); }
+.btn-pill:hover span { transform: translateX(3px); }
 .btn-ghost { display: inline-flex; align-items: center; gap: 0.5em;
   font: 600 0.9rem/1 var(--sans); color: var(--ink); text-decoration: none;
   border-bottom: 1px solid #c8bfb1; padding-bottom: 4px;
   transition: color 0.3s ease, border-color 0.3s ease; }
 .btn-ghost:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Respect the OS "reduce motion" setting everywhere — parallax already checks it
+   in JS; this collapses every CSS transition/animation (hover lifts, reveals,
+   marquee) to near-instant so nothing moves for users who opt out. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ---- skip link (keyboard users jump past the fixed nav) ---- */
 .skip-link { position: absolute; left: -9999px; top: 0; z-index: 60;
@@ -899,11 +915,19 @@ progress { width: 100%; }
   font-size: 0.72rem; letter-spacing: 0.26em; text-transform: uppercase;
   color: var(--accent); margin: 0 0 clamp(30px, 5vw, 54px); }
 .site-body .testimonial-list { max-width: 1320px; margin: clamp(30px,5vw,54px) auto 0;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-.site-body .testimonial { padding: 30px 28px 24px; border-radius: 14px;
-  border: 1px solid #e3dacb; }
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+.site-body .testimonial { position: relative; padding: 40px 30px 26px; border-radius: 16px;
+  border: 1px solid #e6ddce; background: var(--card);
+  box-shadow: 0 18px 40px -34px rgba(59,26,35,0.4);
+  display: flex; flex-direction: column; }
+/* Oversized editorial quotation mark anchoring each card. */
+.site-body .testimonial::before { content: "\201C"; position: absolute;
+  top: 0.06em; left: 0.34em; font-family: var(--serif); font-size: 3.4rem;
+  line-height: 1; color: var(--accent-lt); opacity: 0.55; pointer-events: none; }
 .site-body .testimonial blockquote { font-family: var(--serif); font-style: normal;
-  font-size: 1.28rem; line-height: 1.5; color: #2a241d; }
+  font-size: 1.34rem; line-height: 1.52; color: #2a241d; margin: 0 0 auto; }
+.site-body .testimonial figcaption { margin-top: 20px; padding-top: 16px;
+  border-top: 1px solid var(--line); font-size: 0.95rem; }
 
 /* ---- about strip ---- */
 .about { padding: clamp(60px, 8vw, 110px) clamp(20px, 6vw, 88px);
@@ -946,6 +970,49 @@ progress { width: 100%; }
   font-size: 1.6rem; }
 .sent-note p { margin: 0; color: var(--ink-soft); line-height: 1.6; }
 .center { text-align: center; }
+
+/* Finished-product form controls — one refined treatment for every field on the
+   marketing site so native selects/date pickers stop breaking the cream system.
+   Scoped to .site-body; the admin keeps its own field styling. */
+.site-body .stack-form input,
+.site-body .stack-form select,
+.site-body .stack-form textarea {
+  width: 100%; box-sizing: border-box; min-height: 46px;
+  padding: 0.72rem 0.9rem; border: 1px solid var(--line); border-radius: 11px;
+  background: var(--card); color: var(--ink); font: inherit; line-height: 1.4;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  -webkit-appearance: none; appearance: none;
+}
+.site-body .stack-form textarea { min-height: 128px; resize: vertical; padding-top: 0.7rem; }
+.site-body .stack-form input::placeholder,
+.site-body .stack-form textarea::placeholder { color: var(--muted); opacity: 1; }
+/* Custom dropdown chevron in place of the native arrow appearance:none removes. */
+.site-body .stack-form select {
+  padding-right: 2.4rem; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%235B554C' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0.95rem center;
+}
+.site-body .stack-form input:hover,
+.site-body .stack-form select:hover,
+.site-body .stack-form textarea:hover { border-color: #cbc0ae; }
+.site-body .stack-form input:focus,
+.site-body .stack-form select:focus,
+.site-body .stack-form textarea:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(207, 69, 44, 0.16); background: var(--bg-glow, #fffdfa);
+}
+.site-body .stack-form label { gap: 7px; font-size: 0.92rem; color: var(--ink-soft); font-weight: 500; }
+
+/* Keyboard-visible focus ring across the marketing site — accent, never the
+   browser's default blue box. Mouse clicks stay clean (:focus-visible only).
+   Form fields already get the soft box-shadow ring above, so they're excluded
+   here to avoid a doubled outline. */
+.site-body a:focus-visible,
+.site-body button:focus-visible,
+.site-body summary:focus-visible,
+.site-body [tabindex]:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px;
+}
 
 /* ---- /about — editorial intro, process, stats band ---- */
 .ab-intro { padding: clamp(120px, 16vh, 175px) clamp(20px, 6vw, 88px) 0; }
