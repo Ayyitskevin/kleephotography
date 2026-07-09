@@ -2,6 +2,7 @@
 Inquiry form emails Kevin's inbox so Odysseus inquiry_intake picks it up unchanged."""
 
 import logging
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -698,6 +699,24 @@ async def robots():
         "Disallow: /admin\nDisallow: /p/\nDisallow: /c/\nDisallow: /i/\n"
         "Allow: /\n"
         f"Sitemap: {config.BASE_URL}/sitemap.xml\n"
+    )
+
+
+@router.get("/.well-known/security.txt", response_class=PlainTextResponse)
+async def security_txt():
+    """RFC 9116 — tells security researchers where to report vulnerabilities
+    instead of leaving them to guess (or post publicly). Expires is required by
+    the RFC and must stay under a year out; rendering it live keeps the file
+    from silently going stale."""
+    contact = (
+        f"mailto:{config.CONTACT_EMAIL}" if config.CONTACT_EMAIL else f"{config.BASE_URL}/contact"
+    )
+    expires = (datetime.now(UTC) + timedelta(days=180)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return (
+        f"Contact: {contact}\n"
+        f"Expires: {expires}\n"
+        "Preferred-Languages: en\n"
+        f"Canonical: {config.BASE_URL}/.well-known/security.txt\n"
     )
 
 

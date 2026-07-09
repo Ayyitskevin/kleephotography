@@ -100,6 +100,21 @@ CSP_POLICY = "; ".join(
     )
 )
 
+# Browser features the site never uses, switched off outright so injected or
+# third-party script can't quietly reach them. fullscreen / picture-in-picture /
+# autoplay stay at their defaults — the gallery lightbox and reels rely on the
+# native <video> controls, which need them.
+PERMISSIONS_POLICY = ", ".join(
+    (
+        "camera=()",
+        "microphone=()",
+        "geolocation=()",
+        "payment=()",  # Stripe runs on stripe.com via redirect, never on-origin
+        "usb=()",
+        "browsing-topics=()",
+    )
+)
+
 
 @app.middleware("http")
 async def rate_limit(request: Request, call_next):
@@ -127,6 +142,7 @@ async def common_headers(request: Request, call_next):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "same-origin"
     resp.headers["Content-Security-Policy"] = CSP_POLICY
+    resp.headers["Permissions-Policy"] = PERMISSIONS_POLICY
     # HSTS only when we know we're served over TLS (same signal as Secure
     # cookies) — sending it for a plain-http dev origin would wrongly pin
     # localhost to https. Start with a reversible five-minute policy; longer
