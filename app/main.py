@@ -129,9 +129,10 @@ async def common_headers(request: Request, call_next):
     resp.headers["Content-Security-Policy"] = CSP_POLICY
     # HSTS only when we know we're served over TLS (same signal as Secure
     # cookies) — sending it for a plain-http dev origin would wrongly pin
-    # localhost to https. 2 years + subdomains; no preload (opt in separately).
+    # localhost to https. Start with a reversible five-minute policy; longer
+    # retention and subdomain coverage require a separate TLS inventory.
     if config.COOKIE_SECURE:
-        resp.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        resp.headers["Strict-Transport-Security"] = "max-age=300"
     # Static assets are safe to cache forever: every /static URL carries a
     # content-derived ?v={{ static_rev }} buster (see app/render.py), so a file
     # change changes the URL. Without this the ~300KB stylesheet + fonts + JS
