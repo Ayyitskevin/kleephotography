@@ -16,63 +16,66 @@
 <main class="admin-main">
 
     {% set _cur = statuses.index(p.status) if p.status in statuses else -1 %}
-    <header class="project-head">
-      <div class="ph-top">
-        <div>
-          <div class="ph-client">
-            <a href="/admin/studio/clients/{{ p.client_id }}">{{ p.client_name }}</a>
-          </div>
-        </div>
-        <span class="badge is-{{ p.status }}">{{ p.status }}</span>
-      </div>
+    {% set stage_label = {"inquiry_received": "Inquiry", "consultation_call": "Intro call",
+        "proposal_sent": "Proposal", "contract_signed": "Contract", "retainer_paid": "Retainer",
+        "session_planning": "Shoot", "project_closed": "Gallery", "archived": "Archived"} %}
+    {% set _gal = (galleries | selectattr('id', 'equalto', p.gallery_id) | first) if p.gallery_id else none %}
+    {% set _prop = proposals | first %}
+    {% set _ct = contracts | first %}
+    {% set _inv = invoices | first %}
+    {% set inv_total = invoices | sum(attribute='total_cents') %}
+    {% set in_play = inv_total or (_prop.total_cents if _prop else 0) %}
 
-      {% set _gal = (galleries | selectattr('id', 'equalto', p.gallery_id) | first) if p.gallery_id else none %}
-      <div class="ph-meta">
-        <div class="ph-fact"><span class="k">Client</span><span class="v">{{ p.client_name }}</span></div>
-        <div class="ph-fact"><span class="k">Shoot date</span><span class="v">{{ p.shoot_date or '—' }}</span></div>
-        <div class="ph-fact"><span class="k">Gallery</span><span class="v">{{ _gal.title if _gal else '—' }}</span></div>
-        <div class="ph-fact"><span class="k">Stage</span><span class="v">{{ p.status }}</span></div>
-      </div>
-
-      <div class="pipeline" aria-label="Project stage">
-        {% for s in statuses %}
-        <div class="step {% if loop.index0 < _cur %}done{% elif loop.index0 == _cur %}current{% endif %}">
-          <span class="bar"></span><span class="lbl">{{ s }}</span>
+    {# ── The Room header — who, where it stands, what it's worth, one nudge ── #}
+    <header class="room-head">
+      <span class="room-avatar" aria-hidden="true">{{ ((p.company or p.client_name or "?").split()[:2] | map('first') | join('')) | upper }}</span>
+      <div class="room-id">
+        <div class="room-title">
+          <h2>{{ p.company or p.client_name }} — {{ p.title }}</h2>
+          <span class="room-pill">{{ stage_label.get(p.status, p.status) }}</span>
         </div>
-        {% endfor %}
+        <p class="room-sub">{{ p.client_name }}{% if p.client_email %} · {{ p.client_email }}{% endif %}{% if p.shoot_date %} · shoot {{ p.shoot_date }}{% endif %}{% if _gal %} · {{ _gal.title }}{% endif %}</p>
       </div>
+      <div class="room-money">
+        {% if in_play %}<b>${{ in_play|usd0 }}</b><span>in play</span>{% endif %}
+      </div>
+      {% if _prop and _prop.status in ('sent', 'viewed') %}
+      <a class="room-cta" href="/admin/studio/proposals/{{ _prop.id }}">Nudge proposal &rarr;</a>
+      {% elif _ct and _ct.status in ('sent', 'viewed') %}
+      <a class="room-cta" href="/admin/studio/contracts/{{ _ct.id }}">Nudge contract &rarr;</a>
+      {% elif _inv and _inv.status in ('sent', 'viewed') %}
+      <a class="room-cta" href="/admin/studio/invoices/{{ _inv.id }}">Nudge invoice &rarr;</a>
+      {% endif %}
     </header>
 
-    <div class="project-grid">
+    {# ── Journey timeline — where this project stands, with real dates ── #}
+    <div class="room-journey" aria-label="Project journey">
+      {% set subs = {
+        0: (p.created_at[:10] if p.created_at else ""),
+        1: "",
+        2: (_prop.status if _prop else "on inquiry"),
+        3: (_ct.status if _ct else "on acceptance"),
+        4: ("$" + (_inv.deposit_cents|usd0) if _inv and _inv.deposit_cents else ""),
+        5: (p.shoot_date or "not set"),
+        6: (_gal.title if _gal else "same week")
+      } %}
+      {% for s in statuses[:7] %}
+      <div class="room-step">
+        <div class="room-node">
+          <span class="room-dot{% if loop.index0 < _cur %} is-done{% elif loop.index0 == _cur %} is-now{% endif %}">
+            {%- if loop.index0 < _cur %}&#10003;{% elif loop.index0 == _cur %}&#9679;{% endif -%}
+          </span>
+          <span class="room-lbl{% if loop.index0 == _cur %} is-now{% endif %}">{{ stage_label.get(s, s) }}</span>
+          {% if subs.get(loop.index0) %}<span class="room-sublbl">{{ subs[loop.index0] }}</span>{% endif %}
+        </div>
+        {% if not loop.last %}<span class="room-line{% if loop.index0 < _cur %} is-done{% endif %}" aria-hidden="true"></span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
 
-      <div class="project-main lead-stack">
+    <div class="room-grid">
 
-        <section class="panel">
-          <div class="panel-head"><h2>Project details</h2></div>
-          <form method="post" action="/admin/studio/projects/{{ p.id }}" class="stack-form">
-            <label>Title <input type="text" name="title" value="{{ p.title }}" required></label>
-            <label>Status
-              <select name="status">
-                {% for s in statuses %}
-                <option value="{{ s }}" {% if p.status == s %}selected{% endif %}>{{ s }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>Gallery
-              <select name="gallery_id">
-                <option value="">— none —</option>
-                {% for g in galleries %}
-                <option value="{{ g.id }}" {% if p.gallery_id == g.id %}selected{% endif %}>{{ g.title }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>Shoot date <input type="date" name="shoot_date" value="{{ p.shoot_date or '' }}"></label>
-            <label>Notion page ID <input type="text" name="notion_page_id"
-                   value="{{ p.notion_page_id or '' }}" placeholder="for Sessions sync (optional)"></label>
-            <label>Notes <textarea name="notes" rows="3">{{ p.notes or '' }}</textarea></label>
-            <div><button type="submit" class="primary">Save</button></div>
-          </form>
-        </section>
+      <div class="room-col room-col-docs">
 
         <section class="panel">
           <div class="panel-head">
@@ -207,6 +210,33 @@
           {% else %}<p class="muted">No recurring plans — add one for a monthly retainer client.</p>{% endif %}
         </section>
 
+      </div>
+
+      <div class="room-col room-col-mid">
+
+        {# ── Proposal engagement — narrated from timestamps that already exist ── #}
+        <section class="panel room-engage">
+          <div class="panel-head"><h2>Engagement</h2></div>
+          {% if _prop and _prop.status != 'draft' %}
+          <p class="room-engage-copy">
+            <b>{{ _prop.title }}</b> went out{% if _prop.sent_at %} {{ _prop.sent_at[:10] }}{% endif %}
+            {%- if _prop.status == 'viewed' %} and <b>has been opened</b>{% if _prop.viewed_at %} (last {{ _prop.viewed_at[:16] }}){% endif %} — no answer yet.
+            <span class="room-engage-now">They're deciding — a nudge lands well now.</span>
+            {%- elif _prop.status == 'accepted' %} and <b>was accepted</b>{% if _prop.accepted_at %} {{ _prop.accepted_at[:10] }}{% endif %}.
+            {%- elif _prop.status == 'declined' %} and was declined.
+            {%- else %} — <b>not opened yet</b>.{% endif %}
+          </p>
+          {% elif _ct or _inv %}
+          <p class="room-engage-copy">
+            {%- if _ct %}Contract <b>{{ _ct.status }}</b>{% if _ct.signer_name %} — signed by {{ _ct.signer_name }}{% endif %}.{% endif %}
+            {% if _inv %} Latest invoice <b>{{ _inv.status }}</b>{% if _inv.paid_at %} · paid {{ _inv.paid_at[:10] }}{% endif %}.{% endif %}
+          </p>
+          {% else %}
+          <p class="muted">Nothing sent yet — engagement lands here once a proposal,
+            contract, or invoice goes out.</p>
+          {% endif %}
+        </section>
+
         <section class="panel">
           <div class="panel-head">
             <h2>Shot list <span class="muted">{{ shots|length }} shot{{ "s" if shots|length != 1 }}</span></h2>
@@ -321,7 +351,36 @@
 
       </div>
 
-      <aside class="project-rail">
+      <aside class="room-col project-rail">
+
+        <section class="panel room-settings">
+          <details>
+          <summary><h2>Project settings</h2></summary>
+          <form method="post" action="/admin/studio/projects/{{ p.id }}" class="stack-form">
+            <label>Title <input type="text" name="title" value="{{ p.title }}" required></label>
+            <label>Status
+              <select name="status">
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if p.status == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Gallery
+              <select name="gallery_id">
+                <option value="">— none —</option>
+                {% for g in galleries %}
+                <option value="{{ g.id }}" {% if p.gallery_id == g.id %}selected{% endif %}>{{ g.title }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Shoot date <input type="date" name="shoot_date" value="{{ p.shoot_date or '' }}"></label>
+            <label>Notion page ID <input type="text" name="notion_page_id"
+                   value="{{ p.notion_page_id or '' }}" placeholder="for Sessions sync (optional)"></label>
+            <label>Notes <textarea name="notes" rows="3">{{ p.notes or '' }}</textarea></label>
+            <div><button type="submit" class="primary">Save</button></div>
+          </form>
+          </details>
+        </section>
 
         <div class="ws-admin">
           {% if p.workspace_published %}
