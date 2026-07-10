@@ -7110,3 +7110,59 @@ html[data-theme="dark"] .admin-shell .pb-fill,
 html[data-theme="dark"] .admin-shell .gx-card-nocover { color: var(--ink-soft); }
 html[data-theme="dark"] .admin-shell .pipeline-money { color: var(--terra); }
 html[data-theme="dark"] .admin-shell .fin-card-ok .fin-card-val { color: #5fbf93; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   19. ADMIN FORM SYSTEM — bring the long-tail entry forms into the card system.
+   The revamp carded the dashboard/KPI/financials pages (.fin-form-card / .fin-form)
+   but left the utility forms on .stack-form: a bare 420px flex column floating on
+   the canvas with row-packed labels and an unstyled button — reads as pre-revamp.
+   This generalises the .fin-form-card treatment to every admin .stack-form, so
+   press / email-templates / playbook / forms / client / project / license /
+   contract / proposal / recurring / testimonials all read as one system. Themed
+   vars only → one rule set serves BOTH light and dark (inputs already flip dark
+   via the global §admin input rule). Scoped .admin-shell so the public
+   .site-body .stack-form (contact/booking forms) is untouched.
+   ════════════════════════════════════════════════════════════════════════════ */
+.admin-shell .stack-form {
+  max-width: 640px; gap: 13px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 20px 22px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,.04));
+}
+/* labels → the system's stacked uppercase eyebrow (matches .fin-form label) */
+.admin-shell .stack-form > label,
+.admin-shell .stack-form .form-row > label {
+  display: flex; flex-direction: column; align-items: stretch; gap: 5px;
+  font: 600 .72rem/1.35 var(--font-ui); letter-spacing: .02em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+/* checkbox / inline rows stay horizontal + sentence-case */
+.admin-shell .stack-form label.row {
+  flex-direction: row; align-items: center; gap: 9px;
+  text-transform: none; font-weight: 500; font-size: .82rem;
+  color: var(--ink-soft); letter-spacing: 0;
+}
+.admin-shell .stack-form label.row input { flex: none; }
+/* inputs pick up the system field styling (dark handled globally) */
+.admin-shell .stack-form input,
+.admin-shell .stack-form select,
+.admin-shell .stack-form textarea {
+  border-radius: 9px; padding: 9px 11px; border: 1px solid var(--line);
+}
+/* two-up rows → an even grid instead of the old space-between flex */
+.admin-shell .stack-form .form-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 13px; align-items: start;
+}
+/* the primary submit → the system's forest pill; leave .link / .danger alone
+   (edit forms carry a Save + a Delete link side by side) */
+.admin-shell .stack-form button[type="submit"]:not(.link):not(.danger) {
+  align-self: flex-start; margin-top: 4px; cursor: pointer;
+  padding: .72em 1.3em; border: 0; border-radius: 999px;
+  background: var(--terra-deep); color: #F3F0E2;
+  font: 600 .82rem/1 var(--font-ui);
+}
+.admin-shell .stack-form button[type="submit"]:not(.link):not(.danger):hover {
+  background: var(--terra, #1C4A3A);
+}
+/* edit forms nest a Save+Delete inline row — keep it a row, not stretched */
+.admin-shell .stack-form .inline-form { display: flex; gap: 12px; align-items: center; }
