@@ -1,28 +1,32 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Home · Mise{% endblock %}
 {#
-  Home dashboard — redesign.
-  Drop-in replacement for the previous templates/admin/home.html. Same route,
-  same context object — every variable used here is already produced by the
-  existing home handler (greeting, today_str, kpi, new_inquiries, upcoming_n,
-  outstanding, overdue_inv, revenue, next_steps, horizon_shoots, pipeline,
-  leads, recent_paid, activity_24h).
-
-  Two small, optional context additions are noted inline with  {# +route #}:
-    • horizon_shoots[i].day / .mon  — short date parts for the date chip
-      (derive from the shoot datetime the handler already has).
-    • pipeline[i].value             — formatted $ sum for the stage (optional;
-      falls back to the project count when absent).
-  Styles live in static/mise.css under the `.dash` / `.dash-*` rules.
+  Home dashboard — Admin v4 information design (Fable 5 Revamp PR 4).
+  Same route, same handler; context additions are read-only reshapes
+  (queue, oldest_wait_days, recent_galleries, revenue_months). Every action
+  posts to an endpoint that already existed. Styles: .admin-shell .dash-* /
+  .v4-* rules in static/mise.css.
 #}
-{# Dashboard owns its top bar — the prototype's strict-1:1 sticky chrome
-   (greeting+date · inline search · Sign out · oxblood +New). Overriding the
-   `topbar` block suppresses the shared _topbar so there's a single bar. #}
 {% block topbar %}
-<header class="admin-topbar dash-top">
+<header class="admin-topbar dash-top v4-hero">
   <div class="dash-top-lead">
+    <p class="v4-eyebrow">{{ today_str }}</p>
     <h1>{{ greeting }}, Kevin</h1>
-    <p>{{ today_str }}</p>
+    <p class="v4-summary">
+      {% if queue %}
+        <b>{{ queue|length }} inquir{{ "ies are" if queue|length != 1 else "y is" }} waiting on a reply</b>
+        — the oldest for {{ oldest_wait_days }} day{{ "s" if oldest_wait_days != 1 }}.
+      {% endif %}
+      {% if upcoming_n %}
+        {{ upcoming_n }} shoot{{ "s" if upcoming_n != 1 }} inside 14 days.
+      {% elif outstanding.cents %}
+        ${{ "%.0f" % (outstanding.cents / 100) }} is out across {{ outstanding.n }} invoice{{ "s" if outstanding.n != 1 }}.
+      {% elif queue %}
+        Nothing is booked and nothing is owed: today is a <span class="v4-sell">selling day</span>.
+      {% else %}
+        Inbox clear, nothing owed — a rare quiet morning.
+      {% endif %}
+    </p>
   </div>
   <form class="dash-search" method="get" action="/admin/search" role="search">
     <span class="dash-search-ic" aria-hidden="true">&#8981;</span>
@@ -66,45 +70,13 @@
 {% block admin_body %}
 <main class="admin-main dash">
 
-  {# ── KPI strip ──────────────────────────────────────────────────────── #}
-  <section class="dash-kpis" aria-label="At a glance">
-    <a class="dash-kpi" href="/admin/inbox">
-      <span class="dash-kpi-label">New inquiries</span>
-      <span class="dash-kpi-n">{{ new_inquiries }}</span>
-      {% set d = kpi.inquiries_delta %}
-      <span class="dash-kpi-trend {{ 'up' if d > 0 else 'warn' if d < 0 else 'hold' }}">
-        {% if d > 0 %}&#9650; {{ d }}{% elif d < 0 %}&#9660; {{ -d }}{% else %}&#8226; 0{% endif %}
-        <span class="cap">vs last wk</span></span>
-    </a>
-    <a class="dash-kpi" href="/admin/studio#projects">
-      <span class="dash-kpi-label">Shoots · 14 days</span>
-      <span class="dash-kpi-n">{{ upcoming_n }}</span>
-      {% set d = kpi.bookings_delta %}
-      <span class="dash-kpi-trend {{ 'up' if d > 0 else 'warn' if d < 0 else 'hold' }}">
-        {% if d > 0 %}&#9650; {{ d }}{% elif d < 0 %}&#9660; {{ -d }}{% else %}&#8226; 0{% endif %}
-        <span class="cap">booked</span></span>
-    </a>
-    <a class="dash-kpi" href="/admin/studio">
-      <span class="dash-kpi-label">Outstanding</span>
-      <span class="dash-kpi-n">${{ "%.0f" % (outstanding.cents / 100) }}</span>
-      <span class="dash-kpi-trend {{ 'warn' if overdue_inv else 'hold' }}">
-        {{ outstanding.n }} open<span class="cap">{% if overdue_inv %} · {{ overdue_inv }} overdue{% else %} · none overdue{% endif %}</span></span>
-    </a>
-    <a class="dash-kpi" href="/admin/studio">
-      <span class="dash-kpi-label">Collected · {{ revenue.month_label }}</span>
-      <span class="dash-kpi-n">${{ "%.0f" % (revenue.paid_cents / 100 / 1000) if revenue.paid_cents >= 100000 else "%.0f" % (revenue.paid_cents / 100) }}{{ "k" if revenue.paid_cents >= 100000 }}</span>
-      <span class="dash-kpi-trend hold">
-        {% if revenue.goal_cents %}{{ revenue.goal_pct }}%<span class="cap"> of goal</span>{% else %}{{ revenue.paid_n }} paid{% endif %}</span>
-    </a>
-  </section>
-
-  {# Orphan galleries — published with no studio client (re-homed from the
-     galleries dashboard in the strict-1:1 rebuild). One-click re-link picker. #}
+  {# Orphan galleries — published with no studio client. One-click re-link. #}
   {% if orphans %}
-  <section class="unlinked-warn" aria-label="Published galleries with no client">
+  <section class="unlinked-warn v4-alert" aria-label="Published galleries with no client">
+    <span class="v4-alert-ic" aria-hidden="true">!</span>
     <p class="unlinked-warn-head">
       <strong>{{ orphans|length }} published galler{{ "ies" if orphans|length != 1 else "y" }}
-      {{ "have" if orphans|length != 1 else "has" }} no client linked</strong> — re-link so the booking, proposal and invoice context isn&rsquo;t lost.
+      {{ "have" if orphans|length != 1 else "has" }} no client linked</strong> — link {{ "them" if orphans|length != 1 else "it" }} so booking, proposal and invoice context isn&rsquo;t lost.
     </p>
     <ul class="unlinked-warn-list">
       {% for o in orphans %}
@@ -124,12 +96,174 @@
   </section>
   {% endif %}
 
+  {# ── Reply queue — inquiries as actionable rows, oldest first ─────────── #}
+  <section class="dash-panel v4-queue" aria-label="Action queue">
+    <div class="dash-panel-head">
+      <h2>Reply queue</h2>
+      {% if queue %}<span class="count">{{ queue|length }} waiting · oldest {{ oldest_wait_days }}d</span>{% endif %}
+    </div>
+    {% if queue %}
+    {% for q in queue %}
+    <div class="v4-qrow">
+      <span class="v4-avatar{% if loop.first %} is-oldest{% endif %}">{{ q.initials }}</span>
+      <div class="v4-qbody">
+        <div class="v4-qname">
+          <b>{{ q.name }}</b>
+          <span class="v4-age {{ 'is-red' if q.age_days >= 21 else 'is-amber' }}">waiting {{ q.age_days }} day{{ "s" if q.age_days != 1 }}</span>
+        </div>
+        <div class="v4-qcontext">{{ q.context }}</div>
+      </div>
+      <div class="v4-qactions">
+        <a class="v4-btn-solid" href="/admin/inbox?sel={{ q.id }}">Reply</a>
+        <a class="v4-btn-ghost" href="/admin/inbox?sel={{ q.id }}">{{ q.second }}</a>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}<p class="dash-empty">Inbox clear — nobody is waiting on you.</p>{% endif %}
+  </section>
+
   <div class="dash-grid">
 
-    {# ── LEFT column: run the day ─────────────────────────────────────── #}
+    {# ── LEFT column ──────────────────────────────────────────────────── #}
     <div class="dash-col">
 
-      {# Needs you today — the app's own next-step engine #}
+      {# Pipeline — proportional funnel #}
+      <section class="dash-panel" aria-label="Pipeline">
+        <div class="dash-panel-head">
+          <h2>Pipeline</h2>
+          <a class="link" href="/admin/studio">Studio board &rarr;</a>
+        </div>
+        {% set live_stages = pipeline | selectattr("n") | list %}
+        {% if not live_stages and queue %}
+        <p class="v4-pipeline-note">Nothing in play yet this month — <b>your
+          {{ queue|length }} inquir{{ "ies are" if queue|length != 1 else "y is" }} the pipeline.</b>
+          Convert one to start the funnel.</p>
+        {% endif %}
+        <div class="v4-funnel" role="img" aria-label="Pipeline stages">
+          {% if queue %}<span class="v4-fcell is-in" style="flex: {{ [queue|length, 2]|max }};">{{ queue|length }} inquir{{ "ies" if queue|length != 1 else "y" }}</span>{% endif %}
+          {% if live_stages %}
+            {% for s in live_stages %}
+            <span class="v4-fcell is-live" style="flex: {{ [s.n, 2]|max }};">{{ s.n }} {{ s.label|lower }}</span>
+            {% endfor %}
+          {% else %}
+            <span class="v4-fcell is-hatch" style="flex: 5;">consult &rarr; proposal &rarr; contract &rarr; retainer</span>
+          {% endif %}
+        </div>
+        <div class="v4-actions">
+          {% if queue %}<a class="v4-btn-gold" href="/admin/inbox?sel={{ queue[0].id }}">Convert {{ queue[0].name }} &rarr;</a>{% endif %}
+          <a class="v4-btn-ghost" href="/admin/studio">Draft a proposal</a>
+          <a class="v4-btn-ghost" href="/admin/studio#clients">+ New project</a>
+        </div>
+      </section>
+
+      {# Schedule — empty state first-class #}
+      <section class="dash-panel" aria-label="Schedule">
+        <div class="dash-panel-head">
+          <h2>Schedule</h2>
+          <div class="dash-horizon" role="group" aria-label="Time horizon">
+            <button type="button" class="is-active" data-h="7">7 days</button>
+            <button type="button" data-h="0">Today</button>
+            <button type="button" data-h="1">Tomorrow</button>
+          </div>
+        </div>
+        {% if horizon_shoots %}
+        <ul class="dash-sched" id="dash-schedule">
+          {% for u in horizon_shoots %}
+          <li data-days="{{ u.days_out }}">
+            <div class="dash-date">
+              <div class="d">{{ u.day if u.day is defined else u.shoot_date[8:10] }}</div>
+              <div class="m">{{ u.mon if u.mon is defined else "" }}</div>
+            </div>
+            <div class="dash-sched-body{% if u.days_out == 0 %} is-today{% endif %}">
+              <div class="dash-sched-title"><a href="/admin/studio/projects/{{ u.id }}">{{ u.title }}</a></div>
+              <div class="dash-sched-client">{{ u.client_name }}{% if u.company %} · {{ u.company }}{% endif %}</div>
+            </div>
+            {% if u.time %}<span class="dash-sched-time">{{ u.time }}</span>{% endif %}
+            <span class="dash-sched-when{% if u.days_out == 0 %} is-today{% endif %}">
+              {% if u.days_out == 0 %}today{% elif u.days_out == 1 %}tomorrow{% else %}in {{ u.days_out }}d{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="dash-empty" id="dash-schedule-empty" hidden>Nothing in this window.</p>
+        {% else %}
+        <div class="v4-empty">
+          <span class="v4-empty-ic" aria-hidden="true">&#9711;</span>
+          <div class="v4-empty-body">
+            <b>An open week{% if queue %} — rare{% endif %}.</b>
+            <p>Nothing booked in the next 7 days.{% if queue %} Pencil a date for one of the
+              {{ queue|length }} open inquir{{ "ies" if queue|length != 1 else "y" }}, or block a personal-work day.{% else %} Block a personal-work day, or go find the next menu.{% endif %}</p>
+          </div>
+          <a class="v4-btn-solid" href="/admin/scheduling">Hold a date</a>
+        </div>
+        {% endif %}
+      </section>
+
+      {# Galleries — Pixieset-style covers #}
+      <section class="dash-panel" aria-label="Recent galleries">
+        <div class="dash-panel-head">
+          <h2>Galleries</h2>
+          <span class="count"><a class="link" href="/admin/galleries">library &rarr;</a></span>
+        </div>
+        <div class="v4-galgrid">
+          {% for g in recent_galleries %}
+          <a class="v4-galcard" href="/admin/galleries/{{ g.id }}">
+            <span class="v4-galcover">
+              {% if g.cover_id %}<img src="/admin/thumb/{{ g.id }}/{{ g.cover_id }}" loading="lazy" alt="">{% endif %}
+              <i class="v4-galchip {{ 'is-live' if g.published else 'is-draft' }}">{{ "Live" if g.published else "Draft" }}</i>
+            </span>
+            <span class="v4-galcap">
+              <b>{{ g.title }}</b>
+              <small>{{ g.client_company or g.client_name or "no client" }} · {{ g.n_assets }} photo{{ "s" if g.n_assets != 1 }}</small>
+            </span>
+          </a>
+          {% endfor %}
+          <a class="v4-galnew" href="/admin/galleries">
+            <b aria-hidden="true">+</b> New gallery
+            <small>drag photos to start</small>
+          </a>
+        </div>
+      </section>
+    </div>
+
+    {# ── RIGHT column ─────────────────────────────────────────────────── #}
+    <div class="dash-col">
+
+      {# Month money — dark feature card with trailing bars #}
+      <section class="dash-money v4-money" aria-label="Revenue this month">
+        <div class="dash-panel-head">
+          <h2>{{ revenue.month_label }} money</h2>
+          {% if revenue.goal_cents %}<span class="v4-goal">goal ${{ "{:,.0f}".format(revenue.goal_cents / 100) }}</span>{% endif %}
+        </div>
+        <p class="v4-fig">${{ "{:,.0f}".format(revenue.paid_cents / 100) }}
+          <span>collected so far</span></p>
+        <div class="v4-chart" role="img" aria-label="Collected by month, trailing six months">
+          {% for m in revenue_months %}
+          <div class="v4-month">
+            <div class="v4-bar{% if m.current %} is-current{% endif %}" style="height: {{ 100 if m.current and not m.cents else m.pct }}%;"></div>
+            <span class="v4-mlabel{% if m.current %} is-current{% endif %}">{{ m.label }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="v4-money-foot">
+          <p>{% if outstanding.cents %}${{ "%.0f" % (outstanding.cents / 100) }} out across
+            {{ outstanding.n }} invoice{{ "s" if outstanding.n != 1 }}{% if overdue_inv %} · {{ overdue_inv }} overdue{% endif %}.
+            {% else %}No invoices out. The month is young &mdash;{% endif %}</p>
+          <a class="v4-btn-gold" href="/admin/studio#invoices">Draft invoice &rarr;</a>
+        </div>
+        {% if recent_paid %}
+        <div class="dash-money-paid">
+          <span class="lead">Recently paid</span>
+          {% for i in recent_paid %}
+          <div class="dash-paid-row">
+            <a href="/admin/studio/invoices/{{ i.id }}">{{ i.company or i.client_name }}</a>
+            <span class="dash-paid-amt">${{ "%.0f" % (i.total_cents / 100) }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </section>
+
+      {# Needs you today — the app's next-step engine #}
       <section class="dash-panel" aria-label="Needs you today">
         <div class="dash-panel-head">
           <h2>Needs you today</h2>
@@ -159,124 +293,11 @@
         {% else %}<p class="dash-empty">You're all caught up.</p>{% endif %}
       </section>
 
-      {# Schedule #}
-      <section class="dash-panel" aria-label="Schedule">
-        <div class="dash-panel-head">
-          <h2>Schedule</h2>
-          <div class="dash-horizon" role="group" aria-label="Time horizon">
-            <button type="button" class="is-active" data-h="7">7 days</button>
-            <button type="button" data-h="0">Today</button>
-            <button type="button" data-h="1">Tomorrow</button>
-          </div>
-        </div>
-        {% if horizon_shoots %}
-        <ul class="dash-sched" id="dash-schedule">
-          {% for u in horizon_shoots %}
-          <li data-days="{{ u.days_out }}">
-            <div class="dash-date">
-              <div class="d">{{ u.day if u.day is defined else u.shoot_date[8:10] }}</div>{# +route: u.day #}
-              <div class="m">{{ u.mon if u.mon is defined else "" }}</div>{# +route: u.mon #}
-            </div>
-            <div class="dash-sched-body{% if u.days_out == 0 %} is-today{% endif %}">
-              <div class="dash-sched-title"><a href="/admin/studio/projects/{{ u.id }}">{{ u.title }}</a></div>
-              <div class="dash-sched-client">{{ u.client_name }}{% if u.company %} · {{ u.company }}{% endif %}</div>
-            </div>
-            {% if u.time %}<span class="dash-sched-time">{{ u.time }}</span>{% endif %}
-            <span class="dash-sched-when{% if u.days_out == 0 %} is-today{% endif %}">
-              {% if u.days_out == 0 %}today{% elif u.days_out == 1 %}tomorrow{% else %}in {{ u.days_out }}d{% endif %}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        <p class="dash-empty" id="dash-schedule-empty" hidden>Nothing in this window.</p>
-        {% else %}<p class="dash-empty">Nothing in the next 7 days. Add a shoot date on a project.</p>{% endif %}
-      </section>
-
-      {# Pipeline #}
-      <section class="dash-panel" aria-label="Pipeline">
-        <div class="dash-panel-head">
-          <h2>Pipeline</h2>
-          <a class="link" href="/admin/studio">Studio &rarr;</a>
-        </div>
-        {% set stage_colors = {
-          'Inquiry':   'var(--dash-inquiry)',
-          'Consult':   'var(--dash-consult)',
-          'Proposal':  'var(--dash-proposal)',
-          'Contract':  'var(--dash-contract)',
-          'Retainer':  'var(--dash-retainer)',
-          'Planning':  'var(--dash-planning)',
-          'Closed':    'var(--dash-closed)',
-          'Archived':  'var(--dash-archived)'
-        } %}
-        <div class="dash-stages">
-          {% for s in pipeline %}
-          {% set c = stage_colors.get(s.label, 'var(--neutral)') %}
-          <a class="dash-stage" href="/admin/studio" style="border-left-color: {{ c }};">
-            <span class="dash-stage-label" style="color: {{ c }};">{{ s.label }}</span>
-            <span class="dash-stage-row">
-              <span class="dash-stage-n">{{ s.n }}</span>
-              <span class="dash-stage-val">{{ s.value if s.value is defined else (s.projects|length ~ " open" if s.projects else "—") }}</span>
-            </span>
-          </a>
-          {% endfor %}
-        </div>
-      </section>
-    </div>
-
-    {# ── RIGHT column: money & signals ────────────────────────────────── #}
-    <div class="dash-col">
-
-      {# Revenue #}
-      <section class="dash-money" aria-label="Revenue this month">
-        <div class="dash-panel-head">
-          <h2>{{ revenue.month_label }} revenue</h2>
-          {% if revenue.goal_cents %}<span class="pct">{{ revenue.goal_pct }}% of goal</span>{% endif %}
-        </div>
-        <div class="dash-money-body">
-          {% set pct = revenue.goal_pct if revenue.goal_cents else 100 %}
-          {% set dash = 326.7 %}
-          <div class="dash-ring">
-            <svg viewBox="0 0 120 120" aria-hidden="true">
-              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(243,234,217,.14)" stroke-width="12"></circle>
-              <circle cx="60" cy="60" r="52" fill="none" stroke="var(--dash-gold)" stroke-width="12"
-                      stroke-linecap="round" stroke-dasharray="{{ dash }}"
-                      stroke-dashoffset="{{ "%.1f" % (dash * (1 - pct / 100)) }}"></circle>
-            </svg>
-            <div class="dash-ring-c">
-              <span class="dash-ring-n">${{ "%.1f" % (revenue.paid_cents / 100 / 1000) }}k</span>
-              <span class="dash-ring-cap">collected</span>
-            </div>
-          </div>
-          <div class="dash-money-figs">
-            <div>
-              <div class="dash-fig-n">${{ "%.0f" % (revenue.outstanding_cents / 100) }}</div>
-              <div class="dash-fig-cap">outstanding · {{ outstanding.n }} open</div>
-            </div>
-            {% if revenue.goal_cents %}
-            <div>
-              <div class="dash-fig-n">${{ "%.0f" % (revenue.goal_cents / 100) }}</div>
-              <div class="dash-fig-cap">monthly goal</div>
-            </div>
-            {% endif %}
-          </div>
-        </div>
-        {% if recent_paid %}
-        <div class="dash-money-paid">
-          <span class="lead">Recently paid</span>
-          {% for i in recent_paid %}
-          <div class="dash-paid-row">
-            <a href="/admin/studio/invoices/{{ i.id }}">{{ i.company or i.client_name }}</a>
-            <span class="dash-paid-amt">${{ "%.0f" % (i.total_cents / 100) }}</span>
-          </div>
-          {% endfor %}
-        </div>
-        {% endif %}
-      </section>
-
-      {# Leads #}
+      {# New leads — compact recency view #}
       <section class="dash-panel" aria-label="New leads">
         <div class="dash-panel-head">
           <h2>New leads</h2>
-          <a class="link" href="/admin/inbox">Inquiries &rarr;</a>
+          <a class="link" href="/admin/inbox">Inbox &rarr;</a>
         </div>
         {% if leads %}
         <ul class="dash-leads">
@@ -285,7 +306,7 @@
             <span class="dash-avatar">{{ (l.name[:2]) | upper }}</span>
             <div class="dash-lead-body">
               <div class="dash-lead-name">{{ l.name }}</div>
-              <div class="dash-lead-biz">{{ l.business or l.email }}</div>
+              <div class="dash-lead-biz">{{ l.business or l.email or l.phone }}</div>
             </div>
             {% if l.kind == "booking" %}<span class="dash-pill">Booking</span>{% endif %}
             <span class="dash-ago">{{ l.created_at[:10] }}</span>
@@ -295,13 +316,13 @@
         {% else %}<p class="dash-empty">No open inquiries.</p>{% endif %}
       </section>
 
-      {# Activity #}
+      {# Activity — single-line strip when quiet, feed when not #}
+      {% if activity_24h %}
       <section class="dash-panel" aria-label="Recent activity">
         <div class="dash-panel-head">
           <h2>Activity</h2>
           <a class="link" href="/admin/today">Today &rarr;</a>
         </div>
-        {% if activity_24h %}
         <ul class="dash-activity">
           {% for a in activity_24h %}
           {% set adot = {'paid':'var(--ok)','viewed':'var(--honey)','booking':'var(--clay)'}.get(a.kind, 'var(--neutral)') %}
@@ -312,8 +333,15 @@
           </li>
           {% endfor %}
         </ul>
-        {% else %}<p class="dash-empty">Nothing in the last 24 hours.</p>{% endif %}
       </section>
+      {% else %}
+      <section class="v4-activity-strip" aria-label="Activity">
+        <span class="v4-idle-dot" aria-hidden="true"></span>
+        <p>Quiet for 24 hours — activity lands here the moment a client opens a
+           gallery, pays, or books.</p>
+        <a class="link" href="/admin/today">Today &rarr;</a>
+      </section>
+      {% endif %}
     </div>
   </div>
 

@@ -526,6 +526,7 @@ def _studio_context(request: Request) -> dict:
     return {
         "statuses": PROJECT_STATUSES,
         "stale_days": STALE_DAYS,
+        "intel": _ctx_intel(),
         **_ctx_pipeline(today_iso),
         "outstanding": common.open_invoice_balance(),
         **_ctx_inquiries(),
@@ -539,6 +540,49 @@ def _studio_context(request: Request) -> dict:
         "content_due": _ctx_content_due(today),
         "press_confirm": _ctx_press_confirm(),
     }
+
+
+def _ctx_intel() -> dict:
+    """Per-project intel line for the board cards — the latest thing a client
+    did (or hasn't done) with this project's documents, composed from
+    timestamps that already exist. Later lifecycle stages override earlier
+    ones. Read-only; the card's one-tap next action navigates to the project
+    page where the real (form-posted) action lives."""
+    intel: dict = {}
+    for r in db.all_(
+        "SELECT project_id, status FROM proposals WHERE status IN ('sent','viewed','accepted')"
+    ):
+        intel[r["project_id"]] = {
+            "sent": {"text": "Proposal out — not opened yet", "tone": "muted", "act": "Follow up"},
+            "viewed": {
+                "text": "Proposal opened — awaiting answer",
+                "tone": "gold",
+                "act": "Nudge proposal",
+            },
+            "accepted": {"text": "Proposal accepted", "tone": "go", "act": "Send contract"},
+        }[r["status"]]
+    for r in db.all_(
+        "SELECT project_id, status FROM contracts WHERE status IN ('sent','viewed','signed')"
+    ):
+        intel[r["project_id"]] = (
+            {"text": "Contract signed", "tone": "go", "act": "Send invoice"}
+            if r["status"] == "signed"
+            else {
+                "text": "Contract out — awaiting signature",
+                "tone": "gold",
+                "act": "Nudge contract",
+            }
+        )
+    for r in db.all_(
+        """SELECT project_id, status FROM invoices
+           WHERE status IN ('sent','viewed','deposit_paid') AND project_id IS NOT NULL"""
+    ):
+        intel[r["project_id"]] = (
+            {"text": "Retainer in — plan the shoot", "tone": "go", "act": "Open plan"}
+            if r["status"] == "deposit_paid"
+            else {"text": "Invoice out — unpaid", "tone": "gold", "act": "Nudge invoice"}
+        )
+    return intel
 
 
 @router.get("", response_class=HTMLResponse)
