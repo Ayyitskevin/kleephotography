@@ -6476,3 +6476,137 @@ html[data-theme="dark"] .site-body .svc-tier-mid {
   box-shadow: 0 40px 76px -44px rgba(0, 0, 0, 0.85); }
 html[data-theme="dark"] .site-body .svc-price { color: var(--accent); }
 html[data-theme="dark"] .site-body .svc-pick { background: var(--accent); color: #221507; }
+
+/* ============================================================================
+   THE PRIVATE DINING ROOM — client gallery at candlelight (Revamp PR 3).
+   Scoped strictly to .gallery-body (worn only by the /g/{slug} gallery and
+   the file-drop delivery page — both client delivery surfaces). The PIN gate,
+   money docs, and admin never wear this class. All functional hooks (tile
+   macro, hx-post favorite, lightbox, download links) are untouched markup;
+   this is the room the photos are served in.
+   ========================================================================== */
+.gallery-body { background: #0D1512; color: #F2E9DC; }
+
+/* ── Hero cover — the table setting ───────────────────────────────────────── */
+.gallery-body .gal2-hero { position: relative; height: 70vh; min-height: 440px;
+  overflow: hidden; display: block; padding: 0;
+  background: linear-gradient(140deg, #7A4A2E 0%, #4A2C1E 50%, #16100A 100%); }
+.gallery-body .gal2-hero-img { position: absolute; inset: 0;
+  background-size: cover; background-position: center; }
+.gallery-body .gal2-hero-scrim { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 40%, rgba(9, 15, 12, 0.14) 0%,
+    rgba(9, 15, 12, 0.62) 62%, rgba(7, 11, 9, 0.92) 100%); }
+.gallery-body .gal2-hero-inner { position: absolute; inset: 0; display: grid;
+  place-items: center; text-align: center; padding: 0 20px; }
+.gallery-body .gal2-kicker { margin: 0 0 12px; font: 600 0.62rem/1 var(--sans, sans-serif);
+  letter-spacing: 0.32em; text-transform: uppercase; color: #E0A43B; }
+.gallery-body .gal2-hero h1 { margin: 0; font-family: var(--serif, Georgia, serif);
+  font-weight: 400; font-size: clamp(2.2rem, 5vw, 4.4rem); line-height: 1.04;
+  letter-spacing: -0.028em; color: #F2E9DC; text-wrap: balance; }
+.gallery-body .gal2-hero-sub { font-style: italic; font-size: 0.6em;
+  color: rgba(242, 233, 220, 0.85); }
+.gallery-body .gal2-hero-actions { margin-top: 24px; display: flex;
+  justify-content: center; gap: 12px; flex-wrap: wrap; }
+.gallery-body .gal2-hero .btn { margin: 0; display: inline-flex; align-items: center;
+  gap: 0.5em; padding: 0.9em 1.7em; background: #E0A43B; color: #221507;
+  border-radius: 999px; font: 600 0.88rem/1 var(--sans, sans-serif); text-decoration: none;
+  box-shadow: 0 22px 44px -18px rgba(224, 164, 59, 0.5);
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.gallery-body .gal2-hero .btn:hover { transform: translateY(-2px); }
+.gallery-body .gal2-hero .btn-quiet { background: transparent; color: #F2E9DC;
+  border: 1px solid rgba(242, 233, 220, 0.35); box-shadow: none;
+  font: 600 0.84rem/1 var(--sans, sans-serif); padding: 0.85em 1.4em; }
+.gallery-body .gal2-hero .btn-quiet:hover { border-color: #E0A43B; }
+@keyframes gal2-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+.gallery-body .gal2-cue { position: absolute; left: 50%; bottom: 16px;
+  transform: translateX(-50%); display: flex; flex-direction: column;
+  align-items: center; gap: 6px; pointer-events: none;
+  font: 600 0.56rem/1 var(--sans, sans-serif); letter-spacing: 0.24em;
+  text-transform: uppercase; color: rgba(242, 233, 220, 0.55); }
+.gallery-body .gal2-cue i { font-style: normal; font-size: 0.9rem; color: #E0A43B;
+  animation: gal2-bob 1.8s ease-in-out infinite; }
+
+/* ── Sticky glass section nav ─────────────────────────────────────────────── */
+.gallery-body .section-nav { position: sticky; top: 0; z-index: 20; display: flex;
+  align-items: center; gap: 6px; padding: 12px clamp(16px, 4vw, 40px);
+  background: rgba(13, 21, 18, 0.92);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #1E2A24; overflow-x: auto; }
+.gallery-body .section-nav a { padding: 0.5em 1em; border-radius: 999px;
+  font: 600 0.78rem/1 var(--sans, sans-serif); letter-spacing: 0.02em;
+  text-transform: none; text-decoration: none; border-bottom: none;
+  color: rgba(242, 233, 220, 0.7); white-space: nowrap;
+  transition: color 0.35s ease, background 0.2s ease; }
+.gallery-body .section-nav a:hover { color: #E0A43B; }
+.gallery-body .gal2-progress { margin-left: auto; font: 600 0.72rem/1 var(--sans, sans-serif);
+  color: #E0A43B; white-space: nowrap; padding-left: 12px; }
+
+/* ── The room — grid, section heads, tiles ────────────────────────────────── */
+.gallery-body .gallery-main { padding: clamp(26px, 4vw, 48px) clamp(16px, 4vw, 40px)
+  clamp(48px, 6vw, 80px); max-width: 1500px; margin: 0 auto; }
+.gallery-body .section-name { font-family: var(--serif, Georgia, serif);
+  font-weight: 400; font-size: clamp(1.5rem, 2.8vw, 2.2rem); letter-spacing: -0.02em;
+  text-transform: none; color: #F2E9DC; margin: 2.4rem 0 1rem;
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.gallery-body .section-name .sec-dl { color: #E0A43B; text-decoration: none; }
+.gallery-body .section-name .sec-dl:hover { color: #F2E9DC; }
+.gallery-body .section-caption { color: rgba(242, 233, 220, 0.6); }
+.gallery-body .proof-progress { font: 600 0.74rem/1 var(--sans, sans-serif);
+  padding: 5px 11px; border-radius: 999px;
+  background: rgba(242, 233, 220, 0.1); color: rgba(242, 233, 220, 0.7); }
+.gallery-body .proof-progress.ok { background: rgba(224, 164, 59, 0.18); color: #E0A43B; }
+.gallery-body .grid { gap: 14px; }
+.gallery-body .tile { border-radius: 6px; background: #141C18;
+  box-shadow: 0 40px 80px -50px rgba(0, 0, 0, 0.9); cursor: zoom-in; }
+.gallery-body .tile::after { content: ""; position: absolute; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: radial-gradient(90% 70% at 50% 36%, rgba(255, 214, 140, 0.13) 0%, rgba(13, 21, 18, 0) 55%),
+    linear-gradient(180deg, transparent 60%, rgba(7, 11, 9, 0.55) 100%); }
+.gallery-body .tile img { transition: transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.gallery-body .tile:hover img { transform: scale(1.04); }
+.gallery-body .tile .play-badge { z-index: 2; width: 48px; height: 48px;
+  border-radius: 999px; display: grid; place-items: center;
+  background: rgba(7, 11, 9, 0.55); border: 1px solid rgba(242, 233, 220, 0.3);
+  color: #F2E9DC; font-size: 0.85rem; padding-left: 4px; text-shadow: none; }
+.gallery-body .tile-actions { z-index: 2; right: 10px; bottom: 10px; gap: 8px; }
+.gallery-body .icon-btn { width: 34px; height: 34px; display: grid;
+  place-items: center; padding: 0; border-radius: 999px; margin: 0;
+  background: rgba(7, 11, 9, 0.55); color: #F2E9DC; border: 0;
+  font-size: 0.9rem; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  transition: transform 0.2s ease; text-decoration: none; }
+.gallery-body .icon-btn:hover { transform: scale(1.1); background: rgba(7, 11, 9, 0.7); }
+.gallery-body .fav-btn.faved { color: #E0A43B; }
+.gallery-body .gallery-main .muted { color: rgba(242, 233, 220, 0.55); }
+.gallery-body .proof-toast { background: rgba(13, 21, 18, 0.95); color: #F2E9DC;
+  border: 1px solid rgba(224, 164, 59, 0.35); }
+
+/* ── The referral loop — every delivery sells the next shoot ──────────────── */
+.gallery-body .gal2-cta { margin-top: 34px; border-radius: 8px;
+  border: 1px solid rgba(224, 164, 59, 0.28);
+  background: linear-gradient(165deg, #14241D 0%, #0F1A15 100%);
+  padding: clamp(26px, 4vw, 44px); display: flex; align-items: center;
+  justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.gallery-body .gal2-cta-kicker { margin: 0 0 8px; font: 600 0.62rem/1 var(--sans, sans-serif);
+  letter-spacing: 0.3em; text-transform: uppercase; color: #E0A43B; }
+.gallery-body .gal2-cta h2 { margin: 0; font-family: var(--serif, Georgia, serif);
+  font-weight: 400; font-size: clamp(1.4rem, 2.6vw, 2.1rem); line-height: 1.15;
+  letter-spacing: -0.02em; color: #F2E9DC; text-wrap: balance; }
+.gallery-body .gal2-it { font-style: italic; color: #E0A43B; }
+.gallery-body .gal2-cta p { margin: 10px 0 0; color: rgba(242, 233, 220, 0.6);
+  font-size: 0.95rem; line-height: 1.6; max-width: 34em; }
+.gallery-body .gal2-cta .btn { margin: 0; display: inline-flex; align-items: center;
+  gap: 0.5em; padding: 0.95em 1.8em; background: #E0A43B; color: #221507;
+  border-radius: 999px; font: 600 0.9rem/1 var(--sans, sans-serif); text-decoration: none;
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.gallery-body .gal2-cta .btn:hover { transform: translateY(-2px); }
+.gallery-body .gal2-credit { margin: 30px 0 0; text-align: center;
+  font-size: 0.8rem; color: rgba(242, 233, 220, 0.45); }
+.gallery-body .gal2-credit a { color: #E0A43B; text-decoration: none; }
+.gallery-body .gal2-credit a:hover { color: #F2E9DC; }
+
+/* ── The file-drop delivery page shares the room (same .gallery-body) ─────── */
+.gallery-body .gallery-header { background-color: #10231B; color: #F2E9DC; }
+.gallery-body .gallery-header .btn { background: #E0A43B; color: #221507;
+  border-radius: 999px; font-weight: 600; }
+.gallery-body .gallery-header .muted { color: rgba(242, 233, 220, 0.6); }
+.gallery-body > footer .muted, .gallery-body .center.muted { color: rgba(242, 233, 220, 0.55); }

@@ -2,14 +2,20 @@
 {% block title %}{{ g.title }} · {{ site_name }}{% endblock %}
 {% block bodyclass %}gallery-body cream-theme{% endblock %}
 {% block content %}
-<header class="gallery-header"
-        {% if g.cover_asset_id %}style="background-image:url('/media/{{ g.slug }}/web/{{ g.cover_asset_id }}')"{% endif %}>
-  <div class="gallery-header-inner">
-    <h1>{{ g.title }}</h1>
-    {% if g.client_name %}<p>{{ g.client_name }}</p>{% endif %}
-    <a class="btn" href="/g/{{ g.slug }}/download">Download all</a>
-    {% if favs %}<a class="btn" href="/g/{{ g.slug }}/download/favorites">&#9829; Favorites ({{ favs|length }})</a>{% endif %}
+<header class="gal2-hero">
+  {% if g.cover_asset_id %}<div class="gal2-hero-img" style="background-image:url('/media/{{ g.slug }}/web/{{ g.cover_asset_id }}')" aria-hidden="true"></div>{% endif %}
+  <div class="gal2-hero-scrim" aria-hidden="true"></div>
+  <div class="gal2-hero-inner">
+    <div>
+      <p class="gal2-kicker">{{ site_name }} · table for two, held under</p>
+      <h1>{{ g.title }}{% if g.client_name %}<br><span class="gal2-hero-sub">{{ g.client_name }}</span>{% endif %}</h1>
+      <div class="gal2-hero-actions">
+        <a class="btn" href="/g/{{ g.slug }}/download">&#8595; Download all</a>
+        {% if favs %}<a class="btn btn-quiet" href="/g/{{ g.slug }}/download/favorites">&#9829; Favorites ({{ favs|length }})</a>{% endif %}
+      </div>
+    </div>
   </div>
+  <div class="gal2-cue" aria-hidden="true"><span>View gallery</span><i>&darr;</i></div>
 </header>
 
 {% macro tile(a) %}
@@ -40,6 +46,7 @@
 <nav class="section-nav">
   {% for s in populated %}<a href="#sec-{{ s.id }}">{{ s.name }}</a>{% endfor %}
   {% if unsectioned and sections %}<a href="#sec-more">More</a>{% endif %}
+  <span class="gal2-progress">&#9829; {{ favs|length }} of {{ assets|length }} picked</span>
 </nav>
 {% endif %}
 
@@ -65,6 +72,19 @@
     <div class="grid">{% for a in unsectioned %}{{ tile(a) }}{% endfor %}</div>
   {% endif %}
   {% if not assets %}<p class="muted center">Nothing here yet — check back soon.</p>{% endif %}
+
+  {# Prospect loop — clients share these links; every delivery sells the next shoot #}
+  <div class="gal2-cta">
+    <div>
+      <p class="gal2-cta-kicker">To the friend holding this link</p>
+      <h2>Love these? <span class="gal2-it">Your menu could be next.</span></h2>
+      <p>Food &amp; beverage photography for Asheville &amp; Western North Carolina.
+         Tailored proposal within a business day.</p>
+    </div>
+    <a class="btn" href="/contact?prefill=gallery_question&gallery={{ g.title | urlencode }}">Reserve a shoot &rarr;</a>
+  </div>
+  <p class="gal2-credit">Delivered by {{ site_name }} · Photography that makes people hungry ·
+    <a href="/">kleephotography.com</a></p>
 </main>
 
 <div id="lightbox" class="lightbox" hidden data-slug="{{ g.slug }}"
