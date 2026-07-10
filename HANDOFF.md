@@ -7,6 +7,34 @@ file as you work. **All prior context you need is here — do not assume chat hi
 
 ---
 
+## 0. STATUS 2026-07-10 — queue COMPLETE; no work is currently authorized
+
+Everything below this section is historical context. PRs #2–#18 are all MERGED.
+The audit remediation and the follow-up queue finished as:
+
+- **§6a red-light findings: ALL SEVEN FIXED** (verified in main 2026-07-10) —
+  portal PIN buckets offset (`portal._pin_bucket`), server-side revocable admin
+  sessions (migration 065 + `admin_sessions`), `COOKIE_SECURE` derives from an
+  https BASE_URL, cross-IP per-target PIN cap (`PIN_TARGET_MAX_FAILS`), Stripe
+  `?thanks=1` return acknowledged (#17), `/c/ /w/ /t/` now rate-metered, admin
+  password compare is bytes-safe. HSTS ships at `max-age=300` when COOKIE_SECURE.
+- **Security follow-ups:** Permissions-Policy header + RFC 9116 security.txt (#16);
+  CSP `script-src` has NO `unsafe-inline` — per-request nonces + delegated
+  `static/behaviors.js` (data-confirm / data-print / data-autosubmit / data-goto),
+  45-file sweep (#18). `style-src` keeps `unsafe-inline` deliberately (documented
+  in `app/main.py`). New fragment endpoints must stay script-free (nonce mismatch).
+- **Design pass:** marketing + client-facing form polish, focus-visible states,
+  testimonials elevation (#14, #15). Refactor duplication collapse (#11).
+- Gates at completion: **50 unit + 166 smoke, ruff clean**, CI green on main.
+- **Standing deploy reminders for Kevin:** deploy via `scripts/deploy-flow.sh`;
+  delete/flip any `MISE_COOKIE_SECURE=false` left in flow's `.env`; expect one
+  admin re-login after the 065 session-table migration; post-deploy click through
+  admin flows (delete confirms, studio board, email picker) — a missed CSP spot
+  fails silently with a console `Refused to execute…` line.
+- **Do not start §6b-remaining / §6c or anything new without Kevin's explicit ask.**
+
+---
+
 ## 1. Mission & ground rules
 
 Refactor/improve the whole codebase and leave kleephotography.com ready to ship —
