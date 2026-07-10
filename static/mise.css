@@ -6973,3 +6973,140 @@ html[data-theme="dark"] .admin-shell .ib-act-primary:hover {
   text-transform: uppercase; color: var(--ink-faint); }
 .admin-shell .ib-ctx-rv { font-size: .8rem; font-weight: 600; color: var(--ink); text-align: left;
   overflow-wrap: anywhere; min-width: 0; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   18. LONG-TAIL ADMIN DARK-MODE FINISH PASS
+   The dark .admin-shell block (§2) does NOT redefine --card, so any surface
+   hardcoding near-white (var(--card)/#FFFDFA/#FDFBF6/#FAF9F5) in its own light
+   rule renders glaring on dark. This sweep closes the surfaces §2 missed —
+   found by a deterministic DOM contrast auditor plus a template read of the
+   conditional/empty-state routes the seeded render never reached. Same mechanic
+   and comment style as §2/§2b: bg→--surface, cream/dashed borders→--line.
+   ════════════════════════════════════════════════════════════════════════════ */
+html[data-theme="dark"] .admin-shell .preset-row,
+html[data-theme="dark"] .admin-shell .pb-note,
+html[data-theme="dark"] .admin-shell .pb-fill,
+html[data-theme="dark"] .admin-shell .pipeline,
+html[data-theme="dark"] .admin-shell .spark-card,
+html[data-theme="dark"] .admin-shell .spark-window-picker,
+html[data-theme="dark"] .admin-shell .search-hits a,
+html[data-theme="dark"] .admin-shell .v4-empty,
+html[data-theme="dark"] .admin-shell .v4-galnew,
+html[data-theme="dark"] .admin-shell .needs-attention,
+html[data-theme="dark"] .admin-shell .upcoming-chip,
+html[data-theme="dark"] .admin-shell .today-quiet,
+html[data-theme="dark"] .admin-shell .share-row,
+html[data-theme="dark"] .admin-shell .sub-card,
+html[data-theme="dark"] .admin-shell .gd-pipeline-step {
+  background: var(--surface); border-color: var(--line);
+}
+/* cream linear-gradient panel (bg-image, so the auditor was blind to it) */
+html[data-theme="dark"] .admin-shell .ws-admin { background: var(--surface); }
+
+/* ── 18b. Recessed media wells / placeholder tiles → sunk surface (matches how
+        §10 .rc-thumb was remapped). Taupe covers, sage/white step dots and asset
+        placeholders read as bright blocks otherwise. ─────────────────────────── */
+html[data-theme="dark"] .admin-shell .gx-card-cover { background: var(--surface-sunk); }
+html[data-theme="dark"] .admin-shell .gd-tile-ph {
+  background: var(--surface-sunk); color: var(--ink-faint);
+}
+/* :not() scope so the .is-done (forest) / .is-now (gold) accent dots aren't
+   clobbered by the higher-specificity dark override. */
+html[data-theme="dark"] .admin-shell .room-dot:not(.is-done):not(.is-now) {
+  background: var(--surface-sunk); border-color: var(--line); color: var(--ink-faint);
+}
+/* numbered step marker chip (#18241E, white numeral) blends into the dark card;
+   raise it to a visible neutral. is-done/is-error recolor it via specificity. */
+html[data-theme="dark"] .admin-shell .gd-pipeline-step-n { background: var(--line-strong); }
+
+/* ── 18c. Cream gradient/hatch backgrounds (bg-image → background-color stays
+        transparent, structurally invisible to the auditor). Repaint dark. ────── */
+html[data-theme="dark"] .admin-shell .v4-fcell.is-hatch {
+  background: repeating-linear-gradient(135deg, #1c1c1c 0 8px, #161616 8px 16px);
+}
+html[data-theme="dark"] .admin-shell .ct-kit-logo {
+  background: repeating-conic-gradient(#242424 0% 25%, #1a1a1a 0% 50%) 50% / 16px 16px;
+}
+
+/* ── 18d. Semantic status pills/segments — light tints (#e1f2e9 green, #F7ECD2
+        amber, #F3E3E5 clay, #faf9fc lilac) with no dark mapping, same shape as
+        §4/§9. Keep meaning, map to the dark status tokens. ────────────────────── */
+html[data-theme="dark"] .admin-shell .inv-status.is-paid,
+html[data-theme="dark"] .admin-shell .gd-pipeline-step.is-done {
+  background: var(--ok-bg); color: var(--ok); border-color: var(--ok-line);
+}
+html[data-theme="dark"] .admin-shell .room-pill,
+html[data-theme="dark"] .admin-shell .v4-age.is-amber {
+  background: var(--honey-bg); color: var(--honey); border-color: var(--honey-line);
+}
+html[data-theme="dark"] .admin-shell .v4-age.is-red {
+  background: var(--clay-bg); color: var(--clay);
+}
+html[data-theme="dark"] .admin-shell .gd-pipeline-step.is-error {
+  background: var(--clay-bg); border-color: var(--clay-line);
+}
+html[data-theme="dark"] .admin-shell .gd-pipeline-step.is-active {
+  background: var(--neutral-bg); border-color: var(--neutral-line);
+}
+/* home funnel segments — light tint + white (border-right) divider */
+html[data-theme="dark"] .admin-shell .v4-fcell.is-in {
+  background: var(--ok-bg); color: var(--ok); border-right-color: var(--line);
+}
+html[data-theme="dark"] .admin-shell .v4-fcell.is-live {
+  background: var(--honey-bg); color: var(--honey); border-right-color: var(--line);
+}
+/* green-identity avatar/icon tiles (#E7EFE9 bg + #1C4A3A glyph) — keep the green
+   but go dark-tint + bright terra so the inherited glyph lifts with it.
+   :not(.is-oldest) preserves the gold "oldest inquiry" accent avatar. */
+html[data-theme="dark"] .admin-shell .v4-avatar:not(.is-oldest),
+html[data-theme="dark"] .admin-shell .v4-empty-ic {
+  background: var(--terra-tint); color: var(--terra);
+}
+
+/* ── 18e. Active segment inversion — .spark-window-active hardcodes
+        background: var(--ink) (a FILL) which flips LIGHT in dark; below the
+        auditor's area threshold. Deep-jade fill + light ink, matching the active-
+        segment convention (§3 .stu-viewpill button.is-active). ───────────────── */
+html[data-theme="dark"] .admin-shell .spark-window-active {
+  background: var(--terra-deep); color: #F3F0E2;
+}
+
+/* ── 18f. Text lifts (§2c/2d) — hardcoded near-black / muted / forest text and
+        too-dark terra-deep accents that read dark-on-dark once their surface
+        flips. titles/values→--ink, meta/labels→--ink-soft, interactive & accent
+        greens→--terra, stat green→#5fbf93 (matches §3), dark-gold values→--gold.
+        Gold accents kept. ────────────────────────────────────────────────────── */
+html[data-theme="dark"] .admin-shell .fin-tbl td,
+html[data-theme="dark"] .admin-shell .gd-pipeline-step-title { color: var(--ink); }
+html[data-theme="dark"] .admin-shell .pb-voice,
+html[data-theme="dark"] .admin-shell .rev-label,
+html[data-theme="dark"] .admin-shell .cs-fieldset legend,
+html[data-theme="dark"] .admin-shell .stat-strip,
+html[data-theme="dark"] .admin-shell .form-when,
+html[data-theme="dark"] .admin-shell .cal-dow span,
+html[data-theme="dark"] .admin-shell .pb-map,
+html[data-theme="dark"] .admin-shell .gd-pipeline-badge,
+html[data-theme="dark"] .admin-shell .fin-card-dark .fin-card-label,
+html[data-theme="dark"] .admin-shell .fin-card-dark .fin-card-sub { color: var(--ink-soft); }
+html[data-theme="dark"] .admin-shell .admin-add summary,
+html[data-theme="dark"] .admin-shell .sch-type-copy,
+html[data-theme="dark"] .admin-shell .ct-preset-ratio,
+html[data-theme="dark"] .admin-shell .ct-block-note a,
+html[data-theme="dark"] .admin-shell .pt-actions a { color: var(--terra); }
+html[data-theme="dark"] .admin-shell .v4-galnew:hover {
+  border-color: var(--terra); color: var(--terra);
+}
+html[data-theme="dark"] .admin-shell .gd-proof-n { color: #5fbf93; }
+html[data-theme="dark"] .admin-shell .fin-card-warn .fin-card-val,
+html[data-theme="dark"] .admin-shell .room-money b { color: var(--gold); }
+
+/* ── 18g. Second-order text lifts — child text exposed once its parent surface
+        (§18 .pipeline card, .pb-fill, .gx-card-cover) flipped white→dark. --accent
+        and --muted are NOT redefined in the dark block, so they leaked the light
+        forest/taupe values onto the now-dark card. Plus the fin-card-ok green $
+        twin of §18f's warn/gold lift (#2f7d57 → the §3 bright green). ─────────── */
+html[data-theme="dark"] .admin-shell .pipeline-step,
+html[data-theme="dark"] .admin-shell .pb-fill,
+html[data-theme="dark"] .admin-shell .gx-card-nocover { color: var(--ink-soft); }
+html[data-theme="dark"] .admin-shell .pipeline-money { color: var(--terra); }
+html[data-theme="dark"] .admin-shell .fin-card-ok .fin-card-val { color: #5fbf93; }
