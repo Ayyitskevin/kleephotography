@@ -2,6 +2,9 @@
 {% block title %}{{ d.title }} · {{ site_name }}{% endblock %}
 {% block cream_head %}
 <link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
+{# While a just-made payment is awaiting the webhook, reload periodically so the
+   page flips to its real paid state on its own — no manual refresh to explain. #}
+{% if awaiting_confirmation %}<meta http-equiv="refresh" content="15">{% endif %}
 {% endblock %}
 {% block content %}
 {% set paid_total = paid_cents or 0 %}
@@ -16,6 +19,15 @@
   </div>
 
   <section class="client-doc-paper">
+    {% if awaiting_confirmation %}
+    <div class="client-doc-thanks no-print" role="status">
+      <strong>Thank you — your payment is on its way.</strong>
+      <p>Stripe is confirming it now: card payments usually clear within a minute,
+         bank transfers can take a few business days. This page updates automatically
+         once it lands — your receipt will appear right here, and there's nothing
+         else you need to do.</p>
+    </div>
+    {% endif %}
     <header class="client-doc-head">
       <div>
         <p class="client-doc-kicker">Billed to</p>
@@ -62,13 +74,17 @@
     </section>
     {% endif %}
 
+    {# The Pay button hides while a just-made payment awaits its webhook — the
+       one moment a visible button invites paying twice. Purely cosmetic: any
+       plain /i/{slug} visit shows it again, and payment state never moves here. #}
+    {% set show_pay = amount_due and payments_on and not awaiting_confirmation %}
     {% if d.status == 'paid' %}
     <p class="doc-accepted">Paid in full {{ d.paid_at }} — thank you.</p>
     {% elif amount_due %}
       {% if d.status == 'deposit_paid' %}
       <p class="doc-accepted">Deposit received — your date is reserved.</p>
       {% endif %}
-      {% if payments_on %}
+      {% if show_pay %}
       <div class="client-doc-actions no-print">
         <form method="post" action="/i/{{ d.slug }}/pay">
           <button type="submit" class="client-pay-btn">Pay {{ "deposit" if pay_kind == "deposit" else ("balance" if pay_kind == "balance" else "now") }} — ${{ amount_due|usd }}</button>
@@ -76,15 +92,15 @@
         <button type="button" onclick="window.print()" class="client-secondary-btn">Print / save as PDF</button>
       </div>
       <p class="client-doc-security no-print">Secured by Stripe · card or bank transfer · questions can stay in the email thread.</p>
-      {% else %}
+      {% elif not awaiting_confirmation %}
       <p class="muted">To pay, reply to the email thread — online payment is being set up.</p>
       {% endif %}
     {% endif %}
 
-    {% if not (amount_due and payments_on) or paid_total %}
+    {% if not show_pay or paid_total %}
     <p class="no-print client-doc-print">
-      {% if not (amount_due and payments_on) %}<button type="button" onclick="window.print()" class="link">Print / save as PDF</button>{% endif %}
-      {% if paid_total %}{% if not (amount_due and payments_on) %} · {% endif %}<a href="/i/{{ d.slug }}/receipt" class="link">View receipt</a>{% endif %}
+      {% if not show_pay %}<button type="button" onclick="window.print()" class="link">Print / save as PDF</button>{% endif %}
+      {% if paid_total %}{% if not show_pay %} · {% endif %}<a href="/i/{{ d.slug }}/receipt" class="link">View receipt</a>{% endif %}
     </p>
     {% endif %}
   </section>

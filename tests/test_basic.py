@@ -246,6 +246,53 @@ def test_security_txt(client):
 
 
 @pytest.mark.unit
+def test_invoice_stripe_return_banner(client, monkeypatch):
+    from app import config, db
+
+    # Back from Stripe Checkout with ?thanks=1 but the webhook still in flight,
+    # the invoice must reassure and HIDE the Pay button (a live button moments
+    # after paying invites a double charge) — while never touching payment state.
+    monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test_x")
+    cid = db.run("INSERT INTO clients (name, email) VALUES (?,?)", ("Return UX", "r@ux.test"))
+    pid = db.run("INSERT INTO projects (client_id, title) VALUES (?,?)", (cid, "Shoot"))
+    iid = db.run(
+        """INSERT INTO invoices (project_id, slug, title, line_items, total_cents, status)
+           VALUES (?,?,?,?,?,?)""",
+        (pid, "thanks-ux", "Shoot", "[]", 100000, "sent"),
+    )
+    try:
+        # a plain visit shows the live Pay button and no banner
+        page = client.get("/i/thanks-ux").text
+        assert "client-pay-btn" in page and "client-doc-thanks" not in page
+        # returning with ?thanks=1 pre-webhook: banner + auto-refresh, no Pay
+        # button — and the invoice is NOT marked paid by the query param
+        page = client.get("/i/thanks-ux?thanks=1").text
+        assert "client-doc-thanks" in page and "client-pay-btn" not in page
+        assert 'http-equiv="refresh"' in page
+        assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "viewed"
+        # once the webhook records the payment (deposit here), the banner yields
+        # to the real state — deposit confirmed, balance button live again
+        db.run(
+            """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
+                  amount_cents, kind) VALUES (?,?,?,?,?)""",
+            (iid, "evt_ux_dep", "cs_ux_dep", 40000, "deposit"),
+        )
+        db.run("UPDATE invoices SET status='deposit_paid', deposit_cents=40000 WHERE id=?", (iid,))
+        page = client.get("/i/thanks-ux?thanks=1").text
+        assert "client-doc-thanks" not in page and "Deposit received" in page
+        assert "client-pay-btn" in page  # balance is genuinely still due
+        # fully paid: normal paid state even with a stale ?thanks=1 bookmark
+        db.run("UPDATE invoices SET status='paid', paid_at=datetime('now') WHERE id=?", (iid,))
+        page = client.get("/i/thanks-ux?thanks=1").text
+        assert "client-doc-thanks" not in page and "Paid in full" in page
+    finally:
+        db.run("DELETE FROM payments WHERE invoice_id=?", (iid,))
+        db.run("DELETE FROM invoices WHERE id=?", (iid,))
+        db.run("DELETE FROM projects WHERE id=?", (pid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))
+
+
+@pytest.mark.unit
 def test_csrf_same_origin_enforced(client):
     from app import config, security
 
