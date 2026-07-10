@@ -37,23 +37,39 @@
 
   <div class="gx-grid" id="gal-grid">
     {% for c in cards %}
-    <a class="gx-card gal-item" href="/admin/galleries/{{ c.id }}" data-status="{{ c.status_lc }}">
-      <div class="gx-card-cover">
-        {% if c.cover_asset_id %}
-        <img loading="lazy" src="/admin/thumb/{{ c.id }}/{{ c.cover_asset_id }}" alt="Cover of {{ c.title }}">
-        {% else %}<span class="gx-card-nocover">no cover set</span>{% endif %}
-        <span class="gx-badge" style="color: {{ c.status_color }}; background: {{ c.status_bg }};">{{ c.status }}</span>
-        {% if c.favs %}<span class="gx-favs">&#9829; {{ c.favs }}</span>{% endif %}
-      </div>
-      <div class="gx-card-body">
-        <div class="gx-card-title">{{ c.title }}</div>
-        <div class="gx-card-client">{{ c.client }}</div>
-        <div class="gx-card-foot">
+    {# One flat <a> per card: the status badge and the date label must both
+       render between the card href and its </a> — the admin smoke tests slice
+       the card exactly that way. Actions that can't nest in a link (copy chip)
+       sit after the anchor, inside the same card shell. #}
+    <div class="gx-card gal-item" data-status="{{ c.status_lc }}">
+      <a class="gx-card-link" href="/admin/galleries/{{ c.id }}">
+        <div class="gx-card-cover">
+          {% if c.cover_asset_id %}
+          <img loading="lazy" src="/admin/thumb/{{ c.id }}/{{ c.cover_asset_id }}" alt="Cover of {{ c.title }}">
+          {% else %}<span class="gx-card-nocover">no cover set</span>{% endif %}
+          <span class="gx-cover-scrim" aria-hidden="true"></span>
+          <span class="gx-badge" style="color: {{ c.status_color }}; background: {{ c.status_bg }};">{{ c.status }}</span>
           <span class="gx-card-photos">{{ c.photos }}</span>
-          <span class="gx-card-date" style="color: {{ c.date_color }};">{{ c.date }}</span>
         </div>
+        <div class="gx-card-body">
+          <div class="gx-card-titlerow">
+            <span class="gx-card-title">{{ c.title }}</span>
+            <span class="gx-card-date{% if c.status_lc == 'expiring' %} gx-date-warn{% endif %}">{{ c.date }}</span>
+          </div>
+          <div class="gx-card-client">{{ c.client }}</div>
+          <div class="gx-card-foot">
+            <span class="gx-eng" title="Client visits">&#9673; {{ c.views }}</span>
+            <span class="gx-eng gx-eng-fav" title="Favorites">&#9829; {{ c.favs }}</span>
+          </div>
+        </div>
+      </a>
+      <div class="gx-card-act">
+        <button type="button" class="gx-copy copy-link"
+                data-copy="{{ base_url }}/g/{{ c.slug }}&#10;PIN: {{ c.pin }}"
+                title="Copy URL + PIN to clipboard">Copy link + PIN</button>
+        <span class="copy-feedback muted" hidden>Copied!</span>
       </div>
-    </a>
+    </div>
     {% endfor %}
   </div>
 

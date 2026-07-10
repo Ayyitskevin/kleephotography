@@ -50,10 +50,10 @@
     <!-- LEFT: stats + toolbar + masonry -->
     <div class="gd-left">
       <div class="gd-stats">
-        <div class="gd-stat"><span class="gd-stat-n" style="color:#18241E">{{ assets|length }}</span><span class="gd-stat-l">Photos</span></div>
-        <div class="gd-stat"><span class="gd-stat-n" style="color:#9a7a2c">{{ n_fav }}</span><span class="gd-stat-l">Favorited</span></div>
-        <div class="gd-stat"><span class="gd-stat-n" style="color:#18241E">{{ n_views }}</span><span class="gd-stat-l">Client views</span></div>
-        <div class="gd-stat"><span class="gd-stat-n" style="color:#2f7d57">{{ n_downloads }}</span><span class="gd-stat-l">Downloads</span></div>
+        <div class="gd-stat"><span class="gd-stat-n">{{ assets|length }}</span><span class="gd-stat-l">Photos</span></div>
+        <div class="gd-stat"><span class="gd-stat-n gd-stat-gold">{{ n_fav }}</span><span class="gd-stat-l">Favorited</span></div>
+        <div class="gd-stat"><span class="gd-stat-n">{{ n_views }}</span><span class="gd-stat-l">Client views</span></div>
+        <div class="gd-stat"><span class="gd-stat-n gd-stat-ok">{{ n_downloads }}</span><span class="gd-stat-l">Downloads</span></div>
       </div>
 
       <div class="gd-toolbar">
@@ -224,7 +224,8 @@
           {% if show_pin %}
           <div class="gd-live-tile"><div class="gd-live-k">PIN</div><div class="gd-live-v gd-pin">{{ g.pin }}</div></div>
           {% endif %}
-          <div class="gd-live-tile"><div class="gd-live-k">Expires</div><div class="gd-live-v">{{ g.expires_at or 'Never' }}</div></div>
+          <div class="gd-live-tile"><div class="gd-live-k">Expires</div><div class="gd-live-v">{{ g.expires_at or 'Never' }}</div>
+            <button type="button" class="gd-extend" data-reveal="g-settings">extend</button></div>
         </div>
       </section>
 

@@ -100,6 +100,13 @@ async def dashboard(request: Request):
     }
     soon_iso = (today + dt.timedelta(days=7)).isoformat()
     cards = [common.gallery_card(g, today_iso, soon_iso) for g in gs]
+    # Library-card intel (display-only): the public slug + PIN feed each card's
+    # "Copy link + PIN" chip; client visits pair with favorites as the
+    # engagement row. Enriched here rather than in gallery_card() because only
+    # this page has the visitor subselect on hand.
+    for c, g in zip(cards, gs):
+        c["slug"] = g["slug"]
+        c["views"] = g["n_visitors"]
     card_counts = {"all": len(cards)}
     for k in ("delivered", "proofing", "expiring", "draft"):
         card_counts[k] = sum(1 for c in cards if c["status_lc"] == k)
