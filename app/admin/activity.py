@@ -119,6 +119,86 @@ async def home(request: Request):
            WHERE converted_at IS NULL AND dismissed_at IS NULL
            ORDER BY created_at DESC LIMIT 6"""
     )
+    # Reply queue (v4 dashboard) — the same open inquiries as actionable rows,
+    # oldest first, with an honest waiting age and a channel-appropriate second
+    # action. Pure reshaping of `leads`; no new state, no writes.
+    queue = []
+    for r in sorted(leads, key=lambda x: x["created_at"] or ""):
+        try:
+            age_days = (dt.datetime.now() - dt.datetime.fromisoformat(r["created_at"][:19])).days
+        except (ValueError, TypeError):
+            age_days = 0
+        is_sms = bool(r["phone"]) and not r["email"]
+        queue.append(
+            {
+                "id": r["id"],
+                "name": r["name"] or r["phone"] or "Unknown",
+                "initials": ("".join(w[0] for w in (r["name"] or "").split()[:2]).upper()) or "+1",
+                "age_days": age_days,
+                "context": " · ".join(
+                    x
+                    for x in (
+                        ("Booking inquiry via /book" if r["kind"] == "booking" else None),
+                        ("SMS inquiry — replies by text" if is_sms else None),
+                        r["business"],
+                        r["email"] or r["phone"],
+                        (r["service"] or None),
+                    )
+                    if x
+                ),
+                "second": "Text back"
+                if is_sms
+                else ("Draft proposal" if r["kind"] == "booking" else "Book intro call"),
+            }
+        )
+    oldest_wait_days = queue[0]["age_days"] if queue else 0
+
+    # Recent galleries strip (v4) — Pixieset-style covers. Display-only.
+    recent_galleries = db.all_(
+        """SELECT g.id, g.title, g.published, g.client_id,
+                  c.company AS client_company, c.name AS client_name,
+                  COALESCE(g.cover_asset_id,
+                    (SELECT a.id FROM assets a WHERE a.gallery_id=g.id
+                       AND a.status='ready' AND a.kind='photo'
+                     ORDER BY a.position, a.id LIMIT 1)) AS cover_id,
+                  (SELECT COUNT(*) FROM assets a WHERE a.gallery_id=g.id) AS n_assets
+           FROM galleries g LEFT JOIN clients c ON c.id=g.client_id
+           WHERE g.type='gallery'
+           ORDER BY g.created_at DESC LIMIT 5"""
+    )
+
+    # Trailing six months of collected revenue for the money-card bars —
+    # current month last, heights proportional to the best month (or the goal
+    # if it's higher, so the dashed goal silhouette stays the tallest thing).
+    rev_months = []
+    first_of_month = dt.date.today().replace(day=1)
+    cursor = first_of_month
+    for _ in range(6):
+        rev_months.append(cursor)
+        cursor = (cursor - dt.timedelta(days=1)).replace(day=1)
+    rev_months.reverse()
+    month_cents = {
+        r["ym"]: r["cents"]
+        for r in db.all_(
+            """SELECT strftime('%Y-%m', paid_at) AS ym,
+                      COALESCE(SUM(total_cents), 0) AS cents
+               FROM invoices WHERE status='paid' AND paid_at IS NOT NULL
+               GROUP BY ym"""
+        )
+    }
+    scale = max(
+        [month_cents.get(m.strftime("%Y-%m"), 0) for m in rev_months]
+        + [config.MONTHLY_GOAL_CENTS or 0, 1]
+    )
+    revenue_months = [
+        {
+            "label": m.strftime("%b").upper(),
+            "cents": month_cents.get(m.strftime("%Y-%m"), 0),
+            "pct": max(4, round(month_cents.get(m.strftime("%Y-%m"), 0) * 100 / scale)),
+            "current": m == first_of_month,
+        }
+        for m in rev_months
+    ]
     horizon_shoots = db.all_(
         """SELECT p.id, p.title, c.name AS client_name, c.company,
                   CAST(julianday(p.shoot_date) -
@@ -374,6 +454,10 @@ async def home(request: Request):
             "orphans": orphans,
             "link_clients": link_clients,
             "base_url": config.BASE_URL,
+            "queue": queue,
+            "oldest_wait_days": oldest_wait_days,
+            "recent_galleries": recent_galleries,
+            "revenue_months": revenue_months,
         },
     )
 

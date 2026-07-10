@@ -71,6 +71,17 @@
               <span class="stu-card-val{% if won %} is-won{% elif not p.value_cents %} is-none{% endif %}">{{ ("$" ~ (p.value_cents|usd0)) if p.value_cents else "—" }}</span>
             </div>
             <div class="stu-card-proj">{{ p.title }}</div>
+            <div class="stu-dots" aria-label="Journey">
+              {% set cur = statuses.index(p.status) if p.status in statuses else 0 %}
+              {% for st in statuses[:7] %}
+              <i class="stu-dot{% if loop.index0 < cur %} is-done{% elif loop.index0 == cur %} is-now{% endif %}"
+                 title="{{ stage_label.get(st, st) }}"></i>
+              {% endfor %}
+            </div>
+            {% set pi = intel.get(p.id) %}
+            {% if pi %}
+            <div class="stu-intel is-{{ pi.tone }}">{{ pi.text }}</div>
+            {% endif %}
             <div class="stu-card-foot">
               {% if p.n_overdue %}
                 <span class="stu-step tone-urgent">&#9888; {{ p.n_overdue }} overdue</span>
@@ -85,6 +96,9 @@
                 {%- if won %}{{ p.shoot_date or (p.created_at[:10] if p.created_at else "") }}
                 {%- else %}{{ p.days_in_stage }}d{% endif %}</span>
             </div>
+            {% if pi %}
+            <a class="stu-card-act" href="/admin/studio/projects/{{ p.id }}">{{ pi.act }} &rarr;</a>
+            {% endif %}
           </article>
           {% endfor %}
           <a class="stu-add" href="#clients" data-open-new>+ Add</a>
