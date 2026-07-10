@@ -6896,10 +6896,19 @@ html[data-theme="dark"] .site-body .svc-pick { background: var(--accent); color:
 
 /* Room-width fixes: doc-link slugs ellipsize on one line instead of shattering
    in the narrower columns; timeline timestamps never clip. */
-.admin-shell .room-grid .slug { display: block; max-width: 180px; overflow: hidden;
+.admin-shell .room-grid .slug { display: block; max-width: 100%; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
 .admin-shell .room-grid .timeline-when { white-space: nowrap; overflow: visible; }
-.admin-shell .room-grid .list { table-layout: auto; }
+/* table-layout: fixed pins the doc tables to their (narrow) panel width so a long
+   /p/{slug} URL ellipsizes inside its cell instead of widening the table past the
+   panel and spilling into the next column. The title column keeps the lion's share
+   and wraps on words; the meta/link columns ellipsize. */
+.admin-shell .room-grid .list { table-layout: fixed; width: 100%; }
+.admin-shell .room-grid .list th, .admin-shell .room-grid .list td {
+  overflow: hidden; text-overflow: ellipsis; }
+.admin-shell .room-grid .list th:first-child,
+.admin-shell .room-grid .list td:first-child {
+  width: 44%; white-space: normal; overflow-wrap: break-word; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ADMIN V4 · PART II — THE LIBRARY · THE DARKROOM · THE FRONT DESK
