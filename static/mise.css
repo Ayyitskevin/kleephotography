@@ -2431,13 +2431,15 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .admin-shell .gx-pill.is-active span { opacity: 0.7; }
 
 .admin-shell .gx-grid { display: grid; gap: 18px; margin: 0.2rem 0 1.2rem;
-  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); }
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
 .admin-shell .gx-card { text-decoration: none; background: #FFFEF8; border: 1px solid #E1DDCE;
   border-radius: 15px; overflow: hidden; display: flex; flex-direction: column;
   transition: transform 0.35s cubic-bezier(.2,.7,.2,1), box-shadow 0.35s ease, border-color 0.35s ease; }
 .admin-shell .gx-card:hover { transform: translateY(-5px); border-color: rgba(237,178,60,.6);
   box-shadow: 0 26px 48px -28px rgba(40,30,12,0.4); }
-.admin-shell .gx-card-cover { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #e6ddd0; }
+.admin-shell .gx-card-link { display: block; text-decoration: none; color: inherit; }
+.admin-shell .gx-card-link:hover { text-decoration: none; }
+.admin-shell .gx-card-cover { position: relative; aspect-ratio: 3 / 2; overflow: hidden; background: #e6ddd0; }
 .admin-shell .gx-card-cover img { width: 100%; height: 100%; object-fit: cover; display: block;
   transition: transform 0.5s cubic-bezier(.2,.7,.2,1); }
 .admin-shell .gx-card:hover .gx-card-cover img { transform: scale(1.05); }
@@ -2447,17 +2449,34 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .admin-shell .gx-badge { position: absolute; top: 10px; left: 10px;
   font: 700 0.62rem/1 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase;
   padding: 5px 9px; border-radius: 999px; }
-.admin-shell .gx-favs { position: absolute; top: 10px; right: 10px;
-  font: 600 0.68rem/1 var(--font-ui); color: #F3F0E2; background: rgba(20,14,9,0.5);
-  backdrop-filter: blur(4px); padding: 5px 9px; border-radius: 999px; }
-.admin-shell .gx-card-body { padding: 14px 16px 16px; }
+.admin-shell .gx-cover-scrim { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(9,15,12,0) 55%, rgba(9,15,12,0.5) 100%); }
+.admin-shell .gx-card-photos { position: absolute; right: 12px; bottom: 10px;
+  font: 600 0.72rem/1 var(--font-ui); color: rgba(255,255,255,0.92); }
+.admin-shell .gx-card-body { padding: 14px 16px 15px; }
+.admin-shell .gx-card-titlerow { display: flex; align-items: baseline;
+  justify-content: space-between; gap: 10px; }
 .admin-shell .gx-card-title { font-family: var(--font-display); font-weight: 500;
-  font-size: 1.12rem; color: #18241E; line-height: 1.2; }
+  font-size: 1.12rem; color: #18241E; line-height: 1.2; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-shell .gx-card-client { font: 500 0.8rem/1.3 var(--font-ui); color: #5C6A5E; margin-top: 4px; }
-.admin-shell .gx-card-foot { display: flex; align-items: center; justify-content: space-between;
+.admin-shell .gx-card-foot { display: flex; align-items: center; gap: 14px;
   margin-top: 12px; padding-top: 12px; border-top: 1px solid #EFEAE0; }
-.admin-shell .gx-card-photos { font: 600 0.76rem/1 var(--font-ui); color: #8A9183; }
-.admin-shell .gx-card-date { font: 600 0.76rem/1 var(--font-ui); }
+.admin-shell .gx-eng { display: inline-flex; align-items: center; gap: 5px;
+  font: 600 0.74rem/1 var(--font-ui); color: #8A9183; font-variant-numeric: tabular-nums; }
+.admin-shell .gx-eng-fav { color: #B8892F; }
+.admin-shell .gx-card-date { font: 600 0.72rem/1 var(--font-ui); flex: none; color: #8A9183; }
+.admin-shell .gx-card-date.gx-date-warn { color: #7C2F38; }
+.admin-shell .gx-card-act { display: flex; align-items: center; gap: 8px;
+  padding: 0 16px 14px; margin-top: auto; }
+/* Scoped under .gx-card-act so it out-specifies the generic .admin-shell
+   .copy-link rule (which zeroes border/padding for text-style copy links) and
+   renders as the spec's outline pill. */
+.admin-shell .gx-card-act .gx-copy { border: 1px solid #E1DDCE; background: transparent; cursor: pointer;
+  border-radius: 999px; padding: 6px 12px; color: #1C4A3A; font: 600 0.72rem/1 var(--font-ui); }
+.admin-shell .gx-card-act .gx-copy:hover { border-color: #1C4A3A; background: transparent;
+  text-decoration: none; }
+.admin-shell .gx-card-act .copy-feedback { font: 500 0.72rem/1 var(--font-ui); }
 
 /* ── Gallery detail — strict 1:1 with the Admin Gallery prototype ──────── */
 .admin-shell .gd-topbar .pgtop-lead { display: flex; align-items: center; gap: 13px; min-width: 0; }
@@ -6866,3 +6885,76 @@ html[data-theme="dark"] .site-body .svc-pick { background: var(--accent); color:
   text-overflow: ellipsis; white-space: nowrap; }
 .admin-shell .room-grid .timeline-when { white-space: nowrap; overflow: visible; }
 .admin-shell .room-grid .list { table-layout: auto; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ADMIN V4 · PART II — THE LIBRARY · THE DARKROOM · THE FRONT DESK
+   (Revamp PR-6 — Admin v3 spec screens 3–5: /admin/galleries,
+   /admin/galleries/{id}, /admin/inbox. Elevation over the existing gx-/gd-/ib-
+   structure; every functional hook unchanged.)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Library: photos count lives ON the cover (white over the scrim) in both
+      themes — re-asserted here because the shared dark 2c block dims it. ──── */
+html[data-theme="dark"] .admin-shell .gx-card-photos { color: rgba(255,255,255,0.92); }
+html[data-theme="dark"] .admin-shell .gx-eng { color: var(--ink-faint); }
+html[data-theme="dark"] .admin-shell .gx-eng-fav { color: var(--gold); }
+html[data-theme="dark"] .admin-shell .gx-card-act .gx-copy { border-color: var(--line-strong); color: var(--terra); }
+html[data-theme="dark"] .admin-shell .gx-card-act .gx-copy:hover { border-color: var(--terra); }
+/* Date label: muted by default; the Expiring warn tone goes gold on dark so it
+   stays legible (the light oxblood #7C2F38 reads ~1.9:1 on the dark card). The
+   template now carries a .gx-date-warn class instead of an inline color, so this
+   actually wins the cascade. */
+html[data-theme="dark"] .admin-shell .gx-card-date { color: var(--ink-faint); }
+html[data-theme="dark"] .admin-shell .gx-card-date.gx-date-warn { color: var(--gold); }
+
+/* ── Darkroom (gallery detail): the stat numerals drop their inline hexes for
+      theme-aware classes — the hardcoded near-black went invisible on dark. ── */
+.admin-shell .gd-stat-n { color: var(--ink, #18241E); }
+.admin-shell .gd-stat-gold { color: #9a7a2c; }
+.admin-shell .gd-stat-ok { color: #2f7d57; }
+html[data-theme="dark"] .admin-shell .gd-stat-gold { color: var(--gold); }
+html[data-theme="dark"] .admin-shell .gd-stat-ok { color: #5fbf93; }
+
+/* ── Darkroom: PIN reads as a code; "extend" sits under the expiry and opens
+      the settings panel via the existing data-reveal hook. ─────────────────── */
+.admin-shell .gd-live-v.gd-pin { font-variant-numeric: tabular-nums; letter-spacing: 0.18em; }
+.admin-shell .gd-extend { background: none; border: 0; padding: 0; margin-top: 6px;
+  font: 600 0.72rem/1 var(--font-ui); color: var(--gold, #E0A43B); cursor: pointer; }
+.admin-shell .gd-extend:hover { text-decoration: underline; }
+
+/* Delete form becomes the spec's danger zone — same form, same confirm guard. */
+.admin-shell .gd-delete { margin-top: 14px; border: 1px solid #EED9D4; background: #FDF7F5;
+  border-radius: 12px; padding: 12px 16px; }
+html[data-theme="dark"] .admin-shell .gd-delete {
+  border-color: var(--clay-line); background: var(--clay-bg); }
+
+/* ── Front desk (inbox): unread is amber, the selected thread wears the amber
+      hairline, and "Move it forward" gets one clear gold primary. ──────────── */
+.admin-shell .ib-dot { background: var(--gold); }
+html[data-theme="dark"] .admin-shell .ib-dot { border-color: #181818; }
+.admin-shell .ib-row.is-active { border-color: rgba(224,164,59,0.45); }
+
+.admin-shell .ib-act-primary { background: var(--gold); border-color: var(--gold); color: #221507;
+  box-shadow: 0 10px 22px -12px rgba(143,106,31,0.55); }
+.admin-shell .ib-act-primary:hover { background: #c98f2e; border-color: #c98f2e; color: #221507; }
+/* dark: quiet surface secondaries under one gold primary (replaces the
+   all-jade fill so the hierarchy reads at a glance) */
+html[data-theme="dark"] .admin-shell .ib-act {
+  background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+html[data-theme="dark"] .admin-shell .ib-act:hover {
+  background: var(--surface); border-color: var(--terra); color: var(--ink); }
+html[data-theme="dark"] .admin-shell .ib-act-primary {
+  background: var(--gold); border-color: var(--gold); color: #221507; }
+html[data-theme="dark"] .admin-shell .ib-act-primary:hover {
+  background: #eebc5e; border-color: #eebc5e; color: #221507; }
+
+/* Contact details render as the spec's structured info tiles — same k/v rows,
+   recomposed by CSS alone (eyebrow label over value, two-up grid). */
+.admin-shell .ib-ctx-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.admin-shell .ib-ctx-row { display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px;
+  min-width: 0; }
+.admin-shell .ib-ctx-rk { font-size: .62rem; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-faint); }
+.admin-shell .ib-ctx-rv { font-size: .8rem; font-weight: 600; color: var(--ink); text-align: left;
+  overflow-wrap: anywhere; min-width: 0; }
