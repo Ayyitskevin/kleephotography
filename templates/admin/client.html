@@ -155,7 +155,7 @@
       <td class="muted">{{ b.created_at[:10] }}</td>
       <td>
         <form method="post" action="/admin/studio/clients/{{ c.id }}/brand/{{ b.id }}/delete"
-              class="inline" onsubmit="return confirm('Delete {{ b.filename }}?')">
+              class="inline" data-confirm="Delete {{ b.filename }}?">
           <button class="link danger">delete</button>
         </form>
       </td>
@@ -210,7 +210,7 @@
       <td class="muted">{% if k.active %}yes{% else %}no{% endif %}</td>
       <td>
         <form method="post" action="/admin/studio/clients/{{ c.id }}/kits/{{ k.id }}/delete"
-              class="inline" onsubmit="return confirm('Delete this brand kit?')">
+              class="inline" data-confirm="Delete this brand kit?">
           <button class="link danger">delete</button>
         </form>
       </td>
@@ -314,7 +314,7 @@
     {% set blocker_summary = "Delete " ~ c.name ~ "? This is final." %}
   {% endif %}
   <form method="post" action="/admin/studio/clients/{{ c.id }}/delete"
-        class="inline" onsubmit='return confirm({{ blocker_summary|tojson }})'>
+        class="inline" data-confirm="{{ blocker_summary }}">
     {% if blockers %}<input type="hidden" name="force" value="1">{% endif %}
     <button class="link danger">Delete client{% if blockers %} (despite {{ blockers|length }} blocker{{ "s" if blockers|length != 1 }}){% endif %}</button>
   </form>

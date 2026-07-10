@@ -68,7 +68,7 @@
   </div>
   {% if rows %}
   <p class="studio-empty" id="tpl-empty" hidden>No templates match.</p>
-  <script>
+  <script nonce="{{ csp_nonce }}">
   (function () {
     var search = document.getElementById('tpl-search');
     if (!search) return;

@@ -33,7 +33,7 @@
     <div class="book-manage-change">
       <a href="/booking/{{ b.token }}/reschedule">Need a different time? Reschedule</a>
       <form method="post" action="/booking/{{ b.token }}/cancel"
-            onsubmit="return confirm('Cancel this booking?')">
+            data-confirm="Cancel this booking?">
         <label class="muted">Cancelling? Let me know why <span class="muted">(optional)</span>
           <input type="text" name="reason" maxlength="500"></label>
         <button type="submit" class="linkbtn danger">Cancel booking</button>

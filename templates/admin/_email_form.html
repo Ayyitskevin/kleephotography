@@ -1,10 +1,10 @@
 <h2>Email to client</h2>
 {% set email_tpls = email_template_options(d, p, email_link) %}
 <form method="post" action="{{ email_action }}" class="stack-form" style="max-width:680px"
-      onsubmit="return confirm('Send this email to ' + this.to.value + '?')">
+      data-confirm="Send this email to {to}?">
   {% if email_tpls %}
   <label>Load a template
-    <select onchange="miseFillEmail(this)">
+    <select id="email-tpl-pick">
       <option value="">— keep what's below —</option>
       {% for t in email_tpls %}
       <option value="{{ loop.index0 }}">{{ t.name }}</option>
@@ -12,14 +12,14 @@
     </select>
   </label>
   <script type="application/json" id="email-tpls">{{ email_tpls|tojson }}</script>
-  <script>
-  function miseFillEmail(sel){
-    if(!sel.value){return;}
-    var t=JSON.parse(document.getElementById('email-tpls').textContent)[+sel.value];
-    var f=sel.form;
+  <script nonce="{{ csp_nonce }}">
+  document.getElementById('email-tpl-pick').addEventListener('change', function(){
+    if(!this.value){return;}
+    var t=JSON.parse(document.getElementById('email-tpls').textContent)[+this.value];
+    var f=this.form;
     f.subject.value=t.subject;
     f.message.value=t.body;
-  }
+  });
   </script>
   {% endif %}
   <label>To <input type="email" name="to" value="{{ p.client_email or '' }}" required></label>

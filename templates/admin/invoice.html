@@ -30,7 +30,7 @@
 <main class="admin-main inv-screen">
   {% if is_draft %}
   <form id="inv-send-form" method="post" action="/admin/studio/invoices/{{ d.id }}/send"
-        onsubmit="return confirm('Lock this invoice and mark it sent? It becomes payable at the client link.')"></form>
+        data-confirm="Lock this invoice and mark it sent? It becomes payable at the client link."></form>
   <form method="post" action="/admin/studio/invoices/{{ d.id }}" class="inv-layout">
   {% else %}
   <div class="inv-layout">
@@ -176,7 +176,7 @@
       </section>
       <section class="inv-card inv-actions">
         <form method="post" action="/admin/studio/invoices/{{ d.id }}/duplicate"
-              onsubmit="return confirm('Make an editable copy of this invoice as a new draft? Payments stay with the original.')">
+              data-confirm="Make an editable copy of this invoice as a new draft? Payments stay with the original.">
           <button type="submit" class="ghost">Duplicate as draft</button>
         </form>
       </section>

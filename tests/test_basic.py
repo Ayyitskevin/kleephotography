@@ -199,9 +199,9 @@ def test_check_admin_password_handles_non_ascii(monkeypatch):
 
 @pytest.mark.unit
 def test_csp_header(client):
-    # Content-Security-Policy ships on every response as XSS/clickjacking
-    # defense-in-depth (R18). script-src keeps 'unsafe-inline' for now because the
-    # templates use inline handlers; the locked-down directives are the win here.
+    # Content-Security-Policy ships on every response as XSS defense-in-depth
+    # (R18). script-src has NO 'unsafe-inline' — inline handlers moved to
+    # /static/behaviors.js and the remaining inline blocks carry a nonce.
     csp = client.get("/healthz").headers["content-security-policy"]
     for needed in (
         "default-src 'self'",
@@ -211,10 +211,37 @@ def test_csp_header(client):
         "form-action 'self'",
     ):
         assert needed in csp, needed
+    script_src = next(d for d in csp.split("; ") if d.startswith("script-src "))
+    assert "'unsafe-inline'" not in script_src
+    assert "'nonce-" in script_src
+    # style-src deliberately keeps 'unsafe-inline' (inline style= attributes are
+    # pervasive and style injection is a far weaker vector than script)
+    style_src = next(d for d in csp.split("; ") if d.startswith("style-src "))
+    assert "'unsafe-inline'" in style_src
     # analytics is the only off-origin asset, allowed for script + connect
     assert "https://plausible.io" in csp
     # indexable marketing pages carry the policy too
     assert "content-security-policy" in client.get("/").headers
+
+
+@pytest.mark.unit
+def test_csp_nonce_fresh_and_matches_markup(client):
+    import re
+
+    # The header nonce must be echoed on the page's inline <script> blocks —
+    # a mismatch means every inline script dies silently in the browser.
+    r = client.get("/")
+    csp = r.headers["content-security-policy"]
+    nonce = re.search(r"'nonce-([^']+)'", csp).group(1)
+    assert f'<script nonce="{nonce}">' in r.text
+    # and no inline block may ship without its nonce
+    assert "<script>" not in r.text
+    # nonces are per-request secrets, never reused
+    r2 = client.get("/")
+    nonce2 = re.search(r"'nonce-([^']+)'", r2.headers["content-security-policy"]).group(1)
+    assert nonce2 != nonce
+    # the pre-auth admin login renders nonce-clean too
+    assert "<script>" not in client.get("/admin/login").text
 
 
 @pytest.mark.unit

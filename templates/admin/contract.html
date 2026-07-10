@@ -32,7 +32,7 @@
     <button type="submit">Save draft</button>
   </form>
   <form method="post" action="/admin/studio/contracts/{{ d.id }}/send"
-        onsubmit="return confirm('Lock this contract and mark it sent? The body hash is recorded and editing is disabled.')">
+        data-confirm="Lock this contract and mark it sent? The body hash is recorded and editing is disabled.">
     <button type="submit">Mark sent (locks body)</button>
   </form>
   {% else %}
@@ -43,7 +43,7 @@
   {% else %}
   <form method="post" action="/admin/studio/contracts/{{ d.id }}/countersign"
         class="stack-form" style="max-width:680px"
-        onsubmit="return confirm('Record your typed name as the studio countersignature? This completes the agreement as a bilateral record.')">
+        data-confirm="Record your typed name as the studio countersignature? This completes the agreement as a bilateral record.">
     <label>Countersign as
       <input type="text" name="countersigner_name" required
              placeholder="Your full legal name"></label>
@@ -56,7 +56,7 @@
   <p class="muted">SHA-256: <code>{{ d.body_sha256 }}</code>
     <form method="post" action="/admin/studio/contracts/{{ d.id }}/duplicate"
           class="inline-form"
-          onsubmit="return confirm('Make an editable copy of this contract as a new draft?')">
+          data-confirm="Make an editable copy of this contract as a new draft?">
       <button type="submit" class="link">Duplicate as draft</button>
     </form></p>
   <pre class="doc-body">{{ d.body }}</pre>

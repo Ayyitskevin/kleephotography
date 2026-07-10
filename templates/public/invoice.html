@@ -89,7 +89,7 @@
         <form method="post" action="/i/{{ d.slug }}/pay">
           <button type="submit" class="client-pay-btn">Pay {{ "deposit" if pay_kind == "deposit" else ("balance" if pay_kind == "balance" else "now") }} — ${{ amount_due|usd }}</button>
         </form>
-        <button type="button" onclick="window.print()" class="client-secondary-btn">Print / save as PDF</button>
+        <button type="button" data-print class="client-secondary-btn">Print / save as PDF</button>
       </div>
       <p class="client-doc-security no-print">Secured by Stripe · card or bank transfer · questions can stay in the email thread.</p>
       {% elif not awaiting_confirmation %}
@@ -99,7 +99,7 @@
 
     {% if not show_pay or paid_total %}
     <p class="no-print client-doc-print">
-      {% if not show_pay %}<button type="button" onclick="window.print()" class="link">Print / save as PDF</button>{% endif %}
+      {% if not show_pay %}<button type="button" data-print class="link">Print / save as PDF</button>{% endif %}
       {% if paid_total %}{% if not show_pay %} · {% endif %}<a href="/i/{{ d.slug }}/receipt" class="link">View receipt</a>{% endif %}
     </p>
     {% endif %}

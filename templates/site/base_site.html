@@ -6,7 +6,7 @@
 {# Apply the saved theme on <html> before first paint so dark mode never
    flashes light on load. Shares the admin's localStorage key so a visitor's
    (or Kevin's) choice is one preference across the whole property. #}
-<script>
+<script nonce="{{ csp_nonce }}">
   (function () {
     try {
       if (localStorage.getItem("mise-theme") === "dark")
@@ -115,7 +115,7 @@
     <span>Photography that makes people hungry.</span>
   </div>
 </footer>
-<script>
+<script nonce="{{ csp_nonce }}">
   (function () {
     /* Dark-mode toggle: flips data-theme on <html>, persists to localStorage.
        The pre-paint script in the head applies the saved choice on load. */

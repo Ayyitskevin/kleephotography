@@ -3836,7 +3836,7 @@ def test_upload_all_rejected_reports_zero_accepted(admin):
         # destruction of curation
         admin.post(f"/admin/galleries/{g['id']}/sections", data={"name": "Mains"})
         page = admin.get(f"/admin/galleries/{g['id']}").text
-        assert "sections/" in page and 'onsubmit="return confirm(' in page
+        assert "sections/" in page and 'data-confirm="Remove this section?' in page
     finally:
         db.run("DELETE FROM sections WHERE gallery_id=?", (g["id"],))
         db.run("DELETE FROM galleries WHERE id=?", (g["id"],))
@@ -6615,38 +6615,37 @@ def test_brand_kit_cascade_nearest_ancestor(admin):
 
 
 def test_delete_confirm_onsubmit_well_formed(admin):
-    """The delete-client confirm() lives in an HTML attribute built from
-    tojson, which emits a double-quoted string. If that attribute is itself
-    double-quoted the value terminates early and the confirm dialog never
-    fires — an irreversible delete loses its guard (found in the live
-    walkthrough). The attribute must be single-quoted so tojson's output sits
-    inside it intact. A nasty name (apostrophe + double-quote + ampersand)
-    exercises every char tojson escapes."""
-    import json
+    """The delete-client confirm() guard lives in a data-confirm attribute
+    (dispatched by /static/behaviors.js — no inline JS under the nonce'd CSP).
+    Jinja autoescaping must keep a hostile client name (apostrophe +
+    double-quote + ampersand) inside the attribute: html.unescape of the
+    attribute value has to round-trip the exact message, and the value must
+    never terminate the attribute early (the pre-CSP bug this test was born
+    from). An irreversible delete keeps its guard."""
+    import html as html_mod
     import re
 
     nasty = 'O\'Brien "Smoke" & Oak'
     cid = db.run("INSERT INTO clients (name) VALUES (?)", (nasty,))
 
     def assert_intact(page, must_contain):
-        # The only single-quoted onsubmit on the page is the delete-client form.
-        # If someone reverts to a double-quoted attribute this match drops to
-        # zero and the test fails.
-        m = re.findall(r"onsubmit='([^']*)'", page)
-        assert len(m) == 1, "delete-confirm onsubmit must be single-quoted (and unique)"
-        val = m[0]
-        assert val.startswith("return confirm(") and val.endswith(")")
-        # The argument must be a valid JS/JSON string literal — json.loads
-        # raises if the quoting is unbalanced or the value was truncated.
-        arg = val[len("return confirm(") : -1]
-        msg = json.loads(arg)
+        # exactly one delete-client guard on the page, on the delete form
+        m = re.findall(
+            r'data-confirm="([^"]*)"[^>]*>\s*(?:<input[^>]*>\s*)?<button class="link danger">Delete client',
+            page,
+        )
+        assert len(m) == 1, "delete-client form must carry exactly one data-confirm"
+        msg = html_mod.unescape(m[0])
         assert must_contain in msg
-        # The broken double-double form must never reappear.
-        assert 'onsubmit="return confirm("' not in page
+        # no legacy inline handler may reappear — CSP would silently kill it
+        assert "onsubmit=" not in page
+        return msg
 
     # no blocker → "Delete <name>? This is final." (name carries the nasty chars)
     page = admin.get(f"/admin/studio/clients/{cid}").text
-    assert_intact(page, "This is final.")
+    msg = assert_intact(page, "This is final.")
+    # the hostile characters round-trip intact through attribute escaping
+    assert nasty in msg
 
     # with a child blocker → the WARNING summary, still well-formed
     child = db.run("INSERT INTO clients (name, parent_id) VALUES (?,?)", ("Child Venue", cid))

@@ -48,7 +48,7 @@
               <td class="fin-num fin-net">{{ r.ded }}</td>
               <td class="fin-num">
                 <form method="post" action="/admin/financials/mileage/{{ r.id }}/delete"
-                      onsubmit="return confirm('Delete this trip?');">
+                      data-confirm="Delete this trip?">
                   <button class="fin-del" type="submit" title="Delete">&times;</button>
                 </form>
               </td>

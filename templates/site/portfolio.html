@@ -60,7 +60,7 @@
 
 {% include "site/_lightbox.html" %}
 {% if tags %}
-<script>
+<script nonce="{{ csp_nonce }}">
   (function () {
     const tiles = document.querySelectorAll(".portfolio-masonry .pf-masonry-tile");
     const chips = document.querySelectorAll(".pf-chip");

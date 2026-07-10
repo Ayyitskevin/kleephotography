@@ -22,7 +22,15 @@ def _static_rev() -> int:
 
 templates = Jinja2Templates(
     directory=ROOT / "templates",
-    context_processors=[lambda request: {"static_rev": _static_rev()}],
+    # csp_nonce: set per-request by the common_headers middleware (app/main.py);
+    # inline <script nonce="{{ csp_nonce }}"> blocks must echo it to satisfy the
+    # nonce'd script-src. Empty fallback keeps non-HTTP render paths working.
+    context_processors=[
+        lambda request: {
+            "static_rev": _static_rev(),
+            "csp_nonce": getattr(request.state, "csp_nonce", ""),
+        }
+    ],
 )
 templates.env.globals["site_name"] = config.SITE_NAME
 templates.env.globals["base_url"] = config.BASE_URL

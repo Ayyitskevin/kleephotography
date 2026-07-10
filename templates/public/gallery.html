@@ -99,7 +99,7 @@
   </div>
 </div>
 <script src="/static/lightbox.js?v={{ static_rev }}" defer></script>
-<script>
+<script nonce="{{ csp_nonce }}">
   // Show a brief toast when a fav attempt hits the proofing cap.
   document.body.addEventListener("proof-cap", e => {
     const t = document.getElementById("proof-toast");

@@ -60,7 +60,7 @@
   <p class="studio-empty muted" id="gal-empty" hidden>No galleries match this filter.</p>
   {% else %}<p class="muted">No galleries yet.</p>{% endif %}
 
-  <script>
+  <script nonce="{{ csp_nonce }}">
   (function () {
     var compose = document.getElementById('new-gallery');
     var opener = document.querySelector('.pgtop-new[href="#new-gallery"]');

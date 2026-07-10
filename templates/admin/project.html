@@ -231,7 +231,7 @@
           {% for s in shots %}
           <form method="post" action="/admin/studio/shots/{{ s.id }}" id="shot-{{ s.id }}"></form>
           <form method="post" action="/admin/studio/shots/{{ s.id }}/delete" id="shot-del-{{ s.id }}"
-                onsubmit="return confirm('Remove this shot?')"></form>
+                data-confirm="Remove this shot?"></form>
           {% endfor %}
           <div class="table-scroll">
           <table class="list">

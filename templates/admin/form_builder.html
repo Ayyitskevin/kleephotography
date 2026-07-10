@@ -52,7 +52,7 @@
           <form method="post" action="/admin/forms/fields/{{ fld.id }}/move" class="inline-form">
             <input type="hidden" name="dir" value="down"><button type="submit" title="Move down">&darr;</button></form>
           <form method="post" action="/admin/forms/fields/{{ fld.id }}/delete" class="inline-form"
-                onsubmit="return confirm('Delete field &quot;{{ fld.label }}&quot;?')">
+                data-confirm="Delete field &quot;{{ fld.label }}&quot;?">
             <button type="submit" title="Delete" class="link">&times;</button></form>
         </div>
         <details class="field-edit">
@@ -110,7 +110,7 @@
 
   <section class="danger-zone" aria-label="Delete form">
     <form method="post" action="/admin/forms/{{ f.id }}/delete"
-          onsubmit="return confirm('Delete this form and all its fields and submissions? This cannot be undone.')">
+          data-confirm="Delete this form and all its fields and submissions? This cannot be undone.">
       <button type="submit" class="link danger">Delete this form</button>
     </form>
   </section>

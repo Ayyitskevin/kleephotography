@@ -197,7 +197,7 @@
   {% endif %}
 
 </div>
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
   var box = document.querySelector('.ib-reply-msg');
   if (!box) return;
