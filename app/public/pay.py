@@ -41,7 +41,7 @@ def next_payment(d: "db.sqlite3.Row") -> tuple[int, str]:
 
 
 @router.get("/i/{slug}", response_class=HTMLResponse)
-async def view_invoice(request: Request, slug: str):
+async def view_invoice(request: Request, slug: str, thanks: str = ""):
     d = _invoice_or_404(slug)
     if d["status"] == "sent":
         db.run(
@@ -54,6 +54,22 @@ async def view_invoice(request: Request, slug: str):
                            FROM payments WHERE invoice_id=?""",
         (d["id"],),
     )["c"]
+    # Stripe bounces the client back here with ?thanks=1 after Checkout. If the
+    # webhook that records the payment hasn't landed yet (cards: seconds; ACH:
+    # days), the invoice would still read "amount due" with a live Pay button —
+    # moments after they paid, inviting a double charge. The return param is
+    # treated as PRESENTATION ONLY (reassure + hide the button); the webhook
+    # stays the sole writer of payment state, so a forged ?thanks=1 can't mark
+    # anything paid. A recent payment row means the webhook already landed and
+    # the normal paid/deposit copy tells the story, so no banner.
+    awaiting_confirmation = False
+    if thanks and amount:
+        recent = db.one(
+            """SELECT 1 AS x FROM payments WHERE invoice_id=?
+               AND created_at > datetime('now', '-30 minutes')""",
+            (d["id"],),
+        )
+        awaiting_confirmation = recent is None
     return templates.TemplateResponse(
         request,
         "public/invoice.html",
@@ -64,6 +80,7 @@ async def view_invoice(request: Request, slug: str):
             "pay_kind": kind,
             "paid_cents": paid_cents,
             "payments_on": features.stripe_enabled(),
+            "awaiting_confirmation": awaiting_confirmation,
         },
     )
 

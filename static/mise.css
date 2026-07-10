@@ -1946,6 +1946,15 @@ html[data-theme="dark"] .admin-shell .inv-payments strong { color: var(--terra);
   letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
 }
 .client-doc-terms p { margin: 0; color: var(--muted); line-height: 1.6; }
+.client-doc-thanks {
+  margin: 0 0 24px; padding: 16px 18px;
+  background: var(--card); border: 1px solid var(--accent); border-radius: 12px;
+}
+.client-doc-thanks strong {
+  display: block; margin-bottom: 5px; color: var(--accent);
+  font: 700 1rem/1.3 "Archivo", sans-serif;
+}
+.client-doc-thanks p { margin: 0; color: var(--muted); line-height: 1.55; }
 .client-doc-actions {
   margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;
 }
