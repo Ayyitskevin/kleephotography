@@ -6630,6 +6630,21 @@ html[data-theme="dark"] .site-body .svc-pick { background: var(--accent); color:
 .gallery-body .gallery-header .muted { color: rgba(242, 233, 220, 0.6); }
 .gallery-body > footer .muted, .gallery-body .center.muted { color: rgba(242, 233, 220, 0.55); }
 
+/* ── The private dining room, at 390 (Redesign - Mobile.dc.html · gallery) ────
+   The desktop room already stacks via the auto-fill grid, but at phone widths
+   the min tile width (220px) collapses it to a single column. The mobile spec
+   plates the room two-up, with the section chips reading as tappable pills and
+   a heart big enough to hit with a thumb. Scoped to touch-sized widths so the
+   1440 room the revamp shipped stays pixel-stable. */
+@media (max-width: 560px) {
+  .gallery-body .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* chips: give the anchor-jump nav a resting pill so it's an obvious tap target */
+  .gallery-body .section-nav a { background: rgba(242, 233, 220, 0.08); }
+  .gallery-body .section-nav a:active { background: rgba(224, 164, 59, 0.22); color: #E0A43B; }
+  /* heart / download: 40px round, matching the mock's thumb-sized action */
+  .gallery-body .icon-btn { width: 40px; height: 40px; font-size: 1rem; }
+}
+
 /* ============================================================================
    ADMIN V4 — dashboard information design + studio board intel (Revamp PR 4).
    Scoped .admin-shell; same warm HoneyBook×Pixieset base, NOT flipped dark.

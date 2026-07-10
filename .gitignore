@@ -26,3 +26,6 @@ __pycache__/
 *.swp
 .DS_Store
 .r/
+
+# Fable 5 design export — local reference only, never commit
+_design/
