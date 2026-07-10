@@ -162,6 +162,12 @@ async def common_headers(request: Request, call_next):
     # get revalidated on every repeat navigation.
     if p.startswith("/static/"):
         resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif resp.headers.get("content-type", "").startswith("text/html"):
+        # HTML must revalidate: a page carries ?v={{ static_rev }} asset URLs and a
+        # per-request CSP nonce, so a heuristically-cached copy pins stale CSS/JS
+        # (e.g. a redeploy's dark-mode fix never appears) or a stale nonce. Only the
+        # versioned /static assets above are safe to keep forever.
+        resp.headers.setdefault("Cache-Control", "no-cache")
     return resp
 
 
