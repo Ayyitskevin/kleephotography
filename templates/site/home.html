@@ -1,286 +1,207 @@
 {% extends "site/base_site.html" %}
 {% block title %}{{ site_name }} — Food &amp; Beverage Photography{% endblock %}
-{% block meta_description %}We make your menu sell itself — food &amp; beverage photography and videography for the restaurants, cafés, and bars of Asheville &amp; Western North Carolina.{% endblock %}
+{% block meta_description %}Photography that makes people hungry — food &amp; beverage photography and videography for the restaurants, cafés, and bars of Asheville &amp; Western North Carolina.{% endblock %}
+{% block navclass %} nav-prep{% endblock %}
 {% block site_content %}
 
 <div class="scroll-progress" aria-hidden="true"><div data-progress-bar></div></div>
 
-{# HERO #}
-<section class="hero hero-viewport">
-  <div class="hero-inner">
-    <div data-reveal>
-      <p class="eyebrow">Asheville &amp; Western North Carolina</p>
-      <h1>We make your menu<br><span class="it-accent">sell itself.</span></h1>
-      <p class="lede">For the restaurants, cafés, and bars of Western North
-         Carolina — shot to sell the seat.</p>
-      <div class="hero-actions">
-        <a class="btn-pill" href="/book">Book a shoot <span>&rarr;</span></a>
-        <a class="btn-ghost" href="/portfolio">View the portfolio</a>
+{# ═══ 4:45 PM — PREP LIGHT · the HUNGRY hero ═════════════════════════════════
+   The page is one dinner service: scrolling dims the lights from prep-cream to
+   candlelight. The headline letters are filled with a real starred photo via
+   background-clip: text (inline style carries the per-photo URL; the gradient
+   underneath is the loading/empty fallback, never the shipped look). #}
+<section class="ad-scene ad-prep">
+  <div class="ad-prep-inner">
+    <p class="ad-kicker" data-reveal>4:45 PM · prep light · one night at your restaurant</p>
+    <h1 class="ad-hungry-head" data-reveal>
+      <span class="ad-hungry-lede">Photography that makes people</span>
+      <span class="ad-hungry"{% if featured %} style="background-image: url('/site/img/{{ featured[0].id }}?variant=web'), linear-gradient(115deg, #B0653C 0%, #7A4A2E 30%, #C9A35B 52%, #8A6C36 68%, #5E4152 100%);"{% endif %}>HUNGRY<i aria-hidden="true">.</i></span>
+    </h1>
+    <div class="ad-hero-row" data-reveal>
+      <div class="ad-hero-actions">
+        <a class="btn-dinner" href="#ad-golden">Stay for dinner <span aria-hidden="true">&darr;</span></a>
+        <span class="ad-hero-trust">120+ menus · Asheville &amp; WNC · same-week delivery</span>
       </div>
+      <p class="ad-hero-note">Scroll and the lights go down — the way your photos
+         will meet the room: prep, golden hour, the pour, candlelight.</p>
     </div>
-    <figure class="hero-photo hero-media" style="margin:0;">
-      {% if featured %}
-      <img data-hero-img data-parallax="0.05"
-           src="/site/img/{{ featured[0].id }}?variant=web" fetchpriority="high" decoding="async"
-           srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
-           sizes="(max-width: 900px) 100vw, 55vw"
-           alt="{{ featured[0]|portfolio_alt }}">
-      {% if featured[0].portfolio_tag %}
-      <figcaption>{{ featured[0].portfolio_tag|capitalize }}</figcaption>
-      {% endif %}
-      {% endif %}
-    </figure>
-  </div>
-  <div class="hero-scroll-cue" aria-hidden="true">
-    <span>Scroll</span><span class="hero-scroll-arrow">&darr;</span>
   </div>
 </section>
 
-{# PRESS MARQUEE #}
+{# AS SEEN IN — italic serif strip on the prep→golden transition #}
 {% if press %}
-<section class="marquee" aria-label="As seen in">
-  <div class="marquee-track">
-    {% for p in press %}<span>{{ p.outlet }}</span>{% endfor %}
-    {# duplicate copy is purely visual (seamless scroll loop) — hide it from AT #}
-    {% for p in press %}<span aria-hidden="true">{{ p.outlet }}</span>{% endfor %}
-  </div>
+<section class="ad-press" aria-label="As seen in">
+  {% for p in press %}<em>{{ p.outlet }}</em>{% endfor %}
 </section>
 {% endif %}
 
-{# SELECTED WORK #}
+{# ═══ 6:10 PM — GOLDEN HOUR · tonight's menu (the course list) ═══════════════
+   Direction B's hero interaction, seated in the golden-hour band: hover or
+   click a course and the stage swaps to that course's photo. Falls back to the
+   static plates grid when Kevin has starred fewer than two distinct tags. #}
 {% if featured %}
-<section class="sec" id="work">
-  <div class="sec-inner">
-    <div class="sec-head" data-reveal>
-      <div>
-        <p class="eyebrow">Selected work</p>
-        <h2>Plates that earn the double-take.</h2>
-        <p class="lede" style="margin:14px 0 0;">A few favorites from recent menus — plates,
-           pours, and the rooms they live in.</p>
+<section id="ad-golden" class="ad-scene ad-golden">
+  <div class="ad-scene-inner">
+    <p class="ad-kicker" data-reveal><span class="ad-roman">I.</span> 6:10 PM · golden hour</p>
+    <h2 class="ad-h2" data-reveal>The plates go out <span class="ad-it">looking like this.</span></h2>
+    {% if courses|length >= 2 %}
+    <div class="ad-courses" data-courses data-reveal>
+      <div class="ad-course-list" role="tablist" aria-label="Tonight's menu — pick a course">
+        <p class="ad-course-cue">Tonight's menu — pick a course</p>
+        {% for c in courses %}
+        <button type="button" class="ad-course{% if loop.first %} on{% endif %}"
+                data-course-btn="{{ loop.index0 }}" role="tab"
+                aria-selected="{{ 'true' if loop.first else 'false' }}">
+          <span class="ad-course-num">{{ "%02d"|format(loop.index) }}</span>
+          <span class="ad-course-name">{{ c.label }}</span>
+          {% if c.meta %}<span class="ad-course-meta">{{ c.meta }}</span>{% endif %}
+        </button>
+        {% endfor %}
       </div>
-      <a class="btn-ghost" href="/portfolio">Full portfolio &rarr;</a>
+      <div class="ad-course-stage">
+        {% for c in courses %}
+        <figure class="tile ad-course-panel{% if loop.first %} on{% endif %}"
+                data-course-panel="{{ loop.index0 }}" data-web="/site/img/{{ c.asset.id }}">
+          <img src="/site/img/{{ c.asset.id }}?variant=web"
+               {% if loop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async"
+               srcset="/site/img/{{ c.asset.id }}?variant=thumb 480w, /site/img/{{ c.asset.id }}?variant=web 2048w"
+               sizes="(max-width: 900px) 100vw, 55vw"
+               alt="{{ c.asset|portfolio_alt }}">
+          <figcaption class="ad-course-cap"><span>{{ c.label }}</span>{% if c.meta %}<em>{{ c.meta }}</em>{% endif %}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
     </div>
-    <div class="work-grid" data-reveal>
+    {% else %}
+    <div class="ad-plates" data-reveal>
       {% for a in featured[:3] %}
-      <figure class="tile" data-web="/site/img/{{ a.id }}">
+      <figure class="tile ad-plate ad-plate-{{ loop.index }}" data-web="/site/img/{{ a.id }}">
         <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
              srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
-             sizes="(max-width: 700px) 50vw, 25vw"
+             sizes="(max-width: 700px) 90vw, 40vw"
              alt="{{ a|portfolio_alt }}">
         {% if a.portfolio_tag %}
-        <figcaption class="work-cap">{{ a.portfolio_tag|capitalize }}{% if a.client_name %}
-          <small>{{ a.client_name }}</small>{% elif a.gallery_title %}
-          <small>{{ a.gallery_title }}</small>{% endif %}
-        </figcaption>
-        {% endif %}
-      </figure>
-      {% endfor %}
-    </div>
-    {% if featured|length > 3 %}
-    <div class="work-grid work-grid-row2" data-reveal>
-      {% for a in featured[3:6] %}
-      <figure class="tile" data-web="/site/img/{{ a.id }}">
-        <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-             srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
-             sizes="(max-width: 700px) 50vw, 25vw"
-             alt="{{ a|portfolio_alt }}">
-        {% if a.portfolio_tag %}
-        <figcaption class="work-cap">{{ a.portfolio_tag|capitalize }}{% if a.client_name %}
-          <small>{{ a.client_name }}</small>{% elif a.gallery_title %}
-          <small>{{ a.gallery_title }}</small>{% endif %}
-        </figcaption>
+        <figcaption class="ad-course-cap"><span>{{ a.portfolio_tag|capitalize }}</span>{% if a.client_name %}<em>{{ a.client_name }}</em>{% endif %}</figcaption>
         {% endif %}
       </figure>
       {% endfor %}
     </div>
     {% endif %}
+    <p class="ad-more" data-reveal><a href="/portfolio">Every plate, at its peak &rarr;</a></p>
   </div>
 </section>
 {% endif %}
 
-{# MOTION / REELS #}
+{# ═══ 8:30 PM — DUSK · the pour, in motion ═══════════════════════════════════ #}
 {% if reels %}
-<section class="motion-sec" id="motion">
-  <div class="sec-inner">
-    <div class="motion-head" data-reveal>
-      <div>
-        <p class="eyebrow">Motion</p>
-        <h2>Motion that <span class="it-accent">earns the scroll.</span></h2>
-      </div>
-      <p class="motion-lede">The steam. The pour. The first cut. Built vertical for the feed.</p>
-    </div>
-    <div class="motion-feature" data-reveal>
-      <video autoplay muted loop playsinline preload="metadata"
-             poster="/site/poster/{{ reels[0].id }}">
-        <source src="/site/vid/{{ reels[0].id }}" type="video/mp4">
-      </video>
-      <div class="motion-feature-meta">
-        <div>
-          <span class="motion-feature-label">House reel</span>
-          <p>{{ reels[0].portfolio_tag|capitalize if reels[0].portfolio_tag else 'Featured reel' }}</p>
-        </div>
-        <a class="motion-feature-link" href="/reels">All reels &rarr;</a>
-      </div>
-    </div>
-    {% if reels|length > 1 %}
-    <div class="motion-strip" data-reveal>
-      {% for r in reels[1:5] %}
-      <figure class="motion-reel">
+<section class="ad-scene ad-dusk" id="motion">
+  <div class="ad-scene-inner">
+    <p class="ad-kicker" data-reveal><span class="ad-roman">II.</span> 8:30 PM · dusk</p>
+    <h2 class="ad-h2" data-reveal>The pour goes <span class="ad-it ad-it-warm">vertical.</span></h2>
+    <div class="ad-reels" data-reveal>
+      {% for r in reels[:4] %}
+      <figure class="ad-reel{% if loop.index is even %} ad-reel-lift{% endif %}">
         <video autoplay muted loop playsinline preload="metadata"
                poster="/site/poster/{{ r.id }}">
           <source src="/site/vid/{{ r.id }}" type="video/mp4">
         </video>
-        <div class="motion-reel-meta">
+        <div class="ad-reel-meta">
           <span>{{ r.portfolio_tag|capitalize if r.portfolio_tag else 'Reel' }}</span>
-          <span class="motion-reel-bar"><i></i></span>
+          <span class="ad-reel-bar" aria-hidden="true"><i></i></span>
         </div>
       </figure>
       {% endfor %}
     </div>
-    {% endif %}
+    <p class="ad-more" data-reveal><a href="/reels">All reels &rarr;</a></p>
   </div>
 </section>
 {% endif %}
 
-{# DELIVERY — light band; dark proof panel only #}
-<section class="delivery delivery-light" id="delivery">
-  <div class="sec-inner">
-    <div class="delivery-intro" data-reveal>
-      <p class="eyebrow">After the shoot</p>
-      <h2>Delivery is the easy part.</h2>
-      <p>A private gallery the day after the shoot. Proof, download, post —
-         every crop already sized.</p>
-      {% if demo_gallery %}
-      <p class="delivery-demo-link"><a class="btn-ghost" href="{{ demo_gallery.url }}">Try the sample gallery &rarr;</a>
-        {% if demo_gallery.pin %}<span class="muted">PIN <b>{{ demo_gallery.pin }}</b></span>
-        {% else %}<a class="muted" href="/contact?prefill=demo_gallery">(ask for PIN)</a>{% endif %}
-      </p>
-      {% endif %}
-    </div>
-
-    <div class="delivery-grid">
-      <div class="proof-panel" data-reveal data-proof>
-        <div class="proof-head">
-          <b>Proof &amp; favorite</b>
-          <span><b data-proof-count>0</b> of {{ featured|length if featured else 6 }} selected</span>
-        </div>
-        <div class="proof-bar"><div class="proof-fill" data-proof-fill></div></div>
-        <div class="proof-thumbs">
-          {% if featured %}
-          {% for a in featured %}
-          <button class="proof-thumb" data-proof-thumb type="button" aria-label="Favorite">
-            <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async" alt="Proof thumbnail">
-            <span class="proof-heart">&hearts;</span>
-          </button>
-          {% endfor %}
-          {% else %}
-          {% for i in range(6) %}
-          <button class="proof-thumb" data-proof-thumb type="button" aria-label="Favorite">
-            <span class="proof-ph"></span>
-            <span class="proof-heart">&hearts;</span>
-          </button>
-          {% endfor %}
-          {% endif %}
-        </div>
+{# ═══ 10:15 PM — CANDLELIGHT · the menu comes to the table ═══════════════════
+   The prix-fixe card renders SERVICES (the same tiers/prices /services shows)
+   — reshaped server-side in _prix_fixe(), never re-typed here. #}
+<section class="ad-scene ad-candle{% if not reels %} ad-bridge{% endif %}" id="ad-menu">
+  <div class="ad-scene-inner">
+    <p class="ad-kicker ad-kicker-center ad-flicker" data-reveal><span class="ad-roman">III.</span> 10:15 PM · candlelight</p>
+    <h2 class="ad-h2 ad-h2-center" data-reveal>The menu comes <span class="ad-it ad-it-gold">to the table.</span></h2>
+    <div class="ad-menu-card" data-reveal>
+      <div class="ad-menu-head">
+        <p class="ad-menu-brand">{{ site_name }}</p>
+        <h3>Ways to work together</h3>
+        <p class="ad-menu-sub">quotes tailored within a business day</p>
       </div>
-
-      <div class="crop-demo" data-reveal data-crop>
-        <p class="eyebrow">Social crops, auto-made</p>
-        <h3>One favorite. Every format.</h3>
-        <div class="crop-btns">
-          <button class="crop-btn" data-crop-btn data-ratio="1 / 1" data-name="Square · 1:1"
-                  data-use="Instagram feed &amp; grid posts.">1:1</button>
-          <button class="crop-btn on" data-crop-btn data-ratio="4 / 5" data-name="Portrait · 4:5"
-                  data-use="Maximum feed real estate on mobile.">4:5</button>
-          <button class="crop-btn" data-crop-btn data-ratio="9 / 16" data-name="Story · 9:16"
-                  data-use="Reels, Stories, and TikTok.">9:16</button>
+      {% for g in prix_fixe %}
+      <div class="ad-menu-group">
+        <div class="ad-menu-group-head">
+          <h4>{{ g.title }}</h4>
+          <span>{{ g.tagline }}</span>
         </div>
-        <div class="crop-stage">
-          <div class="crop-preview" data-crop-preview style="aspect-ratio: 4 / 5;">
-            {% if featured %}<img src="/site/img/{{ featured[0].id }}?variant=thumb" decoding="async"
-              srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
-              sizes="(max-width: 700px) 80vw, 40vw" alt="Crop preview">
-            {% else %}<span class="crop-ph"></span>{% endif %}
-          </div>
-          <div class="crop-meta">
-            <b data-crop-name>Portrait · 4:5</b>
-            <p data-crop-use>Maximum feed real estate on mobile.</p>
-          </div>
+        {% for r in g.rows %}
+        <div class="ad-menu-row">
+          <span class="ad-menu-name">{{ r.name }}{% if r.star %}<i aria-hidden="true" title="Most picked">*</i>{% endif %}</span>
+          {% if r.desc %}<span class="ad-menu-desc">{{ r.desc }}</span>{% endif %}
+          <span class="ad-menu-dots" aria-hidden="true"></span>
+          <span class="ad-menu-price">{{ r.price }}</span>
         </div>
+        {% endfor %}
       </div>
+      {% endfor %}
+      <p class="ad-menu-foot"><i aria-hidden="true">*</i> most picked · every tier ends in a private same-week gallery</p>
+      <p class="ad-menu-link"><a href="/services">Full menu details &rarr;</a></p>
     </div>
   </div>
 </section>
 
-{# SERVICES PREVIEW #}
-<section class="services" id="services">
-  <div class="sec-inner">
-    <div data-reveal style="max-width:30em; margin-bottom:clamp(34px,5vw,56px);">
-      <p class="eyebrow">How we work</p>
-      <h2 style="margin:0;">Three ways to work together.</h2>
-    </div>
-    <div class="svc-cards">
-      <a class="svc-card" href="/services" data-reveal>
-        <span class="svc-num">01</span>
-        <h3>Photography</h3>
-        <p>Dishes, drinks, and the rooms they live in — lit to sell.</p>
-        <span class="svc-tiers">Starter · Standard · Premium</span>
-        <span class="svc-cta">Explore photography &rarr;</span>
-      </a>
-      <a class="svc-card" href="/services" data-reveal>
-        <span class="svc-num">02</span>
-        <h3>Videography</h3>
-        <p>Scroll-stopping loops and hero films that move people.</p>
-        <span class="svc-tiers">Starter · Standard · Premium</span>
-        <span class="svc-cta">Explore videography &rarr;</span>
-      </a>
-      <a class="svc-card" href="/services" data-reveal>
-        <span class="svc-num">03</span>
-        <h3>Brand Partner</h3>
-        <p>A steady monthly drumbeat of content. One partner, every platform.</p>
-        <span class="svc-tiers">Monthly retainer</span>
-        <span class="svc-cta">Explore retainers &rarr;</span>
-      </a>
-    </div>
-  </div>
-</section>
-
-{% include "site/_testimonials.html" %}
-
-{# ABOUT STRIP #}
-<section class="about" id="about">
-  <div class="about-grid">
-    {% if featured %}
-    <div class="about-photo" data-reveal>
-      {% set about_a = featured[1] if featured|length > 1 else featured[0] %}
-      <img src="/site/img/{{ about_a.id }}?variant=thumb" loading="lazy" decoding="async"
-           srcset="/site/img/{{ about_a.id }}?variant=thumb 480w, /site/img/{{ about_a.id }}?variant=web 2048w"
-           sizes="(max-width: 900px) 100vw, 45vw"
-           alt="{{ about_a|portfolio_alt }}">
-    </div>
+{# ═══ 11:45 PM — CLOSE · the gallery lands + reservations ════════════════════ #}
+<section class="ad-scene ad-close" id="ad-close">
+  <div class="ad-close-inner">
+    <p class="ad-kicker ad-kicker-center" data-reveal><span class="ad-roman">IV.</span> 11:45 PM · lights out — and the same week&hellip;</p>
+    <h2 class="ad-h2 ad-h2-center" data-reveal>&hellip;the gallery lands, and your menu starts <span class="ad-it ad-it-gold">selling itself.</span></h2>
+    {% if demo_gallery %}
+    <p class="ad-demo" data-reveal><a href="{{ demo_gallery.url }}">Taste the sample gallery &rarr;</a>
+      {% if demo_gallery.pin %}<span>PIN <b>{{ demo_gallery.pin }}</b></span>
+      {% else %}<a class="ad-demo-ask" href="/contact?prefill=demo_gallery">(ask for the PIN)</a>{% endif %}
+    </p>
     {% endif %}
-    <div data-reveal>
-      <p class="eyebrow">About</p>
-      <h2>I'm Kevin Lee, and I'd love to work with you.</h2>
-      <p>I love a great plate, a perfect pour, and the room that frames them —
-         and my job is simple: make every plate look irresistible. We'll scout
-         the menu together, build a shot list, and move fast, always around
-         your service and never against it. Let's win together.</p>
-      <p style="margin-top:26px;"><a class="btn-ghost" href="/about">Read the full story &rarr;</a></p>
-    </div>
-  </div>
-</section>
-
-{# CLOSING CTA #}
-<section class="cta">
-  <div class="cta-inner" data-reveal>
-    <h2>Let's make your food look <span class="it-accent">the way it tastes.</span></h2>
-    <div class="cta-actions">
-      <a class="btn-pill" href="/book">Book a shoot &rarr;</a>
-      <a class="btn-ghost" href="/work">See past work</a>
+    {% include "site/_testimonials.html" %}
+    <div class="ad-reserve" data-reveal>
+      <a class="btn-gold" href="/book">Reserve your night <span aria-hidden="true">&rarr;</span></a>
+      <a class="btn-ghost-cream" href="/contact">Request a quote</a>
     </div>
   </div>
 </section>
 
 {% if featured %}{% include "site/_lightbox.html" %}{% endif %}
+
+{% if courses|length >= 2 %}
+<script nonce="{{ csp_nonce }}">
+  (function () {
+    /* Golden-hour course swap — same delegated-listener pattern as the
+       portfolio filter. Hover previews, click commits; CSS owns the fade. */
+    var wrap = document.querySelector("[data-courses]");
+    if (!wrap) return;
+    var btns = wrap.querySelectorAll("[data-course-btn]");
+    var panels = wrap.querySelectorAll("[data-course-panel]");
+    var show = function (idx) {
+      btns.forEach(function (b) {
+        var on = b.getAttribute("data-course-btn") === idx;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      panels.forEach(function (p) {
+        p.classList.toggle("on", p.getAttribute("data-course-panel") === idx);
+      });
+    };
+    wrap.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-course-btn]");
+      if (b) show(b.getAttribute("data-course-btn"));
+    });
+    wrap.addEventListener("mouseover", function (e) {
+      var b = e.target.closest("[data-course-btn]");
+      if (b) show(b.getAttribute("data-course-btn"));
+    });
+  })();
+</script>
+{% endif %}
 {% endblock %}
