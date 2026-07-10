@@ -3,15 +3,16 @@
 {% block head %}
 <meta name="darkreader-lock">
 <meta name="color-scheme" content="light only">
-{# Apply the saved theme on <html> before first paint so dark mode never
-   flashes light on load. Shares the admin's localStorage key so a visitor's
-   (or Kevin's) choice is one preference across the whole property. #}
+{# The marketing site is DARK-FIRST (After Dark × Direction B): candlelight is
+   the default and an explicit "light" choice is the override. Applied on <html>
+   before first paint so neither theme ever flashes. Shares the admin's
+   localStorage key so a visitor's (or Kevin's) choice is one preference across
+   the property — the admin keeps its own light-first default. #}
 <script nonce="{{ csp_nonce }}">
   (function () {
-    try {
-      if (localStorage.getItem("mise-theme") === "dark")
-        document.documentElement.setAttribute("data-theme", "dark");
-    } catch (e) {}
+    var dark = true;
+    try { dark = localStorage.getItem("mise-theme") !== "light"; } catch (e) {}
+    if (dark) document.documentElement.setAttribute("data-theme", "dark");
   })();
 </script>
 <meta name="description" content="{% block meta_description %}Menus, dishes, drinks, and the rooms they live in — food &amp; beverage photography and videography for Asheville &amp; Western North Carolina.{% endblock %}">
@@ -44,7 +45,7 @@
 {% block bodyclass %}site-body{% endblock %}
 {% block content %}
 <a class="skip-link" href="#main">Skip to content</a>
-<header class="site-nav" data-nav>
+<header class="site-nav{% block navclass %}{% endblock %}" data-nav>
   <a href="/" class="site-brand">
     <b>Kevin&nbsp;Lee</b>
     <small>Food&nbsp;&amp;&nbsp;Beverage</small>
@@ -74,6 +75,13 @@
 
 <div id="main" tabindex="-1">
 {% block site_content %}{% endblock %}
+</div>
+
+{# Sticky mobile CTA — the one persistent money path (<=700px, CSS-gated).
+   Pure markup + mise.css; no script, so CSP is untouched. #}
+<div class="sticky-cta">
+  <span class="sticky-cta-msg">Ready when you are.</span>
+  <a class="btn-gold" href="/contact">Request a quote &rarr;</a>
 </div>
 
 <footer class="site-footer">

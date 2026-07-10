@@ -384,6 +384,56 @@ def _contact_prefill(request: Request) -> dict:
     return {"business": business, "message": message, "service": service, "tier": tier}
 
 
+def _home_courses(featured: list) -> list[dict]:
+    """The golden-hour course list — one course per distinct portfolio tag, backed
+    by the first starred photo wearing it. Pure read-side grouping of what Kevin
+    has actually starred: no invented labels, no fixed menu. Fewer than two
+    courses and the template falls back to the static plates grid."""
+    seen: dict[str, dict] = {}
+    for a in featured:
+        tag = (a["portfolio_tag"] or "").strip()
+        if tag and tag.lower() not in seen:
+            seen[tag.lower()] = {
+                "label": tag.capitalize(),
+                "asset": a,
+                "meta": a["client_name"] or a["gallery_title"] or "",
+            }
+    return list(seen.values())[:5]
+
+
+def _prix_fixe() -> list[dict]:
+    """The candlelight menu card rows, derived from SERVICES (the single source
+    of truth for tiers and prices — same rows /services renders). The middle
+    tier carries the 'most picked' star, matching the approved menu-card spec."""
+    groups = []
+    for s in SERVICES:
+        rows = []
+        for i, t in enumerate(s["tiers"]):
+            bits = []
+            sub = (t.get("subtitle") or "").strip()
+            if sub and sub.lower() != "per month":
+                bits.append(sub.lower())
+            inc = t.get("includes") or []
+            if len(inc) > 1:
+                bits.append(inc[1][0].lower() + inc[1][1:])
+            rows.append(
+                {
+                    "name": t["name"],
+                    "desc": " · ".join(bits),
+                    "price": t["display_price"] + t.get("price_unit", ""),
+                    "star": i == 1,
+                }
+            )
+        groups.append(
+            {
+                "title": s["title"],
+                "tagline": s["tagline"].partition(".")[0].strip().lower(),
+                "rows": rows,
+            }
+        )
+    return groups
+
+
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     featured = _portfolio_assets()[:6]
@@ -398,6 +448,8 @@ async def home(request: Request):
             "press": _press_features()[:12],
             "testimonials": _testimonials(limit=3),
             "demo_gallery": _demo_gallery(),
+            "courses": _home_courses(featured),
+            "prix_fixe": _prix_fixe(),
         },
     )
 

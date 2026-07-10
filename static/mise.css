@@ -5970,68 +5970,75 @@ html[data-theme="dark"] .admin-shell .unlinked-warn-head { color: var(--ink-soft
 html[data-theme="dark"] .admin-shell .unlinked-warn-head strong { color: var(--ink); }
 
 /* ============================================================================
-   PUBLIC SITE — DARK MODE  (additive, scoped to .site-body under
-   html[data-theme="dark"]). Same charcoal / jade / silver scheme as the admin
-   shell. The locked candlelit-editorial LIGHT design is byte-untouched — this
-   layer only adds higher-specificity dark overrides. The toggle + no-flash
-   pre-paint script live in templates/site/base_site.html and share the admin
-   localStorage key ("mise-theme") so the preference is one across the property.
+   PUBLIC SITE — DARK MODE · CANDLELIGHT (After Dark × Direction B).
+   Dark is now the marketing site's DEFAULT (see the dark-first pre-paint
+   script in templates/site/base_site.html); an explicit "light" choice keeps
+   the locked candlelit-editorial LIGHT design, byte-untouched below this
+   layer. Scoped to .site-body under html[data-theme="dark"] — near-black
+   forest surfaces, warm cream ink, gold accent. Shares the admin localStorage
+   key ("mise-theme"); the admin keeps its own light-first default.
    ========================================================================== */
 html[data-theme="dark"] .site-body {
-  --bg: #131313;          /* page charcoal                                    */
-  --ink: #e8e6e2;         /* primary text → light                             */
-  --ink-soft: #c7c3bb;    /* secondary text                                   */
-  --muted: #9a958c;       /* tertiary / labels                                */
-  --card: #1c1c1c;        /* card surface                                     */
-  --line: #2c2c2c;        /* hairlines                                        */
-  --paper2: #1a1a1a;      /* light-panel sections (services/about) → dark     */
-  --accent: #23b487;      /* forest green → bright jade (links, eyebrows)     */
-  --accent-lt: #c8ced3;   /* gold → silver — the dark-mode metallic           */
-  --espresso: #0f1714;    /* dark sections (footer/delivery/stats) jade-black */
-  --espresso2: #16211c;   /* nested dark panels (proof-panel)                 */
-  background: #131313;
+  color-scheme: dark;
+  --bg: #0D1512;          /* candlelight near-black                           */
+  --ink: #F2E9DC;         /* warm cream ink                                   */
+  --ink-soft: #DDD2BF;    /* secondary text                                   */
+  --muted: #A79E8B;       /* tertiary / labels                                */
+  --card: #141C18;        /* card surface — green-black panel                 */
+  --line: #26302A;        /* hairlines                                        */
+  --paper2: #10231B;      /* light-panel sections (services/about) → forest   */
+  --accent: #E0A43B;      /* gold — links, eyebrows, focus                    */
+  --accent-lt: #FFD68C;   /* lighter gold — captions, small metallic accents  */
+  --espresso: #10231B;    /* dark sections (footer/delivery/stats) forest     */
+  --espresso2: #14241D;   /* nested dark panels (proof-panel)                 */
+  background: #0D1512;
 }
 
 /* Buttons that use --ink as a FILL go light-on-light under the var-flip → give
-   them a bright-jade fill with DARK ink (the accessible jade-button pattern,
-   same as the admin inbox/gallery CTAs). */
+   them the gold fill with candlelit-dark ink (≥8:1, same pair as the CTA pill
+   in the After Dark spec). */
 html[data-theme="dark"] .site-body .btn-pill,
 html[data-theme="dark"] .site-body .site-nav nav a.nav-cta {
-  background: var(--accent); color: #06231a;
+  background: var(--accent); color: #221507;
 }
 html[data-theme="dark"] .site-body .btn-pill:hover,
 html[data-theme="dark"] .site-body .site-nav nav a.nav-cta:hover {
-  background: #2ec698; color: #06231a;
+  background: #EDBB58; color: #221507;
 }
-html[data-theme="dark"] .site-body .nav-mobile a.nav-cta { color: #06231a; }
+html[data-theme="dark"] .site-body .nav-mobile a.nav-cta { color: #221507; }
 
-/* Translucent-cream scrolled nav backdrop → translucent charcoal. */
+/* Translucent-cream scrolled nav backdrop → translucent candlelight. */
 html[data-theme="dark"] .site-body .site-nav.scrolled {
-  background: rgba(19, 19, 19, .86); border-bottom-color: var(--line);
+  background: rgba(13, 21, 18, .88); border-bottom-color: var(--line);
 }
-/* Nav links are a hardcoded warm-dark on cream → lift to light. */
-html[data-theme="dark"] .site-body .site-nav nav a { color: #c7c3bb; }
+/* Nav links are a hardcoded warm-dark on cream → lift to warm cream. */
+html[data-theme="dark"] .site-body .site-nav nav a { color: rgba(242, 233, 220, .78); }
 html[data-theme="dark"] .site-body .site-nav nav a:hover { color: var(--accent); }
+html[data-theme="dark"] .site-body .site-nav .site-brand b { color: #F2E9DC; }
+html[data-theme="dark"] .site-body .site-nav .site-brand small { color: var(--accent); }
+html[data-theme="dark"] .site-body .nav-menu-btn span { background: #F2E9DC; }
+html[data-theme="dark"] .site-body .nav-mobile { background: rgba(13, 21, 18, .97); }
+html[data-theme="dark"] .site-body .nav-mobile a { color: rgba(242, 233, 220, .85); }
 
 /* Light hairline borders the var-flip can't reach (hardcoded #e3dacb / #c8bfb1). */
-html[data-theme="dark"] .site-body .btn-ghost { border-bottom-color: rgba(200, 206, 211, .3); }
+html[data-theme="dark"] .site-body .btn-ghost { border-bottom-color: rgba(242, 233, 220, .28); }
 html[data-theme="dark"] .site-body .svc-card,
 html[data-theme="dark"] .site-body .proc-card,
-html[data-theme="dark"] .site-body .testimonial { border-color: #2c2c2c; }
+html[data-theme="dark"] .site-body .testimonial { border-color: #26302A; }
 
 /* Near-black testimonial quote (#2a241d) would vanish on the dark card. */
 html[data-theme="dark"] .site-body .testimonial blockquote { color: var(--ink); }
 
 /* Light image-placeholder backgrounds → dark, so an unloaded/missing image
-   never flashes a pale block on the charcoal page. */
+   never flashes a pale block on the candlelit page. */
 html[data-theme="dark"] .site-body .hero-photo,
 html[data-theme="dark"] .site-body .work-grid .tile,
 html[data-theme="dark"] .site-body .about-photo,
 html[data-theme="dark"] .site-body .ab-photo,
-html[data-theme="dark"] .site-body .contact-photo { background: #222; }
+html[data-theme="dark"] .site-body .contact-photo { background: #141C18; }
 
 /* Footer base rule was a bordeaux hairline. */
-html[data-theme="dark"] .site-body .footer-base { border-top-color: rgba(200, 206, 211, .14); }
+html[data-theme="dark"] .site-body .footer-base { border-top-color: rgba(242, 233, 220, .14); }
 
 /* Footer theme toggle — a NEW element, styled for BOTH themes (it always sits
    in the dark footer). Ghost pill that reads on the espresso footer. */
@@ -6045,18 +6052,324 @@ html[data-theme="dark"] .site-body .footer-base { border-top-color: rgba(200, 20
 .site-body .site-theme-toggle:hover { border-color: var(--accent-lt); color: var(--cream); }
 .site-body .site-theme-toggle-icon { font-size: .9rem; line-height: 1; }
 
-/* Form fields have no explicit background → default white box on the charcoal
-   page. Give the site's contact/lead forms a dark surface. */
+/* Form fields have no explicit background → default white box on the dark
+   page. Candlelight field set from the After Dark spec: #161D19 fields on the
+   #0D1512 page, gold focus (the ring itself comes from the shared :focus rule
+   reading --accent). */
 html[data-theme="dark"] .site-body .stack-form input,
 html[data-theme="dark"] .site-body .stack-form select,
 html[data-theme="dark"] .site-body .stack-form textarea {
-  background: #1c1c1c; color: var(--ink); border-color: #2c2c2c;
+  background: #161D19; color: var(--ink); border-color: #26302A;
 }
 html[data-theme="dark"] .site-body .stack-form input::placeholder,
 html[data-theme="dark"] .site-body .stack-form textarea::placeholder { color: var(--muted); }
+html[data-theme="dark"] .site-body .stack-form input:focus,
+html[data-theme="dark"] .site-body .stack-form select:focus,
+html[data-theme="dark"] .site-body .stack-form textarea:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(224, 164, 59, 0.2);
+}
 /* The form submit uses the global `button` rule (--ink fill + #fff) → washed in
-   dark; give it the bright-jade + dark-ink treatment. */
+   dark; give it the gold + candlelit-ink money-action treatment. */
 html[data-theme="dark"] .site-body .stack-form button[type=submit],
 html[data-theme="dark"] .site-body .stack-form button:not(.site-theme-toggle) {
-  background: var(--accent); color: #06231a;
+  background: var(--accent); color: #221507;
+}
+
+/* ============================================================================
+   AFTER DARK × DIRECTION B — the home page as one dinner service
+   (Fable 5 Revamp, locked 2026-07-10). Scenes carry their own fixed lighting
+   gradients — prep-cream → golden hour → dusk → candlelight → close — so the
+   arc renders identically in both themes; only the shared chrome (nav, footer,
+   inner pages) obeys the data-theme flip. All rules scoped .site-body / .ad-*;
+   the global prefers-reduced-motion collapse neutralizes every animation here.
+   ========================================================================== */
+
+/* ── Scene scaffolding ────────────────────────────────────────────────────── */
+.site-body .ad-scene { position: relative; overflow: hidden;
+  padding: clamp(90px, 12vw, 170px) clamp(20px, 5vw, 72px); }
+.site-body .ad-scene-inner { max-width: 1500px; margin: 0 auto; }
+.site-body .ad-kicker { margin: 0 0 10px; font: 600 0.66rem/1.5 var(--sans);
+  letter-spacing: 0.3em; text-transform: uppercase; }
+.site-body .ad-kicker-center { text-align: center; }
+.site-body .ad-roman { font-style: italic; font-family: var(--serif);
+  font-size: 1.15em; letter-spacing: 0.12em; margin-right: 0.5em; }
+.site-body .ad-h2 { margin: 0 0 clamp(36px, 5vw, 64px); font-family: var(--serif);
+  font-weight: 400; font-size: clamp(2.4rem, 5.4vw, 4.8rem); line-height: 0.98;
+  letter-spacing: -0.028em; max-width: 13em; text-wrap: balance; }
+.site-body .ad-h2-center { margin-left: auto; margin-right: auto; text-align: center; }
+.site-body .ad-it { font-style: italic; }
+.site-body .ad-it-gold { color: #E0A43B; }
+.site-body .ad-it-warm { color: #FFD68C; }
+.site-body .ad-more { margin: 26px 0 0; text-align: right; }
+.site-body .ad-more a { font: 600 0.88rem/1 var(--sans); text-decoration: none;
+  border-bottom: 1.5px solid currentColor; padding-bottom: 4px; }
+@keyframes ad-flicker { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+.site-body .ad-flicker { animation: ad-flicker 4s ease-in-out infinite; }
+@keyframes ad-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+@keyframes ad-loop { 0% { transform: scaleX(0); } 92% { transform: scaleX(1); } 100% { transform: scaleX(1); } }
+
+/* ── 4:45 PM · PREP LIGHT — the HUNGRY hero ───────────────────────────────── */
+.site-body .ad-prep { min-height: 100svh; display: flex; flex-direction: column;
+  justify-content: center; color: #1C1814; padding-top: clamp(110px, 16vh, 170px);
+  background: linear-gradient(180deg, #FBF6EA 0%, #F7EFDD 70%, #F2E4C8 100%); }
+.site-body .ad-prep-inner { max-width: 1500px; margin: 0 auto; width: 100%; }
+.site-body .ad-prep .ad-kicker { color: #8f6a1f; margin-bottom: 4px; }
+.site-body .ad-hungry-head { margin: 0; }
+.site-body .ad-hungry-lede { display: block; font-family: var(--serif);
+  font-style: italic; font-weight: 400;
+  font-size: clamp(1.3rem, 2.6vw, 2.1rem); color: #4A443C; }
+.site-body .ad-hungry { display: block; margin: -0.18em 0 0 -0.05em;
+  padding-top: 0.14em; font-family: var(--serif); font-weight: 500;
+  font-size: clamp(4.6rem, 17.5vw, 15.5rem); line-height: 0.86;
+  letter-spacing: -0.045em;
+  background-image: linear-gradient(115deg, #B0653C 0%, #7A4A2E 30%, #C9A35B 52%, #8A6C36 68%, #5E4152 100%);
+  background-size: cover; background-position: center;
+  background-blend-mode: multiply;
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
+.site-body .ad-hungry i { font-style: normal;
+  background: none; -webkit-background-clip: initial; background-clip: initial;
+  -webkit-text-fill-color: #E0A43B; color: #E0A43B; }
+.site-body .ad-hero-row { margin-top: clamp(24px, 4vh, 44px); display: flex;
+  align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.site-body .ad-hero-actions { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.site-body .btn-dinner { display: inline-flex; align-items: center; gap: 0.55em;
+  padding: 1.02em 1.9em; background: #1C1814; color: #F7F0E4; border-radius: 999px;
+  font: 600 0.92rem/1 var(--sans); text-decoration: none;
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.3s ease; }
+.site-body .btn-dinner:hover { transform: translateY(-2px); background: #143C2F; }
+.site-body .btn-dinner span { animation: ad-bob 1.8s ease-in-out infinite; }
+.site-body .ad-hero-trust { font: 500 0.84rem/1.5 var(--sans); color: #6B6046; }
+.site-body .ad-hero-note { margin: 0; max-width: 21em; text-align: right;
+  font-size: 0.95rem; line-height: 1.6; color: #4A443C; }
+
+/* Home nav sits on the prep-cream hero: force ink links until scrolled, in
+   BOTH themes (the hero is cream regardless of data-theme). Scrolled state
+   falls back to the theme's solid nav. */
+html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) nav a { color: #4A443C; }
+html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) nav a:hover { color: #8f6a1f; }
+html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) .site-brand b { color: #1C1814; }
+html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) .site-brand small { color: #8f6a1f; }
+html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) .nav-menu-btn span { background: #1C1814; }
+html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) nav a.nav-cta { color: #221507; }
+
+/* ── AS SEEN IN — italic serif strip on the prep→golden transition ────────── */
+.site-body .ad-press { display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: center; gap: 14px clamp(28px, 4vw, 64px);
+  padding: 30px clamp(20px, 5vw, 72px); background: #F2E4C8;
+  border-bottom: 1px solid rgba(34, 21, 7, 0.08); }
+.site-body .ad-press em { font-family: var(--serif); font-style: italic;
+  font-size: 1.05rem; color: rgba(34, 21, 7, 0.55); }
+
+/* ── 6:10 PM · GOLDEN HOUR — tonight's menu (course list) ─────────────────── */
+.site-body .ad-golden { color: #221507;
+  background: linear-gradient(180deg, #F2E4C8 0%, #E8C99A 55%, #C99F66 100%); }
+.site-body .ad-golden .ad-kicker { color: #7A4A17; }
+.site-body .ad-golden .ad-more a { color: #221507; border-color: rgba(34, 21, 7, 0.4); }
+.site-body .ad-golden .ad-more a:hover { color: #7A4A17; }
+.site-body .ad-courses { display: grid; grid-template-columns: 0.9fr 1.1fr;
+  gap: clamp(28px, 5vw, 72px); align-items: center; }
+.site-body .ad-course-cue { margin: 0 0 18px; font: 600 0.66rem/1 var(--sans);
+  letter-spacing: 0.32em; text-transform: uppercase; color: #7A4A17; }
+.site-body .ad-course-list { display: flex; flex-direction: column; align-items: flex-start; }
+.site-body .ad-course { display: flex; align-items: baseline; gap: 18px;
+  background: none; border: 0; margin: 0; padding: 4px 0; cursor: pointer;
+  text-align: left; box-shadow: none; }
+.site-body .ad-course:hover { background: none; }
+.site-body .ad-course-num { font: 500 0.72rem/1 var(--sans); width: 2em;
+  letter-spacing: 0.1em; font-variant-numeric: tabular-nums;
+  color: rgba(34, 21, 7, 0.4); transition: color 0.4s ease; }
+.site-body .ad-course-name { font-family: var(--serif); font-weight: 400;
+  font-size: clamp(2.2rem, 5vw, 4.2rem); line-height: 1.06; letter-spacing: -0.025em;
+  color: rgba(34, 21, 7, 0.38); transition: color 0.4s ease; }
+.site-body .ad-course-meta { font: 500 0.78rem/1 var(--sans);
+  color: rgba(34, 21, 7, 0.55); opacity: 0; transition: opacity 0.4s ease;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 12em; }
+.site-body .ad-course.on .ad-course-num { color: #7A4A17; }
+.site-body .ad-course.on .ad-course-name { color: #221507; font-style: italic; }
+.site-body .ad-course.on .ad-course-meta { opacity: 1; }
+.site-body .ad-course-stage { position: relative; aspect-ratio: 4 / 5;
+  max-height: 74vh; border-radius: 6px; overflow: hidden; background: #4A2C1E;
+  box-shadow: 0 60px 110px -55px rgba(66, 36, 8, 0.75); }
+.site-body .ad-course-panel { position: absolute; inset: 0; margin: 0;
+  opacity: 0; transition: opacity 0.9s ease; pointer-events: none; }
+.site-body .ad-course-panel.on { opacity: 1; pointer-events: auto; cursor: zoom-in; }
+.site-body .ad-course-panel img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.site-body .ad-course-cap { position: absolute; left: 15px; right: 15px; bottom: 13px;
+  display: flex; align-items: baseline; gap: 10px; pointer-events: none; }
+.site-body .ad-course-cap span { font: 600 0.66rem/1 var(--sans);
+  letter-spacing: 0.16em; text-transform: uppercase; color: #FFD68C; }
+.site-body .ad-course-cap em { font-family: var(--serif); font-style: italic;
+  font-size: 0.95rem; color: rgba(255, 244, 224, 0.9); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.site-body .ad-course-panel::after { content: ""; position: absolute; inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(20, 10, 4, 0) 60%, rgba(20, 10, 4, 0.55) 100%); }
+/* Fallback: fewer than two distinct tags → the After Dark static plates grid */
+.site-body .ad-plates { display: grid; grid-template-columns: repeat(12, 1fr);
+  gap: 18px; align-items: start; }
+.site-body .ad-plate { position: relative; margin: 0; border-radius: 6px;
+  overflow: hidden; background: #4A2C1E; cursor: zoom-in;
+  box-shadow: 0 60px 110px -55px rgba(66, 36, 8, 0.75); }
+.site-body .ad-plate img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.site-body .ad-plate::after { content: ""; position: absolute; inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(20, 10, 4, 0) 60%, rgba(20, 10, 4, 0.5) 100%); }
+.site-body .ad-plate-1 { grid-column: span 5; aspect-ratio: 4 / 5; }
+.site-body .ad-plate-2 { grid-column: span 4; aspect-ratio: 1 / 1; margin-top: 60px; }
+.site-body .ad-plate-3 { grid-column: span 3; aspect-ratio: 3 / 4; margin-top: 22px; }
+
+/* ── 8:30 PM · DUSK — the pour, in motion ─────────────────────────────────── */
+.site-body .ad-dusk { color: #F2E9DC;
+  background: linear-gradient(180deg, #C99F66 0%, #6E4B52 45%, #33222E 100%); }
+.site-body .ad-dusk .ad-kicker { color: #FFD68C; }
+.site-body .ad-dusk .ad-h2 { color: #F7EEDE; }
+.site-body .ad-dusk .ad-more a { color: #FFD68C; border-color: rgba(255, 214, 140, 0.4); }
+.site-body .ad-dusk .ad-more a:hover { color: #F2E9DC; }
+.site-body .ad-reels { display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;
+  align-items: end; }
+.site-body .ad-reel { position: relative; margin: 0; aspect-ratio: 9 / 16;
+  border-radius: 8px; overflow: hidden; background: #3B2735;
+  box-shadow: 0 50px 100px -55px rgba(10, 5, 12, 0.9); }
+.site-body .ad-reel-lift { transform: translateY(-32px); }
+.site-body .ad-reel video { position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; }
+.site-body .ad-reel::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(90% 60% at 50% 34%, rgba(255, 214, 140, 0.14) 0%, rgba(20, 10, 18, 0) 55%),
+    linear-gradient(180deg, transparent 55%, rgba(16, 8, 14, 0.75) 100%); }
+.site-body .ad-reel-meta { position: absolute; left: 0; right: 0; bottom: 0;
+  z-index: 1; padding: 24px 13px 12px; display: flex; flex-direction: column; gap: 8px; }
+.site-body .ad-reel-meta span:first-child { font: 500 0.8rem/1.2 var(--sans); color: #F7EEDE; }
+.site-body .ad-reel-bar { display: block; height: 2px; border-radius: 999px;
+  background: rgba(242, 233, 220, 0.18); overflow: hidden; }
+.site-body .ad-reel-bar i { display: block; height: 100%; width: 100%;
+  background: #FFD68C; border-radius: 999px; transform-origin: left;
+  animation: ad-loop 3.4s linear infinite; }
+
+/* ── 10:15 PM · CANDLELIGHT — the menu card ───────────────────────────────── */
+.site-body .ad-candle { color: #F2E9DC;
+  background: linear-gradient(180deg, #33222E 0%, #14100E 40%, #0D1512 100%); }
+/* No reels yet → the dusk scene is skipped; start candlelight from golden's
+   last light so the dimming arc never jump-cuts. */
+.site-body .ad-candle.ad-bridge {
+  background: linear-gradient(180deg, #C99F66 0%, #6E4B52 22%, #33222E 46%, #14100E 72%, #0D1512 100%); }
+.site-body .ad-candle .ad-kicker { color: #E0A43B; }
+.site-body .ad-candle .ad-h2 { color: #F2E9DC; }
+.site-body .ad-menu-card { max-width: 820px; margin: 0 auto; background: #F2E9DC;
+  color: #1C1814; border-radius: 6px;
+  padding: clamp(32px, 4.5vw, 60px) clamp(24px, 4.5vw, 72px);
+  box-shadow: 0 80px 150px -70px rgba(0, 0, 0, 0.95),
+    0 0 0 1px rgba(224, 164, 59, 0.35), 0 0 100px -30px rgba(224, 164, 59, 0.35); }
+.site-body .ad-menu-head { text-align: center; margin-bottom: clamp(24px, 3.4vw, 40px); }
+.site-body .ad-menu-brand { margin: 0; font: 600 0.62rem/1 var(--sans);
+  letter-spacing: 0.36em; text-transform: uppercase; color: #8f6a1f; }
+.site-body .ad-menu-head h3 { margin: 10px 0 0; font-family: var(--serif);
+  font-weight: 400; font-size: clamp(1.7rem, 3vw, 2.4rem); letter-spacing: -0.02em; }
+.site-body .ad-menu-sub { margin: 8px 0 0; font-family: var(--serif);
+  font-style: italic; color: #5B554C; }
+.site-body .ad-menu-group { margin-bottom: clamp(20px, 3vw, 32px); }
+.site-body .ad-menu-group-head { display: flex; align-items: baseline; gap: 14px;
+  margin-bottom: 4px; }
+.site-body .ad-menu-group-head h4 { margin: 0; font-family: var(--serif);
+  font-weight: 500; font-size: 1.35rem; white-space: nowrap; }
+.site-body .ad-menu-group-head span { font-family: var(--serif); font-style: italic;
+  font-size: 0.92rem; color: #5B554C; flex: 1; min-width: 0; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.site-body .ad-menu-row { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; }
+.site-body .ad-menu-name { font: 500 0.96rem/1.4 var(--sans); white-space: nowrap; }
+.site-body .ad-menu-name i { font-style: normal; color: #8f6a1f; }
+.site-body .ad-menu-desc { font-family: var(--serif); font-style: italic;
+  font-size: 0.92rem; color: #5B554C; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.site-body .ad-menu-dots { flex: 1; border-bottom: 1.5px dotted #b9ad97;
+  transform: translateY(-4px); min-width: 24px; }
+.site-body .ad-menu-price { font-family: var(--serif); font-size: 1.1rem; white-space: nowrap; }
+.site-body .ad-menu-foot { margin: 0; text-align: center;
+  font: 500 0.78rem/1.5 var(--sans); color: #5B554C; }
+.site-body .ad-menu-foot i { font-style: normal; color: #8f6a1f; }
+.site-body .ad-menu-link { margin: 14px 0 0; text-align: center; }
+.site-body .ad-menu-link a { font: 600 0.84rem/1 var(--sans); color: #7A4A17;
+  text-decoration: none; border-bottom: 1.5px solid rgba(122, 74, 23, 0.4);
+  padding-bottom: 3px; }
+.site-body .ad-menu-link a:hover { color: #221507; }
+
+/* ── 11:45 PM · CLOSE — the gallery lands + reservations ──────────────────── */
+.site-body .ad-close { background: #0D1512; color: #F2E9DC;
+  padding-bottom: clamp(70px, 9vw, 120px); }
+.site-body .ad-close-inner { max-width: 1100px; margin: 0 auto; text-align: center; }
+.site-body .ad-close .ad-kicker { color: #E0A43B; }
+.site-body .ad-close .ad-h2 { color: #F2E9DC; max-width: 14em; line-height: 1;
+  margin-bottom: clamp(28px, 4vw, 44px); }
+.site-body .ad-demo { margin: 0 0 clamp(28px, 4vw, 44px); display: flex;
+  justify-content: center; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  font-size: 0.92rem; color: rgba(242, 233, 220, 0.6); }
+.site-body .ad-demo a { font: 600 0.88rem/1 var(--sans); color: #E0A43B;
+  text-decoration: none; border-bottom: 1px solid rgba(224, 164, 59, 0.4);
+  padding-bottom: 4px; }
+.site-body .ad-demo a:hover { color: #F2E9DC; }
+.site-body .ad-demo b { color: #F2E9DC; }
+.site-body .ad-demo .ad-demo-ask { border-bottom: none; color: rgba(242, 233, 220, 0.6); }
+/* The shared testimonials partial keeps its markup + Review JSON-LD; inside
+   the close scene it reads as bare editorial pull-quotes on near-black. */
+.site-body .ad-close .testimonials { padding: 0; background: transparent; }
+.site-body .ad-close .testimonials h2 { position: absolute; width: 1px; height: 1px;
+  margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.site-body .ad-close .testimonial-list { display: flex; flex-direction: column;
+  gap: 26px; max-width: 720px; margin: 0 auto; }
+.site-body .ad-close .testimonial { background: transparent; border: 0;
+  box-shadow: none; padding: 0; margin: 0; }
+.site-body .ad-close .testimonial::before { content: none; }
+.site-body .ad-close .testimonial blockquote { margin: 0; font-family: var(--serif);
+  font-style: italic; font-size: clamp(1.2rem, 2.3vw, 1.7rem); line-height: 1.5;
+  color: rgba(242, 233, 220, 0.85); text-wrap: balance; }
+.site-body .ad-close .testimonial figcaption { margin-top: 10px; border: 0;
+  padding: 0; justify-content: center; display: flex; gap: 8px;
+  font: 600 0.72rem/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase; }
+.site-body .ad-close .testimonial figcaption strong { color: #E0A43B; font-weight: 600; }
+.site-body .ad-close .testimonial figcaption .muted { color: rgba(242, 233, 220, 0.55); }
+.site-body .ad-reserve { margin-top: clamp(34px, 5vw, 54px); display: flex;
+  justify-content: center; align-items: center; gap: 18px 28px; flex-wrap: wrap; }
+
+/* ── Gold button system (the money action, both themes) ───────────────────── */
+.site-body .btn-gold { display: inline-flex; align-items: center; gap: 0.55em;
+  padding: 1.1em 2.2em; background: #E0A43B; color: #221507; border-radius: 999px;
+  font: 600 0.98rem/1 var(--sans); letter-spacing: 0.02em; text-decoration: none;
+  box-shadow: 0 26px 54px -20px rgba(224, 164, 59, 0.55);
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.3s ease; }
+.site-body .btn-gold:hover { transform: translateY(-2px); background: #EDBB58; }
+.site-body .btn-ghost-cream { display: inline-flex; align-items: center; gap: 0.5em;
+  font: 600 0.92rem/1 var(--sans); color: rgba(242, 233, 220, 0.85);
+  text-decoration: none; border-bottom: 1px solid rgba(242, 233, 220, 0.3);
+  padding-bottom: 5px; transition: color 0.3s ease, border-color 0.3s ease; }
+.site-body .btn-ghost-cream:hover { color: #E0A43B; border-color: #E0A43B; }
+
+/* ── Sticky mobile CTA — the persistent money path (≤700px) ───────────────── */
+.site-body .sticky-cta { display: none; }
+@media (max-width: 700px) {
+  .site-body .sticky-cta { position: fixed; left: 12px; right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 12px 10px 18px; border-radius: 999px;
+    background: rgba(13, 21, 18, 0.94);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.75); }
+  .site-body .sticky-cta-msg { font: 600 0.82rem/1.2 var(--sans); color: #F7F0E4; }
+  .site-body .sticky-cta .btn-gold { padding: 0.8em 1.4em; font-size: 0.84rem;
+    min-height: 44px; box-sizing: border-box; white-space: nowrap; box-shadow: none; }
+  /* keep the bar off the footer fine print */
+  .site-body .site-footer { padding-bottom: 96px; }
+}
+
+/* ── Responsive: the arc on small screens ─────────────────────────────────── */
+@media (max-width: 900px) {
+  .site-body .ad-courses { grid-template-columns: 1fr; gap: 30px; }
+  .site-body .ad-course-stage { max-height: none; aspect-ratio: 4 / 5; order: -1; }
+  .site-body .ad-hero-note { text-align: left; }
+  .site-body .ad-menu-desc { display: none; }
+  .site-body .ad-reel-lift { transform: none; }
+}
+@media (max-width: 700px) {
+  .site-body .ad-plates { grid-template-columns: 1fr 1fr; }
+  .site-body .ad-plate-1 { grid-column: span 2; }
+  .site-body .ad-plate-2, .site-body .ad-plate-3 { grid-column: span 1; margin-top: 0; }
 }
