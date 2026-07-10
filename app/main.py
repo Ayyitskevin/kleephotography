@@ -5,6 +5,7 @@ Mise — self-hosted F&B photography delivery · FastAPI + HTMX · port 8400
 """
 
 import logging
+import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -77,12 +78,14 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
-# Inline <script>/style= attributes and on*-handlers are pervasive in the
-# templates, so script/style-src must permit 'unsafe-inline' — this CSP is
-# hardening-in-depth (object/base/form-action/frame-ancestors locked down,
-# exfil channels narrowed), NOT a full XSS lockdown. Plausible is the only
-# off-origin asset, and only when analytics is enabled. Dropping 'unsafe-inline'
-# later means moving inline handlers to /static JS + nonces first.
+# script-src carries NO 'unsafe-inline': every on*-attribute moved to
+# data-attributes handled by /static/behaviors.js, and the few genuinely inline
+# <script> blocks (pre-paint theme, page-local widgets with Jinja data) carry a
+# per-request nonce — so injected markup can't execute script even if it slips
+# past autoescaping. style-src keeps 'unsafe-inline': inline style= attributes
+# are pervasive (progress widths, board colors), style injection is a far
+# weaker vector than script, and removing it buys little for a large diff.
+# Plausible is the only off-origin asset, and only when analytics is enabled.
 CSP_POLICY = "; ".join(
     (
         "default-src 'self'",
@@ -95,7 +98,7 @@ CSP_POLICY = "; ".join(
         "media-src 'self'",
         "font-src 'self'",
         "style-src 'self' 'unsafe-inline'",
-        "script-src 'self' 'unsafe-inline' https://plausible.io",
+        "script-src 'self' 'nonce-{nonce}' https://plausible.io",
         "connect-src 'self' https://plausible.io",
     )
 )
@@ -134,6 +137,10 @@ async def csrf_guard(request: Request, call_next):
 
 @app.middleware("http")
 async def common_headers(request: Request, call_next):
+    # Fresh CSP nonce per request; templates read it via the csp_nonce context
+    # var (render.py) so inline <script nonce=…> blocks match the header below.
+    nonce = secrets.token_urlsafe(16)
+    request.state.csp_nonce = nonce
     resp = await call_next(request)
     p = request.url.path
     if not (p in site.INDEXABLE or p.startswith(("/site/img/", "/static/", "/work/"))):
@@ -141,7 +148,7 @@ async def common_headers(request: Request, call_next):
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "same-origin"
-    resp.headers["Content-Security-Policy"] = CSP_POLICY
+    resp.headers["Content-Security-Policy"] = CSP_POLICY.format(nonce=nonce)
     resp.headers["Permissions-Policy"] = PERMISSIONS_POLICY
     # HSTS only when we know we're served over TLS (same signal as Secure
     # cookies) — sending it for a plain-http dev origin would wrongly pin

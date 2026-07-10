@@ -48,14 +48,14 @@
     <button type="submit">Save draft</button>
   </form>
   <form method="post" action="/admin/studio/proposals/{{ d.id }}/send"
-        onsubmit="return confirm('Lock this proposal and mark it sent? It becomes visible at the client link.')">
+        data-confirm="Lock this proposal and mark it sent? It becomes visible at the client link.">
     <button type="submit">Mark sent (locks editing)</button>
   </form>
   {% else %}
   <p class="muted">Locked — proposals can’t be edited after sending.
     <form method="post" action="/admin/studio/proposals/{{ d.id }}/duplicate"
           class="inline-form"
-          onsubmit="return confirm('Make an editable copy of this proposal as a new draft?')">
+          data-confirm="Make an editable copy of this proposal as a new draft?">
       <button type="submit" class="link">Duplicate as draft</button>
     </form></p>
   <table class="list">
@@ -74,7 +74,7 @@
 
   {% if d.status == 'accepted' %}
   <form method="post" action="/admin/studio/proposals/{{ d.id }}/convert"
-        onsubmit="return confirm('Create a draft contract and draft invoice from this proposal? Both open as drafts for you to review before sending.')">
+        data-confirm="Create a draft contract and draft invoice from this proposal? Both open as drafts for you to review before sending.">
     <button type="submit">Create contract + invoice from this proposal</button>
     <span class="muted">Spawns drafts seeded from these line items — nothing is sent or charged.</span>
   </form>

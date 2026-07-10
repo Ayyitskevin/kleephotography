@@ -37,7 +37,7 @@
           <td><a href="mailto:{{ b.email }}">{{ b.email }}</a>{% if b.phone %}<br>{{ b.phone }}{% endif %}</td>
           <td>
             <form method="post" action="/admin/scheduling/booking/{{ b.id }}/cancel"
-                  onsubmit="return confirm('Cancel this booking and email the client?')">
+                  data-confirm="Cancel this booking and email the client?">
               <button class="linkbtn danger">Cancel</button>
             </form>
           </td>
@@ -72,7 +72,7 @@
     {% endif %}
   </section>
 
-  <script>
+  <script nonce="{{ csp_nonce }}">
   (function () {
     var btns = document.querySelectorAll('.book-viewtoggle button');
     if (!btns.length) return;

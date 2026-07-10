@@ -40,7 +40,7 @@
           {% if p.brand_overlay %}overlay ON{% else %}overlay off{% endif %}</button>
       </form>
       <form method="post" action="/admin/studio/presets/{{ p.id }}/active" class="inline"
-            {% if p.active %}onsubmit='return confirm({{ ("Deactivate " ~ p.slug ~ "? Clients stop receiving this crop and its links 404. You can reactivate anytime.")|tojson }})'{% endif %}>
+            {% if p.active %}data-confirm="Deactivate {{ p.slug }}? Clients stop receiving this crop and its links 404. You can reactivate anytime."{% endif %}>
         <button type="submit" class="chip {% if p.active %}on{% endif %}">
           {% if p.active %}active{% else %}inactive{% endif %}</button>
       </form>

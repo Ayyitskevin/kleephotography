@@ -63,7 +63,7 @@
         <span class="rc-name" title="{{ r.filename }}">{{ r.filename }}</span>
         <div class="rc-meta">{{ r.meta }}</div>
         <form method="post" action="/admin/financials/receipts/{{ r.id }}/delete"
-              onsubmit="return confirm('Delete this receipt scan?');">
+              data-confirm="Delete this receipt scan?">
           <button class="rc-del" type="submit">Delete</button>
         </form>
       </div>

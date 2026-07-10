@@ -102,7 +102,7 @@
             {% endif %}
           {% endif %}
           <form method="post" action="/admin/comments/{{ c.id }}/hide" class="inline"
-                onsubmit="return confirm('Hide this comment and any replies?')">
+                data-confirm="Hide this comment and any replies?">
             <button class="link danger">hide</button>
           </form>
           <details class="avc-reply">
@@ -145,7 +145,7 @@
               {% if not is_drop %}
               <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/section" class="gd-mrow">
                 <span class="muted">Section</span>
-                <select name="section_id" onchange="this.form.submit()">
+                <select name="section_id" data-autosubmit>
                   <option value="">(none)</option>
                   {% for s in sections %}
                   <option value="{{ s.id }}" {% if a.section_id == s.id %}selected{% endif %}>{{ s.name }}</option>
@@ -180,7 +180,7 @@
               {% endif %}
               {% endif %}
               <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/delete" class="gd-mrow"
-                    onsubmit="return confirm('Delete {{ a.filename }}?')">
+                    data-confirm="Delete {{ a.filename }}?">
                 <button class="link danger">Delete file</button>
               </form>
               {% if a.kind == 'video' %}
@@ -436,7 +436,7 @@
         {% set confirm_msg = "Delete " ~ g.title ~ " and all " ~ (assets|length) ~ " assets permanently? This cannot be undone." %}
       {% endif %}
       <form method="post" action="/admin/galleries/{{ g.id }}/delete" class="inline gd-delete"
-            onsubmit="return confirm({{ confirm_msg|tojson }})">
+            data-confirm="{{ confirm_msg }}">
         {% if portal_favs %}<input type="hidden" name="force" value="1">{% endif %}
         <button class="link danger">Delete {{ 'transfer' if is_drop else 'gallery' }}{% if portal_favs %} (with {{ portal_favs }} portal fav{{ "s" if portal_favs != 1 else "" }}){% endif %}</button>
       </form>
@@ -482,7 +482,7 @@
       {% set email_intro = "Your gallery is ready to view and download:" %}
       {% set email_link = link %}
       {% include "admin/_email_form.html" %}
-      <script>
+      <script nonce="{{ csp_nonce }}">
         (function () {
           const sel = document.getElementById("email-kind");
           const form = sel.closest("details").querySelector("form");
@@ -556,7 +556,7 @@
           </form>
           <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/delete"
                 class="inline"
-                onsubmit="return confirm('Remove this section? Its photos move back to unsorted.')"><button class="link danger">remove</button></form>
+                data-confirm="Remove this section? Its photos move back to unsorted."><button class="link danger">remove</button></form>
         </li>
         {% endfor %}
       </ul>
@@ -569,7 +569,7 @@
   </section>
 </main>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
   // Reveal-and-scroll: topbar / rail buttons open the matching <details> panel.
   document.querySelectorAll('[data-reveal]').forEach(function (btn) {

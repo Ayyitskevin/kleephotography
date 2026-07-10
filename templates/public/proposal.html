@@ -61,18 +61,18 @@
     {% else %}
     <div class="client-doc-actions no-print client-doc-actions-split">
       <form method="post" action="/p/{{ d.slug }}/accept"
-            onsubmit="return confirm('Accept this proposal?')">
+            data-confirm="Accept this proposal?">
         <button type="submit" class="client-pay-btn">Accept proposal</button>
       </form>
       <form method="post" action="/p/{{ d.slug }}/decline"
-            onsubmit="return confirm('Decline this proposal?')">
+            data-confirm="Decline this proposal?">
         <button type="submit" class="client-secondary-btn">Decline</button>
       </form>
     </div>
     {% endif %}
 
     <p class="no-print client-doc-print">
-      <button type="button" onclick="window.print()" class="link">Print / save as PDF</button>
+      <button type="button" data-print class="link">Print / save as PDF</button>
     </p>
   </section>
 

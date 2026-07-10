@@ -86,7 +86,7 @@
     {{ form_table(quests, "No questionnaires yet — build one to gather shoot briefs from booked clients.", "questionnaires") }}
   </section>
 
-  <script>
+  <script nonce="{{ csp_nonce }}">
   (function () {
     var search = document.getElementById('form-search');
     if (!search) return;

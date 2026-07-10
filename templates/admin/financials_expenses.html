@@ -57,7 +57,7 @@
               <td>{% if r.has_receipt %}<span class="fin-pill fin-pill-paid">&checkmark; Receipt</span>{% else %}<span class="fin-pill fin-pill-out">Missing</span>{% endif %}</td>
               <td class="fin-num">
                 <form method="post" action="/admin/financials/expenses/{{ r.id }}/delete"
-                      onsubmit="return confirm('Delete this expense?');">
+                      data-confirm="Delete this expense?">
                   <button class="fin-del" type="submit" title="Delete">&times;</button>
                 </form>
               </td>

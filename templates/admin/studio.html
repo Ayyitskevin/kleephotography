@@ -65,7 +65,7 @@
                    data-name="{{ p.title | lower }}" data-shoot="{{ p.shoot_date or '' }}"
                    data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
                    data-created="{{ p.created_at or '' }}"
-                   onclick="if(!window.__stuDragged)location.href='/admin/studio/projects/{{ p.id }}'">
+                   data-goto="/admin/studio/projects/{{ p.id }}">
             <div class="stu-card-top">
               <span class="stu-card-co">{{ p.company or p.client_name }}</span>
               <span class="stu-card-val{% if won %} is-won{% elif not p.value_cents %} is-none{% endif %}">{{ ("$" ~ (p.value_cents|usd0)) if p.value_cents else "—" }}</span>
@@ -123,7 +123,7 @@
     </table>
   </section>
 
-  <script>
+  <script nonce="{{ csp_nonce }}">
   (function () {
     // Board / List view pill (in the topbar) — swaps the kanban for the flat table.
     var board = document.getElementById('studio-board');

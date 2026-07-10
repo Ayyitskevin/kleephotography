@@ -57,7 +57,7 @@
       <button class="linkbtn">{{ "Deactivate" if e.active else "Activate" }}</button>
     </form>
     <form method="post" action="/admin/scheduling/event/{{ e.id }}/delete"
-          onsubmit="return confirm('Delete this event type? Only allowed if it has no bookings.')">
+          data-confirm="Delete this event type? Only allowed if it has no bookings.">
       <button class="linkbtn danger">Delete</button>
     </form>
   </div>

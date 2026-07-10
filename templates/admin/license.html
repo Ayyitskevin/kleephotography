@@ -172,7 +172,7 @@
   {% endif %}
 
   <form method="post" action="/admin/studio/licenses/{{ d.id }}/delete"
-        onsubmit="return confirm('Soft-delete this license? It will be hidden but kept in the audit log.')">
+        data-confirm="Soft-delete this license? It will be hidden but kept in the audit log.">
     <button type="submit" class="link danger">Delete license</button>
   </form>
 

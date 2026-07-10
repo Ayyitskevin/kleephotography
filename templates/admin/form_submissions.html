@@ -47,7 +47,7 @@
     {% endfor %}
   </div>
   <p class="studio-empty" id="sub-empty" hidden>No submissions match.</p>
-  <script>
+  <script nonce="{{ csp_nonce }}">
   (function () {
     var search = document.getElementById('sub-search');
     if (!search) return;

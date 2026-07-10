@@ -33,7 +33,7 @@
       <button class="dash-signout" type="submit">Sign out</button>
       <button class="dash-signout" type="submit" name="everywhere" value="1"
               title="Revoke every admin session on all devices"
-              onclick="return confirm('Sign out of ALL devices? Any other logged-in session (including a leaked cookie) is revoked immediately.')">Sign out everywhere</button>
+              data-confirm="Sign out of ALL devices? Any other logged-in session (including a leaked cookie) is revoked immediately.">Sign out everywhere</button>
     </form>
     <details class="qc dash-qc" id="quick-create">
       <summary class="dash-new" aria-haspopup="menu">
@@ -49,7 +49,7 @@
     </details>
   </div>
 </header>
-<script>
+<script nonce="{{ csp_nonce }}">
   (function () {
     var d = document.getElementById("quick-create");
     if (!d) return;
@@ -318,7 +318,7 @@
   </div>
 
   {# Schedule horizon filter — same progressive-enhancement pattern as before #}
-  <script>
+  <script nonce="{{ csp_nonce }}">
     (function () {
       var grp = document.querySelector(".dash-horizon");
       if (!grp) return;

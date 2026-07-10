@@ -123,7 +123,7 @@
       <td class="muted">{{ e.note or '—' }}</td>
       <td>
         <form method="post" action="/admin/studio/recurring/{{ d.id }}/deliveries/{{ e.id }}/delete"
-              class="inline" onsubmit="return confirm('Remove this delivery log entry?')">
+              class="inline" data-confirm="Remove this delivery log entry?">
           <button class="link danger">delete</button>
         </form>
       </td>
@@ -154,7 +154,7 @@
       <td>
         <form method="post" action="/admin/studio/recurring/{{ d.id }}/calendar/{{ s.id }}/status"
               class="inline">
-          <select name="status" onchange="this.form.submit()">
+          <select name="status" data-autosubmit>
             {% for st in calendar_statuses %}
             <option value="{{ st }}"{% if st == s.status %} selected{% endif %}>{{ st }}</option>
             {% endfor %}
@@ -164,7 +164,7 @@
       <td class="muted">{{ s.note or '—' }}</td>
       <td>
         <form method="post" action="/admin/studio/recurring/{{ d.id }}/calendar/{{ s.id }}/delete"
-              class="inline" onsubmit="return confirm('Remove this calendar slot?')">
+              class="inline" data-confirm="Remove this calendar slot?">
           <button class="link danger">delete</button>
         </form>
       </td>
@@ -220,7 +220,7 @@
     <div class="inline-form">
       <form method="post" action="/admin/studio/recurring/{{ d.id }}/captions/{{ c.id }}/status"
             class="inline">
-        <select name="status" onchange="this.form.submit()">
+        <select name="status" data-autosubmit>
           {% for st in caption_statuses %}
           <option value="{{ st }}"{% if st == c.status %} selected{% endif %}>{{ st }}</option>
           {% endfor %}
@@ -229,7 +229,7 @@
       {% if ai_caption_enabled %}
       {% if human_body %}
       <form method="post" action="/admin/studio/recurring/{{ d.id }}/captions/{{ c.id }}/draft"
-            class="inline" onsubmit="return confirm('Replace your edited caption with a fresh AI draft? Your current text is overwritten (the AI keeps no copy of it).')">
+            class="inline" data-confirm="Replace your edited caption with a fresh AI draft? Your current text is overwritten (the AI keeps no copy of it).">
         <input type="hidden" name="replace" value="1">
         <button type="submit">Replace with AI draft</button>
       </form>
@@ -241,7 +241,7 @@
       {% endif %}
       {% endif %}
       <form method="post" action="/admin/studio/recurring/{{ d.id }}/captions/{{ c.id }}/delete"
-            class="inline" onsubmit="return confirm('Remove this caption?')">
+            class="inline" data-confirm="Remove this caption?">
         <button class="link danger">delete</button>
       </form>
     </div>
@@ -256,7 +256,7 @@
     duplicates.</p>
   {% else %}
   <form method="post" action="/admin/studio/recurring/{{ d.id }}/generate"
-        onsubmit="return confirm('Create a draft invoice for {{ period }}? It will not be sent — you review and Send it yourself.')">
+        data-confirm="Create a draft invoice for {{ period }}? It will not be sent — you review and Send it yourself.">
     <button type="submit"{% if not d.active or d.total_cents <= 0 %} disabled{% endif %}>
       Generate {{ period }} draft</button>
     {% if not d.active %}<span class="muted">— activate the plan first</span>
@@ -280,7 +280,7 @@
   {% else %}<p class="muted">No invoices generated from this plan yet.</p>{% endif %}
 
   <form method="post" action="/admin/studio/recurring/{{ d.id }}/delete"
-        onsubmit="return confirm('Soft-delete this recurring plan? Generated invoices are kept.')">
+        data-confirm="Soft-delete this recurring plan? Generated invoices are kept.">
     <button type="submit" class="link danger">Delete plan</button>
   </form>
 </main>
