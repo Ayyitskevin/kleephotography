@@ -6780,3 +6780,89 @@ html[data-theme="dark"] .site-body .svc-pick { background: var(--accent); color:
   padding: 6px 12px; border-radius: 999px; background: #143C2F; color: #F3F0E2;
   font: 600 0.7rem/1 var(--sans, sans-serif); text-decoration: none; border: 0; }
 .admin-shell .stu-card-act:hover { background: #1C4A3A; color: #F3F0E2; }
+
+/* ============================================================================
+   THE PROJECT ROOM (Revamp PR 5) — one room per project. Scoped .admin-shell,
+   warm light base. Header + journey + 3-column composition; every panel inside
+   keeps its existing markup and forms.
+   ========================================================================== */
+.admin-shell .room-head { display: flex; align-items: center; gap: 18px;
+  flex-wrap: wrap; margin-bottom: 18px; }
+.admin-shell .room-avatar { flex: none; width: 52px; height: 52px;
+  border-radius: 999px; display: grid; place-items: center; background: #E0A43B;
+  color: #221507; font: 700 1rem/1 var(--sans, sans-serif); }
+.admin-shell .room-id { min-width: 0; }
+.admin-shell .room-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.admin-shell .room-title h2 { margin: 0; font-family: var(--font-display, Georgia, serif);
+  font-weight: 500; font-size: 1.6rem; letter-spacing: -0.01em; }
+.admin-shell .room-pill { padding: 5px 10px; border-radius: 999px;
+  background: #F7ECD2; color: #9a7a2c;
+  font: 700 0.62rem/1 var(--sans, sans-serif); letter-spacing: 0.08em;
+  text-transform: uppercase; white-space: nowrap; }
+.admin-shell .room-sub { margin: 3px 0 0; font-size: 0.84rem; color: var(--ink-faint, #8B8577); }
+.admin-shell .room-money { margin-left: auto; text-align: right; }
+.admin-shell .room-money b { display: block; font-family: var(--font-display, Georgia, serif);
+  font-weight: 400; font-size: 1.5rem; line-height: 1; color: #9a7a2c; }
+.admin-shell .room-money span { font: 600 0.64rem/1.6 var(--sans, sans-serif);
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint, #A79E8B); }
+.admin-shell .room-cta { display: inline-flex; align-items: center;
+  padding: 10px 18px; border-radius: 999px; background: #E0A43B; color: #221507;
+  font: 600 0.8rem/1 var(--sans, sans-serif); text-decoration: none; border: 0;
+  white-space: nowrap; box-shadow: 0 10px 22px -12px rgba(143, 106, 31, 0.55);
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.admin-shell .room-cta:hover { transform: translateY(-1px); color: #221507; }
+
+/* Journey timeline — done / now / future, connector lifted to dot height */
+.admin-shell .room-journey { display: flex; align-items: flex-start; gap: 0;
+  margin-bottom: 22px; overflow-x: auto; padding: 4px 0; }
+.admin-shell .room-step { display: flex; align-items: flex-start; flex: 1; min-width: 96px; }
+.admin-shell .room-node { display: flex; flex-direction: column; align-items: center;
+  gap: 6px; flex: none; width: 96px; }
+.admin-shell .room-dot { width: 30px; height: 30px; border-radius: 999px;
+  display: grid; place-items: center; background: #fff; color: #A79E8B;
+  border: 1.5px solid #E0D8C6; box-sizing: border-box;
+  font: 700 0.72rem/1 var(--sans, sans-serif); }
+.admin-shell .room-dot.is-done { background: #143C2F; color: #F3F0E2; border: 0; }
+.admin-shell .room-dot.is-now { background: #E0A43B; color: #221507; border: 0; }
+.admin-shell .room-lbl { font: 600 0.7rem/1.2 var(--sans, sans-serif);
+  text-align: center; color: var(--ink-faint, #A79E8B); }
+.admin-shell .room-lbl.is-now { color: #9a7a2c; }
+.admin-shell .room-sublbl { font: 500 0.62rem/1.2 var(--sans, sans-serif);
+  color: var(--ink-faint, #A79E8B); text-align: center; max-width: 96px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-shell .room-line { flex: 1; height: 2px; margin-top: 14px;
+  background: #E7E0D2; }
+.admin-shell .room-line.is-done { background: #143C2F; }
+
+/* Room grid — three columns, stacking below 1200px */
+.admin-shell .room-grid { display: grid;
+  grid-template-columns: 1.05fr 1.1fr 0.85fr; gap: 16px; align-items: start; }
+.admin-shell .room-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 1200px) {
+  .admin-shell .room-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 860px) {
+  .admin-shell .room-grid { grid-template-columns: 1fr; }
+}
+
+/* Engagement narration */
+.admin-shell .room-engage-copy { margin: 0; font-size: 0.84rem; line-height: 1.6;
+  color: var(--ink-soft, #4A463D); }
+.admin-shell .room-engage-copy b { color: var(--ink, #22201B); }
+.admin-shell .room-engage-now { color: #1C4A3A; font-weight: 600; }
+
+/* Project settings — tucked behind a summary so the room stays glanceable */
+.admin-shell .room-settings summary { cursor: pointer; list-style: none; }
+.admin-shell .room-settings summary::-webkit-details-marker { display: none; }
+.admin-shell .room-settings summary h2 { display: inline; }
+.admin-shell .room-settings summary::after { content: " ▾"; color: var(--ink-faint, #A79E8B);
+  font-size: 0.8rem; }
+.admin-shell .room-settings details[open] summary::after { content: " ▴"; }
+.admin-shell .room-settings details[open] summary { margin-bottom: 10px; }
+
+/* Room-width fixes: doc-link slugs ellipsize on one line instead of shattering
+   in the narrower columns; timeline timestamps never clip. */
+.admin-shell .room-grid .slug { display: block; max-width: 180px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.admin-shell .room-grid .timeline-when { white-space: nowrap; overflow: visible; }
+.admin-shell .room-grid .list { table-layout: auto; }
