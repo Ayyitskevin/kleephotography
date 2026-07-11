@@ -797,10 +797,13 @@ async def task_delete(task_id: int):
 # ---- Calendar (month grid: shoots + task due dates + invoice due dates) -----
 
 # Three-bucket palette matching the prototype legend (Shoot / Call·delivery / Money).
+# Dark-panel tints (editorial-dark, Revamp PR-G) — these feed the .cal-event
+# inline style directly, so they can't be reached by CSS; match the same
+# clay/ok/honey status tokens the rest of the admin shell uses.
 _CAL_BUCKET = {
-    "shoot": ("#7C2F38", "#f3e3e5"),
-    "call": ("#2f7d57", "#e1f2e9"),
-    "money": ("#9a7a2c", "#f7ecd2"),
+    "shoot": ("#d98a78", "#2e1a18"),
+    "call": ("#9cc178", "#20271a"),
+    "money": ("#d8a857", "#2b2413"),
 }
 
 

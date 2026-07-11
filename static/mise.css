@@ -8154,3 +8154,127 @@ html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
    failure (~2.8:1 resting, ~4.4:1 hover, both under 4.5:1). */
 .admin-shell button.primary, .admin-shell button[type="submit"].primary { color: #0e1319; }
 .admin-shell button.primary:hover { color: #0e1319; }
+
+/* ============================================================================
+   EDITORIAL DARK — SCHEDULING, CALENDAR, TASKS, JOBS, DIGEST/ACTIVITY
+   (Revamp PR-G, Claude Design handoff2). Same rose+gold slate-navy system as
+   PR-D/E/F. Covers calendar.html, scheduling(.html/_bookings/_event), tasks,
+   jobs, today, emails, and the two "activity" views (gallery + studio) that
+   are directly linked from PR-E pages but were never actually visited/tested
+   in that slice. Appended last so it wins by source order over the light
+   base rules and the legacy toggle-dark palette, same tradeoff as before.
+   ========================================================================== */
+
+/* ── 0. Token gaps — --muted and --accent were never redefined at default
+   .admin-shell scope (only PR-D's tokens were: --terra/--gold/--surface/etc).
+   Both still fall through to :root's light values (#8a8378 taupe, #b3552e
+   terracotta), which is invisible-ish on the new navy surfaces and leaks
+   into a LOT of bare, pre-.admin-shell classes across tasks/activity/
+   studio_activity (na-ico, na-count, pipeline-money, spark-head strong, the
+   sparkline SVG's fill= attribute, tk-due, tk-col-n, and more) — confirmed
+   by two independent audits. Closing the token gap fixes all of them in one
+   line, the same move already made for --card in PR-E. --muted maps to the
+   ink-faint role it's used for everywhere (labels/meta); --accent maps to
+   --terra, the same "generic link/accent" role it plays on the marketing
+   site's own --accent redefinition. */
+.admin-shell { --muted: var(--ink-faint); --accent: var(--terra); }
+
+/* ── 1. table.list — shared table component (jobs, today, emails, gallery
+   activity, and already-shipped project/licenses doc tables). Zebra stripe
+   and row-hover both hardcode overlays tuned for a light surface: the
+   zebra is a near-black wash (invisible on dark), and the hover is a stale
+   forest-green leftover from an even earlier palette generation, replaced
+   here by neither — never touched by PR-D/E/F. ─────────────────────────── */
+.admin-shell table.list tbody tr:nth-child(even) td { background: rgba(255, 255, 255, .025); }
+.admin-shell table.list tbody tr:hover td,
+.admin-shell table.list tr:hover td { background: var(--terra-tint); }
+
+/* ── 2. Calendar (/admin/calendar) ────────────────────────────────────────── */
+.admin-shell .cal-monthnav a { background: var(--surface); border-color: var(--line); }
+/* Today's day-number badge: rose fill + cream text is the same ~2.6:1 fail
+   already fixed everywhere else this pairing showed up — navy ink instead. */
+.admin-shell .cal-cell.is-today .cal-cell-num span { color: #0e1319; }
+
+/* ── 3. Scheduling overview (/admin/scheduling) — largest gap in this PR;
+   .sch-* never got the editorial-dark pass at all. Mirrors the legacy
+   html[data-theme="dark"] mappings where one already exists (this file's
+   own §18 pass already worked most of this out), fresh semantic-token
+   choices where it doesn't. ──────────────────────────────────────────────── */
+.admin-shell .sch-h2 { color: var(--ink); }
+.admin-shell .sch-sub { color: var(--ink-faint); }
+.admin-shell .sch-card,
+.admin-shell .sch-type { background: var(--surface); border-color: var(--line); }
+.admin-shell .sch-hero { background: #161e28; color: #e7dfcd; }
+.admin-shell .sch-hero-ico { background: #232e3d; }
+.admin-shell .sch-hero-body p { color: var(--ink-soft); }
+.admin-shell .sch-hero-copy { color: #0e1319; }
+.admin-shell .sch-type-name > span:first-child,
+.admin-shell .sch-day-label,
+.admin-shell .sch-day-hours,
+.admin-shell .sch-up-client { color: var(--ink); }
+.admin-shell .sch-type-meta,
+.admin-shell .sch-cell:not(.is-today):not(.is-empty),
+.admin-shell .sch-up-type,
+.admin-shell .sch-up-time { color: var(--ink-soft); }
+.admin-shell .sch-type-up,
+.admin-shell .sch-dow,
+.admin-shell .sch-type-off,
+.admin-shell .sch-day.is-off .sch-day-hours { color: var(--ink-faint); }
+.admin-shell .sch-type-foot,
+.admin-shell .sch-day,
+.admin-shell .sch-up { border-color: var(--line); }
+.admin-shell .sch-type-copy { color: var(--terra); }
+.admin-shell .sch-switch { background: var(--neutral-bg); }
+.admin-shell .sch-switch.is-on,
+.admin-shell .sch-switch.sch-switch-green.is-on { background: var(--ok); }
+.admin-shell .sch-switch span { background: var(--surface-sunk); color: var(--ink); border-color: var(--line); }
+/* Today-cell fill: same clay-fill-plus-cream-text fail as everywhere else
+   this shape appears (~2.3:1) — navy ink instead. */
+.admin-shell .sch-cell.is-today { background: var(--clay); color: #0e1319; }
+.admin-shell .sch-up-chip { background: var(--neutral-bg); color: var(--neutral); border-color: var(--neutral-line); }
+.admin-shell .sch-up-chip.is-soon { background: var(--clay-bg); color: var(--clay); border-color: var(--clay-line); }
+.admin-shell .sch-up-day,
+.admin-shell .sch-up-mon { color: var(--ok); }
+.admin-shell .sch-up-chip.is-soon .sch-up-day,
+.admin-shell .sch-up-chip.is-soon .sch-up-mon,
+.admin-shell .sch-up-time.is-soon { color: var(--clay); }
+.admin-shell .sch-up-all { color: var(--terra); }
+
+/* ── 4. Booking history + event editor (older, unredesigned .sched-star
+   .linkbtn family — a handful of bare rules still read var(--muted),
+   which §0 above now fixes automatically; only these two need new
+   default-scope rules). ──────────────────────────────────────────────────── */
+.admin-shell .studio-view-toggle button.is-active { background: var(--terra); color: #0e1319; }
+.admin-shell .sched-flash-err { background: var(--clay-bg); color: var(--clay); border-color: var(--clay-line); }
+
+/* ── 5. Tasks (/admin/tasks) ──────────────────────────────────────────────── */
+.admin-shell .tk-col { background: var(--surface-sunk); border-color: var(--line); }
+.admin-shell .tk-chip { background: var(--surface-sunk); }
+.admin-shell a.tk-chip:hover { background: var(--line-strong); }
+.admin-shell .tk-check { border-color: var(--line-strong); }
+.admin-shell .tk-card.is-done .tk-check { background: var(--ok-line); border-color: var(--ok-line); color: var(--ok); }
+/* Add-task button: its own background:var(--clay) never actually applies —
+   it ties in specificity with the later, generic .admin-shell button rule
+   (both 0,1,1) and loses on source order, so it silently renders as a plain
+   grey button today (confirmed live, not just in the CSS text). Re-declare
+   both background and color here (0,2,1 beats the generic 0,1,1) to
+   actually get the intended clay pill, with navy ink instead of the
+   cream that fails against clay. */
+.admin-shell .tk-add-form button { background: var(--clay); color: #0e1319; }
+.admin-shell .tk-add-form button:hover { opacity: .9; }
+
+/* ── 6. Today digest (/admin/today) ───────────────────────────────────────── */
+.admin-shell .inquiry-msg { background: var(--surface-sunk); border: 1px solid var(--line); }
+
+/* ── 7. Gallery + studio activity (/admin/galleries/{id}/activity,
+   /admin/studio/activity) — most of this file's own issues were the --muted/
+   --accent leak already fixed in §0; .spark-window-active is a structural
+   bug (it fills with var(--ink), a TEXT token, not an accent) rather than a
+   palette mismatch, and needs its own rule regardless of the token fix. ──── */
+.admin-shell .spark-window-active { background: var(--terra); color: #0e1319; }
+.admin-shell .na-count { color: #0e1319; }
+/* Pipeline dollar figures: route to gold (money), not the generic --accent/
+   --terra link color §0 now supplies — consistent with every other money
+   figure in this system (.dash-money .pct, .room-money b). */
+.admin-shell .pipeline-money,
+.admin-shell .pipeline-step-val { color: var(--gold); }
