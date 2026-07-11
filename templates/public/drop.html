@@ -1,10 +1,10 @@
 {% extends "base_cream.html" %}
 {% block title %}{{ g.title }} · {{ site_name }}{% endblock %}
-{% block bodyclass %}gallery-body cream-theme{% endblock %}
+{% block bodyclass %}gallery-body{% if sr_enabled() %} sr{% else %} cream-theme{% endif %}{% endblock %}
 {% block content %}
-<header class="gallery-header">
+<header class="gallery-header sr-drophead">
   <div class="gallery-header-inner">
-    <p class="muted" style="margin:0 0 0.3rem">Files from {{ site_name }}</p>
+    <p class="sr-mono sr-mono--signal" style="margin:0 0 0.5rem">Dailies &middot; files from {{ site_name.split(' Photography')[0] }}</p>
     <h1>{{ g.title }}</h1>
     {% if g.captions %}<p>{{ g.captions }}</p>{% endif %}
     <a class="btn" href="/g/{{ g.slug }}/download/zip">&#8595; Download all{% if assets %} ({{ assets|length }}){% endif %}</a>
@@ -39,6 +39,6 @@
 {% endif %}
 
 <footer style="text-align:center;padding:2rem 1rem">
-  <p class="muted">Sent with {{ site_name }}{% if g.expires_at %} · link expires {{ g.expires_at }}{% endif %}</p>
+  <p class="sr-mono">Sent with {{ site_name }}{% if g.expires_at %} · link expires {{ g.expires_at }}{% endif %}</p>
 </footer>
 {% endblock %}

@@ -832,6 +832,48 @@
   text-transform: uppercase; padding: 14px 22px; cursor: pointer; }
 .sr .gate-help a { color: var(--sr-amber); }
 
+/* portal ("season pass") + workspace ("production pass") shelves */
+.sr .portal-main { max-width: 1100px; }
+.sr .portal-header h1 { text-transform: uppercase; letter-spacing: 0.04em; }
+.sr .portal-header .sr-mono { display: block; margin-bottom: 12px; letter-spacing: 0.3em; }
+.sr .portal-share { color: var(--sr-amber); }
+.sr .portal-changelog { border: 1px solid var(--sr-line); padding: 12px 16px;
+  background: none; border-radius: 0; color: var(--sr-ink-mute); }
+.sr .changelog-new, .sr .new-pill { background: var(--sr-amber); color: var(--sr-house);
+  border-radius: 0; font: 700 8.5px/1 var(--sr-mono); letter-spacing: 0.14em;
+  padding: 3px 6px; }
+.sr .section-count { background: none; border: 1px solid var(--sr-line-raised);
+  color: var(--sr-ink-faint); border-radius: 0; font-family: var(--sr-mono); }
+.sr .portal-galleries li, .sr .portal-files li { border-bottom: 1px solid var(--sr-line); }
+.sr .portal-galleries a, .sr .portal-files a { color: var(--sr-cream); }
+.sr .portal-galleries a:hover, .sr .portal-files a:hover { color: var(--sr-amber); }
+.sr .portal-gallery-expired { color: var(--sr-ink-faint); text-decoration: line-through; }
+.sr .portal-cta, .sr .crop-links a { color: var(--sr-amber); }
+.sr .captions summary { color: var(--sr-ink-soft); }
+.sr .captions pre { background: var(--sr-house-deep); border: 1px solid var(--sr-line);
+  color: var(--sr-ink); }
+.sr .usage-rights { border: 1px solid var(--sr-line); background: none;
+  color: var(--sr-ink-mute); border-radius: 0; }
+.sr .portal-main .button { background: var(--sr-amber); color: var(--sr-house);
+  border-radius: 0; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.sr .ws-section h2 { font: 700 15px/1.3 var(--sr-sans); letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--sr-cream); }
+.sr .ws-card { background: var(--sr-card); border: 1px solid var(--sr-line);
+  border-radius: 0; box-shadow: none; }
+.sr a.ws-card:hover { border-color: var(--sr-amber); }
+.sr .ws-card-title { color: var(--sr-cream); }
+.sr .ws-card-meta { color: var(--sr-ink-faint); font-family: var(--sr-mono); }
+.sr .kind-badge { border-radius: 0; font: 700 9px/1 var(--sr-mono);
+  letter-spacing: 0.14em; text-transform: uppercase; }
+.sr .sr-drophead { background: none; border-bottom: 1px solid var(--sr-line); }
+.sr .sr-drophead h1 { text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--sr-cream-strong); }
+.sr .sr-drophead .btn { background: var(--sr-amber); color: var(--sr-house);
+  border-radius: 0; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.sr .doc-head h1 { color: var(--sr-cream-strong); }
+.sr .doc-intro, .sr .doc-page .muted { color: var(--sr-ink-mute); }
+.sr .doc-accepted { color: var(--sr-ok); }
+
 /* client lightbox notes panel */
 .sr .lb-comments { background: var(--sr-overlay); border: 1px solid var(--sr-line-strong);
   color: var(--sr-ink); border-radius: 0; }
@@ -855,6 +897,75 @@
   .sr .sr-export-actions { margin-left: 0; width: 100%; }
   .sr .sr-take { width: 34px; height: 34px; }
   .sr .sr-premiere-inner h1 { font-size: clamp(26px, 8vw, 34px); }
+}
+
+/* ── money docs (3g) — the one cream sheet in the house, display-only ─────── */
+/* Restyle only: amounts, forms, Stripe flow, and status strings are untouched
+   (pay.py is red-light). Print drops the house entirely — pure paper. */
+.sr-moneydoc { background: var(--sr-house); }
+.sr .client-doc { max-width: 760px; margin: 0 auto; padding: 44px 20px 60px; }
+.sr .client-doc-brandbar { background: none; border: 0; color: var(--sr-ink-soft);
+  padding: 0 4px 20px; display: flex; justify-content: space-between;
+  align-items: baseline; }
+.sr .client-doc-brandbar strong { font: 700 13px/1 var(--sr-sans);
+  letter-spacing: 0.24em; text-transform: uppercase; color: var(--sr-cream); }
+.sr .client-doc-brandbar div span { display: block; margin-top: 5px;
+  font: 500 8.5px/1 var(--sr-mono); letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--sr-amber); }
+.sr .client-doc-brandbar > span { font: 400 15px/1 var(--sr-mono);
+  color: var(--sr-cream); }
+.sr .client-doc-paper { background: var(--sr-sheet); color: var(--sr-sheet-body);
+  border: 0; border-radius: 0; padding: 40px 44px;
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.9); }
+.sr .client-doc-kicker { font: 500 8.5px/1 var(--sr-mono); letter-spacing: 0.24em;
+  text-transform: uppercase; color: var(--sr-sheet-gold); }
+.sr .client-doc-paper h1 { color: var(--sr-sheet-ink); font: 700 24px/1.15 var(--sr-sans);
+  letter-spacing: 0.02em; }
+.sr .client-doc-head p { color: var(--sr-sheet-mute); }
+.sr .client-doc-meta p span { color: var(--sr-sheet-gold); font-family: var(--sr-mono);
+  font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+.sr .client-doc-table th { font: 500 9px/1 var(--sr-mono); letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--sr-sheet-mute);
+  border-bottom: 1px solid var(--sr-sheet-line); }
+.sr .client-doc-table td { border-top: 1px solid var(--sr-sheet-line);
+  color: var(--sr-sheet-body); font-variant-numeric: tabular-nums; }
+.sr .client-doc-table td strong { color: var(--sr-sheet-ink); }
+.sr .client-doc-table td small { color: var(--sr-sheet-mute); }
+.sr .client-doc-totals { border-top: 2px solid var(--sr-sheet-ink); }
+.sr .client-doc-totals span { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.22em;
+  text-transform: uppercase; color: #55503f; }
+.sr .client-doc-totals strong { font-variant-numeric: tabular-nums;
+  color: var(--sr-sheet-ink); }
+.sr .client-doc-due strong { font: 400 30px/1.1 var(--sr-serif);
+  color: var(--sr-sheet-ink); }
+.sr .client-doc-terms h2 { font: 500 9.5px/1 var(--sr-mono); letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--sr-sheet-gold); }
+.sr .client-doc-terms p, .sr .client-doc-intro p { color: var(--sr-sheet-body); }
+.sr .client-pay-btn { background: var(--sr-sheet-ink); color: var(--sr-sheet);
+  border: 0; border-radius: 0; font: 700 12.5px/1 var(--sr-sans);
+  letter-spacing: 0.1em; text-transform: uppercase; padding: 14px 26px;
+  cursor: pointer; }
+.sr .client-pay-btn:hover { background: #3c362c; }
+.sr .client-secondary-btn { background: none; border: 1px solid var(--sr-sheet-line);
+  color: var(--sr-sheet-body); border-radius: 0; cursor: pointer; }
+.sr .client-doc-security { color: var(--sr-sheet-mute); }
+.sr .client-doc-paper .doc-accepted { color: #3f6b4f; }
+.sr .client-doc-status.is-ok { color: #3f6b4f; }
+.sr .client-doc-status.is-muted { color: var(--sr-sheet-mute); }
+.sr .client-doc-thanks { border: 1px solid var(--sr-sheet-gold);
+  background: rgba(163, 114, 45, 0.06); color: var(--sr-sheet-body); }
+.sr .client-doc-paper .link { color: var(--sr-sheet-gold); background: none;
+  border: 0; cursor: pointer; }
+.sr .client-doc-foot { color: var(--sr-ink-ghost); font: 500 9.5px/1.7 var(--sr-mono);
+  letter-spacing: 0.14em; text-transform: uppercase; text-align: center; }
+/* receipt + testimonial ride .doc-page on the house */
+.sr .doc-page .list th { color: var(--sr-ink-faint); border-bottom: 1px solid var(--sr-line); }
+.sr .doc-page .list td { color: var(--sr-ink); border-top: 1px solid var(--sr-line);
+  font-variant-numeric: tabular-nums; }
+@media print {
+  body.sr.sr-moneydoc { background: #fff; }
+  .sr .client-doc-brandbar, .sr .client-doc-foot { display: none; }
+  .sr .client-doc-paper { box-shadow: none; padding: 0; }
 }
 
 /* generic marketing scaffolding that survives from mise.css */
