@@ -8,6 +8,11 @@ anything. When code and this file disagree, stop and ask — don't reconcile sil
 This repo (`~/ai-workspace/mise-claude`, or your own clone) is a **working copy, NOT
 production**. flow `/opt/mise` is git + deploy canonical. Never scratch-edit the flow tree.
 
+Scope derivation: the red/green split below narrows the fleet-wide **Permission
+Boundaries** block (canonical in each machine's CLAUDE.md / GROK.md /
+`~/.codex/AGENTS.md`). This file may be stricter than that block for Mise,
+never looser — if the two ever disagree, stop and flag; don't reconcile silently.
+
 ## Green-light — work freely, commit straight to `main`, push `all`
 
 You don't need a human for any of this. Make the change, prove it green (gates below),
