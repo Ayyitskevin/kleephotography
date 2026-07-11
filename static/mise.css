@@ -8568,3 +8568,8 @@ html[data-theme="dark"] .site-body .motion-sound[aria-pressed="true"] {
 }
 .lightbox .lb-dl-mp4:hover { background: rgba(255, 255, 255, .15); }
 .lightbox .lb-dl-mp4[hidden] { display: none; }
+
+/* The meta bar is pointer-events:none by design (clicks pass through to the
+   video); interactive children opt back in — same move as .motion-feature-link.
+   Found via real click testing: without this the video ate the button's clicks. */
+html[data-theme="dark"] .site-body .motion-sound { pointer-events: auto; }
