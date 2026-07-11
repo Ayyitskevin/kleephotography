@@ -33,15 +33,110 @@ INDEXABLE = {
     "/sitemap.xml",
 }
 
-# Public services + tier cards for /services. Mirrors the admin proposal PRESETS
-# in both deliverables and price (price_cents = the shoot-day anchor from
-# app/admin/proposals.py PRESETS — the market-researched floor; final quotes are
-# still tailored on the booking form). The booking dropdown itself stays
-# price-free. Order matters: the public page renders these in nav order.
+# Public services + tier cards for /services, grouped by specialty. Mirrors the
+# admin proposal PRESETS in both deliverables and price (price_cents = the
+# shoot-day anchor from app/admin/proposals.py PRESETS — the market-researched
+# floor; final quotes are still tailored on the booking form). The booking
+# dropdown itself stays price-free. Order matters: the public page renders
+# these in nav order. The F&B groups keep their pre-revamp keys
+# (photography/videography) so the #svc-… anchors linked from reels/footer
+# never break.
 SERVICES = [
     {
+        "key": "real_estate",
+        "title": "Real Estate",
+        "tagline": "Listings, photo and film — MLS-ready stills, twilight "
+        "exteriors, and walkthrough reels that move buyers.",
+        "monthly": False,
+        "tiers": [
+            {
+                "name": "Essentials",
+                "subtitle": "Per listing",
+                "display_price": "$250",
+                "price_cents": 25000,
+                "includes": [
+                    "Up to 1.5 hours on site",
+                    "25 edited, MLS-ready images",
+                    "Web + print resolution",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "Signature",
+                "subtitle": "Photo + reel",
+                "display_price": "$450",
+                "price_cents": 45000,
+                "includes": [
+                    "Up to 2.5 hours on site",
+                    "40 edited, MLS-ready images",
+                    "Twilight exterior set",
+                    "Vertical walkthrough reel, 30–60s",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "Premier",
+                "subtitle": "Photo + film",
+                "display_price": "$850",
+                "price_cents": 85000,
+                "includes": [
+                    "Extended session — photo & film",
+                    "60 edited, MLS-ready images",
+                    "Walkthrough film, 1–2 min + reel",
+                    "Twilight exterior set",
+                    "Full-res files for print",
+                ],
+            },
+        ],
+    },
+    {
+        "key": "portraits",
+        "title": "Portrait & Lifestyle",
+        "tagline": "Headshots, personal branding, families — directed, not "
+        "posed, and delivered ready for wherever they're going.",
+        "monthly": False,
+        "tiers": [
+            {
+                "name": "Tier I",
+                "subtitle": "One look",
+                "display_price": "$350",
+                "price_cents": 35000,
+                "includes": [
+                    "~1 hour session, one look",
+                    "10 edited portraits",
+                    "Studio or on-location",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "Tier II",
+                "subtitle": "Two looks",
+                "display_price": "$600",
+                "price_cents": 60000,
+                "includes": [
+                    "~2 hour session, two looks",
+                    "25 edited portraits",
+                    "Wardrobe + location guidance",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "Tier III",
+                "subtitle": "Extended",
+                "display_price": "$850",
+                "price_cents": 85000,
+                "includes": [
+                    "~3 hour session, multiple looks",
+                    "40 edited portraits",
+                    "On-location options",
+                    "Rush turnaround available",
+                ],
+            },
+        ],
+    },
+    {
         "key": "photography",
-        "title": "Photography",
+        "title": "Food & Beverage — Photography",
         "tagline": "Menus, dishes, drinks, and the rooms they live in. "
         "Every tier delivers a private same-week gallery with social crops baked in.",
         "monthly": False,
@@ -89,7 +184,7 @@ SERVICES = [
     },
     {
         "key": "videography",
-        "title": "Videography",
+        "title": "Food & Beverage — Videography",
         "tagline": "Short-form social motion that earns the scroll, plus hero "
         "brand films for launches and campaigns.",
         "monthly": False,

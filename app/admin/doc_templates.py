@@ -39,6 +39,8 @@ PROPOSAL_GROUPS = [
 CONTRACT_ORDER = [
     "photography_services",
     "photography_agreement",
+    "real_estate_services",
+    "portrait_services",
     "videography_services",
     "general_service",
     "model_release",
@@ -53,6 +55,10 @@ CONTRACT_BLURBS = {
     "payment, reschedule & cancellation.",
     "photography_agreement": "Plain-language alternative — same protections, "
     "client-friendly wording. Draft, attorney review advised.",
+    "real_estate_services": "Listing shoots — property access & readiness, "
+    "weather/twilight rescheduling, MLS usage license. Draft, attorney review advised.",
+    "portrait_services": "Portrait & team sessions — likeness release, usage "
+    "rights, portfolio opt-out. Draft, attorney review advised.",
     "videography_services": "For video shoots — deliverables, licensing, and usage terms.",
     "general_service": "All-purpose client service agreement for non-shoot work.",
     "model_release": "Permission to use a subject's likeness in delivered images.",

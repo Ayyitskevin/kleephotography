@@ -166,6 +166,36 @@ async def download_web_video(request: Request, slug: str, asset_id: int):
     )
 
 
+@router.get("/{slug}/download/rendition/{rendition_id}")
+async def download_rendition(request: Request, slug: str, rendition_id: int):
+    """A ready social-cut rendition (9:16 / 1:1) as an attachment. Same gates
+    as every other download; the tile only links renditions once they're ready,
+    so the email-gate redirect just returns the visitor to the gallery flow."""
+    g, visitor = _gate(request, slug)
+    r = db.one(
+        """SELECT r.*, a.filename, a.id AS a_id FROM asset_renditions r
+           JOIN assets a ON a.id = r.asset_id
+           WHERE r.id=? AND a.gallery_id=? AND r.status='ready'""",
+        (rendition_id, g["id"]),
+    )
+    if not r:
+        raise HTTPException(status_code=404)
+    if _email_required(g) and not visitor["email"]:
+        return RedirectResponse(f"/g/{slug}/download?asset_id={r['a_id']}", status_code=303)
+    path = config.MEDIA_DIR / str(g["id"]) / "renditions" / r["stored"]
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    db.run(
+        "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,?)",
+        (g["id"], visitor["id"], r["a_id"]),
+    )
+    return FileResponse(
+        path,
+        filename=f"{Path(r['filename']).stem}_{r['preset']}.mp4",
+        media_type="video/mp4",
+    )
+
+
 @router.get("/{slug}/download/favorites")
 async def download_favorites(request: Request, slug: str):
     g, visitor = _gate(request, slug)
