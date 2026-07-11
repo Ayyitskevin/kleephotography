@@ -9929,3 +9929,29 @@ def test_bulk_star_and_tag(admin):
         assert "bulk-portfolio" in page and "Star checked" in page and "Unstar" in page
     finally:
         db.run("DELETE FROM assets WHERE id IN (?,?,?)", (ids[0], ids[1], ids[2]))
+
+
+def test_portfolio_video_tiles(admin):
+    g, vid, photo = _ready_video(admin, title="Archive Motion", pin="9911")
+    admin.post(f"/admin/galleries/{g['id']}/assets/{vid['id']}/portfolio", follow_redirects=False)
+    admin.post(f"/admin/galleries/{g['id']}/assets/{photo['id']}/portfolio", follow_redirects=False)
+    try:
+        with TestClient(app) as pub:
+            r = pub.get("/portfolio")
+            # the starred video joins the masonry as a lightbox video tile
+            assert f'data-web="/site/vid/{vid["id"]}"' in r.text
+            assert 'data-kind="video"' in r.text
+            assert f'data-poster="/site/poster/{vid["id"]}"' in r.text
+            assert 'class="play-badge"' in r.text and 'class="dur-badge"' in r.text
+            # video thumbnails serve through the thumb variant; web stays
+            # photo-only (a video's web rendition is the mp4 behind /site/vid)
+            assert pub.get(f"/site/img/{vid['id']}?variant=thumb").status_code == 200
+            assert pub.get(f"/site/img/{vid['id']}?variant=web").status_code == 404
+            assert pub.get(f"/site/vid/{vid['id']}").status_code == 200
+    finally:
+        admin.post(
+            f"/admin/galleries/{g['id']}/assets/{vid['id']}/portfolio", follow_redirects=False
+        )
+        admin.post(
+            f"/admin/galleries/{g['id']}/assets/{photo['id']}/portfolio", follow_redirects=False
+        )

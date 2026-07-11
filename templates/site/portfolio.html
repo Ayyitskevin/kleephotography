@@ -33,13 +33,23 @@
     {% for a in assets %}
     <figure class="tile pf-masonry-tile{% if a.portfolio_tag %} pf-tile{% endif %}"
             {% if a.portfolio_tag %}data-tag="{{ a.portfolio_tag|lower }}"{% endif %}
-            data-sp="{{ a.portfolio_tag|tag_specialty }}"
-            data-web="/site/img/{{ a.id }}">
+            data-sp="{{ a.portfolio_tag|tag_specialty }}" data-kind="{{ a.kind }}"
+            {% if a.kind == 'video' %}data-web="/site/vid/{{ a.id }}" data-poster="/site/poster/{{ a.id }}"
+            {% else %}data-web="/site/img/{{ a.id }}"{% endif %}>
+      {% if a.kind == 'video' %}
+      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+           sizes="(max-width: 700px) 100vw, 300px"
+           {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
+           alt="{{ a|portfolio_alt }}">
+      <span class="play-badge">&#9654;</span>
+      {% if a.duration and a.duration|hms %}<span class="dur-badge">{{ a.duration|hms }}</span>{% endif %}
+      {% else %}
       <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
            srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
            sizes="(max-width: 700px) 100vw, 300px"
            {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
            alt="{{ a|portfolio_alt }}">
+      {% endif %}
       {% if a.portfolio_tag %}
       <figcaption class="portfolio-cap">{{ a.portfolio_tag|tag_label }}{% if a.client_name %}
         <small>{{ a.client_name }}</small>{% elif a.gallery_title %}

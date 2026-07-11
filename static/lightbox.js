@@ -103,7 +103,7 @@
   }
 
   function startShow() {
-    timer = setInterval(() => render(idx + 1), 4000);
+    timer = setInterval(() => step(1), 4000);
     playBtn.innerHTML = "❚❚";
   }
 
@@ -127,6 +127,18 @@
     proofLabel.textContent = src.textContent.trim();
     proofLabel.classList.toggle("ok", src.classList.contains("ok"));
     proofLabel.hidden = false;
+  }
+
+  // Filter-aware navigation: tiles hidden by the grid's active filter
+  // (.pf-hidden or any display:none) are skipped, so arrows/swipe/slideshow
+  // only visit what the visitor can currently see in the grid.
+  function visibleTile(t) { return t.offsetParent !== null; }
+  function step(dir) {
+    let i = idx;
+    for (let n = 0; n < tiles.length; n++) {
+      i = (i + dir + tiles.length) % tiles.length;
+      if (visibleTile(tiles[i])) return render(i);
+    }
   }
 
   function render(i) {
@@ -279,15 +291,15 @@
     el.hidden = !msg;
   }
   lb.querySelector(".lb-close").addEventListener("click", close);
-  lb.querySelector(".lb-prev").addEventListener("click", () => { stopShow(); render(idx - 1); });
-  lb.querySelector(".lb-next").addEventListener("click", () => { stopShow(); render(idx + 1); });
+  lb.querySelector(".lb-prev").addEventListener("click", () => { stopShow(); step(-1); });
+  lb.querySelector(".lb-next").addEventListener("click", () => { stopShow(); step(1); });
   lb.addEventListener("click", (e) => { if (e.target === lb) close(); });
 
   document.addEventListener("keydown", (e) => {
     if (lb.hidden) return;
     if (e.key === "Escape") close();
-    if (e.key === "ArrowLeft") { stopShow(); render(idx - 1); }
-    if (e.key === "ArrowRight") { stopShow(); render(idx + 1); }
+    if (e.key === "ArrowLeft") { stopShow(); step(-1); }
+    if (e.key === "ArrowRight") { stopShow(); step(1); }
     // Keep Tab inside the modal so focus can't wander back to the muted grid.
     if (e.key === "Tab") {
       const focusable = Array.from(
@@ -324,7 +336,7 @@
     x0 = null;
     // Horizontal swipe → navigate; vertical bias filters out scroll attempts
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-      stopShow(); render(idx + (dx < 0 ? 1 : -1));
+      stopShow(); step(dx < 0 ? 1 : -1);
       lastTap = 0;
       return;
     }

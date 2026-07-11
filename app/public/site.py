@@ -662,9 +662,11 @@ def _portfolio_reels() -> list:
     players whose src + poster both 404 (and leak private asset IDs into the
     page). When nothing is starred we return [] and the templates fall back to
     their empty states (home hides the motion band; /reels shows the empty copy)."""
-    return db.all_("""SELECT * FROM assets
-                       WHERE portfolio=1 AND status='ready' AND kind='video'
-                       ORDER BY id DESC""")
+    return db.all_("""SELECT a.*, g.client_name, g.title AS gallery_title
+                       FROM assets a
+                       LEFT JOIN galleries g ON g.id = a.gallery_id
+                       WHERE a.portfolio=1 AND a.status='ready' AND a.kind='video'
+                       ORDER BY a.id DESC""")
 
 
 def _testimonials(gallery_id: int | None = None, limit: int | None = None) -> list:
@@ -841,7 +843,11 @@ async def home(request: Request):
 
 @router.get("/portfolio", response_class=HTMLResponse)
 async def portfolio(request: Request):
-    assets = _portfolio_assets()
+    # photos AND starred videos share the masonry — /services sells motion, so
+    # the archive shouldn't be stills-only. Videos play in the same lightbox.
+    assets = sorted(
+        [*_portfolio_assets(), *_portfolio_reels()], key=lambda r: r["id"], reverse=True
+    )
     # distinct tags actually in use, alphabetical — the subject filter chips
     tags = sorted({a["portfolio_tag"] for a in assets if a["portfolio_tag"]}, key=str.lower)
     # specialty chips render only for verticals that actually have starred work
@@ -1145,10 +1151,14 @@ async def portfolio_image(asset_id: int, variant: str = "web"):
     """Unauthenticated — serves ONLY portfolio-flagged, ready photos."""
     if variant not in ("web", "thumb"):
         raise HTTPException(status_code=404)
+    # thumb serves both kinds (the transcode job writes thumb jpgs for videos —
+    # the /portfolio masonry needs them); web stays photo-only, a video's web
+    # rendition is the mp4 behind /site/vid.
+    kinds = ("photo", "video") if variant == "thumb" else ("photo",)
     a = db.one(
-        """SELECT * FROM assets WHERE id=? AND portfolio=1
-                  AND status='ready' AND kind='photo'""",
-        (asset_id,),
+        f"""SELECT * FROM assets WHERE id=? AND portfolio=1
+                  AND status='ready' AND kind IN ({",".join("?" * len(kinds))})""",
+        (asset_id, *kinds),
     )
     if not a:
         raise HTTPException(status_code=404)
