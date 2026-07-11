@@ -10019,3 +10019,35 @@ def test_portal_motion_band(admin):
     finally:
         db.run("DELETE FROM portals WHERE slug=?", (prow["slug"],))
         db.run("UPDATE galleries SET client_id=NULL WHERE id=?", (g["id"],))
+
+
+def test_screening_room_rollout_flag(client, monkeypatch):
+    """Foundation wiring: body.sr rides the marketing pages when the rollout
+    flag is on (default), disappears when it's off, and the token layer is
+    served. Old themes must render either way — the tokens are body.sr-scoped."""
+    from app import config
+
+    # default: flag ON — the site body carries the sr scope
+    page = client.get("/").text
+    assert 'class="site-body sr"' in page
+    # tokens ship as their own sheet, linked from base.html
+    css = client.get("/static/screening-room-tokens.css")
+    assert css.status_code == 200
+    assert "body.sr" in css.text
+    assert "--sr-house" in css.text
+    assert "/static/screening-room-tokens.css" in page
+    # Plex Mono self-hosted, declared alongside the existing families
+    fonts = client.get("/static/fonts.css").text
+    assert "IBM Plex Mono" in fonts
+    assert client.get("/static/fonts/ibm-plex-mono-500-latin.woff2").status_code == 200
+
+    # kill switch: flag OFF — sr scope gone, page still renders
+    monkeypatch.setattr(config, "SCREENING_ROOM", False)
+    off = client.get("/")
+    assert off.status_code == 200
+    assert 'class="site-body"' in off.text
+    assert " sr" not in off.text.split("<body")[1].split(">")[0]
+
+    # unconverted/legal surfaces never opt in regardless of the flag
+    monkeypatch.setattr(config, "SCREENING_ROOM", True)
+    assert 'class="cream-theme"' in client.get("/admin/login").text

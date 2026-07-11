@@ -69,3 +69,13 @@ def plausible_enabled() -> bool:
 
 def demo_gallery_enabled() -> bool:
     return bool(config.DEMO_GALLERY_SLUG and config.DEMO_GALLERY_PIN)
+
+
+def screening_room() -> bool:
+    """Screening Room redesign — whether converted templates emit body.sr."""
+    return bool(config.SCREENING_ROOM)
+
+
+def aerials_live() -> bool:
+    """Aerial (drone) deliverables — flips on when the Part 107 cert lands."""
+    return bool(config.AERIALS_LIVE)

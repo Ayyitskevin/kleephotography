@@ -1,0 +1,142 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCREENING ROOM — design-token layer for kleephotography.com
+   Drop-in: append to static/mise.css (or ship as static/screening.css loaded
+   after mise.css). Scoped under body.sr so it can roll out surface-by-surface
+   alongside the existing themes, then replace them.
+
+   Per-specialty "film stock": set ONE class on <body> per spoke —
+     body.sr.sr-re  → --sr-stock: steel   (The Space / real estate)
+     body.sr.sr-pl  → --sr-stock: rose    (The Face / portraits)
+     body.sr.sr-fb  → --sr-stock: ember   (The Plate / food & beverage)
+   Everything accent-colored reads var(--sr-stock); the hub uses amber.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.sr {
+  /* house */
+  --sr-house:        #0b0b0c;   /* page background                            */
+  --sr-house-deep:   #060607;   /* screening surfaces, export rail            */
+  --sr-panel:        #0d0d0f;   /* admin deck background                      */
+  --sr-card:         #0a0a0b;   /* cards on panel                             */
+  --sr-overlay:      #101013;   /* ⌘K palette, raised surfaces               */
+
+  /* lines */
+  --sr-line:         #201e1a;
+  --sr-line-strong:  #2a2823;
+  --sr-line-raised:  #33302a;
+  --sr-line-faint:   #1c1a17;
+
+  /* ink */
+  --sr-cream:        #ece4d3;   /* headline / screen cream                    */
+  --sr-cream-strong: #f4ecdf;   /* biggest titles                             */
+  --sr-ink:          #b5afa2;   /* body                                       */
+  --sr-ink-soft:     #9b968a;
+  --sr-ink-mute:     #8a857a;
+  --sr-ink-faint:    #6b675e;
+  --sr-ink-ghost:    #5c584f;
+
+  /* signal + stocks */
+  --sr-amber:        #e39a2d;   /* the one signal color — CTAs, REC, focus    */
+  --sr-stock-re:     #7f9db8;   /* 250D — The Space (also: aerials)           */
+  --sr-stock-pl:     #c8848e;   /* 800T — The Face                            */
+  --sr-stock-fb:     #d2913f;   /* 500T — The Plate                           */
+  --sr-stock:        var(--sr-amber);   /* overridden per spoke below         */
+
+  /* status */
+  --sr-ok:           #7fc09a;
+  --sr-ok-deep:      #4a8c6a;
+  --sr-warn:         #c96f4a;
+
+  /* money sheet (the one cream surface; prints as pure paper) */
+  --sr-sheet:        #f2ead8;
+  --sr-sheet-ink:    #262119;
+  --sr-sheet-body:   #3c362c;
+  --sr-sheet-mute:   #8a7d5f;
+  --sr-sheet-line:   #d8cbaa;
+  --sr-sheet-gold:   #a3722d;
+
+  /* type */
+  --sr-sans:  'Archivo', system-ui, sans-serif;              /* caps titles, UI */
+  --sr-serif: 'Newsreader', Georgia, serif;                  /* italic beats    */
+  --sr-mono:  'IBM Plex Mono', ui-monospace, Menlo, monospace; /* timecode/data.
+                 Self-host Plex Mono woff2 exactly like fonts.css does today.  */
+
+  background: var(--sr-house);
+  color: var(--sr-ink);
+  font-family: var(--sr-sans);
+}
+
+body.sr.sr-re { --sr-stock: var(--sr-stock-re); }
+body.sr.sr-pl { --sr-stock: var(--sr-stock-pl); }
+body.sr.sr-fb { --sr-stock: var(--sr-stock-fb); }
+
+/* ── primitives ───────────────────────────────────────────────────────────── */
+
+/* caps display title: hero 64–68px desktop, 32–40px mobile */
+.sr .sr-title { font: 700 clamp(32px, 4.6vw, 68px)/1.02 var(--sr-sans);
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--sr-cream-strong); }
+
+/* serif italic emotional beat under a title */
+.sr .sr-beat { font-family: var(--sr-serif); font-style: italic;
+  font-size: clamp(15px, 1.4vw, 21px); color: var(--sr-ink-soft); }
+
+/* mono label — kickers, timecodes, metadata */
+.sr .sr-mono { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .sr-mono--signal { color: var(--sr-amber); }
+.sr .sr-mono--stock  { color: var(--sr-stock); }
+
+/* buttons */
+.sr .sr-btn { display: inline-flex; align-items: center; gap: 9px;
+  font: 700 12px/1 var(--sr-sans); letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 14px 26px; border: 0; cursor: pointer;
+  background: var(--sr-stock); color: var(--sr-house); }
+.sr .sr-btn:hover, .sr .sr-btn:focus-visible { background: var(--sr-cream); }
+.sr .sr-btn--ghost { background: transparent; color: var(--sr-cream);
+  border: 1px solid rgba(236, 228, 211, 0.35); }
+.sr .sr-btn--ghost:hover { border-color: var(--sr-stock); color: var(--sr-stock); background: transparent; }
+
+/* focus — visible everywhere, amber, no ambiguity on the dark house */
+.sr :focus-visible { outline: 2px solid var(--sr-amber); outline-offset: 2px; }
+
+/* film chip on any tile that is a video (duration always shown) */
+.sr .sr-filmchip { position: absolute; top: 10px; left: 10px;
+  font: 700 9px/1 var(--sr-mono); letter-spacing: 0.14em;
+  color: var(--sr-house); background: var(--sr-stock); padding: 4px 8px; }
+
+/* aerial marker (▲) — Part 107 deliverables, RE only */
+.sr .sr-aerial { background: var(--sr-stock-re); }
+
+/* viewfinder corner brackets — decorate hero/screening figures */
+.sr .sr-corners { position: relative; }
+.sr .sr-corners::before, .sr .sr-corners::after { content: ""; position: absolute;
+  width: 26px; height: 26px; border: 2px solid rgba(236, 228, 211, 0.5); }
+.sr .sr-corners::before { top: 18px; left: 18px; border-right: 0; border-bottom: 0; }
+.sr .sr-corners::after  { bottom: 18px; right: 18px; border-left: 0; border-top: 0; }
+
+/* circled take (client favorite) — replaces the heart */
+.sr .sr-take { width: 32px; height: 32px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font: 700 12px/1 var(--sr-mono); background: rgba(11, 11, 12, 0.5);
+  border: 2px dashed rgba(236, 228, 211, 0.35); color: rgba(236, 228, 211, 0.5);
+  cursor: pointer; }
+.sr .sr-take.is-circled { border-style: solid; border-color: var(--sr-amber); color: var(--sr-amber); }
+
+/* processing / REC state */
+@keyframes sr-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
+.sr .sr-rec { font: 700 10px/1 var(--sr-mono); letter-spacing: 0.2em; color: var(--sr-amber); }
+.sr .sr-rec::before { content: "● "; animation: sr-blink 1.2s infinite; }
+@media (prefers-reduced-motion: reduce) { .sr .sr-rec::before { animation: none; } }
+
+/* sticky export rail (client gallery) */
+.sr .sr-export { position: sticky; bottom: 0; z-index: 10;
+  background: var(--sr-house-deep); border-top: 1px solid var(--sr-line-strong);
+  display: flex; align-items: center; gap: 20px; padding: 15px 48px; }
+
+/* the money sheet — cream doc floating on the house; print = pure paper */
+.sr .sr-sheet { background: var(--sr-sheet); color: var(--sr-sheet-body);
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.9); }
+@media print {
+  body.sr { background: #fff; }
+  .sr .sr-sheet { box-shadow: none; }
+  .sr .sr-no-print { display: none !important; }
+}

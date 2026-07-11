@@ -37,7 +37,10 @@
 {% include "site/_schema_local.html" %}
 {% block site_head %}{% endblock %}
 {% endblock %}
-{% block bodyclass %}site-body{% endblock %}
+{# Screening Room rollout: body.sr turns the token layer on; spokes append a
+   film-stock class (sr-re / sr-pl / sr-fb) via the sr_stock block so their
+   accent color reads var(--sr-stock). Kill switch: MISE_SCREENING_ROOM=false. #}
+{% block bodyclass %}site-body{% if sr_enabled() %} sr{% block sr_stock %}{% endblock %}{% endif %}{% endblock %}
 {% block content %}
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site-nav{% block navclass %}{% endblock %}" data-nav>
