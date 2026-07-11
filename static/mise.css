@@ -8278,3 +8278,48 @@ html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
    figure in this system (.dash-money .pct, .room-money b). */
 .admin-shell .pipeline-money,
 .admin-shell .pipeline-step-val { color: var(--gold); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PR-H — Clients / Content / Portals / Forms / Templates (editorial dark)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Root-cause fix: the plain button hover fossil (line 3596) still hardcodes
+   the original light theme's white fill and is never overridden for the
+   generic/unclassed case — flagged independently across the clients, forms
+   and templates audits (task-new-form, tpl-use-form, field-actions buttons
+   all fall through to it with no dedicated rule of their own). Fixing it
+   once here clears every plain button's hover across the whole admin shell. */
+.admin-shell button:hover,
+.admin-shell .btn:hover { background: var(--surface-sunk); }
+
+/* ── 1. Clients (/admin/studio/clients, /admin/studio/clients/{id}) ──────── */
+.admin-shell .danger { color: var(--clay); }
+
+/* ── 2. Content library (/admin/studio/content) ──────────────────────────── */
+.admin-shell .ct-pill-on    { background: var(--ok-bg);      color: var(--ok);      border-color: var(--ok-line); }
+.admin-shell .ct-pill-off   { background: var(--neutral-bg); color: var(--neutral); border-color: var(--neutral-line); }
+.admin-shell .ct-pill-draft { background: var(--honey-bg);   color: var(--honey);   border-color: var(--honey-line); }
+.admin-shell .ct-pill-ai,
+.admin-shell .ct-preset-ovl { background: var(--neutral-bg); color: var(--neutral); border-color: var(--neutral-line); }
+.admin-shell .ct-kit-logo   { background: repeating-conic-gradient(#242424 0% 25%, #1a1a1a 0% 50%) 50% / 16px 16px; }
+.admin-shell .ct-ai-on      { color: var(--ok); }
+
+/* ── 3. Client portals (/admin/studio/portals) ────────────────────────────── */
+.admin-shell .pt-link   { background: var(--surface-sunk); border-color: var(--line); }
+.admin-shell .pt-pin    { background: var(--neutral-bg); }
+.admin-shell .pt-rights { color: var(--ok); }
+
+/* ── 4. Presets (/admin/studio/presets) — older bare-selector convention;
+   deliberately unscoped to match the rest of this file's .chip rules. ──── */
+.chip.on { color: #0e1319; }
+
+/* ── 5. Forms (/admin/forms, /admin/forms/{id}, /admin/forms/{id}/submissions) */
+.admin-shell .chip-req { background: var(--clay-bg); color: var(--clay); }
+/* Move up/down reorder buttons: restore the transparent resting look on
+   hover (border+text go accent) instead of the white fossil §0 replaces
+   with --surface-sunk — these are plain icon-style buttons, not surfaces. */
+.admin-shell .field-actions button:hover { background: none; border-color: var(--accent); color: var(--accent); }
+
+/* ── 6. Templates gallery + email templates (/admin/templates,
+   /admin/studio/email-templates) — resolve entirely via §0 and existing
+   PR-D/E token overrides; no page-specific rules needed. ─────────────────── */
