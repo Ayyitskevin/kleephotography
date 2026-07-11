@@ -1,5 +1,6 @@
 {% extends "base_cream.html" %}
 {% block title %}Receipt · {{ d.title }} · {{ site_name }}{% endblock %}
+{% block bodyclass %}{% if sr_enabled() %}sr sr-moneydoc{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
 <main class="doc-page">
   <header class="doc-head">
