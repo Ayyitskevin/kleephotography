@@ -1,14 +1,12 @@
 {% extends "base_cream.html" %}
 {% block title %}{{ p.client_name }} · {{ site_name }}{% endblock %}
+{% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
-<main class="center-card">
-  <h1>{{ p.company or p.client_name }}</h1>
-  <p class="muted">Client portal</p>
-  <form method="post" action="/portal/{{ p.slug }}/pin" class="pin-form">
-    <input type="text" name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4"
-           placeholder="4-digit PIN" autofocus required>
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
-    <button type="submit">Open portal</button>
-  </form>
-</main>
+{% with ticket_kicker="Season pass — client portal",
+        ticket_title=p.company or p.client_name,
+        ticket_for=(p.client_name if p.company else None),
+        ticket_cta="Open the portal",
+        form_action="/portal/" ~ p.slug ~ "/pin" %}
+{% include "public/_ticket_gate.html" %}
+{% endwith %}
 {% endblock %}

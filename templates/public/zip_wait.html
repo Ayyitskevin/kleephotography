@@ -1,20 +1,24 @@
 {% extends "base_cream.html" %}
 {% block title %}Preparing download · {{ g.title }}{% endblock %}
+{% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
-<main class="center-card">
+<main class="center-card sr-statecard">
   <div data-zip-working>
-    <h1>Packing your gallery&hellip;</h1>
+    <p class="sr-rec sr-state-kicker">Packing your export</p>
+    <h1 class="sr-state-title">{{ g.title }}</h1>
     <p class="muted">This can take a minute for large galleries. The download will start
-       automatically.</p>
+       automatically &mdash; this screen updates itself.</p>
     <div class="spinner"></div>
+    <i class="sr-rec-bar" aria-hidden="true"><b></b></i>
   </div>
   <div data-zip-error hidden>
-    <h1>This is taking longer than expected</h1>
+    <p class="sr-state-kicker sr-mono">Cut! &mdash; take two</p>
+    <h1 class="sr-state-title">This is taking longer than expected</h1>
     <p class="muted">Something went wrong packing your download. Please try again — or
        get in touch and I'll send it over directly.</p>
-    <p>
-      <a class="button" href="/g/{{ g.slug }}/download/zip">Try again</a>
-      <a class="button-ghost" href="/contact">Get in touch</a>
+    <p class="sr-state-actions">
+      <a class="button sr-btn" href="/g/{{ g.slug }}/download/zip">Try again</a>
+      <a class="button-ghost sr-btn sr-btn--ghost" href="/contact">Get in touch</a>
     </p>
   </div>
 </main>

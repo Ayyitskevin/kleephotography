@@ -1,0 +1,24 @@
+{# The ticket stub PIN gate (Screening Room 3f) — one anatomy for gallery /
+   workspace / portal gates. Caller sets: ticket_title, ticket_for (optional),
+   ticket_kicker, ticket_cta, form_action, error. Markup contract preserved:
+   ONE numeric input named "pin" (no per-digit JS), error inline, throttle
+   copy comes from the route. PIN logic itself is red-light and untouched. #}
+<main class="center-card sr-gate">
+  <p class="sr-gate-brand sr-mono">{{ site_name.split(' Photography')[0] }} &mdash; photo &times; film</p>
+  <div class="sr-ticket">
+    <span class="sr-ticket-notch sr-ticket-notch--l" aria-hidden="true"></span>
+    <span class="sr-ticket-notch sr-ticket-notch--r" aria-hidden="true"></span>
+    <p class="sr-ticket-kicker">{{ ticket_kicker }}</p>
+    <h1 class="sr-ticket-title">{{ ticket_title }}</h1>
+    {% if ticket_for %}<p class="sr-ticket-for">for {{ ticket_for }}</p>{% endif %}
+    <form method="post" action="{{ form_action }}" class="pin-form sr-ticket-form">
+      <label class="sr-ticket-label" for="sr-pin">Enter PIN from your text</label>
+      <input id="sr-pin" class="sr-pin-input" type="text" name="pin" inputmode="numeric"
+             pattern="[0-9]{4}" maxlength="4" placeholder="&middot;&middot;&middot;&middot;"
+             autocomplete="one-time-code" autofocus required>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <button type="submit" class="sr-ticket-go">{{ ticket_cta }}</button>
+    </form>
+  </div>
+  <p class="sr-gate-help">Lost the text? <a href="/contact">Message Kevin</a></p>
+</main>

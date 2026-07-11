@@ -395,9 +395,10 @@ def test_full_gallery_flow(admin):
         assert r.headers["content-type"] == "application/zip"
         zf = zipfile.ZipFile(io.BytesIO(r.content))
         assert zf.namelist() == ["dish.jpg"]
-        # favorites ZIP: header button shows, bundle holds exactly the faved original
+        # favorites ZIP: the export rail offers "takes only" with a live count,
+        # and the bundle holds exactly the faved original
         page = pub.get(f"/g/{g['slug']}").text
-        assert f"/g/{g['slug']}/download/favorites" in page and "Favorites (1)" in page
+        assert f"/g/{g['slug']}/download/favorites" in page and "1 take circled" in page
         r = pub.get(f"/g/{g['slug']}/download/favorites")
         assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
         assert zipfile.ZipFile(io.BytesIO(r.content)).namelist() == ["dish.jpg"]

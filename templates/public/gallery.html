@@ -1,22 +1,38 @@
 {% extends "base_cream.html" %}
+{# The Premiere (Screening Room 3e): title card → Reel One row → the frames as
+   circled takes → sticky export rail. All interactions stay the existing
+   HTMX endpoints; the kill switch (MISE_SCREENING_ROOM=false) falls back to
+   the cream gallery styling on identical markup. #}
 {% block title %}{{ g.title }} · {{ site_name }}{% endblock %}
-{% block bodyclass %}gallery-body cream-theme{% endblock %}
+{% block bodyclass %}gallery-body{% if sr_enabled() %} sr{% else %} cream-theme{% endif %}{% endblock %}
 {% block content %}
-<header class="gal2-hero">
-  {% if g.cover_asset_id %}<div class="gal2-hero-img" style="background-image:url('/media/{{ g.slug }}/web/{{ g.cover_asset_id }}')" aria-hidden="true"></div>{% endif %}
-  <div class="gal2-hero-scrim" aria-hidden="true"></div>
-  <div class="gal2-hero-inner">
-    <div>
-      <p class="gal2-kicker">{{ site_name }} · private gallery</p>
-      <h1>{{ g.title }}{% if g.client_name %}<br><span class="gal2-hero-sub">{{ g.client_name }}</span>{% endif %}</h1>
-      <div class="gal2-hero-actions">
-        <a class="btn" href="/g/{{ g.slug }}/download">&#8595; Download all</a>
-        {% if favs %}<a class="btn btn-quiet" href="/g/{{ g.slug }}/download/favorites">&#9829; Favorites ({{ favs|length }})</a>{% endif %}
-      </div>
+{% set films = assets|selectattr("kind", "equalto", "video")|list %}
+{% set n_stills = assets|length - films|length %}
+
+<header class="sr-premiere-card sr-corners4">
+  <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+  {% if g.cover_asset_id %}<div class="sr-premiere-bg" style="background-image:url('/media/{{ g.slug }}/web/{{ g.cover_asset_id }}')" aria-hidden="true"></div>{% endif %}
+  <div class="sr-premiere-scrim" aria-hidden="true"></div>
+  <div class="sr-premiere-inner">
+    <p class="sr-mono sr-mono--signal">{{ site_name.split(' Photography')[0] }} presents &middot; a private premiere</p>
+    <h1>{{ g.title }}</h1>
+    <p class="sr-beat">{% if g.client_name %}for {{ g.client_name }}{% if assets %} &mdash; {% endif %}{% endif %}{% if assets %}{{ n_stills }} frame{{ 's' if n_stills != 1 }}{% if films %} &middot; {{ films|length }} film{{ 's' if films|length != 1 }}{% endif %}{% endif %}</p>
+    <div class="sr-premiere-actions">
+      {% if films %}<a class="sr-btn" href="#reel">&#9654; Roll the reel</a>{% endif %}
+      {% if n_stills %}<a class="sr-btn sr-btn--ghost" href="#frames">Skip to the frames &darr;</a>{% endif %}
+      <a class="sr-btn sr-btn--ghost" href="/g/{{ g.slug }}/download">&darr; Download all</a>
     </div>
   </div>
-  <div class="gal2-cue" aria-hidden="true"><span>View gallery</span><i>&darr;</i></div>
+  <p class="sr-premiere-foot sr-mono">{% if g.expires_at %}Screening open until {{ g.expires_at }} &middot; {% endif %}admitted with PIN &middot;&middot;&middot;&middot;</p>
 </header>
+
+{% macro takebtn(a) %}
+<button class="icon-btn sr-take-btn" hx-post="/g/{{ g.slug }}/fav/{{ a.id }}" hx-swap="innerHTML"
+        title="Circle this take" aria-label="Circle this take">
+  {% if a.id in favs %}<span id="take-{{ a.id }}" class="fav-btn faved sr-take is-circled">{{ fav_order.get(a.id, '&#10003;') }}</span>
+  {% else %}<span id="take-{{ a.id }}" class="fav-btn sr-take">&#9675;</span>{% endif %}
+</button>
+{% endmacro %}
 
 {% macro tile(a) %}
 <figure class="tile" data-id="{{ a.id }}" data-kind="{{ a.kind }}"
@@ -30,12 +46,9 @@
   {% if a.kind == 'video' %}<span class="play-badge">&#9654;</span>
   {% if a.duration and a.duration|hms %}<span class="dur-badge">{{ a.duration|hms }}</span>{% endif %}
   {% endif %}
+  {% if sr_enabled() %}<span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}</span>{% endif %}
   <div class="tile-actions">
-    <button class="icon-btn" hx-post="/g/{{ g.slug }}/fav/{{ a.id }}" hx-swap="innerHTML"
-            title="Favorite">
-      {% if a.id in favs %}<span class="fav-btn faved">&#9829;</span>
-      {% else %}<span class="fav-btn">&#9825;</span>{% endif %}
-    </button>
+    {{ takebtn(a) }}
     {% if a.kind == 'video' %}
     <a class="icon-btn icon-btn-mp4" href="/g/{{ g.slug }}/download?asset_id={{ a.id }}&web=1"
        title="Download web-ready MP4">MP4</a>
@@ -50,53 +63,94 @@
 </figure>
 {% endmacro %}
 
-{% set populated = [] %}
-{% for s in sections %}{% if by_section[s.id] %}{% if populated.append(s) %}{% endif %}{% endif %}{% endfor %}
-{% set n_targets = populated|length + (1 if unsectioned and sections else 0) %}
-{% if n_targets >= 2 %}
-<nav class="section-nav">
-  {% for s in populated %}<a href="#sec-{{ s.id }}">{{ s.name }}</a>{% endfor %}
-  {% if unsectioned and sections %}<a href="#sec-more">More</a>{% endif %}
-  <span class="gal2-progress">&#9829; {{ favs|length }} of {{ assets|length }} picked</span>
-</nav>
-{% endif %}
-
-<main class="gallery-main">
+<main class="gallery-main sr-wrap">
   <div id="proof-toast" class="proof-toast" hidden></div>
-  {% for s in sections %}
-    {% if by_section[s.id] %}
-      <h2 class="section-name" id="sec-{{ s.id }}">{{ s.name }}
-        <a class="sec-dl" href="/g/{{ g.slug }}/download/section/{{ s.id }}"
-           title="Download {{ s.name }}">&#8595;</a>
-        {% if s.proof_target %}
-          {% set picks = section_picks.get(s.id, 0) %}
-          <span id="proof-{{ s.id }}"
-                class="proof-progress {{ 'ok' if picks >= s.proof_target else 'muted' }}">{{ picks }} of {{ s.proof_target }} picked</span>
-        {% endif %}
-      </h2>
-      {% if s.caption %}<p class="section-caption">{{ s.caption }}</p>{% endif %}
-      <div class="grid">{% for a in by_section[s.id] %}{{ tile(a) }}{% endfor %}</div>
-    {% endif %}
-  {% endfor %}
-  {% if unsectioned %}
-    {% if sections %}<h2 class="section-name" id="sec-more">More</h2>{% endif %}
-    <div class="grid">{% for a in unsectioned %}{{ tile(a) }}{% endfor %}</div>
-  {% endif %}
-  {% if not assets %}<p class="muted center">Nothing here yet — check back soon.</p>{% endif %}
 
-  {# Prospect loop — clients share these links; every delivery sells the next shoot #}
-  <div class="gal2-cta">
-    <div>
-      <p class="gal2-cta-kicker">To the friend holding this link</p>
-      <h2>Love these? <span class="gal2-it">Your shoot could be next.</span></h2>
-      <p>Real estate, portraits, and food &amp; beverage — photography &amp; film for
-         Asheville &amp; Western North Carolina. Tailored proposal within a business day.</p>
+  {# ═══ REEL ONE — films first, cuts & rendering renditions beside the hero ══ #}
+  {% if films %}
+  <section id="reel" class="sr-section" aria-label="Films">
+    <div class="sr-kickrow">
+      <p class="sr-mono sr-mono--signal">Reel one &mdash; watch first</p>
+      <span class="sr-mono">{{ films|length }} film{{ 's' if films|length != 1 }}</span>
     </div>
-    <a class="btn" href="/contact?prefill=gallery_question&gallery={{ g.title | urlencode }}">Reserve a shoot &rarr;</a>
+    <div class="sr-reelrow">
+      {% for a in films %}
+      <div class="sr-reelcell{% if loop.first %} sr-reelcell--hero{% endif %}">
+        {{ tile(a) }}
+      </div>
+      {% for r in renditions_pending.get(a.id, []) %}
+      <div class="sr-reelcell">{% with r=r, preset=r.preset.replace('x', ':') %}{% include "public/_rec_tile.html" %}{% endwith %}</div>
+      {% endfor %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {# ═══ THE FRAMES — circle your takes (sections stay the curation) ══════════ #}
+  {% set populated = [] %}
+  {% for s in sections %}{% if by_section[s.id]|rejectattr("kind", "equalto", "video")|list %}{% if populated.append(s) %}{% endif %}{% endif %}{% endfor %}
+  {% set stills_unsectioned = unsectioned|rejectattr("kind", "equalto", "video")|list %}
+  {% set n_targets = populated|length + (1 if stills_unsectioned and sections else 0) %}
+  {% if n_stills %}
+  <section id="frames" class="sr-section" aria-label="The frames">
+    <div class="sr-kickrow">
+      <p class="sr-mono">The frames &mdash; circle your takes</p>
+      <span class="sr-mono sr-mono--signal">&#9829; <span class="gal2-progress" id="sr-picked-line" style="display:inline;">{{ favs|length }} of {{ assets|length }} picked</span></span>
+    </div>
+    {% if n_targets >= 2 %}
+    <nav class="section-nav">
+      {% for s in populated %}<a href="#sec-{{ s.id }}">{{ s.name }}</a>{% endfor %}
+      {% if stills_unsectioned and sections %}<a href="#sec-more">More</a>{% endif %}
+    </nav>
+    {% endif %}
+    {% for s in sections %}
+      {% set stills = by_section[s.id]|rejectattr("kind", "equalto", "video")|list %}
+      {% if stills %}
+        <h2 class="section-name" id="sec-{{ s.id }}">{{ s.name }}
+          <a class="sec-dl" href="/g/{{ g.slug }}/download/section/{{ s.id }}"
+             title="Download {{ s.name }}">&#8595;</a>
+          {% if s.proof_target %}
+            {% set picks = section_picks.get(s.id, 0) %}
+            <span id="proof-{{ s.id }}"
+                  class="proof-progress {{ 'ok' if picks >= s.proof_target else 'muted' }}">{{ picks }} of {{ s.proof_target }} picked</span>
+          {% endif %}
+        </h2>
+        {% if s.caption %}<p class="section-caption">{{ s.caption }}</p>{% endif %}
+        <div class="grid">{% for a in stills %}{{ tile(a) }}{% endfor %}</div>
+      {% endif %}
+    {% endfor %}
+    {% if stills_unsectioned %}
+      {% if sections %}<h2 class="section-name" id="sec-more">More</h2>{% endif %}
+      <div class="grid">{% for a in stills_unsectioned %}{{ tile(a) }}{% endfor %}</div>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% if not assets %}<p class="muted center sr-empty-takes">Nothing on the reel yet &mdash; check back soon.</p>{% endif %}
+
+  {# Prospect loop — every delivery sells the next shoot, told as end credits #}
+  <div class="sr-prospect">
+    <p class="sr-mono">To the friend holding this link</p>
+    <h2>Love these? <em>Your shoot could be next.</em></h2>
+    <p class="sr-prospect-body">Real estate, portraits, and food &amp; beverage — photography &amp; film for
+       Asheville &amp; Western North Carolina. Tailored proposal within a business day.</p>
+    <a class="sr-btn" href="/contact?prefill=gallery_question&gallery={{ g.title | urlencode }}">Reserve a shoot &rarr;</a>
   </div>
-  <p class="gal2-credit">Delivered by {{ site_name }} · The space, the face, the plate ·
+  <p class="sr-credit sr-mono">Delivered by {{ site_name }} &middot; the space, the face, the plate &middot;
     <a href="/">kleephotography.com</a></p>
 </main>
+
+{# ═══ EXPORT RAIL — sticky, above the thumb on mobile ════════════════════════ #}
+{% if assets %}
+<div class="sr-export">
+  <span class="sr-mono sr-mono--signal">Export</span>
+  <span class="sr-export-msg" id="sr-export-count">{% if favs %}{{ favs|length }} take{{ 's' if favs|length != 1 }} circled{% else %}no takes circled yet{% endif %}</span>
+  <div class="sr-export-actions">
+    <a class="sr-btn sr-btn--ghost" href="/contact?prefill=gallery_question&gallery={{ g.title | urlencode }}">Message Kevin</a>
+    <a class="sr-btn sr-btn--ghost" href="/g/{{ g.slug }}/download/favorites">&darr; Takes only</a>
+    <a class="sr-btn" href="/g/{{ g.slug }}/download">&darr; Everything{% if total_bytes > 52428800 %} &middot; {{ "%.1f"|format(total_bytes / 1073741824) if total_bytes >= 1073741824 else (total_bytes / 1048576)|round|int ~ " MB" }}{{ " GB" if total_bytes >= 1073741824 }}{% endif %}</a>
+  </div>
+</div>
+{% endif %}
 
 <div id="lightbox" class="lightbox" hidden data-slug="{{ g.slug }}"
      role="dialog" aria-modal="true" aria-label="Photo viewer">

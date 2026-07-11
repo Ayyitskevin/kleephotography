@@ -1,7 +1,10 @@
 {% extends "base_cream.html" %}
+{% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
-<main class="center-card">
-  <h1>{{ g.title }}</h1>
+<main class="center-card sr-statecard sr-corners4">
+  <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+  <p class="sr-state-kicker sr-mono">Screening closed</p>
+  <h1 class="sr-state-title">{{ g.title }}</h1>
   <p>This gallery has expired.
     {% if contact_email %}<a href="mailto:{{ contact_email }}">Get in touch</a>{% else %}<a href="/contact">Get in touch</a>{% endif %}
     to have it re-opened.</p>

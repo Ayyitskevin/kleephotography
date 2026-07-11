@@ -1,8 +1,11 @@
 {% extends "base_cream.html" %}
+{% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
-<main class="center-card">
-  <h1>{{ site_name }}</h1>
+<main class="center-card sr-statecard sr-corners4">
+  <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+  <p class="sr-state-kicker sr-mono">Technical difficulties</p>
+  <h1 class="sr-state-title">{{ site_name }}</h1>
   <p>{{ message }}</p>
-  <p class="muted"><a href="/">Back to the homepage</a></p>
+  <p class="muted"><a href="/">Back to the lobby</a> &middot; <a href="/contact">Get in touch</a></p>
 </main>
 {% endblock %}
