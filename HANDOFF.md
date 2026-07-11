@@ -7,7 +7,31 @@ file as you work. **All prior context you need is here — do not assume chat hi
 
 ---
 
-## 0. STATUS 2026-07-10 — queue COMPLETE; no work is currently authorized
+## 0a. STATUS 2026-07-11 — 3-specialty flagship revamp (in flight)
+
+Kevin approved the hub-and-spoke revamp: real estate / portrait & lifestyle /
+food & beverage, photo AND video, under the kept "Kevin Lee Photography" brand
+("Photography & Film" lockup). Green work is on branch
+`claude/kleephotography-flagship-revamp-v0vgl9` (draft PR — Kevin merges):
+
+- Specialty taxonomy = portfolio-tag prefix convention (`re/`, `pl/`, bare =
+  legacy F&B) in `app/specialties.py` — zero schema. Spokes at
+  `/real-estate` `/portraits` `/food-beverage` (INDEXABLE + sitemap updated —
+  both lists live in `app/public/site.py`); homepage is the router (three
+  doors); portfolio/reels/work/about/contact broadened in place. F&B spoke
+  inherits the old home copy (SEO). JSON-LD broadened + dead-image fix.
+  Video delivery UX: duration badges, web-MP4 download, per-specialty booking
+  intake labels (event-slug prefix convention `re-`/`pl-`).
+- **No client-facing URL moved. Zero redirects needed. Money/schema/contract
+  files untouched in the green pass.**
+- Operator runbook: `ops/SPECIALTY-LAUNCH.md` (tagging, event types,
+  launch checklist).
+- RED (draft PRs, Kevin merges, never self-merge): R1 per-specialty
+  services/pricing (site.py SERVICES + proposals.py PRESETS — includes the
+  $650-display vs $900-anchor question), R2 RE+portrait contract templates,
+  R3 video renditions migration (9:16/1:1 encodes, format-choice downloads).
+
+## 0b. STATUS 2026-07-10 — prior refactor queue COMPLETE
 
 Everything below this section is historical context. PRs #2–#18 are all MERGED.
 The audit remediation and the follow-up queue finished as:

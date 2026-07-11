@@ -1,4 +1,7 @@
 {% extends "site/base_site.html" %}
+{# Middleware already sends X-Robots-Tag: noindex for /book/{slug}; align the
+   meta so the page stops emitting conflicting index,follow. #}
+{% block robots %}<meta name="robots" content="noindex, follow">{% endblock %}
 {% block title %}{{ e.name }} — {{ site_name }}{% endblock %}
 {% block meta_description %}{{ e.description or 'Book ' ~ e.name ~ ' — pick a time and get an instant confirmation with a calendar invite.' }}{% endblock %}
 {% block site_content %}
@@ -115,8 +118,36 @@
             <label>Anything I should know? <span class="muted">(optional)</span>
               <textarea name="notes" rows="3"></textarea></label>
             {% if e.creates_notion_session %}
+            {# Intake labels follow the event-type slug prefix convention
+               (ops/SPECIALTY-LAUNCH.md): 're-…' real estate, 'pl-…' portrait &
+               lifestyle, anything else keeps the original F&B intake. Labels
+               only — the input names/columns are identical in all three. #}
+            {% set sp = 're' if e.slug.startswith('re-') else ('pl' if e.slug.startswith('pl-') else 'fb') %}
             <fieldset class="book-intake">
               <legend>Shoot details <span class="muted">(helps me prep — optional)</span></legend>
+              {% if sp == 're' %}
+              <label>Property address
+                <input type="text" name="venue_address"></label>
+              <label>Size &amp; rooms
+                <input type="text" name="dish_count" placeholder="e.g. 3,200 sq ft · 4 bed 3 bath"></label>
+              <label>Access &amp; parking notes
+                <input type="text" name="parking_notes"></label>
+              <label>On-site contact <span class="muted">(name + number on the day)</span>
+                <input type="text" name="onsite_contact"></label>
+              <label>Listing link or references <span class="muted">(links or a few words)</span>
+                <textarea name="style_refs" rows="2"></textarea></label>
+              {% elif sp == 'pl' %}
+              <label>Session location <span class="muted">(studio, your office, outdoors…)</span>
+                <input type="text" name="venue_address"></label>
+              <label>Who's being photographed?
+                <input type="text" name="dish_count" placeholder="e.g. just me · team of 8 · family of 5"></label>
+              <label>Parking &amp; access notes
+                <input type="text" name="parking_notes"></label>
+              <label>On-site contact <span class="muted">(if it isn't you)</span>
+                <input type="text" name="onsite_contact"></label>
+              <label>Looks &amp; references <span class="muted">(links or a few words)</span>
+                <textarea name="style_refs" rows="2"></textarea></label>
+              {% else %}
               <label>Venue / shoot address
                 <input type="text" name="venue_address"></label>
               <label>How many dishes or setups?
@@ -127,6 +158,7 @@
                 <input type="text" name="onsite_contact"></label>
               <label>Style references <span class="muted">(links or a few words)</span>
                 <textarea name="style_refs" rows="2"></textarea></label>
+              {% endif %}
             </fieldset>
             {% endif %}
             <input type="text" name="website" class="hp-field" tabindex="-1"

@@ -45,12 +45,20 @@ def _store_zip(gallery_id: int, assets, out: Path) -> None:
     jobs.build_zip(out, entries)
 
 
-def _target(slug: str, asset_id: int | None, fav: int | None, section: int | None) -> str:
+def _target(
+    slug: str,
+    asset_id: int | None,
+    fav: int | None,
+    section: int | None,
+    web: int | None = None,
+) -> str:
     if fav:
         return f"/g/{slug}/download/favorites"
     if section is not None:
         return f"/g/{slug}/download/section/{section}"
     if asset_id is not None:
+        if web:
+            return f"/g/{slug}/download/web/{asset_id}"
         return f"/g/{slug}/download/asset/{asset_id}"
     return f"/g/{slug}/download/zip"
 
@@ -62,15 +70,23 @@ async def download_page(
     asset_id: int | None = None,
     fav: int | None = None,
     section: int | None = None,
+    web: int | None = None,
 ):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
         return templates.TemplateResponse(
             request,
             "public/email_gate.html",
-            {"g": g, "asset_id": asset_id, "fav": fav, "section": section, "error": None},
+            {
+                "g": g,
+                "asset_id": asset_id,
+                "fav": fav,
+                "section": section,
+                "web": web,
+                "error": None,
+            },
         )
-    return RedirectResponse(_target(slug, asset_id, fav, section), status_code=303)
+    return RedirectResponse(_target(slug, asset_id, fav, section, web), status_code=303)
 
 
 @router.post("/{slug}/email", response_class=HTMLResponse)
@@ -81,6 +97,7 @@ async def capture_email(
     asset_id: int | None = Form(None),
     fav: int | None = Form(None),
     section: int | None = Form(None),
+    web: int | None = Form(None),
 ):
     g, visitor = _gate(request, slug)
     email = email.strip().lower()
@@ -93,13 +110,14 @@ async def capture_email(
                 "asset_id": asset_id,
                 "fav": fav,
                 "section": section,
+                "web": web,
                 "error": "That doesn't look like an email.",
             },
             status_code=400,
         )
     db.run("UPDATE visitors SET email=? WHERE id=?", (email, visitor["id"]))
     log.info("email captured for gallery %s visitor %s", g["id"], visitor["id"])
-    return RedirectResponse(_target(slug, asset_id, fav, section), status_code=303)
+    return RedirectResponse(_target(slug, asset_id, fav, section, web), status_code=303)
 
 
 @router.get("/{slug}/download/asset/{asset_id}")
@@ -120,6 +138,32 @@ async def download_asset(request: Request, slug: str, asset_id: int):
         (g["id"], visitor["id"], asset_id),
     )
     return FileResponse(path, filename=a["filename"], media_type="application/octet-stream")
+
+
+@router.get("/{slug}/download/web/{asset_id}")
+async def download_web_video(request: Request, slug: str, asset_id: int):
+    """Web-ready MP4 for a delivered video — the same transcoded H.264 the
+    gallery streams, offered as a download so clients get a post-anywhere file
+    without pulling the multi-GB camera original."""
+    g, visitor = _gate(request, slug)
+    if _email_required(g) and not visitor["email"]:
+        return RedirectResponse(f"/g/{slug}/download?asset_id={asset_id}&web=1", status_code=303)
+    a = db.one(
+        "SELECT * FROM assets WHERE id=? AND gallery_id=? AND status='ready' AND kind='video'",
+        (asset_id, g["id"]),
+    )
+    if not a:
+        raise HTTPException(status_code=404)
+    path = config.MEDIA_DIR / str(g["id"]) / "web" / f"{Path(a['stored']).stem}.mp4"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    db.run(
+        "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,?)",
+        (g["id"], visitor["id"], asset_id),
+    )
+    return FileResponse(
+        path, filename=f"{Path(a['filename']).stem}_web.mp4", media_type="video/mp4"
+    )
 
 
 @router.get("/{slug}/download/favorites")

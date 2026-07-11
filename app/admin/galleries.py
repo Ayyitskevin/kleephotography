@@ -28,6 +28,9 @@ DEFAULT_SECTIONS = [
 # Suggested portfolio-tag values for the admin datalist. Kevin can type any
 # value; these just speed up the common ones. /portfolio filter chips are
 # computed from whatever tags actually exist on starred assets.
+# Specialty prefix convention (app/specialties.py): 're/…' real estate,
+# 'pl/…' portrait & lifestyle, 'fb/…' food & beverage. Unprefixed tags are
+# legacy F&B — the pre-revamp archive needs no re-tagging.
 PORTFOLIO_TAG_SUGGESTIONS = [
     "Dishes",
     "Drinks",
@@ -36,6 +39,16 @@ PORTFOLIO_TAG_SUGGESTIONS = [
     "Plating",
     "Behind the Scenes",
     "Detail",
+    "re/exteriors",
+    "re/interiors",
+    "re/twilight",
+    "re/aerial",
+    "re/walkthrough",
+    "pl/headshots",
+    "pl/branding",
+    "pl/family",
+    "pl/golden-hour",
+    "fb/motion",
 ]
 
 

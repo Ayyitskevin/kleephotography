@@ -10,7 +10,7 @@
 <script nonce="{{ csp_nonce }}">
   document.documentElement.setAttribute("data-theme", "dark");
 </script>
-<meta name="description" content="{% block meta_description %}Menus, dishes, drinks, and the rooms they live in — food &amp; beverage photography and videography for Asheville &amp; Western North Carolina.{% endblock %}">
+<meta name="description" content="{% block meta_description %}Photography &amp; film for real estate, portraits, and food &amp; beverage — Asheville &amp; Western North Carolina.{% endblock %}">
 <link rel="canonical" href="{{ base_url }}{{ request.url.path }}">
 {# Pages with their own share card (e.g. /work/{slug} articles) override this
    whole block; everything else gets a website card that mirrors the page's
@@ -43,13 +43,13 @@
 <header class="site-nav{% block navclass %}{% endblock %}" data-nav>
   <a href="/" class="site-brand">
     <b>Kevin&nbsp;Lee</b>
-    <small>Food&nbsp;&amp;&nbsp;Beverage</small>
+    <small>Photography&nbsp;&amp;&nbsp;Film</small>
   </a>
   <nav>
-    <a href="/portfolio">Portfolio</a>
+    <a href="/real-estate">Real Estate</a>
+    <a href="/portraits">Portraits</a>
+    <a href="/food-beverage">Food &amp; Beverage</a>
     <a href="/work">Work</a>
-    <a href="/reels">Reels</a>
-    <a href="/services">Services</a>
     <a href="/about">About</a>
     <a href="/book">Book a call</a>
     <a href="/contact" class="nav-cta">Request a quote</a>
@@ -59,10 +59,10 @@
 </header>
 
 <div class="nav-mobile" id="site-mobile-menu" data-mobile-menu>
-  <a href="/portfolio">Portfolio</a>
+  <a href="/real-estate">Real Estate</a>
+  <a href="/portraits">Portraits</a>
+  <a href="/food-beverage">Food &amp; Beverage</a>
   <a href="/work">Work</a>
-  <a href="/reels">Reels</a>
-  <a href="/services">Services</a>
   <a href="/about">About</a>
   <a href="/book">Book a call</a>
   <a href="/contact" class="nav-cta">Request a quote</a>
@@ -83,11 +83,15 @@
   <div class="footer-grid">
     <div class="footer-brand">
       <b>{{ site_name }}</b>
-      <p>Food &amp; beverage photography and videography. Asheville &amp; Western
-         North Carolina — Charlotte, Raleigh, and Wilmington on regular rotation.</p>
+      <p>Real estate, portrait &amp; lifestyle, and food &amp; beverage — photography
+         and film for Asheville &amp; Western North Carolina. Charlotte, Raleigh,
+         and Wilmington on regular rotation.</p>
     </div>
     <div class="footer-col">
       <b>Explore</b>
+      <a href="/real-estate">Real Estate</a>
+      <a href="/portraits">Portraits</a>
+      <a href="/food-beverage">Food &amp; Beverage</a>
       <a href="/portfolio">Portfolio</a>
       <a href="/work">Work</a>
       <a href="/reels">Reels</a>
@@ -110,7 +114,7 @@
   </div>
   <div class="footer-base">
     <span>&copy; 2026 {{ site_name }} · Kleephotography.com</span>
-    <span>Photography that makes people hungry.</span>
+    <span>The space, the face, the plate — shot to sell.</span>
   </div>
 </footer>
 {% endblock %}

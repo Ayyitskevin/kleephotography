@@ -8,8 +8,8 @@
   <aside class="contact-aside" data-reveal>
     <p class="eyebrow">Contact</p>
     <h1>Work with <span class="it-accent">me.</span></h1>
-    <p class="lede">Tell me about your restaurant, café, bar, or brand and what
-       you need — a menu refresh, a launch, or ongoing content. I read every
+    <p class="lede">Tell me about your listing, your team, your restaurant, or
+       your brand — and what you need: photo, video, or both. I read every
        message and reply within a business day.</p>
 
     <div class="contact-details">
@@ -54,16 +54,16 @@
       <label>Project type
         <select name="service">
           <option value="">Not sure yet — help me choose</option>
-          <option value="Photography"{% if prefill and prefill.service == 'Photography' %} selected{% endif %}>Photography</option>
-          <option value="Videography"{% if prefill and prefill.service == 'Videography' %} selected{% endif %}>Videography</option>
-          <option value="Photography + Videography"{% if prefill and prefill.service == 'Photography + Videography' %} selected{% endif %}>Photography + Videography</option>
+          <option value="Real Estate"{% if prefill and prefill.service == 'Real Estate' %} selected{% endif %}>Real Estate — photo / video</option>
+          <option value="Portraits"{% if prefill and prefill.service == 'Portraits' %} selected{% endif %}>Portraits &amp; Lifestyle</option>
+          <option value="Food &amp; Beverage"{% if prefill and prefill.service == 'Food & Beverage' %} selected{% endif %}>Food &amp; Beverage — photo / video</option>
           <option value="Brand Partner (monthly retainer)"{% if prefill and prefill.service == 'Brand Partner (monthly retainer)' %} selected{% endif %}>Brand Partner (monthly retainer)</option>
         </select></label>
       <label>Target date <input type="date" name="shoot_date"
              value="{{ prefill.shoot_date if prefill else '' }}"></label>
-      <label>How many dishes or setups? <input type="text" name="dish_count"
+      <label>What's the scope? <input type="text" name="dish_count"
              value="{{ prefill.dish_count if prefill else '' }}"
-             placeholder="e.g. 12 dishes, 2 cocktails, full menu"></label>
+             placeholder="e.g. 12 dishes, 3,200 sq ft listing, team of 8"></label>
       <label>Usage / licensing
         <select name="usage">
           <option value="">Standard — web &amp; social</option>

@@ -1,22 +1,26 @@
 {% extends "site/base_site.html" %}
 {% block title %}Portfolio — {{ site_name }}{% endblock %}
-{% block meta_description %}Selected food &amp; beverage photography — dishes, drinks, and the rooms they live in, shot for menus, social, and campaigns.{% endblock %}
+{% block meta_description %}Selected work across real estate, portraits, and food &amp; beverage — exteriors, faces, dishes, and the rooms they live in, shot for listings, brands, and menus.{% endblock %}
 {% block site_content %}
 
 <section class="page-hero page-hero-portfolio">
   <div class="page-hero-inner" data-reveal>
     <p class="eyebrow">Portfolio</p>
-    <h1>Every dish, photographed <span class="it-accent">at its peak.</span></h1>
-    <p class="lede">A working archive of menus, drinks, pastry, and the rooms
-       they live in — across Asheville and Western North Carolina.</p>
+    <h1>The working <span class="it-accent">archive.</span></h1>
+    <p class="lede">Spaces, faces, and plates across Asheville and Western
+       North Carolina — filter by specialty or subject.</p>
   </div>
-  {% if tags %}
-  <nav class="portfolio-filter" aria-label="Filter portfolio by tag" data-reveal>
-    <button class="pf-chip pf-chip-active" data-filter="">All
+  {% if tags or sp_chips %}
+  <nav class="portfolio-filter" aria-label="Filter portfolio" data-reveal>
+    <button class="pf-chip pf-chip-active" data-filter="" aria-pressed="true">All
       <span class="muted">({{ assets|length }})</span></button>
+    {% for c in sp_chips %}
+    <button class="pf-chip" data-filter="sp:{{ c.key }}" aria-pressed="false">{{ c.name }}
+      <span class="muted">({{ c.count }})</span></button>
+    {% endfor %}
     {% for tag in tags %}
     {% set n = assets|selectattr("portfolio_tag", "equalto", tag)|list|length %}
-    <button class="pf-chip" data-filter="{{ tag|lower }}">{{ tag }}
+    <button class="pf-chip" data-filter="tag:{{ tag|lower }}" aria-pressed="false">{{ tag|tag_label }}
       <span class="muted">({{ n }})</span></button>
     {% endfor %}
   </nav>
@@ -29,6 +33,7 @@
     {% for a in assets %}
     <figure class="tile pf-masonry-tile{% if a.portfolio_tag %} pf-tile{% endif %}"
             {% if a.portfolio_tag %}data-tag="{{ a.portfolio_tag|lower }}"{% endif %}
+            data-sp="{{ a.portfolio_tag|tag_specialty }}"
             data-web="/site/img/{{ a.id }}">
       <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
            srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
@@ -36,7 +41,7 @@
            {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
            alt="{{ a|portfolio_alt }}">
       {% if a.portfolio_tag %}
-      <figcaption class="portfolio-cap">{{ a.portfolio_tag|capitalize }}{% if a.client_name %}
+      <figcaption class="portfolio-cap">{{ a.portfolio_tag|tag_label }}{% if a.client_name %}
         <small>{{ a.client_name }}</small>{% elif a.gallery_title %}
         <small>{{ a.gallery_title }}</small>{% endif %}
       </figcaption>
@@ -51,7 +56,7 @@
 
 <section class="cta cta-band">
   <div class="cta-inner" data-reveal>
-    <h2>Let's add your restaurant to <span class="it-accent">the archive.</span></h2>
+    <h2>Let's add your shoot to <span class="it-accent">the archive.</span></h2>
     <div class="cta-actions">
       <a class="btn-pill" href="/book">Book a shoot &rarr;</a>
     </div>
@@ -59,23 +64,34 @@
 </section>
 
 {% include "site/_lightbox.html" %}
-{% if tags %}
+{% if tags or sp_chips %}
 <script nonce="{{ csp_nonce }}">
   (function () {
     const tiles = document.querySelectorAll(".portfolio-masonry .pf-masonry-tile");
     const chips = document.querySelectorAll(".pf-chip");
-    function apply(tag) {
+    // Filters are namespaced: "" all · "sp:re" specialty · "tag:dishes" subject.
+    function apply(f) {
       tiles.forEach(t => {
-        const tt = t.dataset.tag || "";
-        t.classList.toggle("pf-hidden", tag !== "" && tt !== tag);
+        let show = true;
+        if (f.startsWith("sp:")) show = (t.dataset.sp || "") === f.slice(3);
+        else if (f.startsWith("tag:")) show = (t.dataset.tag || "") === f.slice(4);
+        t.classList.toggle("pf-hidden", f !== "" && !show);
       });
-      chips.forEach(c => c.classList.toggle(
-        "pf-chip-active", (c.dataset.filter || "") === (tag || "")));
-      if (tag) history.replaceState(null, "", "#" + tag);
+      chips.forEach(c => {
+        const on = (c.dataset.filter || "") === (f || "");
+        c.classList.toggle("pf-chip-active", on);
+        c.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      if (f) history.replaceState(null, "", "#" + f);
       else history.replaceState(null, "", location.pathname);
     }
     chips.forEach(c => c.addEventListener("click", () => apply(c.dataset.filter || "")));
-    const initial = (location.hash || "").slice(1);
+    let initial = (location.hash || "").slice(1);
+    // Pre-revamp bookmarks/shares used bare tag hashes (#dishes) — map them
+    // onto the namespaced filter so old links keep landing on the right view.
+    if (initial && !document.querySelector(`.pf-chip[data-filter="${CSS.escape(initial)}"]`)) {
+      initial = "tag:" + initial;
+    }
     if (initial && document.querySelector(`.pf-chip[data-filter="${CSS.escape(initial)}"]`)) {
       apply(initial);
     }

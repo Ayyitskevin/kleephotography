@@ -1,20 +1,31 @@
 {% extends "site/base_site.html" %}
 {% block title %}Reels — {{ site_name }}{% endblock %}
-{% block meta_description %}Short-form food &amp; beverage video — reels, social motion, and brand films by {{ site_name }}. Asheville &amp; Western North Carolina.{% endblock %}
+{% block meta_description %}Short-form video across real estate, portraits, and food &amp; beverage — walkthrough reels, brand films, and social motion by {{ site_name }}. Asheville &amp; Western North Carolina.{% endblock %}
 {% block site_content %}
 
 <section class="page-hero">
   <div class="page-hero-inner" data-reveal>
     <p class="eyebrow">Motion</p>
     <h1>Motion that <span class="it-accent">earns the scroll.</span></h1>
-    <p class="lede">The steam. The pour. The first cut. Built vertical for the feed.</p>
+    <p class="lede">Walkthroughs, brand films, and the first cut — built vertical
+       for the feed, across all three specialties.</p>
   </div>
+  {% if sp_chips %}
+  <nav class="portfolio-filter" aria-label="Filter reels by specialty" data-reveal>
+    <button class="pf-chip pf-chip-active" data-filter="" aria-pressed="true">All
+      <span class="muted">({{ reels|length }})</span></button>
+    {% for c in sp_chips %}
+    <button class="pf-chip" data-filter="{{ c.key }}" aria-pressed="false">{{ c.name }}
+      <span class="muted">({{ c.count }})</span></button>
+    {% endfor %}
+  </nav>
+  {% endif %}
 </section>
 
 {% if reels %}
 <section class="motion-sec motion-page">
   <div class="sec-inner">
-    <div class="motion-feature" data-reveal>
+    <div class="motion-feature" data-sp="{{ reels[0].portfolio_tag|tag_specialty }}" data-reveal>
       <video autoplay muted loop playsinline preload="metadata"
              poster="/site/poster/{{ reels[0].id }}">
         <source src="/site/vid/{{ reels[0].id }}" type="video/mp4">
@@ -22,20 +33,20 @@
       <div class="motion-feature-meta">
         <div>
           <span class="motion-feature-label">House reel</span>
-          <p>{{ reels[0].portfolio_tag|capitalize if reels[0].portfolio_tag else 'Featured reel' }}</p>
+          <p>{{ reels[0].portfolio_tag|tag_label if reels[0].portfolio_tag else 'Featured reel' }}</p>
         </div>
       </div>
     </div>
     {% if reels|length > 1 %}
     <div class="motion-strip" data-reveal>
       {% for r in reels[1:] %}
-      <figure class="motion-reel">
+      <figure class="motion-reel" data-sp="{{ r.portfolio_tag|tag_specialty }}">
         <video autoplay muted loop playsinline preload="metadata"
                poster="/site/poster/{{ r.id }}">
           <source src="/site/vid/{{ r.id }}" type="video/mp4">
         </video>
         <div class="motion-reel-meta">
-          <span>{{ r.portfolio_tag|capitalize if r.portfolio_tag else 'Reel' }}</span>
+          <span>{{ r.portfolio_tag|tag_label if r.portfolio_tag else 'Reel' }}</span>
           <span class="motion-reel-bar"><i></i></span>
         </div>
       </figure>
@@ -56,8 +67,8 @@
   <div class="svc-foot-card" data-reveal>
     <div>
       <h2>Motion that earns the scroll.</h2>
-      <p>Tell me your dishes and where you post — I'll send a reel plan within
-         a business day.</p>
+      <p>Tell me what you're selling and where you post — I'll send a reel
+         plan within a business day.</p>
     </div>
     <div class="svc-foot-actions">
       <a class="btn-saffron" href="/book">Book a shoot &rarr;</a>
@@ -65,4 +76,23 @@
     </div>
   </div>
 </section>
+
+{% if sp_chips %}
+<script nonce="{{ csp_nonce }}">
+  (function () {
+    const items = document.querySelectorAll("[data-sp]");
+    const chips = document.querySelectorAll(".pf-chip");
+    function apply(sp) {
+      items.forEach(el => el.classList.toggle(
+        "pf-hidden", sp !== "" && (el.dataset.sp || "") !== sp));
+      chips.forEach(c => {
+        const on = (c.dataset.filter || "") === (sp || "");
+        c.classList.toggle("pf-chip-active", on);
+        c.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    }
+    chips.forEach(c => c.addEventListener("click", () => apply(c.dataset.filter || "")));
+  })();
+</script>
+{% endif %}
 {% endblock %}

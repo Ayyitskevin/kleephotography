@@ -1,11 +1,23 @@
-{# LocalBusiness / ProfessionalService JSON-LD — marketing pages only #}
+{# LocalBusiness / ProfessionalService JSON-LD — marketing pages only.
+   og_img is set locally: the base template's og block {% set %} is invisible
+   here (Jinja block scoping), so relying on it silently dropped the image
+   field on every page. #}
+{% set og_img = og_image_id() %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "ProfessionalService",
   "name": {{ site_name|tojson }},
   "url": {{ base_url|tojson }},
-  "description": "Food and beverage photography and videography for restaurants, cafés, bars, and food brands.",
+  "description": "Photography and film studio in Asheville, NC — real estate photography and walkthrough video, portrait and lifestyle sessions, and food and beverage photography and videography for restaurants, cafés, bars, and food brands.",
+  "serviceType": [
+    "Real estate photography",
+    "Real estate video",
+    "Portrait photography",
+    "Personal branding photography",
+    "Food and beverage photography",
+    "Food and beverage videography"
+  ],
   "areaServed": [
     {"@type": "Place", "name": "Asheville, NC"},
     {"@type": "Place", "name": "Western North Carolina"},

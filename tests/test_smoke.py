@@ -503,6 +503,29 @@ def test_video_pipeline_full_flow(admin):
         assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
         assert pub.get(f"/media/{g['slug']}/poster/999999").status_code == 404
 
+        # duration badge renders from the probed duration, and the tile offers
+        # the web-ready MP4 action alongside the original download
+        assert 'class="dur-badge"' in page
+        assert "icon-btn-mp4" in page
+
+        # web-MP4 download: the email gate carries the web flag through, then
+        # the transcoded H.264 serves as an attachment (video-only route)
+        r = pub.get(f"/g/{g['slug']}/download", params={"asset_id": a["id"], "web": 1})
+        assert 'name="web" value="1"' in r.text
+        r = pub.post(
+            f"/g/{g['slug']}/email",
+            # same address the photo-flow test captures — test_captured_emails
+            # asserts exactly one unique captured email across the suite
+            data={"email": "chef@bistro.com", "asset_id": a["id"], "web": 1},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        assert r.headers["location"].endswith(f"/download/web/{a['id']}")
+        r = pub.get(f"/g/{g['slug']}/download/web/{a['id']}")
+        assert r.status_code == 200 and r.headers["content-type"] == "video/mp4"
+        assert "_web.mp4" in r.headers.get("content-disposition", "")
+        assert pub.get(f"/g/{g['slug']}/download/web/999999").status_code == 404
+
 
 def _ready_video(admin, title="Reel Review", pin="1234"):
     """Create a published gallery with one ready video + one photo; return
@@ -3232,7 +3255,7 @@ def test_inquiry_form(monkeypatch):
                 "email": "sam@localhost",
                 "business": "Taqueria Luz",
                 "message": "Need a menu shoot in July.",
-                "service": "Photography",
+                "service": "Food & Beverage",
                 "dish_count": "12 dishes",
                 "usage": "Not sure",
                 "budget": "Under $1,000",
@@ -3242,8 +3265,8 @@ def test_inquiry_form(monkeypatch):
         assert 'value="Sam Owner"' in r.text and 'value="sam@localhost"' in r.text
         assert 'value="Taqueria Luz"' in r.text and "Need a menu shoot in July." in r.text
         assert 'value="12 dishes"' in r.text
-        # selects re-select the chosen option
-        assert '<option value="Photography" selected' in r.text
+        # selects re-select the chosen option (specialty options since the revamp)
+        assert '<option value="Food &amp; Beverage" selected' in r.text
         assert '<option value="Not sure" selected' in r.text
         assert '<option value="Under $1,000" selected' in r.text
         # nothing was stored for the rejected submission
@@ -4553,17 +4576,18 @@ def test_portfolio_tag_filter(admin):
         # filter chips render with per-tag counts + an "All" chip
         assert 'class="portfolio-filter"' in r.text
         assert 'data-filter=""' in r.text and ">All" in r.text  # 'All' chip
-        # alphabetical: Dishes (2) before Drinks (1)
-        assert r.text.index('data-filter="dishes"') < r.text.index('data-filter="drinks"')
+        # alphabetical: Dishes (2) before Drinks (1); tag filters are namespaced
+        assert r.text.index('data-filter="tag:dishes"') < r.text.index('data-filter="tag:drinks"')
         # per-tag counts visible
         assert ">Dishes" in r.text and "(2)" in r.text
         assert ">Drinks" in r.text and "(1)" in r.text
-        # tiles carry lowercased tag attrs
+        # tiles carry lowercased tag attrs + the derived specialty bucket
         assert 'data-tag="dishes"' in r.text
         assert 'data-tag="drinks"' in r.text
+        assert 'data-sp="fb"' in r.text  # legacy unprefixed tags = F&B
         # filter chip data-filter is lowercased to match
-        assert 'data-filter="dishes"' in r.text
-        assert 'data-filter="drinks"' in r.text
+        assert 'data-filter="tag:dishes"' in r.text
+        assert 'data-filter="tag:drinks"' in r.text
 
     # clearing a tag (empty string) → DB stores NULL, chip count drops
     admin.post(
@@ -4582,8 +4606,8 @@ def test_portfolio_tag_filter(admin):
     with TestClient(app) as pub:
         r = pub.get("/portfolio")
         # Dishes tag now has nothing → chip gone (we only show tags actually in use)
-        assert 'data-filter="dishes"' not in r.text
-        assert 'data-filter="drinks"' in r.text  # Drinks still has the lone tagged photo
+        assert 'data-filter="tag:dishes"' not in r.text
+        assert 'data-filter="tag:drinks"' in r.text  # Drinks still has the lone tagged photo
 
 
 def test_proofing_mode(admin):
@@ -9734,3 +9758,66 @@ def test_webhook_ignores_unrelated_event_type(client, monkeypatch):
     body = _checkout_event("evt_other_1", 1, "full", 1, etype="payment_intent.created")
     r = _post_signed(client, body)
     assert r.status_code == 200 and r.json()["ignored"] == "payment_intent.created"
+
+
+def test_specialty_pages(admin):
+    g = db.one("SELECT * FROM galleries ORDER BY id LIMIT 1")
+    from app import config as cfg
+
+    with TestClient(app) as pub:
+        # all three spokes render, are indexable, and sit in the sitemap
+        for path in ("/real-estate", "/portraits", "/food-beverage"):
+            r = pub.get(path)
+            assert r.status_code == 200, path
+            assert "x-robots-tag" not in r.headers, path
+            assert 'content="index, follow"' in r.text
+            assert '"@type": "FAQPage"' in r.text  # FAQ JSON-LD rides on every spoke
+        sm = pub.get("/sitemap.xml")
+        for path in ("/real-estate", "/portraits", "/food-beverage"):
+            assert f"<loc>{cfg.BASE_URL}{path}</loc>" in sm.text
+
+        # nothing carries an re/ tag yet → the RE spoke falls back to the
+        # shared empty state instead of an empty grid
+        assert "empty-state" in pub.get("/real-estate").text
+
+        # the hub renders one door per specialty, each linking to its spoke
+        r = pub.get("/")
+        assert r.text.count('class="sp-door"') == 3
+        for slug in ("real-estate", "portraits", "food-beverage"):
+            assert f'href="/{slug}"' in r.text
+
+    # plant two synthetic starred photos: one RE-prefixed, one legacy-tagged
+    # (unprefixed = F&B by convention)
+    re_id = db.run(
+        "INSERT INTO assets (gallery_id, kind, filename, stored, status, portfolio, "
+        "portfolio_tag) VALUES (?,?,?,?,?,?,?)",
+        (g["id"], "photo", "re.jpg", "cafefeed01cafefeed.jpg", "ready", 1, "re/exteriors"),
+    )
+    fb_id = db.run(
+        "INSERT INTO assets (gallery_id, kind, filename, stored, status, portfolio, "
+        "portfolio_tag) VALUES (?,?,?,?,?,?,?)",
+        (g["id"], "photo", "fb.jpg", "cafefeed02cafefeed.jpg", "ready", 1, "dishes"),
+    )
+    try:
+        with TestClient(app) as pub:
+            r = pub.get("/real-estate")
+            assert f'data-web="/site/img/{re_id}"' in r.text
+            assert f"/site/img/{fb_id}" not in r.text
+            # prefix-derived craft phrase lands in the alt text
+            assert "real estate photography by" in r.text
+            # the spoke og:image is its own specialty's lead asset
+            assert f'property="og:image" content="{cfg.BASE_URL}/site/img/{re_id}"' in r.text
+            # prefix is stripped from the visible chip/caption label
+            assert "re/exteriors" not in r.text and "Exteriors" in r.text
+
+            r = pub.get("/food-beverage")
+            assert f'data-web="/site/img/{fb_id}"' in r.text
+            assert f'data-web="/site/img/{re_id}"' not in r.text
+
+            # (grid attributes, not bare substrings — the sitewide JSON-LD
+            # image may legitimately reference any starred asset on any page)
+            r = pub.get("/portraits")
+            assert f'data-web="/site/img/{re_id}"' not in r.text
+            assert f'data-web="/site/img/{fb_id}"' not in r.text
+    finally:
+        db.run("DELETE FROM assets WHERE id IN (?,?)", (re_id, fb_id))
