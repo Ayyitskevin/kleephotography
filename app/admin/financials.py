@@ -128,6 +128,8 @@ def _ledger(start: str, end: str) -> list[dict]:
                 "net": _usd(r["cents"]),
                 "status": "Paid",
                 "st": "paid",
+                "inv_id": r["inv_id"],
+                "act": "Receipt",
             }
         )
     for r in _outstanding_rows(start, end):
@@ -144,6 +146,8 @@ def _ledger(start: str, end: str) -> list[dict]:
                 "net": _usd(r["cents"]),
                 "status": "Outstanding",
                 "st": "out",
+                "inv_id": r["inv_id"],
+                "act": "Nudge",
             }
         )
     out.sort(key=lambda x: x["raw"] or "", reverse=True)
@@ -190,6 +194,34 @@ async def income(request: Request, range: str = "quarter"):
 
     ranges = [{"key": k, "label": lbl, "on": k == range} for k, lbl in _RANGES]
 
+    # Month reel (Screening Room 3i): trailing six months of collected cash,
+    # heights proportional to the best month. Read-only.
+    first_of_month = dt.date.today().replace(day=1)
+    reel_months, cursor = [], first_of_month
+    # NB: the route's `range` query param shadows the builtin in this scope
+    for _ in (0, 1, 2, 3, 4, 5):
+        reel_months.append(cursor)
+        cursor = (cursor - dt.timedelta(days=1)).replace(day=1)
+    reel_months.reverse()
+    by_ym = {
+        r["ym"]: r["cents"]
+        for r in db.all_(
+            """SELECT strftime('%Y-%m', created_at) AS ym,
+                      COALESCE(SUM(amount_cents), 0) AS cents
+               FROM payments GROUP BY ym"""
+        )
+    }
+    reel_scale = max([by_ym.get(m.strftime("%Y-%m"), 0) for m in reel_months] + [1])
+    month_reel = [
+        {
+            "label": m.strftime("%b").upper(),
+            "cents": by_ym.get(m.strftime("%Y-%m"), 0),
+            "pct": max(4, round(by_ym.get(m.strftime("%Y-%m"), 0) * 100 / reel_scale)),
+            "current": m == first_of_month,
+        }
+        for m in reel_months
+    ]
+
     return templates.TemplateResponse(
         request,
         "admin/financials.html",
@@ -201,6 +233,7 @@ async def income(request: Request, range: str = "quarter"):
             "range": range,
             "range_label": _RANGE_LABELS[range],
             "row_count": len(rows),
+            "month_reel": month_reel,
         },
     )
 

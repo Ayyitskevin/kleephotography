@@ -14,10 +14,13 @@
   <div class="pgtop-lead">
     <a class="gd-back" href="/admin/galleries" aria-label="Back to galleries">&larr;</a>
     <div class="gd-lead-text">
-      <p class="gd-eyebrow">Galleries</p>
+      <p class="gd-eyebrow">The bench</p>
       <h1>{{ g.title }}</h1>
     </div>
     <span class="gd-status {{ status_cls }}">{{ status_label }}</span>
+    {% if sr_enabled() and not is_drop and assets %}
+    <span class="sr-bench-keys sr-mono" aria-hidden="true">&larr;&rarr; move &middot; S star &middot; B cover &middot; 1&ndash;{{ [sections|length, 9]|min }} bin &middot; X cut</span>
+    {% endif %}
   </div>
   <div class="pgtop-actions gd-actions">
     {{ cp.copy_link(base_url ~ "/g/" ~ g.slug, g.pin if show_pin else None) }}
@@ -127,7 +130,7 @@
         {% endfor %}
       {% endmacro %}
 
-      <div class="gd-masonry" id="gd-masonry">
+      <div class="gd-masonry" id="gd-masonry"{% if not is_drop %} data-cull{% endif %}>
         {% for a in assets %}
         <figure class="gd-tile" data-section="{{ a.section_id or '' }}" data-fav="{{ 1 if a.n_fav else 0 }}" id="asset-{{ a.id }}">
           {% if a.status == 'ready' %}
@@ -229,6 +232,18 @@
 
     <!-- RIGHT: delivery rail -->
     <div class="gd-rail" data-gal-rail>
+
+      {% if not is_drop %}
+      {# Premiere check — publish-readiness at a glance, read-only #}
+      {% set n_transcoding = assets | rejectattr("status", "equalto", "ready") | list | length %}
+      <section class="sr-premcheck" aria-label="Premiere check">
+        <b class="sr-mono sr-mono--signal">Premiere check</b>
+        <span class="{{ 'is-ok' if g.cover_asset_id else 'is-miss' }}">{{ '&#10003;'|safe if g.cover_asset_id else '&#9675;'|safe }} title card (cover)</span>
+        <span class="{{ 'is-miss' if n_transcoding else 'is-ok' }}">{% if n_transcoding %}<i class="sr-rec">Rec</i> {{ n_transcoding }} file{{ 's' if n_transcoding != 1 }} processing{% else %}&#10003; all files ready{% endif %}</span>
+        <span class="{{ 'is-ok' if (g.client_id or client) else 'is-miss' }}">{{ '&#10003;'|safe if (g.client_id or client) else '&#10007;'|safe }} client {{ 'linked' if (g.client_id or client) else 'not linked' }}</span>
+        <span class="{{ 'is-ok' if g.published else 'is-miss' }}">{{ '&#10003;'|safe if g.published else '&#9675;'|safe }} {{ 'curtain up' if g.published else 'curtain down (draft)' }}</span>
+      </section>
+      {% endif %}
 
       <section class="gd-live">
         <div class="gd-live-head">
