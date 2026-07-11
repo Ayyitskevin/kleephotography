@@ -58,24 +58,29 @@ def _initials(name: str) -> str:
 
 
 def _channel(inq) -> dict:
-    """How the lead arrived — booking form, text, or general inquiry."""
+    """How the lead arrived — booking form, text, or general inquiry.
+
+    Dark-panel tints (editorial-dark, Revamp PR-E) — these feed the .ib-chan
+    inline style directly, so they can't be reached by CSS; match the same
+    honey/ok/clay/neutral status tokens the rest of the admin shell uses.
+    """
     if inq["kind"] == "booking":
-        return {"ch_label": "Booking", "ch_color": "#9a7a2c", "ch_bg": "#f7ecd2"}
+        return {"ch_label": "Booking", "ch_color": "#d8a857", "ch_bg": "#2b2413"}
     if inq["kind"] == "sms":
-        return {"ch_label": "Text", "ch_color": "#2f7d57", "ch_bg": "#e1f2e9"}
+        return {"ch_label": "Text", "ch_color": "#9cc178", "ch_bg": "#20271a"}
     if inq["kind"] == "call":
-        return {"ch_label": "Call", "ch_color": "#7C2F38", "ch_bg": "#f3e3e5"}
-    return {"ch_label": "Inquiry", "ch_color": "#2f6d8a", "ch_bg": "#ddeef0"}
+        return {"ch_label": "Call", "ch_color": "#d98a78", "ch_bg": "#2e1a18"}
+    return {"ch_label": "Inquiry", "ch_color": "#aba9a3", "ch_bg": "#242424"}
 
 
 def _stage(inq) -> dict:
     if inq["converted_at"]:
-        return {"stage": "Converted", "stage_color": "#2f7d57", "stage_bg": "#e1f2e9"}
+        return {"stage": "Converted", "stage_color": "#9cc178", "stage_bg": "#20271a"}
     if inq["dismissed_at"]:
-        return {"stage": "Dismissed", "stage_color": "#5C6A5E", "stage_bg": "#ecefe6"}
+        return {"stage": "Dismissed", "stage_color": "#aba9a3", "stage_bg": "#242424"}
     if inq["kind"] == "booking":
-        return {"stage": "Booking", "stage_color": "#9a7a2c", "stage_bg": "#f7ecd2"}
-    return {"stage": "Lead", "stage_color": "#7C2F38", "stage_bg": "#f3e3e5"}
+        return {"stage": "Booking", "stage_color": "#d8a857", "stage_bg": "#2b2413"}
+    return {"stage": "Lead", "stage_color": "#d98a78", "stage_bg": "#2e1a18"}
 
 
 def _thread_row(inq, active_id):

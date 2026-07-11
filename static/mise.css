@@ -7816,3 +7816,224 @@ html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
 .admin-shell .stu-intel.is-go { color: var(--ok); }
 .admin-shell .stu-card-act { background: #232e3d; color: #e7dfcd; }
 .admin-shell .stu-card-act:hover { background: #2c3949; color: #e7dfcd; }
+
+/* ============================================================================
+   EDITORIAL DARK — STUDIO BOARD, PROJECT ROOM, GALLERIES, INBOX (Revamp PR-E,
+   Claude Design handoff2). Same rose+gold slate-navy system as PR-D, appended
+   last so it wins by source order over the light base rules above AND the
+   legacy toggle-dark palette (§ADMIN DARK MODE + §18 long-tail pass) — those
+   two blocks are pre-editorial-dark work scoped to the old ☾ toggle and stay
+   inert under this default, exactly as PR-D left them for the sidebar/
+   dashboard (see that section's comment for the full rationale).
+   ========================================================================== */
+
+/* ── 0. Generic form controls — the studio "+ new project" popover, the
+   inbox reply composer, and the gallery-detail manage panel all hang plain
+   inputs/selects/textareas off their own scoped rules or the base typed-input
+   rule (line ~3517); neither has a default-scope dark override yet, so they'd
+   still show a cream field on the new navy shell. Mirror the legacy toggle's
+   §8 at default scope. ──────────────────────────────────────────────────── */
+.admin-shell input[type="text"], .admin-shell input[type="number"], .admin-shell input[type="date"],
+.admin-shell input[type="email"], .admin-shell input[type="search"],
+.admin-shell textarea, .admin-shell select {
+  background: var(--surface-sunk); color: var(--ink); border-color: var(--line);
+}
+.admin-shell input[type="text"]:focus, .admin-shell input[type="number"]:focus,
+.admin-shell input[type="date"]:focus, .admin-shell input[type="email"]:focus,
+.admin-shell input[type="search"]:focus,
+.admin-shell textarea:focus, .admin-shell select:focus {
+  background: var(--surface); border-color: var(--line-strong);
+}
+.admin-shell input::placeholder, .admin-shell textarea::placeholder { color: var(--ink-ghost); }
+.admin-shell .stu-newproj-pop input { background: var(--surface-sunk); }
+/* "+ New project" / "+ New gallery" page-top action: same cream-on-rose
+   ~2.2:1 AA fail the mocks hit repeatedly (already fixed once for the
+   dashboard's .qc-btn/.dash-new in PR-D) — route to the same gold fill +
+   navy ink so the fill/text pairing actually passes. */
+.admin-shell .pgtop-new { background: var(--gold); color: #0e1319; }
+.admin-shell .pgtop-new:hover { background: #dcc07a; color: #0e1319; }
+
+/* ── 1. Studio board — column rail + cards. Columns/cards hardcode the old
+   cream family (#EFEADF/#FFFEF8); the mock's own board uses the exact same
+   surface/surface-sunk hexes already in the token block, so this is a
+   straight bg/border swap, no new colors. ──────────────────────────────── */
+.admin-shell .stu-viewpill { background: var(--surface-sunk); }
+.admin-shell .stu-col { background: var(--surface-sunk); border-color: var(--line); }
+.admin-shell .stu-col-count { color: var(--ink-faint); }
+.admin-shell .stu-card { background: var(--surface); border-color: var(--line); }
+.admin-shell .stu-col-over { outline-color: var(--line-strong); }
+/* Card value: gold text only (never a fill), same rule the mock uses for its
+   "open deal" numeral. "Won" stays the established success-green rather than
+   the mock's muted blue-grey, to match every other paid/live/done pill in
+   this system. */
+.admin-shell .stu-card-val { color: var(--gold); }
+.admin-shell .stu-card-val.is-won { color: var(--ok); }
+.admin-shell .stu-card-val.is-none { color: var(--ink-faint); }
+/* Step tone pills: the mock's own rose-text-on-pale-tint "urgent" pill
+   computes to ~2.4:1 and fails AA even though it looks like the safe
+   "tinted background" shape — rose is too mid-luminance to carry as text on
+   a pale tint. Route each tone to its dark status-tint pair instead (same
+   family already used for badges/pills elsewhere in this system). */
+.admin-shell .stu-step.tone-urgent { color: var(--clay); background: var(--clay-bg); }
+.admin-shell .stu-step.tone-warn { color: var(--honey); background: var(--honey-bg); }
+.admin-shell .stu-step.tone-ready { color: var(--ok); background: var(--ok-bg); }
+.admin-shell .stu-step.tone-calm { background: var(--neutral-bg); }
+.admin-shell .stu-card-age { color: var(--ink-faint); }
+.admin-shell .stu-add { border-color: var(--line-strong); color: var(--ink-faint); }
+.admin-shell .stu-add:hover { border-color: var(--terra); color: var(--ink-soft); }
+.admin-shell .stu-portal-ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+.admin-shell .stu-portal-muted { color: var(--ink-faint); background: var(--surface-sunk); }
+.admin-shell .stu-newproj-pop { background: var(--surface); }
+/* Board/list toggle + "Add client" popover submit both hardcode a rose fill
+   + cream text — rose is too mid-luminance for light text at any shade
+   (terra ~2.6:1, terra-deep ~3.8:1, both fail 4.5:1); route to navy ink
+   instead, the same accent+navy convention already used for gold. */
+.admin-shell .stu-viewpill button.is-active { background: var(--terra); color: #0e1319; }
+.admin-shell .stu-newproj-pop button { color: #0e1319; }
+.admin-shell .stu-newproj-pop button:hover { color: #0e1319; }
+
+/* ── 2. Project room — header identity, money figure, journey timeline.
+   Everything else on this page (proposal/contract/invoice tables, badges,
+   activity timeline, workspace-publish panel) is the shared .panel/.badge/
+   .timeline system, already var-driven since PR-D — only the room-only
+   header/journey pieces below hardcode the old amber/forest palette. ────── */
+.admin-shell .room-avatar { background: var(--gold); color: #0e1319; }
+.admin-shell .room-pill { background: var(--honey-bg); color: var(--honey); }
+.admin-shell .room-money b { color: var(--gold); }
+.admin-shell .room-cta { background: var(--gold); color: #0e1319;
+  box-shadow: 0 10px 22px -12px rgba(208, 177, 98, .45); }
+.admin-shell .room-cta:hover { color: #0e1319; }
+.admin-shell .room-dot { background: var(--surface-sunk); color: var(--ink-faint); border-color: var(--line-strong); }
+.admin-shell .room-dot.is-done { background: var(--ok-line); color: #eaf3e0; }
+.admin-shell .room-dot.is-now { background: var(--gold); color: #0e1319; }
+.admin-shell .room-lbl.is-now { color: var(--gold); }
+.admin-shell .room-line { background: var(--line); }
+.admin-shell .room-line.is-done { background: var(--ok-line); }
+.admin-shell .room-engage-now { color: var(--ok); }
+/* Shared long-tail pieces that show up on the project rail (kind-badge tags
+   on the email-activity/timeline rows, the workspace-publish panel): two
+   .kind-* tones and .ws-admin still hardcode pale cream, unreached by any
+   existing dark pass. */
+.admin-shell .kind-contract { background: var(--line-faint); color: var(--ink-soft); border-color: var(--line); }
+.admin-shell .kind-email { background: var(--line-faint); color: var(--ink-soft); border-color: var(--line); }
+.admin-shell .timeline-contract .timeline-dot { border-color: var(--ink-faint); }
+.admin-shell .timeline-email .timeline-dot { border-color: var(--ink-faint); }
+.admin-shell .ws-admin { background: var(--surface); border-color: var(--terra-tint-2); }
+/* .stack-form's primary submit (project settings "Save", "Publish workspace")
+   hardcodes var(--terra-deep) fill + cream text — that pairing was ~7:1 safe
+   against the old forest-green --terra-deep, but PR-D repointed the token to a
+   medium rose (#b3606a), quietly dropping it to ~3.8:1. Route to the brighter
+   --terra + navy ink instead (~6.3:1), the same accent+navy pairing used
+   everywhere else in this system. */
+.admin-shell .stack-form button[type="submit"]:not(.link):not(.danger) {
+  background: var(--terra); color: #0e1319;
+}
+.admin-shell .stack-form button[type="submit"]:not(.link):not(.danger):hover {
+  background: var(--terra); color: #0e1319; opacity: .9;
+}
+
+/* ── 3. Galleries library — filter pills, cards, status badge, copy chip. ── */
+.admin-shell .gx-pill { background: var(--surface); color: var(--ink-soft);
+  box-shadow: inset 0 0 0 1px var(--line); }
+.admin-shell .gx-pill.is-active { background: var(--terra); color: #0e1319; }
+.admin-shell .gx-card { background: var(--surface); border-color: var(--line); }
+.admin-shell .gx-card:hover { border-color: var(--terra); box-shadow: 0 26px 48px -28px rgba(0,0,0,.55); }
+.admin-shell .gx-card-cover { background: var(--surface-sunk); }
+.admin-shell .gx-card-title { color: var(--ink); }
+.admin-shell .gx-card-client { color: var(--ink-soft); }
+.admin-shell .gx-card-foot { border-top-color: var(--line); }
+.admin-shell .gx-eng { color: var(--ink-faint); }
+.admin-shell .gx-eng-fav { color: var(--gold); }
+.admin-shell .gx-card-date { color: var(--ink-faint); }
+.admin-shell .gx-card-date.gx-date-warn { color: var(--clay); }
+.admin-shell .gx-card-act .gx-copy { border-color: var(--line-strong); color: var(--terra); }
+.admin-shell .gx-card-act .gx-copy:hover { border-color: var(--terra); }
+
+/* ── 4. Gallery detail — back button, stat tiles, toolbar, masonry, manage
+   popover, live-share/deliver/proof rail, studio pipeline steps. ─────────── */
+.admin-shell .gd-back { border-color: var(--line); color: var(--ink-soft); background: var(--surface); }
+.admin-shell .gd-status.is-live { color: var(--ok); background: var(--ok-bg); }
+.admin-shell .gd-status.is-draft { color: var(--neutral); background: var(--neutral-bg); }
+.admin-shell .gd-cover { background: var(--surface-sunk); }
+/* No-cover-set placeholder: the shade overlay's greenish rgba(12,26,19,…) was
+   tuned to sit over a light-forest cover photo; with no photo it now tints
+   the navy panel green. Recompute the same alpha ramp from the actual navy
+   base so an empty cover reads as flat slate, not a green cast. */
+.admin-shell .gd-cover-shade {
+  background: linear-gradient(90deg, rgba(14,19,25,.78) 0%, rgba(14,19,25,.25) 60%, transparent 100%);
+}
+/* Page-top secondary link ("Upload", "Client →", "Studio →") hardcodes a
+   cream pill; unreached by any existing pass since it's a shared class, not
+   room-/gd-specific. */
+.admin-shell .pgtop-link { background: var(--surface); }
+.admin-shell .gd-stat { background: var(--surface); border-color: var(--line); }
+.admin-shell .gd-stat-l { color: var(--ink-faint); }
+.admin-shell .gd-pill { border-color: var(--line); background: var(--surface); color: var(--ink-soft); }
+.admin-shell .gd-pill.is-active { background: var(--terra); border-color: var(--terra); color: #0e1319; }
+.admin-shell .gd-favtoggle { background: var(--surface); border-color: var(--line); color: var(--ink); }
+.admin-shell .gd-favtoggle .gd-heart { color: var(--gold); }
+.admin-shell .gd-favtoggle.is-active { background: var(--honey-bg); border-color: var(--honey); }
+.admin-shell .gd-btn-sm { border-color: var(--line); background: var(--surface); color: var(--ink-soft); }
+.admin-shell .gd-tile-ph { background: var(--surface-sunk); color: var(--ink-faint); }
+.admin-shell .gd-manage-body { background: var(--surface); border-color: var(--line); }
+.admin-shell .gd-manage-head { color: var(--ink-faint); }
+.admin-shell .gd-live { background: var(--surface-sunk); color: var(--ink); }
+.admin-shell .gd-live h3 { color: var(--ink); }
+.admin-shell .gd-live-label { color: var(--ink-faint); }
+.admin-shell .gd-live-link { background: #0e1319; border-color: var(--line); }
+.admin-shell .gd-live-url { color: var(--ink-soft); }
+.admin-shell .gd-live-tile { background: #0e1319; border-color: var(--line); }
+.admin-shell .gd-live-k { color: var(--ink-faint); }
+.admin-shell .gd-live-v { color: var(--ink); }
+.admin-shell .gd-deliver, .admin-shell .gd-proof { background: var(--surface); border-color: var(--line); }
+.admin-shell .gd-deliver h3, .admin-shell .gd-proof-head h3 { color: var(--ink); }
+.admin-shell .gd-deliver-row { border-top-color: var(--line); }
+.admin-shell .gd-deliver-l { color: var(--ink); }
+.admin-shell .gd-deliver-m { color: var(--ink-faint); }
+.admin-shell .gd-deliver-arr { color: var(--ink-faint); }
+.admin-shell .gd-proof-n { color: var(--ok); }
+.admin-shell .gd-proof-bar { background: var(--surface-sunk); }
+.admin-shell .gd-proof-fill { background: var(--gold); }
+.admin-shell .gd-proof-note { color: var(--ink-soft); }
+.admin-shell .gd-studio-pipeline { background: var(--surface); border-color: var(--line); }
+.admin-shell .gd-pipeline-step { border-color: var(--line); background: var(--surface-sunk); }
+.admin-shell .gd-pipeline-step.is-done { border-color: var(--ok-line); background: var(--ok-bg); }
+.admin-shell .gd-pipeline-step.is-active { border-color: var(--terra-tint-2); background: var(--terra-tint); }
+.admin-shell .gd-pipeline-step.is-error { border-color: var(--clay-line); background: var(--clay-bg); }
+.admin-shell .gd-pipeline-step-n { background: var(--line-strong); }
+.admin-shell .gd-pipeline-step.is-done .gd-pipeline-step-n { background: var(--ok-line); color: var(--ok); }
+.admin-shell .gd-pipeline-step.is-error .gd-pipeline-step-n { background: var(--clay-line); color: var(--clay); }
+.admin-shell .gd-pipeline-step-title { color: var(--ink); }
+.admin-shell .gd-pipeline-badge { color: var(--ink-faint); }
+.admin-shell .gd-pipeline-step.is-done .gd-pipeline-badge { color: var(--ok); }
+.admin-shell .gd-pipeline-step.is-error .gd-pipeline-badge { color: var(--clay); }
+.admin-shell .gd-pipeline-err { color: var(--clay); }
+.admin-shell .gd-panel { background: var(--surface); border-color: var(--line); }
+.admin-shell .gd-panel > summary { color: var(--ink); }
+.admin-shell .gd-panel > summary::before { color: var(--ink-faint); }
+
+/* ── 5. Inbox — threads pane, conversation pane, context pane. The three-
+   pane chrome hardcodes cream panel bg + a dark-forest inbound-bubble text
+   color that goes invisible once its card surface flips dark. ───────────── */
+.admin-shell .ib-threads { background: var(--surface-rail); }
+.admin-shell .ib-tab { background: var(--surface-sunk); }
+.admin-shell .ib-tab.is-active { background: var(--terra); color: #0e1319; }
+.admin-shell .ib-row:hover { background: rgba(255, 255, 255, .04); }
+.admin-shell .ib-row.is-active { border-color: var(--line); box-shadow: none; }
+.admin-shell .ib-dot { border-color: var(--surface-rail); }
+.admin-shell .ib-convo { background: var(--surface-sunk); }
+.admin-shell .ib-bubble { border-color: var(--line); color: var(--ink); }
+.admin-shell .ib-context { background: var(--surface-rail); }
+
+/* ── 6. Money/success text that stayed a light-mode green — lift it onto the
+   bright dark-mode green already used for the same "success" role elsewhere
+   in this system (§3 .stu-intel.is-go). ──────────────────────────────────── */
+.admin-shell .ib-reply-sent { color: var(--ok); }
+/* Reply/Send-reply CTAs: same rose-fill+cream-text failure as .stack-form's
+   submit (§2) — worse on hover, since the base rule's hover swaps to the even
+   brighter --terra, dropping contrast further (~2.6:1). Route both states to
+   navy ink on --terra, the one rose shade that actually clears 4.5:1. */
+.admin-shell .ib-reply-btn, .admin-shell .ib-reply-send { background: var(--terra); color: #0e1319; }
+.admin-shell .ib-reply-btn:hover, .admin-shell .ib-reply-send:hover {
+  background: var(--terra); color: #0e1319; opacity: .9;
+}

@@ -19,11 +19,14 @@ async def save_upload(file, dest: Path) -> int:
     return size
 
 
+# Dark-panel tints (editorial-dark, Revamp PR-E) — these feed the .gx-badge
+# inline style directly, so they can't be reached by CSS; match the same
+# ok/honey/neutral/clay status tokens the rest of the admin shell uses.
 _STATUS_STYLE = {
-    "Delivered": ("#2f7d57", "#e1f2e9"),
-    "Proofing": ("#9a7a2c", "#f7ecd2"),
-    "Draft": ("#5C6A5E", "#ecefe6"),
-    "Expiring": ("#7C2F38", "#f3e3e5"),
+    "Delivered": ("#9cc178", "#20271a"),
+    "Proofing": ("#d8a857", "#2b2413"),
+    "Draft": ("#aba9a3", "#242424"),
+    "Expiring": ("#d98a78", "#2e1a18"),
 }
 
 
@@ -97,10 +100,10 @@ def gallery_card(g, today_iso: str, soon_iso: str) -> dict:
         else:
             days = (dt.date.fromisoformat(exp) - dt.date.fromisoformat(today_iso)).days
             date_label = f"{days} day{'s' if days != 1 else ''}"
-        date_color = "#7C2F38"
+        date_color = "#d98a78"
     else:
         date_label = short_date(g["created_at"])
-        date_color = "#8A9183"
+        date_color = "#bfc3c8"
     n = g["n_assets"]
     photos = f"{n} photo{'s' if n != 1 else ''}" if n else "No photos yet"
     return {
