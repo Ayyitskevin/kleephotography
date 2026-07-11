@@ -446,6 +446,36 @@ SPECIALTY_PAGES = {
         "exteriors, and walkthrough reels land here as they're delivered.",
         "cta_h1": "Got a listing",
         "cta_h2": "going live?",
+        # Screening Room (3b — "a listing premiere"): the walkthrough film IS
+        # the page. Chapter times are fractions of the real hero film's
+        # duration (no chapter schema); the aerial chapter and spec-line
+        # segment ride the aerials_live flag.
+        "sr": {
+            "nav_archive": "Listings screened",
+            "cta": "Book a listing",
+            "h2a": "Listings worth",
+            "h2b": "the drive.",
+            "spec": ["MLS next-day", "Film in 48h"],
+            "spec_aerial": "Aerial Pass {rate} — FAA Part 107",
+            "chapters": [
+                {"at": 0.0, "label": "The approach"},
+                {"at": 0.21, "label": "Kitchen & great room"},
+                {"at": 0.48, "label": "Primary suite"},
+                {"at": 0.62, "label": "Aerial orbit", "aerial": True},
+                {"at": 0.81, "label": "Twilight close"},
+            ],
+            "agents_cut": "vertical for social + hero for the listing page, "
+            "delivered together, 48 hours after the shoot.",
+            "agents_cut_aerial": "aerial establishing + vertical for social + "
+            "hero for the listing page, delivered together, 48 hours after "
+            "the shoot.",
+            "strip_label": "Stills — frames pulled from the film day",
+            "proof": [
+                ("18h", "avg. MLS turnaround"),
+                ("48h", "walkthrough film"),
+                ("1 link", "agent + seller share"),
+            ],
+        },
     },
     "pl": {
         "title": "Portrait & Lifestyle Photography",
@@ -540,6 +570,39 @@ SPECIALTY_PAGES = {
         "they're delivered — the calendar is open now.",
         "cta_h1": "Let's make time",
         "cta_h2": "for a session.",
+        # Screening Room (3k — reassurance psychology): direction promised up
+        # front, the nerves named and answered in the client's own words.
+        "sr": {
+            "nav_archive": "Sessions screened",
+            "cta": "Book a session",
+            "beat": "directed, never posed — you'll always know what to do with your hands",
+            "body": "Headshots, personal branding, families, and the moments "
+            "in between. Every frame is coached — where to look, when to "
+            "move — and delivered ready for wherever it's going: LinkedIn, "
+            "the company site, the mantel.",
+            "stats": [
+                ("10 min", "until most people relax"),
+                ("Same week", "private gallery"),
+            ],
+            "nerves": [
+                (
+                    "“I'm awkward in front of a camera.”",
+                    "That's most people — and my favorite kind of session. "
+                    "Everything is directed; you're never left posing in silence.",
+                ),
+                (
+                    "“What do I even wear?”",
+                    "Solid colors you already feel good in beat anything bought "
+                    "for the shoot. Bring one backup look; we pick together.",
+                ),
+                (
+                    "“Can you do our whole team?”",
+                    "One visit, matched lighting and framing — new hires slot in "
+                    "later without the team page looking stitched together.",
+                ),
+            ],
+            "frames_label": "Selected sessions — none of them born camera-ready",
+        },
     },
     "fb": {
         "title": "Food & Beverage Photography & Video",
@@ -637,8 +700,82 @@ SPECIALTY_PAGES = {
         "empty_body": "Menus, pours, and the rooms they live in land here as they're delivered.",
         "cta_h1": "Let's make your food look",
         "cta_h2": "the way it tastes.",
+        # Screening Room (3c + 3l): full-bleed opening title card, appetite
+        # grid, the process told as courses.
+        "sr": {
+            "nav_archive": "Menus screened",
+            "cta": "Book a shoot",
+            "presents": "Kevin Lee presents — Food & Beverage",
+            "h2a": "Your menu,",
+            "h2b": "selling itself.",
+            "beat": "the steam, the pour, the first cut — in the thirty seconds a dish looks alive",
+            "card_meta_l": "Stock 500T — appetite grade",
+            "card_meta_r": "Same-week gallery · crops 1:1 / 4:5 / 9:16",
+            "grid_label": "Recent menus — plates, pours & the rooms they live in",
+            "courses": [
+                (
+                    "First course — Scout",
+                    "We walk the menu together, agree the hero dishes and "
+                    "drinks, and build the shot list around your service window.",
+                ),
+                (
+                    "Main — Shoot fast",
+                    "Natural light first, styling honest, shot in the thirty "
+                    "seconds a dish looks alive. The kitchen never waits.",
+                ),
+                (
+                    "Dessert — Same week",
+                    "A private premiere within the week — full-res downloads, "
+                    "circled takes, crops already cut for every platform.",
+                ),
+            ],
+            "cta_final": "Book the kitchen's slot",
+        },
     },
 }
+
+
+def _sr_rate_cells(key: str) -> list[dict]:
+    """Rate cells for the spoke rails (#rates). Labels are the approved
+    Screening Room copy; every dollar figure is read from SERVICES so pricing
+    keeps its single source of truth."""
+
+    def tier(gkey: str, i: int) -> dict:
+        return next(s for s in SERVICES if s["key"] == gkey)["tiers"][i]
+
+    if key == "re":
+        return [
+            {"price": tier("real_estate", 0)["display_price"], "label": "Essentials — per listing"},
+            {
+                "price": tier("real_estate", 1)["display_price"],
+                "label": "Signature — photo + reel",
+                "pick": True,
+            },
+            {"price": tier("real_estate", 2)["display_price"], "label": "Premier — photo + film"},
+        ]
+    if key == "pl":
+        return [
+            {"price": tier("portraits", 0)["display_price"], "label": "Tier I — one look"},
+            {
+                "price": tier("portraits", 1)["display_price"],
+                "label": "Tier II — two looks",
+                "pick": True,
+            },
+            {"price": tier("portraits", 2)["display_price"], "label": "Tier III — extended"},
+        ]
+    return [
+        {"price": tier("photography", 0)["display_price"], "label": "Photo starter — half day"},
+        {
+            "price": tier("videography", 0)["display_price"],
+            "label": "Reel starter — hero + 3 cutdowns",
+        },
+        {
+            "price": tier("brand_partner", 1)["display_price"],
+            "unit": "/mo",
+            "label": "Brand partner — photo + reels monthly",
+            "pick": True,
+        },
+    ]
 
 
 def _portfolio_assets() -> list:
@@ -1154,6 +1291,8 @@ def _specialty_page(request: Request, key: str):
             "book_url": book_url,
             "faqs": page["faqs"],
             "faq_heading": "Good to know",
+            "rates": _sr_rate_cells(key),
+            "aerial_rate": specialties.aerial_pass_display(),
         },
     )
 

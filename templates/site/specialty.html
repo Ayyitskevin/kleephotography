@@ -1,13 +1,21 @@
 {% extends "site/base_site.html" %}
-{# Shared spoke template for /real-estate, /portraits, /food-beverage — one
-   anatomy, three sets of copy (site.SPECIALTY_PAGES) and specialty-filtered
-   work/reels/case studies. Reuses the home hero/work/motion primitives so the
-   spokes and the hub read as one editorial system. #}
+{# Shared spoke template for /real-estate, /portraits, /food-beverage — the
+   three Screening Room features (3b The Space · 3k The Face · 3c+3l The
+   Plate). One route + context per spoke (site.SPECIALTY_PAGES, .sr = the
+   Screening Room copy), three hero anatomies below; everything downstream
+   (filmstrip/grids, rates rail, case studies, FAQ) is shared. #}
 {# Top-level so the og block AND site_content both see it — a {% set %} inside
    one block is invisible to the others (Jinja block scoping). #}
 {% set og_asset = photos[0] if photos else None %}
 {% block title %}{{ page.title }} — {{ site_name }}{% endblock %}
 {% block meta_description %}{{ page.meta }}{% endblock %}
+{% block sr_stock %} sr-{{ sp_key }}{% endblock %}
+{% block brand_chip %}{{ sp.feature }} — {{ sp.screen_name }}{% endblock %}
+{% block nav_items %}
+<a href="/portfolio#sp:{{ sp_key }}">{{ page.sr.nav_archive }}</a>
+<a href="#rates">Rates</a>
+<a href="{{ book_url }}" class="nav-cta">{{ page.sr.cta }}</a>
+{% endblock %}
 {% block og %}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{ site_name }}">
@@ -21,200 +29,373 @@
 
 <div class="scroll-progress" aria-hidden="true"><div data-progress-bar></div></div>
 
-{# ═══ HERO — same signature two-column frame + reel as the hub ═══════════════ #}
-<section class="eh sp-hero">
-  <div class="eh-grid" data-hero-grid>
-    <div class="eh-copy">
-      <p class="eh-kicker" data-reveal>{{ page.kicker }}</p>
-      <h1 class="eh-title" data-reveal>{{ page.h1a }} <span class="eh-em">{{ page.h1b }}</span></h1>
-      <p class="eh-lede" data-reveal>{{ page.lede }}</p>
-      <ul class="sp-pills" data-reveal aria-label="At a glance">
-        {% for p in page.pills %}<li class="sp-pill">{{ p }}</li>{% endfor %}
-      </ul>
-      <div class="eh-actions" data-reveal>
-        <a class="ebtn ebtn-fill" data-magnetic href="{{ book_url }}">Book a shoot
-          <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
-        <a class="elink" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote <span aria-hidden="true">&rarr;</span></a>
-      </div>
-    </div>
-    <div class="eh-media" data-hero-media>
-      <div class="eh-frame">
-        {% if photos %}
-        <img class="eh-frame-img" data-parallax="0.05"
-             src="/site/img/{{ photos[0].id }}?variant=web"
-             srcset="/site/img/{{ photos[0].id }}?variant=thumb 480w, /site/img/{{ photos[0].id }}?variant=web 2048w"
-             sizes="(max-width: 860px) 92vw, 46vw" fetchpriority="high" decoding="async"
-             alt="{{ photos[0]|portfolio_alt }}">
-        {% endif %}
-        <span class="eh-frame-veil" aria-hidden="true"></span>
-        <figcaption class="eh-frame-cap">{{ page.hero_caption }}</figcaption>
-      </div>
+{% if sp_key == "re" %}
+{# ═══ 3b · THE SPACE — a listing premiere: the walkthrough film IS the page ══ #}
+<section class="sr-wrap sr-section" aria-label="Listing premiere" data-seek-scope>
+  <div class="sr-featurehead">
+    <h1>{{ page.sr.h2a }} <em>{{ page.sr.h2b }}</em></h1>
+    <p class="sr-specline">{% for s in page.sr.spec %}{{ s }} &middot; {% endfor %}{% if aerials_live() %}<b>{{ page.sr.spec_aerial.format(rate=aerial_rate) }}</b> &middot; {% endif %}From {{ rates[0].price }}</p>
+  </div>
+  <div class="sr-premiere">
+    <figure class="sr-screen sr-screen--film" data-sr-player>
       {% if hero_reel %}
-      <div class="eh-reel" data-hero-reel data-parallax="-0.06">
-        <video autoplay muted loop playsinline preload="metadata"
-               poster="/site/poster/{{ hero_reel.id }}">
-          <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
-        </video>
-        <span class="eh-reel-play" aria-hidden="true">&#9654;</span>
+      <video autoplay muted loop playsinline preload="metadata"
+             poster="/site/poster/{{ hero_reel.id }}" aria-label="Walkthrough film">
+        <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
+      </video>
+      {% elif photos %}
+      <img src="/site/img/{{ photos[0].id }}?variant=web"
+           srcset="/site/img/{{ photos[0].id }}?variant=thumb 480w, /site/img/{{ photos[0].id }}?variant=web 2048w"
+           sizes="(max-width: 1000px) 100vw, 900px" fetchpriority="high" decoding="async"
+           alt="{{ photos[0]|portfolio_alt }}">
+      {% endif %}
+      <span class="sr-screen-scrim" aria-hidden="true"></span>
+      <span class="sr-screenbadge">&#9679; Premiere — {{ page.hero_caption }}</span>
+      {% if hero_reel %}
+      <div class="sr-playerstrip" aria-hidden="true">
+        <span class="sr-tc-play">&#9654;</span>
+        <span data-sr-tc>00:00:00:00</span>
+        <i class="sr-progress"><b data-sr-bar></b>
+          {%- if hero_reel.duration %}{% for ch in page.sr.chapters if ch.at > 0 and (not ch.aerial or aerials_live()) %}<i style="left: {{ (ch.at * 100)|round|int }}%;"></i>{% endfor %}{% endif -%}
+        </i>
+        {% if hero_reel.duration and hero_reel.duration|hms %}<span>{{ hero_reel.duration|hms }}</span>{% endif %}
       </div>
       {% endif %}
+    </figure>
+    <div class="sr-chapters">
+      {% if hero_reel and hero_reel.duration %}
+      <p class="sr-mono">Chapters</p>
+      {% for ch in page.sr.chapters if not ch.aerial or aerials_live() %}
+      <button type="button" class="sr-chapter{% if ch.aerial %} sr-chapter--marked{% endif %}"
+              data-seek="{{ (hero_reel.duration * ch.at)|round|int }}">
+        <i>{{ ((hero_reel.duration * ch.at)|round|int)|hms if ch.at > 0 else "0:00" }}</i>
+        {{ ch.label }}
+        {% if ch.aerial %}<i class="sr-chapter-badge">Drone</i>{% endif %}
+      </button>
+      {% endfor %}
+      {% endif %}
+      <div class="sr-agentcut">
+        <b>Agent's cut:</b> {{ page.sr.agents_cut_aerial if aerials_live() else page.sr.agents_cut }}
+      </div>
     </div>
   </div>
 </section>
 
-{# ═══ SELECTED WORK — specialty-filtered starred photos ══════════════════════ #}
-{% if photos %}
-<section class="ework" id="work">
-  <div class="ework-head" data-reveal>
-    <div class="ework-head-txt">
-      <p class="esec-kicker">Selected work</p>
-      <h2 class="esec-h2">{{ page.work_heading }}</h2>
-      <p class="esec-lede">{{ page.work_sub }}</p>
+{% if aerials_live() %}
+{# ═══ THE AERIAL PASS — steel-bordered, launches with the Part 107 cert ══════ #}
+{% set aerial_leads = [] %}
+{% for a in photos %}{% if a.portfolio_tag and "aerial" in a.portfolio_tag %}{% set _ = aerial_leads.append(a) %}{% endif %}{% endfor %}
+<section class="sr-wrap" aria-label="The Aerial Pass">
+  <div class="sr-aerialpass">
+    <div class="sr-aerialpass-grid">
+      <figure>
+        {% if aerial_leads %}
+        <img src="/site/img/{{ aerial_leads[0].id }}?variant=web" loading="lazy" decoding="async"
+             sizes="(max-width: 1000px) 100vw, 820px" alt="{{ aerial_leads[0]|portfolio_alt }}">
+        {% elif photos %}
+        <img src="/site/img/{{ photos[-1].id }}?variant=web" loading="lazy" decoding="async"
+             sizes="(max-width: 1000px) 100vw, 820px" alt="{{ photos[-1]|portfolio_alt }}">
+        {% endif %}
+        <span class="sr-screen-scrim" aria-hidden="true"></span>
+        <span class="sr-screenbadge">&#9650; The Aerial Pass</span>
+      </figure>
+      <div class="sr-aerialpass-copy">
+        <p class="sr-mono">The Aerial Pass — new</p>
+        <h3>The lot, the roofline, <em>the whole street.</em></h3>
+        <p>Drone stills and orbit clips flown the same visit as the interiors —
+           acreage, roof condition, and how the property sits in its
+           neighborhood. Cut straight into the walkthrough film.</p>
+        <ul class="sr-aerialpass-checks">
+          <li><b>&#10003;</b> FAA Part 107 certified pilot</li>
+          <li><b>&#10003;</b> LAANC airspace clearance, handled</li>
+          <li><b>&#10003;</b> {{ aerial_rate }} add-on to any tier &middot; included in Premier</li>
+        </ul>
+        <a class="sr-btn sr-btn--ghost" href="{{ book_url }}">Add aerials to a booking &rarr;</a>
+      </div>
     </div>
-    <a class="elink ework-head-link" href="/portfolio#sp:{{ sp_key }}">Full portfolio <span aria-hidden="true">&rarr;</span></a>
   </div>
-  <div class="ework-grid">
+</section>
+{% endif %}
+
+{# ═══ FILMSTRIP STILLS — frames pulled from the film day ═════════════════════ #}
+{% if photos %}
+<section class="sr-wrap sr-section" aria-label="Selected stills" id="work">
+  <div class="sr-kickrow">
+    <p class="sr-mono">{{ page.sr.strip_label }}{% if aerials_live() %} <span class="sr-mono--stock">&middot; aerial frames marked &#9650;</span>{% endif %}</p>
+    <a class="sr-mono sr-mono--stock" href="/portfolio#sp:{{ sp_key }}">Full archive &rarr;</a>
+  </div>
+  <div class="sr-filmstrip">
     {% for a in photos[:6] %}
-    <figure class="tile ework-fig ework-fig-{{ loop.index }}" data-web="/site/img/{{ a.id }}">
+    <figure class="tile{{ ' sr-frame-wide' if loop.index is odd else ' sr-frame-tall' }}" data-web="/site/img/{{ a.id }}">
       <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-           srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
-           sizes="(max-width: 860px) 92vw, 30vw" alt="{{ a|portfolio_alt }}">
-      <figcaption class="ework-cap">
-        <span class="ework-cap-t">{{ a.portfolio_tag|tag_label if a.portfolio_tag else 'Selected work' }}</span>
-        {% if a.client_name %}<span class="ework-cap-s">{{ a.client_name }}</span>{% endif %}
-      </figcaption>
+           sizes="(max-width: 700px) 45vw, 300px" alt="{{ a|portfolio_alt }}">
+      {% if a.portfolio_tag and "aerial" in a.portfolio_tag %}
+      <span class="sr-filmchip sr-aerial" aria-hidden="true">&#9650; Aerial</span>
+      {% endif %}
+      <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
     </figure>
     {% endfor %}
   </div>
 </section>
 {% else %}
-<section class="ework">
-  <div class="empty-state" data-reveal>
+<section class="sr-wrap sr-section">
+  <div class="empty-state">
     <p><strong>{{ page.empty_head }}</strong></p>
     <p class="muted">{{ page.empty_body }}</p>
     <div class="empty-state-actions">
-      <a class="btn-pill" href="{{ book_url }}">Book a shoot <span>&rarr;</span></a>
+      <a class="btn-pill" href="{{ book_url }}">{{ page.sr.cta }} <span>&rarr;</span></a>
       <a class="btn-ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
     </div>
   </div>
 </section>
 {% endif %}
 
-{# ═══ MOTION — specialty reels ═══════════════════════════════════════════════ #}
-{% if reels %}
-<section class="emotion" id="motion">
-  <div class="emotion-head" data-reveal>
-    <div class="emotion-head-txt">
-      <p class="esec-kicker esec-kicker-gold">Motion</p>
-      <h2 class="esec-h2 esec-h2-cream">{{ page.motion_heading }}</h2>
-    </div>
-    <p class="emotion-sub">{{ page.motion_sub }}</p>
+{# ═══ PROOF STRIP ════════════════════════════════════════════════════════════ #}
+<section class="sr-wrap" aria-label="Turnaround">
+  <div class="sr-stats">
+    {% for n, label in page.sr.proof %}
+    <div class="sr-stat"><b>{{ n }}</b><small>{{ label }}</small></div>
+    {% endfor %}
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a></div>
   </div>
-  {% set feat = reels[0] %}
-  <figure class="emotion-feature" data-reveal>
-    <video autoplay muted loop playsinline preload="metadata" poster="/site/poster/{{ feat.id }}">
-      <source src="/site/vid/{{ feat.id }}" type="video/mp4">
-    </video>
-    <span class="emotion-veil" aria-hidden="true"></span>
-    <span class="emotion-play" aria-hidden="true">&#9654;</span>
-    <figcaption class="emotion-flabel">
-      <span>{{ sp.name }} reel</span>
-      {% if feat.portfolio_tag %}<span class="emotion-flabel-tag">{{ feat.portfolio_tag|tag_label }}</span>{% endif %}
-    </figcaption>
-  </figure>
-  {% if reels|length > 1 %}
-  <div class="emotion-strip">
-    {% for r in reels[1:5] %}
-    <figure class="emotion-clip">
-      <video autoplay muted loop playsinline preload="metadata" poster="/site/poster/{{ r.id }}">
-        <source src="/site/vid/{{ r.id }}" type="video/mp4">
-      </video>
-      <figcaption>{{ r.portfolio_tag|tag_label if r.portfolio_tag else 'Reel' }}</figcaption>
+</section>
+
+{% elif sp_key == "pl" %}
+{# ═══ 3k · THE FACE — direction promised up front ════════════════════════════ #}
+<section class="sr-wrap" aria-label="Portrait sessions">
+  <div class="sr-herosplit">
+    <div class="sr-herosplit-copy">
+      <span class="sr-mono sr-mono--stock">{{ page.kicker }}</span>
+      <h1>{{ page.h1a }}<br><em>{{ page.h1b }}</em></h1>
+      <p class="sr-beat">{{ page.sr.beat }}</p>
+      <p class="sr-lede">{{ page.sr.body }}</p>
+      <div class="sr-herosplit-actions">
+        <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
+        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+      </div>
+      <div class="sr-stats">
+        {% for n, label in page.sr.stats %}
+        <div class="sr-stat"><b>{{ n }}</b><small>{{ label }}</small></div>
+        {% endfor %}
+        <div class="sr-stat"><b>From {{ rates[0].price }}</b><small>{{ rates[0].label|lower }}</small></div>
+      </div>
+    </div>
+    <figure class="sr-herosplit-fig">
+      {% if photos %}
+      <img src="/site/img/{{ photos[0].id }}?variant=web"
+           srcset="/site/img/{{ photos[0].id }}?variant=thumb 480w, /site/img/{{ photos[0].id }}?variant=web 2048w"
+           sizes="(max-width: 1000px) 100vw, 560px" fetchpriority="high" decoding="async"
+           alt="{{ photos[0]|portfolio_alt }}">
+      {% endif %}
+      <span class="sr-frameno">{{ sp.stock }} &middot; FR&middot;{{ "%04d"|format(photos[0].id) if photos else "0000" }} &mdash; {{ page.hero_caption }}</span>
     </figure>
+  </div>
+</section>
+
+{# ═══ THE NERVES, NAMED ══════════════════════════════════════════════════════ #}
+<section class="sr-wrap sr-section" aria-label="Common worries, answered">
+  <div class="sr-3up">
+    {% for q, a in page.sr.nerves %}
+    <div>
+      <p class="sr-3up-q">{{ q }}</p>
+      <p>{{ a }}</p>
+    </div>
     {% endfor %}
   </div>
-  {% endif %}
-  <p class="emotion-more" data-reveal><a class="elink" href="/reels">All reels <span aria-hidden="true">&rarr;</span></a></p>
+</section>
+
+{# ═══ SESSION FRAMES + MOTION LOOP ═══════════════════════════════════════════ #}
+{% if photos %}
+<section class="sr-wrap sr-section" aria-label="Selected sessions" id="work">
+  <div class="sr-kickrow">
+    <p class="sr-mono">{{ page.sr.frames_label }}</p>
+    <a class="sr-mono sr-mono--stock" href="/portfolio#sp:{{ sp_key }}">Full archive &rarr;</a>
+  </div>
+  <div class="sr-sessions">
+    {% for a in photos[:3] %}
+    <figure class="tile" data-web="/site/img/{{ a.id }}">
+      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+           sizes="(max-width: 700px) 45vw, 340px" alt="{{ a|portfolio_alt }}">
+      <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
+    </figure>
+    {% if loop.index == 2 and hero_reel %}
+    <figure class="tile" data-kind="video" data-web="/site/vid/{{ hero_reel.id }}" data-poster="/site/poster/{{ hero_reel.id }}">
+      <img src="/site/img/{{ hero_reel.id }}?variant=thumb" loading="lazy" decoding="async"
+           sizes="(max-width: 700px) 45vw, 420px" alt="{{ hero_reel|portfolio_alt }}">
+      <span class="sr-filmchip" aria-hidden="true">&#9654; Loop{% if hero_reel.duration and hero_reel.duration|hms %} &middot; {{ hero_reel.duration|hms }}{% endif %}</span>
+      <span class="sr-frameno" aria-hidden="true">Motion, between the stills</span>
+    </figure>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="sr-wrap sr-section">
+  <div class="empty-state">
+    <p><strong>{{ page.empty_head }}</strong></p>
+    <p class="muted">{{ page.empty_body }}</p>
+    <div class="empty-state-actions">
+      <a class="btn-pill" href="{{ book_url }}">{{ page.sr.cta }} <span>&rarr;</span></a>
+      <a class="btn-ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+    </div>
+  </div>
 </section>
 {% endif %}
 
-{# ═══ DELIVERABLES — what you get ════════════════════════════════════════════ #}
-<section class="sp-sec sp-deliver-sec">
-  <div class="sp-deliver-intro" data-reveal>
-    <p class="esec-kicker">What you get</p>
-    <h2 class="esec-h2">Built for where it's going.</h2>
-  </div>
-  <div class="sp-deliver">
-    {% for title, body in page.deliverables %}
-    <article class="sp-dcard" data-reveal>
-      <span class="sp-dnum">{{ "%02d"|format(loop.index) }}</span>
-      <h3>{{ title }}</h3>
-      <p>{{ body }}</p>
-    </article>
-    {% endfor %}
+{% else %}
+{# ═══ 3c · THE PLATE — full-bleed opening title card ═════════════════════════ #}
+<section aria-label="Food &amp; beverage">
+  <div class="sr-titlecard sr-corners4">
+    <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+    {% if hero_reel %}
+    <video autoplay muted loop playsinline preload="metadata"
+           poster="/site/poster/{{ hero_reel.id }}" aria-label="Appetite reel">
+      <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
+    </video>
+    {% elif photos %}
+    <img src="/site/img/{{ photos[0].id }}?variant=web"
+         srcset="/site/img/{{ photos[0].id }}?variant=thumb 480w, /site/img/{{ photos[0].id }}?variant=web 2048w"
+         sizes="100vw" fetchpriority="high" decoding="async"
+         alt="{{ photos[0]|portfolio_alt }}">
+    {% endif %}
+    <span class="sr-titlecard-scrim" aria-hidden="true"></span>
+    <div class="sr-titlecard-copy">
+      <span class="sr-mono">{{ page.sr.presents }}</span>
+      <h1>{{ page.sr.h2a }}<br>{{ page.sr.h2b }}</h1>
+      <p class="sr-beat">{{ page.sr.beat }}</p>
+      <div class="sr-titlecard-actions">
+        <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
+        {% if hero_reel and hero_reel.duration and hero_reel.duration|hms %}
+        <a class="sr-btn sr-btn--ghost" href="/reels">&#9654; Watch {{ hero_reel.duration|hms }}</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="sr-titlecard-meta" aria-hidden="true">
+      <span>{{ page.sr.card_meta_l }}</span>
+      <span>{{ page.sr.card_meta_r }}</span>
+    </div>
   </div>
 </section>
 
-{# ═══ PROCESS ════════════════════════════════════════════════════════════════ #}
-<section class="sp-sec sp-proc">
-  <h2 class="eyebrow" data-reveal>How a shoot runs</h2>
-  <div class="proc-grid">
-    {% for title, body in page.process %}
-    <div class="proc-card" data-reveal>
-      <span class="proc-num">{{ "%02d"|format(loop.index) }}</span>
-      <h3>{{ title }}</h3>
+{# ═══ APPETITE GRID ══════════════════════════════════════════════════════════ #}
+{% if photos %}
+<section class="sr-wrap sr-section" aria-label="Recent menus" id="work">
+  <div class="sr-kickrow">
+    <p class="sr-mono">{{ page.sr.grid_label }}</p>
+    <span class="sr-mono sr-mono--stock">{% if photos %}{{ photos|length }} still{{ 's' if photos|length != 1 }}{% endif %}{% if reels %} &middot; {{ reels|length }} film{{ 's' if reels|length != 1 }}{% endif %} in this feature</span>
+  </div>
+  <div class="sr-appetite">
+    {% for a in photos[:6] %}
+    <figure class="tile" data-web="/site/img/{{ a.id }}">
+      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+           sizes="(max-width: 700px) 45vw, 350px" alt="{{ a|portfolio_alt }}">
+      <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
+    </figure>
+    {% if loop.index == 2 and reels %}
+    <figure class="tile" data-kind="video" data-web="/site/vid/{{ reels[0].id }}" data-poster="/site/poster/{{ reels[0].id }}">
+      <img src="/site/img/{{ reels[0].id }}?variant=thumb" loading="lazy" decoding="async"
+           sizes="(max-width: 700px) 45vw, 350px" alt="{{ reels[0]|portfolio_alt }}">
+      <span class="sr-filmchip" aria-hidden="true">&#9654;{% if reels[0].duration and reels[0].duration|hms %} {{ reels[0].duration|hms }} &mdash;{% endif %} {{ reels[0].portfolio_tag|tag_label if reels[0].portfolio_tag else 'The steam' }}</span>
+    </figure>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="sr-wrap sr-section">
+  <div class="empty-state">
+    <p><strong>{{ page.empty_head }}</strong></p>
+    <p class="muted">{{ page.empty_body }}</p>
+    <div class="empty-state-actions">
+      <a class="btn-pill" href="{{ book_url }}">{{ page.sr.cta }} <span>&rarr;</span></a>
+      <a class="btn-ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ═══ COURSES — the process, told as a menu ══════════════════════════════════ #}
+<section class="sr-wrap sr-section" aria-label="How a shoot runs">
+  <div class="sr-3up">
+    {% for kick, body in page.sr.courses %}
+    <div>
+      <p class="sr-3up-kick">{{ kick }}</p>
       <p>{{ body }}</p>
     </div>
     {% endfor %}
   </div>
 </section>
+{% endif %}
 
-{# ═══ CASE STUDIES — specialty-grouped, derived from starred-asset tags ══════ #}
-{% if studies %}
-<section class="sp-sec sp-cs">
-  <div class="sp-cs-head" data-reveal>
-    <p class="esec-kicker">Case studies</p>
-    <h2 class="esec-h2">{{ sp.name }} work, in the wild.</h2>
+{# ═══ SHARED: RATES RAIL — figures come from site.py SERVICES ════════════════ #}
+<section class="sr-wrap" aria-label="Rates" id="rates">
+  <div class="sr-tiers">
+    {% for r in rates %}
+    <div class="sr-tier{% if r.pick %} sr-tier--pick{% endif %}">
+      <b>{{ r.price }}{% if r.unit %}<span>{{ r.unit }}</span>{% endif %}</b>
+      <small>{{ r.label }}</small>
+    </div>
+    {% endfor %}
+    <div class="sr-tier sr-stat--cta"><a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta_final or page.sr.cta }} &rarr;</a></div>
   </div>
-  <div class="work-editorial-grid" data-reveal>
+  <p class="sr-kickrow" style="margin-top: 12px;">
+    <a class="sr-mono" href="/services">Every tier, in detail &rarr;</a>
+    {% if sp_key == "re" and aerials_live() %}<span class="sr-mono sr-mono--stock">Aerial Pass {{ aerial_rate }} on any tier</span>{% endif %}
+  </p>
+</section>
+
+{# ═══ SHARED: IN THE WILD — case studies for this feature ════════════════════ #}
+{% if studies %}
+<section class="sr-wrap sr-section" aria-label="Case studies">
+  <div class="sr-kickrow">
+    <p class="sr-mono">{{ sp.screen_name }}, in the wild</p>
+    <a class="sr-mono sr-mono--stock" href="/work">All screenings &rarr;</a>
+  </div>
+  <div class="sr-features">
     {% for s in studies %}
-    <a class="work-editorial-card" href="/work/{{ s.slug }}">
-      <div class="work-editorial-img">
+    <a class="sr-card" href="/work/{{ s.slug }}">
+      <div class="sr-card-head">
+        <span class="sr-mono sr-mono--stock">Screening</span>
+        <span class="sr-card-count">{{ s.cs_location or "" }}</span>
+      </div>
+      <figure class="sr-card-media">
         {% if s.hero_id %}
         <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
-             srcset="/site/img/{{ s.hero_id }}?variant=thumb 480w, /site/img/{{ s.hero_id }}?variant=web 2048w"
-             sizes="(max-width: 700px) 100vw, 50vw"
-             alt="{{ s.cs_tagline or s.title }}">
-        {% else %}
-        <span class="placeholder">no hero photo starred yet</span>
+             sizes="(max-width: 700px) 92vw, 440px" alt="{{ s.cs_tagline or s.title }}">
         {% endif %}
-      </div>
-      <h3>{{ s.cs_tagline or s.title }}</h3>
-      <p class="muted">{{ s.client_name or "" }}{% if s.client_name and s.cs_location %} · {% endif %}{{ s.cs_location or "" }}</p>
+        <span class="sr-card-scrim" aria-hidden="true"></span>
+        <span class="sr-card-title">
+          <b>{{ s.cs_tagline or s.title }}</b>
+          {% if s.client_name %}<small>{{ s.client_name }}</small>{% endif %}
+        </span>
+      </figure>
     </a>
     {% endfor %}
   </div>
 </section>
 {% endif %}
 
-{# ═══ TESTIMONIALS ═══════════════════════════════════════════════════════════ #}
-<section class="etestimonials" data-reveal>
-  {% include "site/_testimonials.html" %}
+{# ═══ SHARED: PULL QUOTE — first real published testimonial ══════════════════ #}
+{% if testimonials %}
+<section class="sr-wrap" aria-label="Client quote">
+  <p class="sr-quote">&ldquo;{{ testimonials[0].quote }}&rdquo;
+    <span class="sr-quote-by">&mdash; {{ testimonials[0].attribution_name }}{% if testimonials[0].business %}, {{ testimonials[0].business }}{% endif %}</span>
+  </p>
 </section>
+{% endif %}
 
-{# ═══ FAQ ════════════════════════════════════════════════════════════════════ #}
-<section class="sp-sec faq-narrow">
+{# ═══ SHARED: FAQ (FAQPage JSON-LD rides the include) ════════════════════════ #}
+<section class="sr-wrap sr-section" aria-label="Common questions">
   {% include "site/_faq.html" %}
 </section>
 
-{# ═══ CLOSING CTA ════════════════════════════════════════════════════════════ #}
-<section class="ecta">
-  <div class="ecta-inner" data-reveal>
-    <h2 class="ecta-h2">{{ page.cta_h1 }} <span class="eem">{{ page.cta_h2 }}</span></h2>
-    <div class="ecta-actions">
-      <a class="ebtn ebtn-fill" data-magnetic href="{{ book_url }}">Book a shoot
-        <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
-      <a class="elink" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote <span aria-hidden="true">&rarr;</span></a>
+{# ═══ SHARED: CLOSING CTA ════════════════════════════════════════════════════ #}
+<section class="sr-wrap sr-section" aria-label="Book">
+  <div class="sr-pagehead" style="border-bottom: 0; text-align: center;">
+    <h2 class="sr-title" style="font-size: clamp(26px, 3vw, 44px);">{{ page.cta_h1 }} <span class="sr-em">{{ page.cta_h2 }}</span></h2>
+    <div class="sr-titlecard-actions" style="margin-top: 20px;">
+      <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
+      <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
     </div>
   </div>
 </section>
