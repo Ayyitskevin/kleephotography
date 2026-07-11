@@ -6394,57 +6394,65 @@ html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) nav a.nav-c
 }
 
 /* ============================================================================
-   AFTER DARK — INNER PAGES AT CANDLELIGHT (Revamp PR 2). Everything here is
-   scoped under html[data-theme="dark"] .site-body: the locked light design
-   stays byte-untouched below; candlelight is the default via the dark-first
-   pre-paint. Editorial scale, the candle image treatment, and gold fills for
-   every control whose light design used the ink pill (cream-on-cream after
-   the token flip).
+   EDITORIAL DARK — INNER PAGES (Revamp PR-B, Claude Design handoff2). Portfolio,
+   Work (+detail), Services, About, Contact, Book, Reels, Press. These pages
+   already carry the target structure/hooks 1:1 — this is a recolor pass onto
+   the rose+gold editorial system PR-A introduced, plus a few real contrast
+   fixes the old candlelight tokens (single accent = gold) can't express now
+   that .site-body has TWO accents: rose (--accent, primary — eyebrows, links,
+   emphasis) and gold (--accent-lt, secondary — numerals, money actions).
+   Everything here is scoped html[data-theme="dark"] .site-body; the dark-first
+   pre-paint (base_site.html) makes this the only state the marketing site
+   renders in, so no light-mode fork is needed.
    ========================================================================== */
 
-/* ── 1 · Gold fills for ink-pill controls (contrast fixes) ────────────────── */
+/* ── 1 · Ink-pill contrast fixes (dark navy ink reads on light/gold fills) ── */
 html[data-theme="dark"] .site-body .pf-chip { background: transparent; }
 html[data-theme="dark"] .site-body .pf-chip.pf-chip-active {
-  background: var(--accent); color: #221507; border-color: var(--accent); }
-html[data-theme="dark"] .site-body .pf-chip.pf-chip-active .muted { color: rgba(34, 21, 7, 0.6); }
+  background: var(--ink); color: #0e1319; border-color: var(--ink); }
+html[data-theme="dark"] .site-body .pf-chip.pf-chip-active .muted { color: rgba(14, 19, 25, 0.6); }
 html[data-theme="dark"] .site-body .svc-cta:hover {
-  background: var(--accent); color: #221507; border-color: var(--accent); }
+  background: var(--accent-lt); color: #0e1319; border-color: var(--accent-lt); }
 html[data-theme="dark"] .site-body .svc-tier-mid .svc-cta {
-  background: var(--accent); color: #221507; border-color: transparent; }
-html[data-theme="dark"] .site-body .svc-tier-mid .svc-cta:hover { background: #EDBB58; }
-html[data-theme="dark"] .site-body .sched-btn { background: var(--accent); color: #221507; }
-html[data-theme="dark"] .site-body .skip-link { background: #F2E9DC; color: #0D1512; }
+  background: var(--accent-lt); color: #0e1319; border-color: transparent; }
+html[data-theme="dark"] .site-body .svc-tier-mid .svc-cta:hover { background: #dcc07a; }
+html[data-theme="dark"] .site-body .btn-saffron:hover { background: #0e1319; color: #e7dfcd; }
+html[data-theme="dark"] .site-body .skip-link { background: #e7dfcd; color: #0e1319; }
+/* Error copy (contact/book form validation) was hardcoded oxblood — ~2:1 on
+   the new slate-navy page, effectively unreadable. Rose passes AA easily. */
+html[data-theme="dark"] .site-body .error { color: var(--accent); }
 
-/* ── 2 · Editorial scale + rhythm (Direction B) ───────────────────────────── */
+/* ── 2 · Editorial scale + rhythm ──────────────────────────────────────────── */
 html[data-theme="dark"] .site-body .page-hero-inner h1 {
-  font-size: clamp(2.8rem, 6vw, 5.6rem); line-height: 0.98;
-  letter-spacing: -0.028em; max-width: 12em; text-wrap: balance; }
+  font-size: clamp(2.4rem, 5.4vw, 4.6rem); line-height: 1;
+  letter-spacing: -0.024em; max-width: 13em; text-wrap: balance; }
 html[data-theme="dark"] .site-body .page-hero-inner .lede {
-  font-size: 1.1rem; line-height: 1.62; max-width: 34em; text-wrap: pretty; }
+  font-size: 1.06rem; line-height: 1.62; max-width: 34em; text-wrap: pretty; }
 html[data-theme="dark"] .site-body .sec-head h2,
 html[data-theme="dark"] .site-body .cta h2 {
-  font-size: clamp(2.2rem, 5vw, 4.2rem); letter-spacing: -0.025em; line-height: 1.02; }
+  font-size: clamp(2rem, 4.6vw, 3.6rem); letter-spacing: -0.02em; line-height: 1.05; }
 html[data-theme="dark"] .site-body .eyebrow { color: var(--accent); }
 html[data-theme="dark"] .site-body .it-accent { color: var(--accent); }
 
-/* ── 3 · The candle image treatment — one radius, one shadow, one glow ────── */
+/* ── 3 · Image treatment — navy scrim (no candle glow), radius per context ── */
 html[data-theme="dark"] .site-body .pf-masonry-tile,
 html[data-theme="dark"] .site-body .work-grid .tile,
 html[data-theme="dark"] .site-body .work-editorial-card .tile,
 html[data-theme="dark"] .site-body .work-feature-media,
 html[data-theme="dark"] .site-body .work-editorial-img,
-html[data-theme="dark"] .site-body .wg-tile,
+html[data-theme="dark"] .site-body .wg-tile {
+  border-radius: 4px; box-shadow: 0 26px 50px -38px rgba(0, 0, 0, 0.9); }
 html[data-theme="dark"] .site-body .work-hero-frame,
-html[data-theme="dark"] .site-body .about-photo,
+html[data-theme="dark"] .site-body .about-photo {
+  border-radius: 6px; box-shadow: 0 26px 50px -38px rgba(0, 0, 0, 0.9); }
 html[data-theme="dark"] .site-body .contact-photo,
 html[data-theme="dark"] .site-body .book-aside-photo {
-  border-radius: 4px; box-shadow: 0 26px 50px -38px rgba(0, 0, 0, 0.9); }
+  border-radius: 8px; box-shadow: 0 26px 50px -38px rgba(0, 0, 0, 0.9); }
 html[data-theme="dark"] .site-body .pf-masonry-tile::after,
 html[data-theme="dark"] .site-body .work-grid .tile::after,
 html[data-theme="dark"] .site-body .wg-tile::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
-  background: radial-gradient(90% 70% at 50% 38%, rgba(255, 214, 140, 0.12) 0%, rgba(13, 21, 18, 0) 55%),
-    linear-gradient(180deg, rgba(9, 15, 12, 0) 55%, rgba(9, 15, 12, 0.55) 100%); }
+  background: linear-gradient(180deg, rgba(10, 15, 20, 0) 55%, rgba(10, 15, 20, 0.6) 100%); }
 html[data-theme="dark"] .site-body .pf-masonry-tile img {
   transition: transform 0.85s cubic-bezier(0.2, 0.7, 0.2, 1); }
 html[data-theme="dark"] .site-body .pf-masonry-tile:hover img { transform: scale(1.04); }
@@ -6452,7 +6460,7 @@ html[data-theme="dark"] .site-body .portfolio-cap { z-index: 2; }
 
 /* ── 4 · Press — the run of record ────────────────────────────────────────── */
 html[data-theme="dark"] .site-body .press-item {
-  padding: 20px 4px; border-bottom: 1px solid rgba(242, 233, 220, 0.12); }
+  padding: 20px 4px; border-bottom: 1px solid var(--line); }
 html[data-theme="dark"] .site-body .press-outlet {
   font: 700 1rem/1.3 var(--sans); color: var(--ink); min-width: 170px; }
 html[data-theme="dark"] .site-body .press-title {
@@ -6460,41 +6468,40 @@ html[data-theme="dark"] .site-body .press-title {
 html[data-theme="dark"] .site-body .press-title:hover { color: var(--ink); }
 html[data-theme="dark"] .site-body .press-date { font-variant-numeric: tabular-nums; }
 
-/* ── 5 · Reels at dusk ────────────────────────────────────────────────────── */
+/* ── 5 · Reels ─────────────────────────────────────────────────────────────── */
 html[data-theme="dark"] .site-body .motion-feature,
 html[data-theme="dark"] .site-body .motion-reel {
   border-radius: 10px; box-shadow: 0 50px 90px -50px rgba(0, 0, 0, 0.9); }
-html[data-theme="dark"] .site-body .motion-reel-bar i { background: var(--accent); }
-html[data-theme="dark"] .site-body .motion-feature-label { color: var(--accent); }
+html[data-theme="dark"] .site-body .motion-reel-bar i { background: var(--accent-lt); }
+html[data-theme="dark"] .site-body .motion-feature-label { color: var(--accent-lt); }
 
-/* ── 6 · About — process cards + the stats band ───────────────────────────── */
+/* ── 6 · About — process cards + the stats band. Numerals read gold (the
+   secondary accent), same as the spec's Newsreader "120+ / 8 yrs" figures. ── */
 html[data-theme="dark"] .site-body .proc-card {
   background: var(--card); border-radius: 14px; }
 html[data-theme="dark"] .site-body .proc-num {
-  font-family: var(--serif); font-weight: 400; font-size: 2.5rem; color: var(--accent); }
+  font-family: var(--serif); font-weight: 400; font-size: 2.5rem; color: var(--accent-lt); }
 html[data-theme="dark"] .site-body .ab-stats { background: var(--espresso); }
-html[data-theme="dark"] .site-body .ab-stat b { color: var(--accent); }
-html[data-theme="dark"] .site-body .ab-stat span { color: rgba(242, 233, 220, 0.55); }
+html[data-theme="dark"] .site-body .ab-stat b { color: var(--accent-lt); }
+html[data-theme="dark"] .site-body .ab-stat span { color: var(--muted); }
 
-/* ── 7 · Contact / book cards — the proofing-card surface ─────────────────── */
+/* ── 7 · Contact / book cards — flat editorial slate, no candlelight glow ── */
 html[data-theme="dark"] .site-body .contact-card,
 html[data-theme="dark"] .site-body .book-form-card,
 html[data-theme="dark"] .site-body .book-card {
-  background: linear-gradient(165deg, #14241D 0%, #0F1A15 100%);
-  border: 1px solid rgba(224, 164, 59, 0.22); border-radius: 18px;
-  box-shadow: 0 40px 80px -52px rgba(0, 0, 0, 0.9); }
+  background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+  box-shadow: 0 40px 70px -50px rgba(0, 0, 0, 0.55); }
 html[data-theme="dark"] .site-body .book-event-card a { border-radius: 14px; }
 html[data-theme="dark"] .site-body .book-event-card a:hover { border-color: var(--accent); }
 
-/* ── 8 · Tier cards — gold ring on the picked tier ────────────────────────── */
+/* ── 8 · Tier cards — rose ring + rose-tinted glow on the picked tier;
+   price stays plain ink (only the "Most picked" label is accent-colored,
+   already handled by the base .svc-pick rule). ─────────────────────────── */
 html[data-theme="dark"] .site-body .svc-tier {
   background: var(--card); border-color: var(--line); border-radius: 16px; }
 html[data-theme="dark"] .site-body .svc-tier-mid {
-  background: linear-gradient(165deg, #14241D 0%, #0F1A15 100%);
-  border-color: rgba(224, 164, 59, 0.35);
-  box-shadow: 0 40px 76px -44px rgba(0, 0, 0, 0.85); }
-html[data-theme="dark"] .site-body .svc-price { color: var(--accent); }
-html[data-theme="dark"] .site-body .svc-pick { background: var(--accent); color: #221507; }
+  background: var(--card); border-color: var(--accent);
+  box-shadow: 0 30px 56px -38px rgba(124, 47, 56, 0.42); }
 
 /* ============================================================================
    THE PRIVATE DINING ROOM — client gallery at candlelight (Revamp PR 3).
