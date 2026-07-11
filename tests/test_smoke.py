@@ -9756,6 +9756,12 @@ def test_specialty_pages(admin):
         # shared empty state instead of an empty grid
         assert "empty-state" in pub.get("/real-estate").text
 
+        # the hub renders one door per specialty, each linking to its spoke
+        r = pub.get("/")
+        assert r.text.count('class="sp-door"') == 3
+        for slug in ("real-estate", "portraits", "food-beverage"):
+            assert f'href="/{slug}"' in r.text
+
     # plant two synthetic starred photos: one RE-prefixed, one legacy-tagged
     # (unprefixed = F&B by convention)
     re_id = db.run(

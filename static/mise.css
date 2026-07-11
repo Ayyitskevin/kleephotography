@@ -8485,3 +8485,49 @@ html[data-theme="dark"] .site-body .sp-cs-head { max-width: 720px; margin-bottom
 @media (max-width: 900px) {
   html[data-theme="dark"] .site-body .sp-deliver { grid-template-columns: 1fr; }
 }
+
+/* Homepage specialty doors — the hub's router. Tall image cards, scrim +
+   copy anchored low, one per vertical. */
+html[data-theme="dark"] .site-body .sp-doors-head { max-width: 720px; margin-bottom: 44px; }
+html[data-theme="dark"] .site-body .sp-doors {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+}
+html[data-theme="dark"] .site-body .sp-door {
+  position: relative; display: block; border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--line); background: #161e28; aspect-ratio: 3 / 4;
+  text-decoration: none; transition: transform .35s ease, border-color .35s ease;
+}
+html[data-theme="dark"] .site-body .sp-door:hover { transform: translateY(-4px); border-color: var(--accent); }
+html[data-theme="dark"] .site-body .sp-door-media { position: absolute; inset: 0; }
+html[data-theme="dark"] .site-body .sp-door-media img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform .6s ease;
+}
+html[data-theme="dark"] .site-body .sp-door:hover .sp-door-media img { transform: scale(1.04); }
+html[data-theme="dark"] .site-body .sp-door-veil {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(14,19,25,.05) 35%, rgba(14,19,25,.88) 100%);
+}
+html[data-theme="dark"] .site-body .sp-door-copy {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 24px;
+}
+html[data-theme="dark"] .site-body .sp-door-copy h3 {
+  margin: 0 0 6px; font-family: var(--serif); font-weight: 400;
+  font-size: 1.6rem; color: #e7dfcd;
+}
+html[data-theme="dark"] .site-body .sp-door-copy p {
+  margin: 0 0 14px; font-size: .95rem; color: var(--ink-soft); max-width: 30em;
+}
+html[data-theme="dark"] .site-body .sp-door-cta {
+  font: 600 .78rem/1 var(--sans); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent);
+}
+html[data-theme="dark"] .site-body .sp-doors-foot {
+  margin: 34px 0 0; color: var(--muted); font-size: .95rem;
+}
+html[data-theme="dark"] .site-body .sp-doors-foot a { color: var(--accent); }
+
+@media (max-width: 900px) {
+  html[data-theme="dark"] .site-body .sp-doors { grid-template-columns: 1fr; }
+  html[data-theme="dark"] .site-body .sp-door { aspect-ratio: 4 / 3; }
+}

@@ -1,6 +1,6 @@
 {% extends "site/base_site.html" %}
-{% block title %}{{ site_name }} — Food &amp; Beverage Photography{% endblock %}
-{% block meta_description %}Photography that makes people hungry — food &amp; beverage photography and videography for the restaurants, cafés, and bars of Asheville &amp; Western North Carolina.{% endblock %}
+{% block title %}{{ site_name }} — Real Estate &middot; Portraits &middot; Food &amp; Beverage{% endblock %}
+{% block meta_description %}Photography &amp; film studio in Asheville, NC — real estate listings, portraits &amp; personal branding, and the food &amp; beverage work that made the name. Photo and video, delivered fast.{% endblock %}
 {% block navclass %}{% endblock %}
 {% block site_content %}
 
@@ -15,13 +15,14 @@
   <div class="eh-grid" data-hero-grid>
     <div class="eh-copy">
       <p class="eh-kicker" data-reveal>Asheville &amp; Western North Carolina</p>
-      <h1 class="eh-title" data-reveal>We make your menu <span class="eh-em">sell itself.</span></h1>
-      <p class="eh-lede" data-reveal>For the restaurants, cafés, and bars of Western
-         North Carolina — shot to sell the seat.</p>
+      <h1 class="eh-title" data-reveal>The space, the face, <span class="eh-em">the plate.</span></h1>
+      <p class="eh-lede" data-reveal>A photography &amp; film studio in Asheville —
+         real estate, portraits, and food &amp; beverage. Three crafts, one
+         standard: work that sells what it shows.</p>
       <div class="eh-actions" data-reveal>
         <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
           <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
-        <a class="elink" href="/portfolio">View the portfolio <span aria-hidden="true">&rarr;</span></a>
+        <a class="elink" href="/work">See the work <span aria-hidden="true">&rarr;</span></a>
       </div>
     </div>
     <div class="eh-media" data-hero-media>
@@ -34,7 +35,7 @@
              alt="{{ featured[0]|portfolio_alt }}">
         {% endif %}
         <span class="eh-frame-veil" aria-hidden="true"></span>
-        <figcaption class="eh-frame-cap">Tasting menu · Asheville</figcaption>
+        <figcaption class="eh-frame-cap">{{ featured[0].portfolio_tag|tag_label if featured and featured[0].portfolio_tag else 'Selected work' }} · Asheville</figcaption>
       </div>
       {% if hero_reel %}
       <div class="eh-reel" data-hero-reel data-parallax="-0.06">
@@ -48,6 +49,39 @@
     </div>
   </div>
   <div class="eh-cue" aria-hidden="true"><span>Scroll</span><span class="eh-cue-arr">&darr;</span></div>
+</section>
+
+{# ═══ THE THREE DOORS — one per specialty, each a full specialist page ═══════
+   The hub's core job: a visitor finds their vertical without scrolling past
+   the fold. Lead image = that specialty's newest starred photo (slate frame
+   when nothing is tagged yet). #}
+<section class="sp-sec sp-doors-sec" id="specialties">
+  <div class="sp-doors-head" data-reveal>
+    <p class="esec-kicker">Three specialties</p>
+    <h2 class="esec-h2">Pick your door.</h2>
+  </div>
+  <div class="sp-doors">
+    {% for d in doors %}
+    <a class="sp-door" data-reveal href="/{{ d.slug }}">
+      <div class="sp-door-media">
+        {% if d.lead %}
+        <img src="/site/img/{{ d.lead.id }}?variant=thumb" loading="lazy" decoding="async"
+             srcset="/site/img/{{ d.lead.id }}?variant=thumb 480w, /site/img/{{ d.lead.id }}?variant=web 2048w"
+             sizes="(max-width: 860px) 92vw, 30vw" alt="{{ d.lead|portfolio_alt }}">
+        {% endif %}
+        <span class="sp-door-veil" aria-hidden="true"></span>
+      </div>
+      <div class="sp-door-copy">
+        <h3>{{ d.name }}</h3>
+        <p>{{ d.line }}</p>
+        <span class="sp-door-cta">See the work <span aria-hidden="true">&rarr;</span></span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  <p class="sp-doors-foot" data-reveal>Every specialty ships photo, film, or both —
+     one-off shoots or the monthly <a href="/services#svc-brand_partner">Brand
+     Partner</a> rhythm. <a href="/services">See services &amp; tiers &rarr;</a></p>
 </section>
 
 {# ═══ AS SEEN IN — auto-scrolling press marquee ══════════════════════════════ #}
@@ -72,9 +106,9 @@
   <div class="ework-head" data-reveal>
     <div class="ework-head-txt">
       <p class="esec-kicker">Selected work</p>
-      <h2 class="esec-h2">Plates that earn the double-take.</h2>
-      <p class="esec-lede">A few favorites from recent menus — plates, pours, and
-         the rooms they live in.</p>
+      <h2 class="esec-h2">Recent favorites, all three crafts.</h2>
+      <p class="esec-lede">Spaces, faces, and plates from recent shoots — the
+         frames clients ran with.</p>
     </div>
     <a class="elink ework-head-link" href="/portfolio">Full portfolio <span aria-hidden="true">&rarr;</span></a>
   </div>
@@ -85,7 +119,7 @@
            srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
            sizes="(max-width: 860px) 92vw, 30vw" alt="{{ a|portfolio_alt }}">
       <figcaption class="ework-cap">
-        <span class="ework-cap-t">{{ a.portfolio_tag|capitalize if a.portfolio_tag else 'Selected work' }}</span>
+        <span class="ework-cap-t">{{ a.portfolio_tag|tag_label if a.portfolio_tag else 'Selected work' }}</span>
         {% if a.client_name %}<span class="ework-cap-s">{{ a.client_name }}</span>{% endif %}
       </figcaption>
     </figure>
@@ -113,7 +147,7 @@
     <span class="emotion-play" aria-hidden="true">&#9654;</span>
     <figcaption class="emotion-flabel">
       <span>House reel</span>
-      {% if feat.portfolio_tag %}<span class="emotion-flabel-tag">{{ feat.portfolio_tag|capitalize }}</span>{% endif %}
+      {% if feat.portfolio_tag %}<span class="emotion-flabel-tag">{{ feat.portfolio_tag|tag_label }}</span>{% endif %}
     </figcaption>
   </figure>
   {% if reels|length > 1 %}
@@ -123,7 +157,7 @@
       <video autoplay muted loop playsinline preload="metadata" poster="/site/poster/{{ r.id }}">
         <source src="/site/vid/{{ r.id }}" type="video/mp4">
       </video>
-      <figcaption>{{ r.portfolio_tag|capitalize if r.portfolio_tag else 'Reel' }}</figcaption>
+      <figcaption>{{ r.portfolio_tag|tag_label if r.portfolio_tag else 'Reel' }}</figcaption>
     </figure>
     {% endfor %}
   </div>
@@ -184,37 +218,6 @@
 </section>
 {% endif %}
 
-{# ═══ SERVICES — three ways to work together ════════════════════════════════ #}
-<section class="eservices" id="services">
-  <div class="eservices-intro" data-reveal>
-    <p class="esec-kicker">How we work</p>
-    <h2 class="esec-h2">Three ways to work together.</h2>
-  </div>
-  <div class="eservices-grid">
-    <a class="esvc" data-reveal href="/services">
-      <span class="esvc-num">01</span>
-      <h3 class="esvc-h3">Photography</h3>
-      <p class="esvc-body">Dishes, drinks, and the rooms they live in — lit to sell.</p>
-      <span class="esvc-tiers">Starter · Standard · Premium</span>
-      <span class="esvc-cta">Explore photography <span aria-hidden="true">&rarr;</span></span>
-    </a>
-    <a class="esvc" data-reveal href="/services">
-      <span class="esvc-num">02</span>
-      <h3 class="esvc-h3">Videography</h3>
-      <p class="esvc-body">Scroll-stopping loops and hero films that move people.</p>
-      <span class="esvc-tiers">Starter · Standard · Premium</span>
-      <span class="esvc-cta">Explore videography <span aria-hidden="true">&rarr;</span></span>
-    </a>
-    <a class="esvc" data-reveal href="/services#svc-brand_partner">
-      <span class="esvc-num">03</span>
-      <h3 class="esvc-h3">Brand Partner</h3>
-      <p class="esvc-body">A steady monthly drumbeat of content. One partner, on call.</p>
-      <span class="esvc-tiers">Monthly retainer</span>
-      <span class="esvc-cta">Become a partner <span aria-hidden="true">&rarr;</span></span>
-    </a>
-  </div>
-</section>
-
 {# ═══ TESTIMONIALS — real published reviews (Review/Person JSON-LD in include) #}
 <section class="etestimonials" data-reveal>
   {% include "site/_testimonials.html" %}
@@ -232,10 +235,11 @@
     <div class="eabout-copy" data-reveal>
       <p class="esec-kicker">About</p>
       <h2 class="esec-h2 eabout-h2">I'm Kevin Lee, and I'd love to work with you.</h2>
-      <p class="eabout-body">I love a great plate, a perfect pour, and the room that
-         frames them — and my job is simple: make every plate look irresistible.
-         We'll scout the menu together, build a shot list, and move fast, always
-         around your service and never against it. Let's win together.</p>
+      <p class="eabout-body">I shoot the spaces people want to live in, the faces
+         they trust, and the plates they crave — and the job is the same in all
+         three: make it look the way it feels at its best. We'll plan fast,
+         shoot around your day, and deliver work that earns its keep. Let's
+         win together.</p>
       <a class="elink" href="/about">Read the full story <span aria-hidden="true">&rarr;</span></a>
     </div>
   </div>
@@ -250,7 +254,7 @@
       {% else %}<a class="ecta-demo-ask" href="/contact?prefill=demo_gallery">(ask for the PIN)</a>{% endif %}
     </p>
     {% endif %}
-    <h2 class="ecta-h2">Let's make your food look <span class="eem">the way it tastes.</span></h2>
+    <h2 class="ecta-h2">Let's make it look <span class="eem">the way it feels.</span></h2>
     <div class="ecta-actions">
       <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
         <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>

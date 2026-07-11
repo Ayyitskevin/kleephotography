@@ -687,54 +687,35 @@ def _contact_prefill(request: Request) -> dict:
     return {"business": business, "message": message, "service": service, "tier": tier}
 
 
-def _home_courses(featured: list) -> list[dict]:
-    """The golden-hour course list — one course per distinct portfolio tag, backed
-    by the first starred photo wearing it. Pure read-side grouping of what Kevin
-    has actually starred: no invented labels, no fixed menu. Fewer than two
-    courses and the template falls back to the static plates grid."""
-    seen: dict[str, dict] = {}
-    for a in featured:
-        tag = (a["portfolio_tag"] or "").strip()
-        if tag and tag.lower() not in seen:
-            seen[tag.lower()] = {
-                "label": tag.capitalize(),
-                "asset": a,
-                "meta": a["client_name"] or a["gallery_title"] or "",
-            }
-    return list(seen.values())[:5]
+# One-liner under each homepage specialty door. The F&B line keeps the
+# long-standing "makes people hungry" phrase on the home page.
+DOOR_LINES = {
+    "re": "MLS-ready stills and walkthrough reels that move listings.",
+    "pl": "Headshots, branding, and families — directed, not posed.",
+    "fb": "Menus, pours, and rooms — photography that makes people hungry.",
+}
 
 
-def _prix_fixe() -> list[dict]:
-    """The candlelight menu card rows, derived from SERVICES (the single source
-    of truth for tiers and prices — same rows /services renders). The middle
-    tier carries the 'most picked' star, matching the approved menu-card spec."""
-    groups = []
-    for s in SERVICES:
-        rows = []
-        for i, t in enumerate(s["tiers"]):
-            bits = []
-            sub = (t.get("subtitle") or "").strip()
-            if sub and sub.lower() != "per month":
-                bits.append(sub.lower())
-            inc = t.get("includes") or []
-            if len(inc) > 1:
-                bits.append(inc[1][0].lower() + inc[1][1:])
-            rows.append(
-                {
-                    "name": t["name"],
-                    "desc": " · ".join(bits),
-                    "price": t["display_price"] + t.get("price_unit", ""),
-                    "star": i == 1,
-                }
-            )
-        groups.append(
+def _specialty_doors() -> list[dict]:
+    """The homepage's three specialty doors: name, one-liner, and that
+    vertical's newest starred photo as the lead image (None → slate frame)."""
+    assets = _portfolio_assets()
+    doors = []
+    for key, meta in specialties.SPECIALTIES.items():
+        lead = next(
+            (a for a in assets if specialties.specialty_key(a["portfolio_tag"]) == key),
+            None,
+        )
+        doors.append(
             {
-                "title": s["title"],
-                "tagline": s["tagline"].partition(".")[0].strip().lower(),
-                "rows": rows,
+                "key": key,
+                "slug": meta["slug"],
+                "name": meta["name"],
+                "line": DOOR_LINES[key],
+                "lead": lead,
             }
         )
-    return groups
+    return doors
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -751,8 +732,7 @@ async def home(request: Request):
             "press": _press_features()[:12],
             "testimonials": _testimonials(limit=3),
             "demo_gallery": _demo_gallery(),
-            "courses": _home_courses(featured),
-            "prix_fixe": _prix_fixe(),
+            "doors": _specialty_doors(),
         },
     )
 
