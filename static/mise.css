@@ -7547,3 +7547,272 @@ html[data-theme="dark"] .site-body .stack-form button:not(.site-theme-toggle) {
   .site-body .epress-track { animation: none; }
   .site-body .eh-cue-arr { animation: none; }
 }
+
+/* ============================================================================
+   EDITORIAL DARK — ADMIN SHELL + DASHBOARD (Revamp PR-D, Claude Design
+   handoff2). Recolors the admin DEFAULT surface (sidebar, topbar, ⌘K command
+   palette, /admin/home dashboard, login) onto the same rose+gold slate-navy
+   system already shipped for the marketing site + client gallery: base
+   #0e1319, ink #afbbca, dusty-rose #d37e88 (primary — links/eyebrows/active
+   nav), gold #d0b162 (secondary — money actions, paired with dark-navy ink
+   text, never cream/white, to keep AA contrast on the fill).
+
+   DARK-ONLY, not a toggle repaint: this overrides the base (untoggled)
+   `.admin-shell` tokens directly, appended last so it wins by source order
+   over the earlier warm "FOREST + GOLD — ADMIN ONLY" light palette. The
+   pre-existing `html[data-theme="dark"] .admin-shell` block above (a THIRD,
+   unrelated charcoal/jade palette from an older iteration, toggled by the
+   sidebar-footer ☾ button) is now legacy: most of the dashboard/login pieces
+   below were never wired into it, so bringing it forward would mean writing
+   this same sweep twice for no visual difference. It's left in place,
+   inert for anyone whose browser doesn't have a stored `dark` preference —
+   if you'd previously toggled dark mode on in admin, you may still see the
+   old charcoal look; toggle it once more to drop back to this new default
+   (a follow-up can formally retire the button once you've had a look).
+   ========================================================================== */
+
+/* ── 1. Foundational tokens — cascades through every var()-driven rule ────── */
+.admin-shell {
+  --bg:            #0e1319;
+  --bg-glow:       #141b24;
+  --surface:       #1e2a3c;
+  --surface-sunk:  #161e28;
+  --surface-rail:  #161e28;
+  --card-bg:       #1e2a3c;
+
+  --ink:           #afbbca;
+  --ink-soft:      #cdd0d4;
+  --ink-faint:     #bfc3c8;
+  --ink-ghost:     #6b7480;
+
+  --terra:         #d37e88;   /* rose — primary accent: links, active nav, eyebrows */
+  --terra-deep:    #b3606a;   /* hover / pressed on rose                            */
+  --terra-tint:    rgba(211, 126, 136, .14);
+  --terra-tint-2:  rgba(211, 126, 136, .24);
+  --gold:          #d0b162;   /* secondary accent — money actions, dark-ink text    */
+  --dash-gold:     #d0b162;   /* money-panel figures (.dash-money .pct, v4-goal) — a
+                                 separate token from --gold pre-dating this reskin;
+                                 redeclared here so it doesn't keep resolving to the
+                                 old #E0A43B amber and read as a second, mismatched
+                                 gold on the same card                             */
+  --clay:          #d98a78;   --clay-bg: #2e1a18;   --clay-line: #4a2c28;
+  --ok:            #9cc178;   --ok-bg:   #20271a;   --ok-line:   #354028;
+  --honey:         #d8a857;   --honey-bg:#2b2413;   --honey-line:#473a1f;
+  --neutral:       #aba9a3;   --neutral-bg:#242424; --neutral-line:#353535;
+
+  --line:        #24303e;
+  --line-strong: #34404e;
+  --line-faint:  #1a212b;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow:    0 1px 2px rgba(0, 0, 0, .4), 0 10px 26px -14px rgba(0, 0, 0, .6);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, .45), 0 22px 48px -20px rgba(0, 0, 0, .7);
+}
+/* Page background — the base rule paints warm-cream radial glows; repaint navy. */
+.admin-shell {
+  background:
+    radial-gradient(1100px 520px at 78% -8%, #141b24 0%, rgba(20, 27, 36, 0) 70%),
+    radial-gradient(900px 480px at -6% 4%, #161e28 0%, rgba(22, 30, 40, 0) 60%),
+    var(--bg);
+}
+/* Error copy (admin forms) was hardcoded oxblood — fails AA on the new navy
+   background (~1.9:1, same bug fixed for the marketing site in PR-B). Rose
+   passes easily. */
+.admin-shell .error { color: var(--terra); }
+/* Login sits in .cream-theme, not .admin-shell — --gold/--terra don't resolve
+   there (and must not, since money docs share .cream-theme and stay
+   untouched), so every login rule below uses literal hex instead of var(). */
+.cream-theme .login-card .error { color: #d37e88; }
+
+/* ── 2. Topbar + quick-create ("+New") — gold fill needs dark ink, not cream,
+   to stay AA-legible (the mock's cream-on-rose "+New" button is ~2.2:1). ──── */
+.admin-shell .admin-topbar { background: rgba(14, 19, 25, .9); }
+.admin-shell .qc-btn,
+.admin-shell .dash-new {
+  background: var(--gold); color: #0e1319;
+}
+.admin-shell .qc-btn:hover,
+.admin-shell .dash-new:hover { background: #dcc07a; color: #0e1319; }
+
+/* ── 3. Sidebar panel — navy, not forest ──────────────────────────────────── */
+.admin-shell .admin-nav {
+  background: linear-gradient(180deg, #161e28 0%, #0b0f14 100%);
+  border-right-color: #05070a;
+}
+.admin-shell .admin-brand { border-bottom-color: rgba(175, 187, 202, .14); }
+.admin-shell .admin-brand .mark { color: #e7dfcd; }
+.admin-shell .admin-brand .mark b { color: var(--gold); }
+.admin-shell .admin-nav-label { color: #7b8794; }
+.admin-shell .admin-nav a { color: #9aa5b3; }
+.admin-shell .admin-nav a:hover { background: var(--terra-tint); color: #e7dfcd; text-decoration: none; }
+.admin-shell .admin-nav a .ico { color: #7b8794; }
+.admin-shell .admin-nav a.is-active .ico { color: var(--gold); }
+.admin-shell .admin-nav-foot { color: #7b8794; border-top-color: rgba(175, 187, 202, .12); }
+.admin-shell .theme-toggle {
+  background: rgba(255, 255, 255, .05); color: #9aa5b3;
+  border-color: rgba(175, 187, 202, .16);
+}
+.admin-shell .theme-toggle:hover { color: #e7dfcd; border-color: rgba(175, 187, 202, .32); }
+
+/* ── 4. NS-shell brand/cmd/kbd — gold crest lockup, rose active-nav bar ───── */
+.admin-shell .ns-crest { box-shadow: inset 0 0 0 1.5px rgba(208, 177, 98, .4); }
+.admin-shell .ns-crm { color: var(--gold); border-color: rgba(208, 177, 98, .45); }
+.admin-shell .ns-cmd { background: #10151c; border-color: #263549; color: #8b96a3; }
+.admin-shell .ns-cmd:hover { background: #141b24; border-color: #34404e;
+  box-shadow: 0 0 0 3px rgba(208, 177, 98, .08); }
+.admin-shell .ns-kbd { color: #8b96a3; background: #0b0f14; border-color: #263549; }
+/* Active-item indicator: a raised navy panel (not a solid rose fill, which
+   would fail contrast under the cream/active nav text sitting on top of it)
+   plus the rose left-bar as the "you are here" accent. */
+.admin-shell .ns-ind { background: #232e3d; }
+.admin-shell .ns-list a.is-active { color: #e7dfcd; }
+.admin-shell .ns-list a.is-active::before { background: var(--gold); }
+.admin-shell .ns-pulse { background: #5fd29a; box-shadow: 0 0 8px #5fd29a; }
+
+/* ── 5. Command palette (⌘K) — flat editorial slate, gold-selected row ────── */
+.ns-pal { background: rgba(9, 12, 16, .6); }
+.ns-pal-box { background: #1e2a3c; border-color: #24303e;
+  box-shadow: 0 30px 80px -20px rgba(9, 12, 16, .6); }
+.ns-pal-head { border-bottom-color: #24303e; }
+.ns-pal-head svg { stroke: #8b96a3; }
+.ns-pal-input { color: #afbbca; }
+.ns-pal-input::placeholder { color: #6b7480; }
+.ns-pal-esc { color: #8b96a3; background: #161e28; }
+.ns-pal-group { color: #6b7480; }
+/* .admin-shell prefix is load-bearing here: bare .ns-pal-row (1 class) loses
+   the cascade to the pre-existing global `.admin-shell a { color: var(--terra) }`
+   link-color rule (1 class + 1 element = higher specificity), which is why
+   unselected palette rows rendered rose instead of muted ink. */
+.admin-shell .ns-pal-row { color: #cdd0d4; }
+/* The base rule (line ~4771) only neutralizes text-decoration on :hover, not
+   color — so a real mouse hover (as opposed to the JS-driven .sel class) fell
+   through to the global .admin-shell a:hover rose-deep. Selection is what
+   should carry emphasis here, not native hover. */
+/* :not(.sel) is load-bearing: the JS sets .sel via mousemove, so the mouse is
+   almost always physically resting on the currently-selected row — without
+   this exclusion, :hover would immediately override the dark-navy text .sel
+   needs for the gold fill with the muted-ink hover color, for every
+   mouse-driven selection. */
+.admin-shell .ns-pal-row:hover:not(.sel) { color: #cdd0d4; }
+/* .admin-shell prefix (3 classes) is load-bearing, not decorative: a bare
+   .ns-pal-row.sel (2 classes) loses to the pre-existing global
+   .admin-shell a:hover rule (2 classes + 1 element — b-component ties at 2,
+   so the element count breaks the tie) whenever the mouse actually rests on
+   the row, which — since the JS sets .sel via mousemove — is the ordinary
+   case for mouse-driven selection, not an edge case. Confirmed via a real
+   .hover() in Chromium: without this prefix the gold row showed deep-rose
+   text, not the intended dark navy. */
+.admin-shell .ns-pal-row.sel { background: var(--gold); color: #0e1319; }
+/* The legacy toggle-dark palette (html[data-theme="dark"], ~line 5744) sets
+   .ns-pal-row to a light ink color at higher specificity (adds the html +
+   [data-theme] selectors) than this rule alone can beat — it would win over
+   .sel's dark-navy text whenever that old toggle is on, leaving light text on
+   the gold highlight. Match its exact specificity shape so ours wins instead. */
+html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
+.ns-pal-ic { background: #161e28; color: #afbbca; }
+.ns-pal-row.sel .ns-pal-ic { background: rgba(14, 19, 25, .3); color: #0e1319; }
+.ns-pal-sub { color: #6b7480; }
+.ns-pal-row.sel .ns-pal-sub { color: rgba(14, 19, 25, .65); }
+.ns-pal-empty { color: #6b7480; }
+.ns-pal-foot { border-top-color: #24303e; color: #6b7480; }
+
+/* ── 6. Login — the only page that never wears the toggle, always this look ─ */
+.cream-theme .login-wrap {
+  background: radial-gradient(120% 90% at 50% 0%, #1e2a3c 0%, #161e28 55%, #0e1319 100%);
+}
+.login-crest { background: #d0b162; color: #0e1319; }
+.login-name { color: #e7dfcd; }
+.login-name span { color: #d0b162; }
+.login-eyebrow { color: #8b96a3; }
+.login-card { background: #1e2a3c; box-shadow: 0 40px 80px -40px rgba(0, 0, 0, .7); }
+.login-card label { color: #9aa5b3; }
+.login-card input[type=password] {
+  border-color: #24303e; background: #161e28; color: #afbbca;
+}
+.login-card input[type=password]:focus { border-color: #d37e88; }
+.login-card button { background: #d0b162; color: #0e1319; }
+.login-note { color: #6b7480; }
+.login-foot { color: #6b7480; }
+
+/* ── 7. Dashboard v4 — alert, reply queue, buttons, funnel, empty states ──── */
+.admin-shell .v4-sell { color: var(--terra); }
+.admin-shell .v4-alert { background: var(--honey-bg); border-color: var(--honey-line); }
+.admin-shell .v4-alert .unlinked-warn-head { color: #d8c896; }
+.admin-shell .v4-alert .unlinked-warn-head strong { color: #efe4c0; }
+.admin-shell .v4-alert-ic { background: var(--gold); color: #0e1319; }
+/* Orphan-gallery picker (the row/select/button embedded inside the alert) —
+   the base rules are a plain cream banner and weren't reached by the .v4-alert
+   override above (different selector paths: row/select/button, not the
+   wrapper). Left alone they'd stay a jarring white select + oxblood button
+   on the new dark banner. */
+.admin-shell .unlinked-warn-row { background: rgba(255, 255, 255, .04); border-color: rgba(216, 168, 87, .25); }
+.admin-shell .unlinked-warn-pick select {
+  background: #161e28; border-color: #24303e; color: #cdd0d4; }
+.admin-shell .unlinked-warn-pick button { background: var(--gold); color: #0e1319; }
+.admin-shell .unlinked-warn-pick button:hover { background: #dcc07a; }
+
+.admin-shell .v4-qrow { border-top-color: var(--line-faint); }
+.admin-shell .v4-avatar { background: var(--terra-tint-2); color: #e7dfcd; }
+.admin-shell .v4-avatar.is-oldest { background: var(--gold); color: #0e1319; }
+.admin-shell .v4-age.is-red { background: var(--clay-bg); color: #e5a99a; }
+.admin-shell .v4-age.is-amber { background: var(--honey-bg); color: #d8a857; }
+
+.admin-shell .v4-btn-solid { background: #232e3d; color: #e7dfcd; }
+.admin-shell .v4-btn-solid:hover { background: #2c3949; color: #e7dfcd; }
+.admin-shell .v4-btn-ghost:hover { border-color: var(--terra); color: var(--terra); }
+.admin-shell .v4-btn-gold { background: var(--gold); color: #0e1319;
+  box-shadow: 0 10px 22px -12px rgba(208, 177, 98, .45); }
+.admin-shell .v4-btn-gold:hover { color: #0e1319; }
+
+.admin-shell .v4-fcell.is-in { background: var(--terra-tint-2); color: #e7dfcd;
+  border-right-color: #0e1319; }
+.admin-shell .v4-fcell.is-live { background: var(--honey-bg); color: #d8a857;
+  border-right-color: #0e1319; }
+.admin-shell .v4-fcell.is-hatch {
+  background: repeating-linear-gradient(135deg, #161e28 0 8px, #1c2530 8px 16px); }
+
+.admin-shell .v4-empty { border-color: #34404e; background: #161e28; }
+.admin-shell .v4-empty-ic { background: var(--terra-tint-2); color: #e7dfcd; }
+
+/* ── 8. Galleries strip ────────────────────────────────────────────────────── */
+.admin-shell .v4-galcard:hover { box-shadow: 0 16px 32px -22px rgba(0, 0, 0, .55); }
+.admin-shell .v4-galchip.is-draft { background: var(--neutral-bg); color: var(--neutral); }
+.admin-shell .v4-galchip.is-live { background: var(--ok-bg); color: var(--ok); }
+.admin-shell .v4-galnew { border-color: #34404e; background: #161e28; }
+.admin-shell .v4-galnew:hover { border-color: var(--terra); color: var(--terra); }
+
+/* ── 9. Money card — flat slate, gold figures, navy chart track ───────────── */
+.admin-shell .dash-money { background: #161e28; border-color: #24303e; }
+.admin-shell .v4-fig { color: #e7dfcd; }
+.admin-shell .v4-fig span { color: #8b96a3; }
+.admin-shell .v4-bar { background: rgba(175, 187, 202, .14); }
+.admin-shell .v4-bar.is-current { background: rgba(208, 177, 98, .18);
+  border-color: rgba(208, 177, 98, .55); }
+.admin-shell .v4-mlabel { color: #7b8794; }
+.admin-shell .v4-mlabel.is-current { color: var(--gold); }
+.admin-shell .v4-money-foot { border-top-color: rgba(175, 187, 202, .14); }
+.admin-shell .v4-money-foot p,
+.admin-shell .dash-ring-cap, .admin-shell .dash-fig-cap,
+.admin-shell .dash-money-paid .lead, .admin-shell .dash-paid-row a { color: #8b96a3; }
+.admin-shell .dash-money-paid { border-top-color: rgba(175, 187, 202, .14); }
+/* .dash-paid-amt has a hardcoded #E0A43B (old amber) fallback rule elsewhere
+   that doesn't read the --dash-gold var at all — override explicitly so the
+   "recently paid" figure doesn't mismatch the ring/goal gold beside it. */
+.admin-shell .dash-paid-amt { color: var(--gold); }
+
+/* ── 11. Dashboard hero search — was still a hardcoded cream pill + forest
+   focus ring, unreached by the topbar recolor above (different selector). ── */
+.admin-shell .dash-search input { background: #161e28; border-color: #24303e; }
+.admin-shell .dash-search input:focus {
+  border-color: var(--terra); box-shadow: 0 0 0 3px var(--terra-tint); }
+
+/* ── 10. Activity strip + studio board pieces reused on the dashboard ─────── */
+.admin-shell .v4-activity-strip { background: var(--surface); border-color: var(--line); }
+.admin-shell .v4-idle-dot { background: #4a5562; }
+.admin-shell .stu-dot { border-color: #34404e; }
+.admin-shell .stu-dot.is-done { background: var(--terra); border-color: var(--terra); }
+.admin-shell .stu-dot.is-now { background: var(--gold); border-color: var(--gold); }
+.admin-shell .stu-intel.is-gold { color: var(--gold); }
+.admin-shell .stu-intel.is-go { color: var(--ok); }
+.admin-shell .stu-card-act { background: #232e3d; color: #e7dfcd; }
+.admin-shell .stu-card-act:hover { background: #2c3949; color: #e7dfcd; }
