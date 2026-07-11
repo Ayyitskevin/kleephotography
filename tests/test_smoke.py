@@ -507,6 +507,8 @@ def test_video_pipeline_full_flow(admin):
         # the web-ready MP4 action alongside the original download
         assert 'class="dur-badge"' in page
         assert "icon-btn-mp4" in page
+        # the lightbox reaches the web MP4 too (tile data attr + viewer chip)
+        assert "data-dl-web=" in page and 'class="lb-dl-mp4"' in page
 
         # web-MP4 download: the email gate carries the web flag through, then
         # the transcoded H.264 serves as an attachment (video-only route)
@@ -9981,3 +9983,39 @@ def test_portfolio_video_tiles(admin):
         admin.post(
             f"/admin/galleries/{g['id']}/assets/{photo['id']}/portfolio", follow_redirects=False
         )
+
+
+def test_portal_motion_band(admin):
+    g, vid, photo = _ready_video(admin, title="Motion Portal", pin="7788")
+    # client + portal, gallery linked to the client
+    admin.post(
+        "/admin/studio/clients",
+        data={"name": "Motion Client", "email": "motion@example.com"},
+        follow_redirects=False,
+    )
+    cid = db.one("SELECT id FROM clients ORDER BY id DESC LIMIT 1")["id"]
+    db.run("UPDATE galleries SET client_id=? WHERE id=?", (cid, g["id"]))
+    admin.post(f"/admin/studio/clients/{cid}/portal", follow_redirects=False)
+    admin.post(
+        f"/admin/studio/clients/{cid}/portal/publish",
+        data={"published": "true"},
+        follow_redirects=False,
+    )
+    prow = db.one("SELECT slug, pin FROM portals ORDER BY id DESC LIMIT 1")
+    try:
+        with TestClient(app) as pub:
+            r = pub.post(
+                f"/portal/{prow['slug']}/pin", data={"pin": prow["pin"]}, follow_redirects=False
+            )
+            assert r.status_code == 303
+            page = pub.get(f"/portal/{prow['slug']}").text
+            # delivered motion lists with duration + a route into the gallery
+            assert "Reels &amp; films" in page
+            assert f"/portal/{prow['slug']}/thumb/{vid['id']}" in page
+            assert f"/g/{g['slug']}" in page
+            assert 'class="dur-badge"' in page
+            # the portal thumb route serves the video's thumbnail
+            assert pub.get(f"/portal/{prow['slug']}/thumb/{vid['id']}").status_code == 200
+    finally:
+        db.run("DELETE FROM portals WHERE slug=?", (prow["slug"],))
+        db.run("UPDATE galleries SET client_id=NULL WHERE id=?", (g["id"],))

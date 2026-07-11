@@ -8559,3 +8559,12 @@ html[data-theme="dark"] .site-body .motion-sound {
 html[data-theme="dark"] .site-body .motion-sound[aria-pressed="true"] {
   background: var(--accent-lt); border-color: var(--accent-lt); color: #0e1319;
 }
+
+/* Lightbox web-MP4 chip — sits beside the original-download arrow. */
+.lightbox .lb-dl-mp4 {
+  font: 700 .68rem/1 var(--sans, sans-serif); letter-spacing: .05em;
+  color: #fff; text-decoration: none; align-self: center;
+  border: 1px solid rgba(255, 255, 255, .45); border-radius: 999px; padding: 6px 10px;
+}
+.lightbox .lb-dl-mp4:hover { background: rgba(255, 255, 255, .15); }
+.lightbox .lb-dl-mp4[hidden] { display: none; }

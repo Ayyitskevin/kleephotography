@@ -4,6 +4,7 @@
   const stage = lb.querySelector(".lb-stage");
   const favBtn = lb.querySelector(".lb-fav");
   const dlLink = lb.querySelector(".lb-dl");
+  const dlMp4 = lb.querySelector(".lb-dl-mp4");
   const playBtn = lb.querySelector(".lb-play");
   const proofLabel = lb.querySelector(".lb-proof");
   const tiles = Array.from(document.querySelectorAll(".tile"));
@@ -147,6 +148,11 @@
     syncFav(t);
     refreshProof(t);
     if (dlLink) dlLink.href = t.dataset.dl || "#";
+    // videos also offer the web-ready MP4 straight from the viewer
+    if (dlMp4) {
+      if (t.dataset.dlWeb) { dlMp4.href = t.dataset.dlWeb; dlMp4.hidden = false; }
+      else { dlMp4.hidden = true; dlMp4.href = "#"; }
+    }
     stage.innerHTML = "";
     if (t.dataset.kind === "video") {
       const v = document.createElement("video");

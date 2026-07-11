@@ -85,6 +85,28 @@
   <p class="muted">Favorite photos in your galleries and crops will appear here.</p>
   {% endif %}
 
+  {% if motion %}
+  <h2 class="section-name">Reels &amp; films
+    <span class="section-count">{{ motion|length }}</span>
+  </h2>
+  <p class="muted">Delivered motion across your galleries &mdash; watch, leave timecoded notes, and download from the gallery.</p>
+  <div class="grid">
+    {% for v in motion %}
+    <figure class="tile">
+      <a href="/g/{{ v.gallery_slug }}" title="Open {{ v.gallery_title }}">
+        <img src="/portal/{{ p.slug }}/thumb/{{ v.id }}" loading="lazy" alt="{{ v.filename }}">
+        <span class="play-badge">&#9654;</span>
+        {% if v.duration and v.duration|hms %}<span class="dur-badge">{{ v.duration|hms }}</span>{% endif %}
+      </a>
+      <figcaption>
+        <span class="muted">{{ v.gallery_title }}</span>
+        <span class="crop-links"><a href="/g/{{ v.gallery_slug }}">Watch &amp; download &rarr;</a></span>
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% if brand %}
   <h2 class="section-name">Brand assets
     <span class="section-count">{{ brand|length }}</span>
