@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi.templating import Jinja2Templates
 
-from . import config, db
+from . import config, db, specialties
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -52,7 +52,9 @@ templates.env.globals["plausible_domain"] = config.PLAUSIBLE_DOMAIN
 
 
 def _portfolio_alt(asset, site_name: str | None = None) -> str:
-    """Accessible alt text from portfolio_tag when present."""
+    """Accessible alt text from portfolio_tag when present. The craft phrase
+    follows the tag's specialty prefix (app/specialties.py); untagged assets
+    stay 'food & beverage' — everything starred before the revamp is F&B."""
     name = site_name or config.SITE_NAME
     tag = ""
     try:  # works for dict and sqlite3.Row (which lacks .get)
@@ -62,11 +64,24 @@ def _portfolio_alt(asset, site_name: str | None = None) -> str:
     except (TypeError, KeyError, IndexError):
         tag = ""
     if tag:
-        return f"{tag.capitalize()} — food & beverage photography by {name}"
+        key, label = specialties.split_tag(tag)
+        craft = specialties.SPECIALTIES[key]["craft"]
+        if label:
+            return f"{label.capitalize()} — {craft} by {name}"
+        return f"{craft[0].upper()}{craft[1:]} by {name}"
     return f"Food & beverage photography by {name}"
 
 
 templates.env.filters["portfolio_alt"] = _portfolio_alt
+
+
+def _tag_label(tag: str | None) -> str:
+    """'re/exteriors' → 'Exteriors' — chip/caption display for portfolio tags
+    (specialty prefix stripped, capitalized like the old |capitalize chips)."""
+    return specialties.tag_label(tag).capitalize()
+
+
+templates.env.filters["tag_label"] = _tag_label
 
 
 def _diff_tokens(value):
