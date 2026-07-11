@@ -9787,9 +9787,10 @@ def test_specialty_pages(admin):
         # no re-shoot event type exists yet → CTA falls back to /book
         assert 'href="/book"' in r.text and 'href="/book/re-shoot"' not in r.text
 
-        # the hub renders one door per specialty, each linking to its spoke
+        # the hub renders one feature title card per specialty, each
+        # linking to its spoke (sp-door stays the stable hook class)
         r = pub.get("/")
-        assert r.text.count('class="sp-door"') == 3
+        assert r.text.count("sp-door") == 3
         for slug in ("real-estate", "portraits", "food-beverage"):
             assert f'href="/{slug}"' in r.text
 
@@ -9829,9 +9830,9 @@ def test_specialty_pages(admin):
             assert f'data-web="/site/img/{re_id}"' not in r.text
             assert f'data-web="/site/img/{fb_id}"' not in r.text
 
-            # the RE door now badges its single starred frame
+            # the RE title card now badges its single starred frame
             r = pub.get("/")
-            assert "1 frame" in r.text
+            assert "1 still" in r.text
 
         # once the conventional event type exists, the spoke CTA deep-links it
         admin.post(

@@ -12,26 +12,49 @@ alt text (app/render.py), and the admin tag suggestions all read from here.
 """
 
 SPECIALTIES: dict[str, dict] = {
-    # key → public page slug, display name, craft phrase for <img alt> text.
+    # key → public page slug, display name, craft phrase for <img alt> text,
+    # plus the Screening Room vocabulary: feature billing, film-stock code, and
+    # marquee screen name (shared by the lobby cards, spoke navs, archive
+    # chips, and the admin deck so the language never drifts per surface).
     # Order matters: nav, homepage doors, and /work groups render in this order.
     "re": {
         "slug": "real-estate",
         "name": "Real Estate",
         "craft": "real estate photography",
+        "feature": "Feature 01",
+        "stock": "250D",
+        "screen_name": "The Space",
     },
     "pl": {
         "slug": "portraits",
         "name": "Portrait & Lifestyle",
         "craft": "portrait & lifestyle photography",
+        "feature": "Feature 02",
+        "stock": "800T",
+        "screen_name": "The Face",
     },
     "fb": {
         "slug": "food-beverage",
         "name": "Food & Beverage",
         "craft": "food & beverage photography",
+        "feature": "Feature 03",
+        "stock": "500T",
+        "screen_name": "The Plate",
     },
 }
 
 DEFAULT_KEY = "fb"  # unprefixed tags = legacy F&B (everything pre-revamp)
+
+# The Aerial Pass add-on rate, in ONE place (booking intake label, the
+# /real-estate band, proposal copy all read this). $150 is a PLACEHOLDER —
+# Kevin sets the real number before MISE_AERIALS_LIVE flips on
+# (ops/SPECIALTY-LAUNCH.md carries the launch checklist).
+AERIAL_PASS_CENTS = 15000
+
+
+def aerial_pass_display() -> str:
+    """'+$150' — the add-on chip wherever the Aerial Pass is offered."""
+    return f"+${AERIAL_PASS_CENTS // 100}"
 
 
 def split_tag(tag: str | None) -> tuple[str, str]:

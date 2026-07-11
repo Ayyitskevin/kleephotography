@@ -8,11 +8,18 @@
 <link rel="icon" href="/static/favicon.ico?v={{ static_rev }}" sizes="32x32">
 <link rel="icon" href="/static/favicon.svg?v={{ static_rev }}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v={{ static_rev }}">
-<link rel="stylesheet" href="/static/mise.css?v={{ static_rev }}">
+{# mise.css loads inside a named cascade layer so the unlayered Screening Room
+   sheets below always win inside body.sr scope — the legacy themes carry
+   html[data-theme] selectors whose specificity would otherwise out-rank any
+   sanely-scoped restyle. Unlayered-over-layered is specificity-independent,
+   and non-sr surfaces are untouched because every screening rule is
+   body.sr-scoped. (style-src keeps 'unsafe-inline'; see app/main.py.) #}
+<style>@import url("/static/mise.css?v={{ static_rev }}") layer(mise);</style>
 {# Screening Room token layer — scoped body.sr, inert on unconverted surfaces.
    Converted bases opt in via their bodyclass when sr_enabled() (config
    MISE_SCREENING_ROOM); legal/e-sign surfaces (contract.html) never do. #}
 <link rel="stylesheet" href="/static/screening-room-tokens.css?v={{ static_rev }}">
+<link rel="stylesheet" href="/static/screening.css?v={{ static_rev }}">
 <script src="/static/htmx.min.js?v={{ static_rev }}" defer></script>
 <script src="/static/behaviors.js?v={{ static_rev }}" defer></script>
 <script src="/static/copy_link.js?v={{ static_rev }}" defer></script>

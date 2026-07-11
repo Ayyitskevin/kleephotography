@@ -43,32 +43,38 @@
 {% block bodyclass %}site-body{% if sr_enabled() %} sr{% block sr_stock %}{% endblock %}{% endif %}{% endblock %}
 {% block content %}
 <a class="skip-link" href="#main">Skip to content</a>
+{# Marquee nav (Screening Room 3a): brand caps + mono chip, three features by
+   their screen names, the archive, one amber CTA. Spokes override brand_chip
+   (their feature billing) and nav_items (their prefiltered links) — the CTA
+   picks up the spoke's film stock from body.sr-* via var(--sr-stock). #}
 <header class="site-nav{% block navclass %}{% endblock %}" data-nav>
   <a href="/" class="site-brand">
     <b>Kevin&nbsp;Lee</b>
-    <small>Photography&nbsp;&amp;&nbsp;Film</small>
+    <small>{% block brand_chip %}Photo&nbsp;&times;&nbsp;Film{% endblock %}</small>
   </a>
-  <nav>
-    <a href="/real-estate">Real Estate</a>
-    <a href="/portraits">Portraits</a>
-    <a href="/food-beverage">Food &amp; Beverage</a>
-    <a href="/work">Work</a>
-    <a href="/about">About</a>
-    <a href="/book">Book a call</a>
-    <a href="/contact" class="nav-cta">Request a quote</a>
+  <nav aria-label="Site">
+    {% block nav_items %}
+    <a href="/real-estate">The Space</a>
+    <a href="/portraits">The Face</a>
+    <a href="/food-beverage">The Plate</a>
+    <a href="/portfolio">Archive</a>
+    <a href="/book" class="nav-cta">Book a shoot</a>
+    {% endblock %}
   </nav>
   <button class="nav-menu-btn" data-menu-btn aria-label="Menu" aria-expanded="false"
           aria-controls="site-mobile-menu"><span></span><span></span></button>
 </header>
 
 <div class="nav-mobile" id="site-mobile-menu" data-mobile-menu>
-  <a href="/real-estate">Real Estate</a>
-  <a href="/portraits">Portraits</a>
-  <a href="/food-beverage">Food &amp; Beverage</a>
-  <a href="/work">Work</a>
-  <a href="/about">About</a>
-  <a href="/book">Book a call</a>
-  <a href="/contact" class="nav-cta">Request a quote</a>
+  <a href="/real-estate">The Space — Real Estate</a>
+  <a href="/portraits">The Face — Portraits</a>
+  <a href="/food-beverage">The Plate — Food &amp; Bev</a>
+  <a href="/portfolio">Archive</a>
+  <a href="/book" class="nav-cta">Book a shoot</a>
+  <a class="nav-mobile-quiet" href="/services">Rates</a>
+  <a class="nav-mobile-quiet" href="/work">In the wild</a>
+  <a class="nav-mobile-quiet" href="/about">About</a>
+  <a class="nav-mobile-quiet" href="/contact">Request a quote</a>
 </div>
 
 <div id="main" tabindex="-1">
@@ -82,40 +88,29 @@
   <a class="btn-gold" href="/contact">Request a quote &rarr;</a>
 </div>
 
+{# Credits footer (Screening Room 3a) — a one-person production, end titles.
+   "flown" joins the credit roll only once the Part 107 cert is live. The
+   quiet second row keeps the rest of the site reachable (crawl + humans). #}
 <footer class="site-footer">
-  <div class="footer-grid">
-    <div class="footer-brand">
-      <b>{{ site_name }}</b>
-      <p>Real estate, portrait &amp; lifestyle, and food &amp; beverage — photography
-         and film for Asheville &amp; Western North Carolina. Charlotte, Raleigh,
-         and Wilmington on regular rotation.</p>
-    </div>
-    <div class="footer-col">
-      <b>Explore</b>
-      <a href="/real-estate">Real Estate</a>
-      <a href="/portraits">Portraits</a>
-      <a href="/food-beverage">Food &amp; Beverage</a>
-      <a href="/portfolio">Portfolio</a>
-      <a href="/work">Work</a>
-      <a href="/reels">Reels</a>
-      <a href="/services">Services</a>
-      <a href="/about">About</a>
-    </div>
-    <div class="footer-col">
-      <b>Start</b>
-      <a href="/contact">Request a quote</a>
-      <a href="/book">Book a call</a>
-      <a href="/services#svc-brand_partner">Brand Partner</a>
-    </div>
-    <div class="footer-col">
-      <b>Follow</b>
-      {% if instagram_url %}<a href="{{ instagram_url }}" rel="me noopener noreferrer" target="_blank">Instagram</a>{% endif %}
-      <a href="/press">Press</a>
-      {% if contact_email %}<a href="mailto:{{ contact_email }}">Email</a>{% endif %}
-      <a href="/contact">Get in touch</a>
-    </div>
+  <p class="sr-credits-label">A one-person production</p>
+  <p class="sr-credits">shot ·{% if aerials_live() %} flown ·{% endif %} directed · edited · graded · delivered
+     by <b>Kevin Lee</b>, Asheville NC</p>
+  <div class="sr-footlinks">
+    {% if instagram_url %}<a href="{{ instagram_url }}" rel="me noopener noreferrer" target="_blank">Instagram</a>{% endif %}
+    <a href="/press">Press</a>
+    <a href="/portfolio">Archive</a>
+    <a class="sr-footlinks-cta" href="/contact">Client entrance &rarr;</a>
   </div>
-  <div class="footer-base">
+  <div class="sr-footlinks sr-footlinks-quiet">
+    <a href="/services">Rates</a>
+    <a href="/work">In the wild</a>
+    <a href="/reels">Reels</a>
+    <a href="/about">About</a>
+    <a href="/book">Book a shoot</a>
+    <a href="/contact">Request a quote</a>
+    {% if contact_email %}<a href="mailto:{{ contact_email }}">Email</a>{% endif %}
+  </div>
+  <div class="sr-footbase">
     <span>&copy; 2026 {{ site_name }} · Kleephotography.com</span>
     <span>The space, the face, the plate — shot to sell.</span>
   </div>

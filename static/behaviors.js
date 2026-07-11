@@ -11,6 +11,9 @@
      [data-goto]                 navigate to the given URL on click, unless
                                  window.__stuDragged is set (the studio board
                                  raises it during a drag so drop != navigate)
+     [data-seek]                 chapter chips: jump the nearest scoped <video>
+                                 (closest [data-seek-scope], else the page's
+                                 first video) to the given second and play
 
    Capture-phase listeners so a cancelled confirm also stops htmx/other
    delegated listeners from acting on the same event. */
@@ -42,10 +45,20 @@
   document.addEventListener(
     "click",
     function (ev) {
-      var el = ev.target.closest ? ev.target.closest("[data-print], [data-goto], button[data-confirm], a[data-confirm]") : null;
+      var el = ev.target.closest ? ev.target.closest("[data-print], [data-goto], [data-seek], button[data-confirm], a[data-confirm]") : null;
       if (!el) return;
       if (el.hasAttribute("data-print")) {
         window.print();
+        return;
+      }
+      if (el.hasAttribute("data-seek")) {
+        var scope = el.closest("[data-seek-scope]") || document;
+        var vid = scope.querySelector("video");
+        var t = parseFloat(el.getAttribute("data-seek"));
+        if (vid && !isNaN(t)) {
+          vid.currentTime = t;
+          vid.play().catch(function () { /* poster-only until user presses play */ });
+        }
         return;
       }
       if (el.hasAttribute("data-goto")) {

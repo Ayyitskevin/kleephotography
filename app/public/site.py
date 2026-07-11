@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
-from .. import config, db, mailer, security, specialties
+from .. import config, db, features, mailer, security, specialties
 from ..render import ROOT, templates
 
 log = logging.getLogger("mise.public.site")
@@ -802,30 +802,36 @@ def _contact_prefill(request: Request) -> dict:
     return {"business": business, "message": message, "service": service, "tier": tier}
 
 
-# One-liner under each homepage specialty door. The F&B line keeps the
-# long-standing "makes people hungry" phrase on the home page.
+# Subtitle under each lobby title card (Screening Room 3a). The RE line gains
+# "& aerials" only once the Part 107 cert is live (aerials_live flag).
 DOOR_LINES = {
-    "re": "MLS-ready stills and walkthrough reels that move listings.",
-    "pl": "Headshots, branding, and families — directed, not posed.",
-    "fb": "Menus, pours, and rooms — photography that makes people hungry.",
+    "re": "real estate — stills & film",
+    "re_aerial": "real estate — stills, film & aerials",
+    "pl": "portraits — directed, never posed",
+    "fb": "food & beverage — the original craft",
 }
 
 
 def _specialty_doors() -> list[dict]:
-    """The homepage's three specialty doors: name, one-liner, that vertical's
-    newest starred photo as the lead image (None → slate frame), and honest
-    work counts (rendered only when non-zero — no vanity zeros)."""
+    """The lobby's three feature title cards: screen name, film-stock billing,
+    subtitle, that vertical's newest starred photo as the card artwork (None →
+    house-black card), and honest work counts (rendered only when non-zero —
+    no vanity zeros)."""
     assets = _portfolio_assets()
     reels = _portfolio_reels()
     doors = []
     for key, meta in specialties.SPECIALTIES.items():
         mine = [a for a in assets if specialties.specialty_key(a["portfolio_tag"]) == key]
+        line_key = "re_aerial" if key == "re" and features.aerials_live() else key
         doors.append(
             {
                 "key": key,
                 "slug": meta["slug"],
                 "name": meta["name"],
-                "line": DOOR_LINES[key],
+                "feature": meta["feature"],
+                "stock": meta["stock"],
+                "screen_name": meta["screen_name"],
+                "line": DOOR_LINES[line_key],
                 "lead": mine[0] if mine else None,
                 "n_photos": len(mine),
                 "n_reels": sum(
