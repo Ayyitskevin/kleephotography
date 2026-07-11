@@ -25,6 +25,8 @@ CONTRACT_LIBRARY = {
     "nda": "Unilateral NDA",
     "photography_services": "Photography Services Agreement",
     "photography_agreement": "Photography Agreement (plain-language)",
+    "real_estate_services": "Real Estate Media Services Agreement",
+    "portrait_services": "Portrait & Lifestyle Session Agreement",
     "general_service": "General Client Service Agreement",
     "model_release": "Model Release",
     "independent_contractor": "Independent Contractor Agreement",
