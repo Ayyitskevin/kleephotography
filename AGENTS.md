@@ -29,7 +29,7 @@ You don't need a human for any of this. Make the change, prove it green (gates b
 
 These are irreversible, money/legal, or schema-shaped. Do the work on a
 `claude/<topic>` branch, push it, open a PR with the risk spelled out, and **do not
-self-merge**. A human presses the button (R11).
+self-merge**. A human presses the button (R1).
 
 - **Money path** — anything under `app/public/pay.py`, Stripe Checkout/webhook logic,
   invoice/payment/deposit/balance math, `payments`/`invoices` state transitions.
@@ -63,11 +63,11 @@ locally before pushing — CI runs the same on `main` and on PRs.
 
 ## Conventions that bite if you miss them
 
-- **Conform, don't reinvent** (R8). Match the surrounding style even where you'd choose
+- **Conform, don't reinvent** (R11). Match the surrounding style even where you'd choose
   differently. Surface a harmful convention; never silently fork it.
-- **Surgical changes** (R3). Touch only what the task needs. No drive-by cleanup of
+- **Surgical changes** (R10). Touch only what the task needs. No drive-by cleanup of
   adjacent code in the same commit.
-- **No abstraction for single-use code** (R2). Extract a helper only when there's real
+- **No abstraction for single-use code** (R9). Extract a helper only when there's real
   shared use or drift risk, not on spec.
 - **SQL safety.** All dynamic SQL uses bound `?` placeholders or `db.ident(value,
   whitelist)` for identifiers. Never f-string a user value into SQL.
