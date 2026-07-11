@@ -32,7 +32,7 @@
         {% for p in page.pills %}<li class="sp-pill">{{ p }}</li>{% endfor %}
       </ul>
       <div class="eh-actions" data-reveal>
-        <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
+        <a class="ebtn ebtn-fill" data-magnetic href="{{ book_url }}">Book a shoot
           <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
         <a class="elink" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote <span aria-hidden="true">&rarr;</span></a>
       </div>
@@ -71,7 +71,7 @@
       <h2 class="esec-h2">{{ page.work_heading }}</h2>
       <p class="esec-lede">{{ page.work_sub }}</p>
     </div>
-    <a class="elink ework-head-link" href="/portfolio">Full portfolio <span aria-hidden="true">&rarr;</span></a>
+    <a class="elink ework-head-link" href="/portfolio#sp:{{ sp_key }}">Full portfolio <span aria-hidden="true">&rarr;</span></a>
   </div>
   <div class="ework-grid">
     {% for a in photos[:6] %}
@@ -89,7 +89,14 @@
 </section>
 {% else %}
 <section class="ework">
-  {% include "site/_empty_portfolio.html" %}
+  <div class="empty-state" data-reveal>
+    <p><strong>{{ page.empty_head }}</strong></p>
+    <p class="muted">{{ page.empty_body }}</p>
+    <div class="empty-state-actions">
+      <a class="btn-pill" href="{{ book_url }}">Book a shoot <span>&rarr;</span></a>
+      <a class="btn-ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+    </div>
+  </div>
 </section>
 {% endif %}
 
@@ -205,7 +212,7 @@
   <div class="ecta-inner" data-reveal>
     <h2 class="ecta-h2">{{ page.cta_h1 }} <span class="eem">{{ page.cta_h2 }}</span></h2>
     <div class="ecta-actions">
-      <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
+      <a class="ebtn ebtn-fill" data-magnetic href="{{ book_url }}">Book a shoot
         <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
       <a class="elink" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote <span aria-hidden="true">&rarr;</span></a>
     </div>

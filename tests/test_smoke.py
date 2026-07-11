@@ -9777,9 +9777,13 @@ def test_specialty_pages(admin):
         for path in ("/real-estate", "/portraits", "/food-beverage"):
             assert f"<loc>{cfg.BASE_URL}{path}</loc>" in sm.text
 
-        # nothing carries an re/ tag yet → the RE spoke falls back to the
-        # shared empty state instead of an empty grid
-        assert "empty-state" in pub.get("/real-estate").text
+        # nothing carries an re/ tag yet → the RE spoke falls back to its
+        # specialty empty state (copy-led, not the generic include)
+        r = pub.get("/real-estate")
+        assert "empty-state" in r.text
+        assert "Real estate work is being curated" in r.text
+        # no re-shoot event type exists yet → CTA falls back to /book
+        assert 'href="/book"' in r.text and 'href="/book/re-shoot"' not in r.text
 
         # the hub renders one door per specialty, each linking to its spoke
         r = pub.get("/")
@@ -9810,6 +9814,8 @@ def test_specialty_pages(admin):
             assert f'property="og:image" content="{cfg.BASE_URL}/site/img/{re_id}"' in r.text
             # prefix is stripped from the visible chip/caption label
             assert "re/exteriors" not in r.text and "Exteriors" in r.text
+            # with work present, the portfolio link opens pre-filtered
+            assert 'href="/portfolio#sp:re"' in r.text
 
             r = pub.get("/food-beverage")
             assert f'data-web="/site/img/{fb_id}"' in r.text
@@ -9820,8 +9826,22 @@ def test_specialty_pages(admin):
             r = pub.get("/portraits")
             assert f'data-web="/site/img/{re_id}"' not in r.text
             assert f'data-web="/site/img/{fb_id}"' not in r.text
+
+            # the RE door now badges its single starred frame
+            r = pub.get("/")
+            assert "1 frame" in r.text
+
+        # once the conventional event type exists, the spoke CTA deep-links it
+        admin.post(
+            "/admin/scheduling/event",
+            data={"name": "Real Estate Shoot", "slug": "re-shoot", "duration_min": 120},
+            follow_redirects=False,
+        )
+        with TestClient(app) as pub:
+            assert 'href="/book/re-shoot"' in pub.get("/real-estate").text
     finally:
         db.run("DELETE FROM assets WHERE id IN (?,?)", (re_id, fb_id))
+        db.run("DELETE FROM event_types WHERE slug='re-shoot'")
 
 
 def test_video_renditions_flow(admin):

@@ -440,6 +440,10 @@ SPECIALTY_PAGES = {
             ),
         ],
         "contact_service": "Real Estate",
+        "book_slug": "re-shoot",
+        "empty_head": "Real estate work is being curated for the site.",
+        "empty_body": "The listing pipeline is open — MLS-ready stills, twilight "
+        "exteriors, and walkthrough reels land here as they're delivered.",
         "cta_h1": "Got a listing",
         "cta_h2": "going live?",
     },
@@ -530,6 +534,10 @@ SPECIALTY_PAGES = {
             ),
         ],
         "contact_service": "Portraits",
+        "book_slug": "pl-session",
+        "empty_head": "Portrait sessions are being curated for the site.",
+        "empty_body": "Headshots, branding, and family sessions land here as "
+        "they're delivered — the calendar is open now.",
         "cta_h1": "Let's make time",
         "cta_h2": "for a session.",
     },
@@ -624,6 +632,9 @@ SPECIALTY_PAGES = {
             ),
         ],
         "contact_service": "Food & Beverage",
+        "book_slug": "fb-shoot",
+        "empty_head": "New food & beverage work is being curated for the site.",
+        "empty_body": "Menus, pours, and the rooms they live in land here as they're delivered.",
         "cta_h1": "Let's make your food look",
         "cta_h2": "the way it tastes.",
     },
@@ -801,22 +812,25 @@ DOOR_LINES = {
 
 
 def _specialty_doors() -> list[dict]:
-    """The homepage's three specialty doors: name, one-liner, and that
-    vertical's newest starred photo as the lead image (None → slate frame)."""
+    """The homepage's three specialty doors: name, one-liner, that vertical's
+    newest starred photo as the lead image (None → slate frame), and honest
+    work counts (rendered only when non-zero — no vanity zeros)."""
     assets = _portfolio_assets()
+    reels = _portfolio_reels()
     doors = []
     for key, meta in specialties.SPECIALTIES.items():
-        lead = next(
-            (a for a in assets if specialties.specialty_key(a["portfolio_tag"]) == key),
-            None,
-        )
+        mine = [a for a in assets if specialties.specialty_key(a["portfolio_tag"]) == key]
         doors.append(
             {
                 "key": key,
                 "slug": meta["slug"],
                 "name": meta["name"],
                 "line": DOOR_LINES[key],
-                "lead": lead,
+                "lead": mine[0] if mine else None,
+                "n_photos": len(mine),
+                "n_reels": sum(
+                    1 for r in reels if specialties.specialty_key(r["portfolio_tag"]) == key
+                ),
             }
         )
     return doors
@@ -1100,6 +1114,11 @@ def _specialty_page(request: Request, key: str):
     """Shared renderer for the three specialty spokes — same anatomy, distinct
     copy (SPECIALTY_PAGES) and specialty-filtered work/reels/studies."""
     page = SPECIALTY_PAGES[key]
+    # CTA deep-link: the moment Kevin creates the conventional event type in
+    # the live admin (ops/SPECIALTY-LAUNCH.md slugs), spokes route straight to
+    # its picker; until then they land on the /book index. No code redeploy.
+    et = db.one("SELECT slug FROM event_types WHERE slug=? AND active=1", (page["book_slug"],))
+    book_url = f"/book/{et['slug']}" if et else "/book"
     photos = [
         a for a in _portfolio_assets() if specialties.specialty_key(a["portfolio_tag"]) == key
     ]
@@ -1118,6 +1137,7 @@ def _specialty_page(request: Request, key: str):
         "site/specialty.html",
         {
             "sp": specialties.SPECIALTIES[key],
+            "sp_key": key,
             "page": page,
             "photos": photos,
             "reels": vids,
@@ -1125,6 +1145,7 @@ def _specialty_page(request: Request, key: str):
             "studies": studies[:4],
             "testimonials": quotes[:3],
             "demo_gallery": _demo_gallery(),
+            "book_url": book_url,
             "faqs": page["faqs"],
             "faq_heading": "Good to know",
         },

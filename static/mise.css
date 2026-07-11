@@ -8543,3 +8543,9 @@ html[data-theme="dark"] .site-body .work-group-head:first-child { margin-top: 0;
   padding: 4px 7px; font: 600 .72rem/1 var(--sans, sans-serif); letter-spacing: .04em;
 }
 .tile .icon-btn-mp4 { font: 700 .62rem/1 var(--sans, sans-serif); letter-spacing: .04em; }
+
+/* Homepage door work-count badge (renders only when non-zero). */
+html[data-theme="dark"] .site-body .sp-door-count {
+  display: block; margin: 0 0 12px; font: 600 .72rem/1 var(--sans);
+  letter-spacing: .08em; text-transform: uppercase; color: var(--accent-lt);
+}

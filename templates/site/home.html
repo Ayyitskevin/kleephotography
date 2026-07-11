@@ -74,6 +74,9 @@
       <div class="sp-door-copy">
         <h3>{{ d.name }}</h3>
         <p>{{ d.line }}</p>
+        {% if d.n_photos or d.n_reels %}
+        <span class="sp-door-count">{% if d.n_photos %}{{ d.n_photos }} frame{{ 's' if d.n_photos != 1 }}{% endif %}{% if d.n_photos and d.n_reels %} · {% endif %}{% if d.n_reels %}{{ d.n_reels }} reel{{ 's' if d.n_reels != 1 }}{% endif %}</span>
+        {% endif %}
         <span class="sp-door-cta">See the work <span aria-hidden="true">&rarr;</span></span>
       </div>
     </a>
