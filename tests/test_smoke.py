@@ -1613,18 +1613,22 @@ def test_tasks_board_view(admin):
     db.run("DELETE FROM tasks WHERE title IN ('Due-today board task','Undated board task')")
 
 
-def test_manage_nav_financials_expenses(admin):
-    # Financials and Expenses must appear as first-class links in the Manage
-    # sidebar (not palette-only), and their active-state guards must not overlap:
-    # on the income page only Financials is highlighted; on the expenses/mileage
-    # pages only Expenses is. A bad guard would light both at once and mislead.
+def test_manage_nav_financials_expenses(admin, monkeypatch):
+    # Deck rail (Screening Room): Money is a first-class rail stop, lit on every
+    # financials path (income AND expenses/mileage — one Ledger, tabs inside).
+    # The legacy sidebar behind the kill switch keeps the old split guards:
+    # Financials lights on income only, Expenses on expenses/mileage only.
+    from app import config
+
     inc = admin.get("/admin/financials").text
-    assert 'href="/admin/financials" title="Financials"' in inc
-    assert 'href="/admin/financials/expenses" title="Expenses"' in inc
-    # active financials link, inactive expenses link, on the income page
+    assert 'href="/admin/financials" title="Money" class="is-active"' in inc
+    exp = admin.get("/admin/financials/expenses").text
+    assert 'href="/admin/financials" title="Money" class="is-active"' in exp
+
+    monkeypatch.setattr(config, "SCREENING_ROOM", False)
+    inc = admin.get("/admin/financials").text
     assert 'href="/admin/financials" title="Financials" class="is-active"' in inc
     assert 'href="/admin/financials/expenses" title="Expenses"><' in inc
-
     exp = admin.get("/admin/financials/expenses").text
     assert 'href="/admin/financials/expenses" title="Expenses" class="is-active"' in exp
     assert 'href="/admin/financials" title="Financials"><' in exp

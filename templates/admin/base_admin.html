@@ -25,6 +25,10 @@
 </script>
 {% block admin_head %}{% endblock %}
 {% endblock %}
+{# Screening Room command deck: body.sr.sr-admin puts the shell on the house
+   panel; the kill switch (MISE_SCREENING_ROOM=false) restores the candlelit
+   look on identical markup. #}
+{% block bodyclass %}{% if sr_enabled() %}sr sr-admin{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
 <div class="admin-shell">
   {% include "admin/_nav.html" %}
