@@ -1,8 +1,10 @@
 {% extends "base_cream.html" %}
 {% block title %}{{ p.company or p.client_name }} · {{ site_name }}{% endblock %}
+{% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
-<main class="gallery-main portal-main">
-  <header class="portal-header">
+<main class="gallery-main portal-main sr-wrap">
+  <header class="portal-header sr-pagehead">
+    <span class="sr-mono sr-mono--signal">Season pass &middot; your screenings</span>
     <h1>{{ p.company or p.client_name }}</h1>
     <p class="muted">Client portal · {{ site_name }}
       · <a class="portal-share" href="{{ share_href }}" title="Open your email client with a prefilled message you can forward to a teammate">&#9993; Share this portal</a>

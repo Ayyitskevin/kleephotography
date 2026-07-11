@@ -68,7 +68,7 @@
 {% endblock %}
 
 {% block admin_body %}
-<main class="admin-main dash">
+<main class="admin-main dash sr-deck">
 
   {# Orphan galleries — published with no studio client. One-click re-link. #}
   {% if orphans %}
@@ -96,137 +96,53 @@
   </section>
   {% endif %}
 
-  {# ── Reply queue — inquiries as actionable rows, oldest first ─────────── #}
-  <section class="dash-panel v4-queue" aria-label="Action queue">
-    <div class="dash-panel-head">
-      <h2>Reply queue</h2>
-      {% if queue %}<span class="count">{{ queue|length }} waiting · oldest {{ oldest_wait_days }}d</span>{% endif %}
-    </div>
-    {% if queue %}
-    {% for q in queue %}
-    <div class="v4-qrow">
-      <span class="v4-avatar{% if loop.first %} is-oldest{% endif %}">{{ q.initials }}</span>
-      <div class="v4-qbody">
-        <div class="v4-qname">
-          <b>{{ q.name }}</b>
-          <span class="v4-age {{ 'is-red' if q.age_days >= 21 else 'is-amber' }}">waiting {{ q.age_days }} day{{ "s" if q.age_days != 1 }}</span>
-        </div>
-        <div class="v4-qcontext">{{ q.context }}</div>
+  <div class="sr-deck-grid">
+
+    {# ═══ ON DECK — the one ranked queue: money → replies → shipping → booking #}
+    <aside class="sr-ondeck" aria-label="On deck">
+      <div class="sr-kickrow">
+        <b class="sr-mono sr-mono--signal">On deck</b>
+        <span class="sr-mono">Ranked · {{ on_deck|length }}</span>
       </div>
-      <div class="v4-qactions">
-        <a class="v4-btn-solid" href="/admin/inbox?sel={{ q.id }}">Reply</a>
-        <a class="v4-btn-ghost" href="/admin/inbox?sel={{ q.id }}">{{ q.second }}</a>
-      </div>
-    </div>
-    {% endfor %}
-    {% else %}<p class="dash-empty">Inbox clear — nobody is waiting on you.</p>{% endif %}
-  </section>
-
-  <div class="dash-grid">
-
-    {# ── LEFT column ──────────────────────────────────────────────────── #}
-    <div class="dash-col">
-
-      {# Pipeline — proportional funnel #}
-      <section class="dash-panel" aria-label="Pipeline">
-        <div class="dash-panel-head">
-          <h2>Pipeline</h2>
-          <a class="link" href="/admin/studio">Studio board &rarr;</a>
-        </div>
-        {% set live_stages = pipeline | selectattr("n") | list %}
-        {% if not live_stages and queue %}
-        <p class="v4-pipeline-note">Nothing in play yet this month — <b>your
-          {{ queue|length }} inquir{{ "ies are" if queue|length != 1 else "y is" }} the pipeline.</b>
-          Convert one to start the funnel.</p>
-        {% endif %}
-        <div class="v4-funnel" role="img" aria-label="Pipeline stages">
-          {% if queue %}<span class="v4-fcell is-in" style="flex: {{ [queue|length, 2]|max }};">{{ queue|length }} inquir{{ "ies" if queue|length != 1 else "y" }}</span>{% endif %}
-          {% if live_stages %}
-            {% for s in live_stages %}
-            <span class="v4-fcell is-live" style="flex: {{ [s.n, 2]|max }};">{{ s.n }} {{ s.label|lower }}</span>
-            {% endfor %}
-          {% else %}
-            <span class="v4-fcell is-hatch" style="flex: 5;">consult &rarr; proposal &rarr; contract &rarr; retainer</span>
-          {% endif %}
-        </div>
-        <div class="v4-actions">
-          {% if queue %}<a class="v4-btn-gold" href="/admin/inbox?sel={{ queue[0].id }}">Convert {{ queue[0].name }} &rarr;</a>{% endif %}
-          <a class="v4-btn-ghost" href="/admin/studio">Draft a proposal</a>
-          <a class="v4-btn-ghost" href="/admin/studio#clients">+ New project</a>
-        </div>
-      </section>
-
-      {# Schedule — empty state first-class #}
-      <section class="dash-panel" aria-label="Schedule">
-        <div class="dash-panel-head">
-          <h2>Schedule</h2>
-          <div class="dash-horizon" role="group" aria-label="Time horizon">
-            <button type="button" class="is-active" data-h="7">7 days</button>
-            <button type="button" data-h="0">Today</button>
-            <button type="button" data-h="1">Tomorrow</button>
+      <div class="sr-ondeck-cards">
+        {% for c in on_deck %}
+        <div class="sr-deckcard sr-deckcard--{{ c.stock }}{% if loop.first %} is-top{% endif %}">
+          <div class="sr-deckcard-head">
+            <a class="sr-deckcard-title" href="{{ c.url }}">{{ c.title }}</a>
+            {% if c.badge %}<span class="sr-deckcard-badge">{{ c.badge }}</span>{% endif %}
+          </div>
+          {% if c.meta %}<small>{{ c.meta }}</small>{% endif %}
+          <div class="sr-deckcard-actions">
+            <a class="sr-deckcard-go" href="{{ c.url }}">{{ c.action }}</a>
+            {% if c.second %}<a class="sr-deckcard-2nd" href="{{ c.url }}">{{ c.second }}</a>{% endif %}
+            {% if c.key %}
+            <form method="post" action="/admin/home/nudge/dismiss" class="sr-deckcard-snooze">
+              <input type="hidden" name="key" value="{{ c.key }}">
+              <button type="submit" title="Snooze until tomorrow" aria-label="Snooze until tomorrow">&#9711;</button>
+            </form>
+            {% endif %}
           </div>
         </div>
-        {% if horizon_shoots %}
-        <ul class="dash-sched" id="dash-schedule">
-          {% for u in horizon_shoots %}
-          <li data-days="{{ u.days_out }}">
-            <div class="dash-date">
-              <div class="d">{{ u.day if u.day is defined else u.shoot_date[8:10] }}</div>
-              <div class="m">{{ u.mon if u.mon is defined else "" }}</div>
-            </div>
-            <div class="dash-sched-body{% if u.days_out == 0 %} is-today{% endif %}">
-              <div class="dash-sched-title"><a href="/admin/studio/projects/{{ u.id }}">{{ u.title }}</a></div>
-              <div class="dash-sched-client">{{ u.client_name }}{% if u.company %} · {{ u.company }}{% endif %}</div>
-            </div>
-            {% if u.time %}<span class="dash-sched-time">{{ u.time }}</span>{% endif %}
-            <span class="dash-sched-when{% if u.days_out == 0 %} is-today{% endif %}">
-              {% if u.days_out == 0 %}today{% elif u.days_out == 1 %}tomorrow{% else %}in {{ u.days_out }}d{% endif %}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        <p class="dash-empty" id="dash-schedule-empty" hidden>Nothing in this window.</p>
         {% else %}
-        <div class="v4-empty">
-          <span class="v4-empty-ic" aria-hidden="true">&#9711;</span>
-          <div class="v4-empty-body">
-            <b>An open week{% if queue %} — rare{% endif %}.</b>
-            <p>Nothing booked in the next 7 days.{% if queue %} Pencil a date for one of the
-              {{ queue|length }} open inquir{{ "ies" if queue|length != 1 else "y" }}, or block a personal-work day.{% else %} Block a personal-work day, or go find the next menu.{% endif %}</p>
-          </div>
-          <a class="v4-btn-solid" href="/admin/scheduling">Hold a date</a>
-        </div>
+        <p class="dash-empty">Deck clear — nothing needs you right now.</p>
+        {% endfor %}
+      </div>
+
+      {# day strip — the week ahead, preflight on aerial shoots #}
+      <div class="sr-daystrip">
+        {% if horizon_shoots %}
+        {% for u in horizon_shoots %}
+        <a href="/admin/studio/projects/{{ u.id }}">{{ u.mon|upper }} {{ u.day }} — {{ u.title|upper }}{% if u.days_out == 0 %} · TODAY{% endif %}</a>
+        {% if u.aerial %}<span class="sr-daystrip-aerial">&#9492; Aerial Pass · confirm LAANC · batteries</span>{% endif %}
+        {% endfor %}
+        {% else %}
+        <span>Week open — <a href="/admin/scheduling">hold a date</a></span>
         {% endif %}
-      </section>
+      </div>
+    </aside>
 
-      {# Galleries — Pixieset-style covers #}
-      <section class="dash-panel" aria-label="Recent galleries">
-        <div class="dash-panel-head">
-          <h2>Galleries</h2>
-          <span class="count"><a class="link" href="/admin/galleries">library &rarr;</a></span>
-        </div>
-        <div class="v4-galgrid">
-          {% for g in recent_galleries %}
-          <a class="v4-galcard" href="/admin/galleries/{{ g.id }}">
-            <span class="v4-galcover">
-              {% if g.cover_id %}<img src="/admin/thumb/{{ g.id }}/{{ g.cover_id }}" loading="lazy" alt="">{% endif %}
-              <i class="v4-galchip {{ 'is-live' if g.published else 'is-draft' }}">{{ "Live" if g.published else "Draft" }}</i>
-            </span>
-            <span class="v4-galcap">
-              <b>{{ g.title }}</b>
-              <small>{{ g.client_company or g.client_name or "no client" }} · {{ g.n_assets }} photo{{ "s" if g.n_assets != 1 }}</small>
-            </span>
-          </a>
-          {% endfor %}
-          <a class="v4-galnew" href="/admin/galleries">
-            <b aria-hidden="true">+</b> New gallery
-            <small>drag photos to start</small>
-          </a>
-        </div>
-      </section>
-    </div>
-
-    {# ── RIGHT column ─────────────────────────────────────────────────── #}
-    <div class="dash-col">
+    {# ═══ MAIN — money, library, pipeline, the wire ═══════════════════════ #}
+    <div class="sr-deck-main">
 
       {# Month money — dark feature card with trailing bars #}
       <section class="dash-money v4-money" aria-label="Revenue this month">
@@ -263,64 +179,66 @@
         {% endif %}
       </section>
 
-      {# Needs you today — the app's next-step engine #}
-      <section class="dash-panel" aria-label="Needs you today">
+      {# Library — recent galleries as covers #}
+      <section class="dash-panel" aria-label="Recent galleries">
         <div class="dash-panel-head">
-          <h2>Needs you today</h2>
-          {% if next_steps %}<span class="count">{{ next_steps|length }} open</span>{% endif %}
+          <h2>The library</h2>
+          <span class="count"><a class="link" href="/admin/galleries">all galleries &rarr;</a></span>
         </div>
-        {% if next_steps %}
-        <ul class="dash-todo">
-          {% for n in next_steps %}
-          {% set dot = {'warn':'var(--clay)','hold':'var(--honey)','go':'var(--ok)'}.get(n.tone, 'var(--neutral)') %}
-          <li>
-            <span class="dash-dot" style="background: {{ dot }};"></span>
-            <div class="dash-todo-body">
-              <div class="dash-todo-title"><a href="{{ n.url }}">{{ n.text }}</a></div>
-              {% if n.detail %}<div class="dash-todo-sub">{{ n.detail }}</div>{% endif %}
-            </div>
-            {% if n.meta %}<span class="dash-todo-meta {{ n.tone or 'mute' }}">{{ n.meta }}</span>{% endif %}
-            <a class="dash-todo-meta go" href="{{ n.url }}" aria-label="Open">&rarr;</a>
-            {% if n.key %}
-            <form method="post" action="/admin/home/nudge/dismiss" class="dash-todo-check">
-              <input type="hidden" name="key" value="{{ n.key }}">
-              <button type="submit" class="dash-check" title="Clear for today" aria-label="Clear for today">&#9711;</button>
-            </form>
-            {% endif %}
-          </li>
+        <div class="v4-galgrid">
+          {% for g in recent_galleries %}
+          <a class="v4-galcard" href="/admin/galleries/{{ g.id }}">
+            <span class="v4-galcover">
+              {% if g.cover_id %}<img src="/admin/thumb/{{ g.id }}/{{ g.cover_id }}" loading="lazy" alt="">{% endif %}
+              <i class="v4-galchip {{ 'is-live' if g.published else 'is-draft' }}">{{ "Live" if g.published else "Draft" }}</i>
+            </span>
+            <span class="v4-galcap">
+              <b>{{ g.title }}</b>
+              <small>{{ g.client_company or g.client_name or "no client" }} · {{ g.n_assets }} photo{{ "s" if g.n_assets != 1 }}</small>
+            </span>
+          </a>
           {% endfor %}
-        </ul>
-        {% else %}<p class="dash-empty">You're all caught up.</p>{% endif %}
+          <a class="v4-galnew" href="/admin/galleries">
+            <b aria-hidden="true">+</b> New gallery
+            <small>drag photos to start</small>
+          </a>
+        </div>
       </section>
 
-      {# New leads — compact recency view #}
-      <section class="dash-panel" aria-label="New leads">
+      {# Pipeline — proportional funnel #}
+      <section class="dash-panel" aria-label="Pipeline">
         <div class="dash-panel-head">
-          <h2>New leads</h2>
-          <a class="link" href="/admin/inbox">Inbox &rarr;</a>
+          <h2>Pipeline</h2>
+          <a class="link" href="/admin/studio">Studio board &rarr;</a>
         </div>
-        {% if leads %}
-        <ul class="dash-leads">
-          {% for l in leads %}
-          <li>
-            <span class="dash-avatar">{{ (l.name[:2]) | upper }}</span>
-            <div class="dash-lead-body">
-              <div class="dash-lead-name">{{ l.name }}</div>
-              <div class="dash-lead-biz">{{ l.business or l.email or l.phone }}</div>
-            </div>
-            {% if l.kind == "booking" %}<span class="dash-pill">Booking</span>{% endif %}
-            <span class="dash-ago">{{ l.created_at[:10] }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        {% else %}<p class="dash-empty">No open inquiries.</p>{% endif %}
+        {% set live_stages = pipeline | selectattr("n") | list %}
+        {% if not live_stages and queue %}
+        <p class="v4-pipeline-note">Nothing in play yet this month — <b>your
+          {{ queue|length }} inquir{{ "ies are" if queue|length != 1 else "y is" }} the pipeline.</b>
+          Convert one to start the funnel.</p>
+        {% endif %}
+        <div class="v4-funnel" role="img" aria-label="Pipeline stages">
+          {% if queue %}<span class="v4-fcell is-in" style="flex: {{ [queue|length, 2]|max }};">{{ queue|length }} inquir{{ "ies" if queue|length != 1 else "y" }}</span>{% endif %}
+          {% if live_stages %}
+            {% for s in live_stages %}
+            <span class="v4-fcell is-live" style="flex: {{ [s.n, 2]|max }};">{{ s.n }} {{ s.label|lower }}</span>
+            {% endfor %}
+          {% else %}
+            <span class="v4-fcell is-hatch" style="flex: 5;">consult &rarr; proposal &rarr; contract &rarr; retainer</span>
+          {% endif %}
+        </div>
+        <div class="v4-actions">
+          {% if queue %}<a class="v4-btn-gold" href="/admin/inbox?sel={{ queue[0].id }}">Convert {{ queue[0].name }} &rarr;</a>{% endif %}
+          <a class="v4-btn-ghost" href="/admin/studio">Draft a proposal</a>
+          <a class="v4-btn-ghost" href="/admin/studio#clients">+ New project</a>
+        </div>
       </section>
 
-      {# Activity — single-line strip when quiet, feed when not #}
+      {# The wire — last 24h #}
       {% if activity_24h %}
       <section class="dash-panel" aria-label="Recent activity">
         <div class="dash-panel-head">
-          <h2>Activity</h2>
+          <h2>The wire — last 24h</h2>
           <a class="link" href="/admin/today">Today &rarr;</a>
         </div>
         <ul class="dash-activity">
@@ -344,32 +262,5 @@
       {% endif %}
     </div>
   </div>
-
-  {# Schedule horizon filter — same progressive-enhancement pattern as before #}
-  <script nonce="{{ csp_nonce }}">
-    (function () {
-      var grp = document.querySelector(".dash-horizon");
-      if (!grp) return;
-      var list = document.getElementById("dash-schedule");
-      var empty = document.getElementById("dash-schedule-empty");
-      var rows = list ? list.querySelectorAll("li") : [];
-      grp.addEventListener("click", function (e) {
-        var btn = e.target.closest("button[data-h]");
-        if (!btn) return;
-        var h = btn.getAttribute("data-h");
-        grp.querySelectorAll("button").forEach(function (b) {
-          b.classList.toggle("is-active", b === btn);
-        });
-        var shown = 0;
-        rows.forEach(function (li) {
-          var d = parseInt(li.getAttribute("data-days"), 10);
-          var vis = (h === "7") ? (d >= 0 && d <= 7) : (d === parseInt(h, 10));
-          li.hidden = !vis;
-          if (vis) shown++;
-        });
-        if (empty) empty.hidden = shown !== 0;
-      });
-    })();
-  </script>
 </main>
 {% endblock %}

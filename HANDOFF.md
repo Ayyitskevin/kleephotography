@@ -7,6 +7,55 @@ file as you work. **All prior context you need is here — do not assume chat hi
 
 ---
 
+## 0. STATUS 2026-07-11 — SCREENING ROOM full-platform redesign (this branch)
+
+Kevin approved the **Screening Room** redesign (design handoff:
+`design_handoff_screening_room/` — cinema front-of-house, command-deck
+back-of-house). Implemented end-to-end on branch `claude/new-session-693cw5`
+(platform session constraint — the handoff's 5-PR plan landed as 5 phase
+groups of commits on ONE draft PR; Kevin merges):
+
+- **Foundation:** `static/screening-room-tokens.css` (verbatim from the
+  handoff) + `static/screening.css` component layer, loaded after mise.css.
+  mise.css itself now loads inside a CSS cascade layer (`layer(mise)`) so the
+  body.sr-scoped redesign wins without specificity wars — non-sr surfaces are
+  untouched. IBM Plex Mono self-hosted (400/500/700, latin+ext) in fonts.css.
+  Flags: `MISE_SCREENING_ROOM` (default ON — the kill switch back to the
+  legacy look) and `MISE_AERIALS_LIVE` (default OFF) in config/features.
+- **Marketing:** home = the Lobby (house reel + live mono timecode via
+  data-sr-player in site.js, three feature title cards, ticker, credits
+  footer); spokes = 3b/3k/3c+3l (RE premiere hero with data-seek chapter
+  chips at fractions of the real film's duration; Aerial Pass band, spec-line
+  segment, ticker line, credits "flown" all gated on aerials_live); archive
+  chips (250D/800T/500T + ▶ films first), reels, services/about/contact/
+  press/work/booking restyled. Aerial add-on: checkbox on re- intakes →
+  bookings.notes tag (zero schema); rate single-sourced in
+  `specialties.AERIAL_PASS_CENTS` (**$150 PLACEHOLDER — Kevin sets it**).
+- **Client:** ticket-stub PIN gates (shared `_ticket_gate.html`; PIN logic
+  untouched), premiere gallery (Reel One row, circled takes = favorites
+  numbered in pick order, sticky export rail w/ OOB count, REC tiles polling
+  `/g/{slug}/rendition-tile/{id}` every 8s), portal/workspace/drop/zip-wait/
+  email-gate/error/expired restyles. **Money docs (invoice/proposal/receipt)
+  are display-only bodyclass opt-ins in their own commit (bc5d3c7) —
+  red-adjacent, flag for Kevin.** contract.html untouched.
+- **Admin:** command deck — 64px rail (legacy sidebar kept behind the kill
+  switch), ON DECK ranked queue (read-only merge; nudge dismiss = snooze),
+  day strip with Aerial Pass preflight, ⌘K command runner (multi-token, ">"
+  actions filter, client bindings lazy-loaded from /admin/palette.json),
+  bench culling keys (data-cull in behaviors.js → existing endpoints) +
+  premiere check, ledger month reel + one action per row, 5-tab mobile bar.
+- **Gates at completion: 59 unit / 174 smoke / ruff clean.** Tests updated
+  where they pinned pre-redesign copy (each noted in commit messages).
+- Aerials launch checklist: `ops/SPECIALTY-LAUNCH.md`. Post-merge deploy
+  checks (Kevin): /healthz · home · one spoke · one PIN gallery · /admin
+  login · one favorite toggle — a missed CSP spot fails silently, check the
+  console. Rollback: `MISE_SCREENING_ROOM=false` restores the legacy look
+  without a revert; full revert = revert the merge.
+- Deliberately deferred (documented in the PR body): full focused-project
+  rebuild of /admin/studio/projects/{id} (journey timeline restyled only),
+  per-page pixel work on long-tail admin surfaces (harmonized to house
+  tokens, not redesigned), swipe gestures on the mobile deck.
+
 ## 0a. STATUS 2026-07-11 — 3-specialty flagship revamp (in flight)
 
 Kevin approved the hub-and-spoke revamp: real estate / portrait & lifestyle /

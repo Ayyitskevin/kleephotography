@@ -1,0 +1,22 @@
+{# REC tile for a social cut that's still rendering (Screening Room 3e).
+   Polls itself via hx-get every ~8s; when the encode lands it swaps to the
+   ready chip. Script-free fragment — the CSP nonce rule stays satisfied. #}
+{% if r.status == "ready" %}
+<div class="sr-rec-tile is-ready" id="rec-{{ r.id }}">
+  <span class="sr-mono sr-mono--signal">&#10003; {{ preset }} cut &mdash; ready</span>
+  <a class="sr-btn" href="/g/{{ g.slug }}/download/rendition/{{ r.id }}">&darr; Download {{ preset }}</a>
+</div>
+{% elif r.status == "failed" %}
+<div class="sr-rec-tile is-failed" id="rec-{{ r.id }}">
+  <span class="sr-mono">{{ preset }} cut hit a snag &mdash; it's on my bench</span>
+</div>
+{% else %}
+<div class="sr-rec-tile" id="rec-{{ r.id }}"
+     hx-get="/g/{{ g.slug }}/rendition-tile/{{ r.id }}" hx-trigger="every 8s"
+     hx-swap="outerHTML">
+  <span class="sr-rec">Rec</span>
+  <b>{{ preset }} cut &mdash; rendering</b>
+  <small>this tile updates itself</small>
+  <i class="sr-rec-bar" aria-hidden="true"><b></b></i>
+</div>
+{% endif %}

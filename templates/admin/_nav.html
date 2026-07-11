@@ -1,5 +1,22 @@
 {% set _p = request.url.path %}
-{# Shared admin sidebar — recreated 1:1 from the Claude Design "Admin Sidebar"
+{% if sr_enabled() %}
+{# Screening Room command deck rail (3h): 64px, five destinations — Deck /
+   Projects / Money / Library / Day — plus ⌘K and the sync pulse. Every other
+   admin surface is a verb in the palette, not a rail stop. On phones the rail
+   becomes the 5-tab bottom bar (CSS). #}
+<aside class="admin-nav sr-rail" aria-label="Primary">
+  <a class="sr-rail-brand" href="/admin/home" aria-label="Kevin Lee — the deck">K</a>
+  <a href="/admin/home" title="Deck"{% if _p.startswith('/admin/home') or _p.startswith('/admin/today') or _p.startswith('/admin/inbox') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true">&#9638;</span><span class="sr-rail-lbl">Deck</span></a>
+  <a href="/admin/studio" title="Projects"{% if _p.startswith('/admin/studio') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true">&#9707;</span><span class="sr-rail-lbl">Proj</span></a>
+  <button type="button" class="sr-rail-cmd" id="ns-cmd-open" aria-haspopup="dialog"
+          title="⌘K — jump, act, create" aria-label="Command menu (Ctrl or ⌘ + K)"><span class="sr-rail-ico" aria-hidden="true">&#8981;</span><span class="sr-rail-lbl">&#8984;K</span></button>
+  <a href="/admin/financials" title="Money"{% if _p.startswith('/admin/financials') or _p.startswith('/admin/reports') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true">$</span><span class="sr-rail-lbl">Ledger</span></a>
+  <a href="/admin/galleries" title="Library"{% if _p.startswith('/admin/galleries') or _p.startswith('/admin/transfers') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true">&#9636;</span><span class="sr-rail-lbl">Lib</span></a>
+  <a href="/admin/scheduling" title="Day" class="sr-rail-day{% if _p.startswith('/admin/scheduling') or _p.startswith('/admin/calendar') %} is-active{% endif %}"><span class="sr-rail-ico" aria-hidden="true">&#9684;</span><span class="sr-rail-lbl">Day</span></a>
+  <span class="ns-pulse sr-rail-pulse" title="self-hosted, synced" aria-hidden="true"></span>
+</aside>
+{% else %}
+{# Legacy sidebar — recreated 1:1 from the Claude Design "Admin Sidebar"
    prototype: honey-badger crest, gold "CRM" lockup, ⌘K command palette, an
    animated active-indicator and a live status pulse. The Mise class hooks
    (.admin-nav / .admin-nav-label / a.is-active / .ico / .lbl) are kept so the
@@ -42,17 +59,18 @@
     </button>
   </div>
 </aside>
+{% endif %}
 
 {# ── Command palette (⌘K) — overlay, lives once per page ──────────────────── #}
 <div class="ns-pal" id="ns-pal" role="presentation" hidden>
   <div class="ns-pal-box" role="dialog" aria-modal="true" aria-label="Command menu">
     <div class="ns-pal-head">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#3B5A48" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input class="ns-pal-input" id="ns-pal-input" type="text" autocomplete="off" spellcheck="false" placeholder="Jump to a page or run an action…" aria-label="Search pages and actions">
+      <input class="ns-pal-input" id="ns-pal-input" type="text" autocomplete="off" spellcheck="false" placeholder="Jump, act, or create — try “inv” + a client…" aria-label="Search pages and actions">
       <span class="ns-pal-esc">ESC</span>
     </div>
     <div class="ns-pal-list" id="ns-pal-list"></div>
-    <div class="ns-pal-foot"><span>↑↓ Navigate</span><span>↵ Open</span><span>esc Close</span></div>
+    <div class="ns-pal-foot"><span>↑↓ Move</span><span>↵ Run</span><span>esc Close</span><span class="ns-pal-hint">type &gt; for actions only</span></div>
   </div>
 </div>
 <script nonce="{{ csp_nonce }}">
@@ -97,6 +115,32 @@
     { label: "New form",        group: "Action",    href: "/admin/forms",                 glyph: "+", kw: "new form create intake questionnaire" }
   ];
 
+  /* Command-runner upgrade (Screening Room 3h): verbs with the client
+     pre-bound — "inv copper" resolves to "Draft invoice → The Copper Crane".
+     Bindings load lazily from /admin/palette.json the first time the palette
+     opens, so ordinary page renders stay lean. */
+  var extrasLoaded = false;
+  function loadExtras() {
+    if (extrasLoaded) return;
+    extrasLoaded = true;
+    fetch("/admin/palette.json").then(function (r) { return r.json(); }).then(function (d) {
+      (d.clients || []).forEach(function (c) {
+        var who = c.company || c.name || ("Client #" + c.id);
+        var kw = ((c.company || "") + " " + (c.name || "")).toLowerCase();
+        CMDS.push({ label: "Draft invoice → " + who, group: "Action",
+                    href: "/admin/studio/clients/" + c.id, glyph: "$",
+                    kw: "inv invoice draft bill money " + kw });
+        CMDS.push({ label: "New session → " + who, group: "Action",
+                    href: "/admin/studio/clients/" + c.id + "#new-session", glyph: "+",
+                    kw: "session project shoot book new " + kw });
+        CMDS.push({ label: who, group: "Client",
+                    href: "/admin/studio/clients/" + c.id, glyph: "◉",
+                    kw: "client open go to " + kw });
+      });
+      if (open) render();
+    }).catch(function () { extrasLoaded = false; });
+  }
+
   var pal = document.getElementById("ns-pal");
   var input = document.getElementById("ns-pal-input");
   var list = document.getElementById("ns-pal-list");
@@ -117,10 +161,25 @@
 
   function visible() {
     var q = input.value.trim().toLowerCase();
-    if (q) {
-      return CMDS.filter(function (c) {
-        return (c.label + " " + c.kw + " " + c.group).toLowerCase().indexOf(q) !== -1;
+    // ">" scopes to actions only (command-runner mode)
+    var actionsOnly = q.charAt(0) === ">";
+    if (actionsOnly) q = q.slice(1).trim();
+    var pool = actionsOnly ? CMDS.filter(function (c) { return c.group === "Action"; }) : CMDS;
+    if (q || actionsOnly) {
+      // every word must hit somewhere — "inv night" finds "Draft invoice →
+      // Night Bloom Bar" the way the mock promises
+      var toks = q.split(/\s+/).filter(Boolean);
+      var hits = pool.filter(function (c) {
+        var hay = (c.label + " " + c.kw + " " + c.group).toLowerCase();
+        return toks.every(function (t) { return hay.indexOf(t) !== -1; });
       });
+      // verbs rank above destinations — a matched query is usually an intent
+      if (q) {
+        hits.sort(function (a, b) {
+          return (b.group === "Action" ? 1 : 0) - (a.group === "Action" ? 1 : 0);
+        });
+      }
+      return hits;
     }
     var rec = recent()
       .map(function (h) { return CMDS.filter(function (c) { return c.group !== "Action" && c.href === h; })[0]; })
@@ -159,7 +218,7 @@
 
   function show() {
     open = true; sel = 0; input.value = ""; pal.hidden = false;
-    pal.classList.add("open"); render();
+    pal.classList.add("open"); loadExtras(); render();
     setTimeout(function () { input.focus(); }, 40);
   }
   function hide() { open = false; pal.classList.remove("open"); pal.hidden = true; }

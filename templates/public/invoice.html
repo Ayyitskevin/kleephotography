@@ -1,5 +1,6 @@
 {% extends "base_cream.html" %}
 {% block title %}{{ d.title }} · {{ site_name }}{% endblock %}
+{% block bodyclass %}{% if sr_enabled() %}sr sr-moneydoc{% else %}cream-theme{% endif %}{% endblock %}
 {% block cream_head %}
 <link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
 {# While a just-made payment is awaiting the webhook, reload periodically so the

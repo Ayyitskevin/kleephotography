@@ -3,20 +3,22 @@
 {% block meta_description %}Photography, videography, and monthly Brand Partner retainers for real estate, portraits, and food &amp; beverage — Asheville and Western North Carolina. Three tiers per category.{% endblock %}
 {% block site_content %}
 
-{# PAGE HEADER #}
-<section class="page-hero">
-  <div class="page-hero-inner" data-reveal>
-    <p class="eyebrow">Services</p>
-    <h1>Priced by specialty. <span class="it-accent">Tiered by scope.</span></h1>
-    <p class="lede">Real estate, portrait &amp; lifestyle, and food &amp; beverage —
-       photo and film, three tiers each, plus the Brand Partner monthly
-       retainer. Tell me your goal on the <a href="/book">booking form</a> and
-       I'll quote the right fit, usually within a business day.</p>
+{# PAGE HEADER — the features & screenings board #}
+<section class="sr-wrap">
+  <div class="sr-pagehead">
+    <span class="sr-mono">Features &amp; screenings</span>
+    <h1>Priced by feature. <em>Tiered by scope.</em></h1>
+    <div class="sr-kickrow" style="margin-top: 10px;">
+      <p class="sr-beat" style="margin: 0;">photo and film, three tiers each, plus the Brand Partner monthly rhythm</p>
+      <span class="sr-mono">Tailored quote within a business day</span>
+    </div>
+    <p class="sr-lede" style="margin-top: 14px;">Tell me your goal on the
+       <a href="/book">booking form</a> and I'll quote the right fit.</p>
   </div>
 </section>
 
 {# CATEGORIES #}
-<section class="svc-cats">
+<section class="svc-cats sr-wrap sr-section">
   <div class="sec-inner">
     {% for s in services %}
     <div class="svc" id="svc-{{ s.key }}" data-reveal>
@@ -51,22 +53,23 @@
   </div>
 </section>
 
-{% include "site/_testimonials.html" %}
+{% if testimonials %}
+<section class="sr-wrap sr-section" aria-label="Testimonials">
+  {% include "site/_testimonials.html" %}
+</section>
+{% endif %}
 
-{# FOOT — bordeaux card #}
-<section class="svc-foot-sec">
-  <div class="svc-foot-card" data-reveal>
-    <div>
-      <h2>Not sure which tier?</h2>
-      <p>Tell me your menu count, deliverable goal, or content rhythm on the
-         booking form and I'll come back with a tailored proposal. Most shoots
-         happen in Asheville and Western North Carolina; Charlotte, Raleigh, and
-         Wilmington are regulars too.</p>
+{# FOOT #}
+<section class="sr-wrap sr-section" aria-label="Not sure which tier">
+  <div class="sr-stats">
+    <div class="sr-stat">
+      <b>Not sure which tier?</b>
+      <small>Menu count, deliverable goal, or content rhythm &mdash; tailored
+        proposal within a business day. Asheville &amp; WNC; Charlotte,
+        Raleigh, Wilmington on rotation.</small>
     </div>
-    <div class="svc-foot-actions">
-      <a class="btn-saffron" href="/book">Book a shoot &rarr;</a>
-      <a class="btn-ghost-dark" href="/work">See past work</a>
-    </div>
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Book a shoot &rarr;</a></div>
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn sr-btn--ghost" href="/work">See past work</a></div>
   </div>
 </section>
 {% endblock %}

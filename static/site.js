@@ -47,6 +47,40 @@
     });
   }
 
+  // --- Screening Room player chrome (house reel / premiere heroes) ---
+  // One timeupdate listener per [data-sr-player]: live mono timecode
+  // (HH:MM:SS:FF at 24fps, matching the marquee) + a progress line. Ambient
+  // playback is IO-gated — the reel pauses offscreen. Reduced motion already
+  // stripped autoplay above, so these sit on their posters with native
+  // controls; the timecode still tracks manual playback.
+  document.querySelectorAll("[data-sr-player]").forEach(function (wrap) {
+    var video = wrap.querySelector("video");
+    if (!video) return;
+    var tc = wrap.querySelector("[data-sr-tc]");
+    var bar = wrap.querySelector("[data-sr-bar]");
+    function pad(n) { return String(n).padStart(2, "0"); }
+    if (tc || bar) {
+      video.addEventListener("timeupdate", function () {
+        var t = video.currentTime || 0;
+        if (tc) {
+          tc.textContent = pad(Math.floor(t / 3600)) + ":" + pad(Math.floor(t / 60) % 60) +
+            ":" + pad(Math.floor(t) % 60) + ":" + pad(Math.floor((t % 1) * 24));
+        }
+        if (bar && video.duration) {
+          bar.style.width = ((video.currentTime / video.duration) * 100) + "%";
+        }
+      });
+    }
+    if (!reduceMotion && "IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) video.play().catch(function () {});
+          else video.pause();
+        });
+      }, { threshold: 0.25 }).observe(video);
+    }
+  });
+
   // --- mobile menu ---
   var menuBtn = document.querySelector("[data-menu-btn]");
   var mobileMenu = document.querySelector("[data-mobile-menu]");

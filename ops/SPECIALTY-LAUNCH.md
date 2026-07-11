@@ -92,3 +92,25 @@ Suggested setup (durations/buffers are starting points — adjust to taste):
    weeks. The F&B copy moved to `/food-beverage` (home links to it from
    the doors); if F&B impressions dip hard, the F&B spoke can absorb more
    of the old home copy — it's all green-light template work.
+
+
+## The Aerial Pass — launch checklist (flip the day the Part 107 cert lands)
+
+Everything ships dark behind `MISE_AERIALS_LIVE` (default off). To launch:
+
+1. **Set the real rate** in `app/specialties.py` → `AERIAL_PASS_CENTS`
+   (the shipped `15000` = **$150 is a placeholder**). This is the ONE place —
+   the /real-estate band, booking intake label, and booking-note tag all read
+   it.
+2. **Flip the flag**: `MISE_AERIALS_LIVE=true` in flow's `.env`, restart.
+   That turns on, all at once: the Aerial Pass band + spec-line segment +
+   aerial chapter on /real-estate, the aerial ticker line on the lobby,
+   "flown" in the credits footer, the Aerial Pass checkbox on `re-` booking
+   intakes, and ▲ AERIAL badges on aerial-tagged tiles.
+3. **Tag aerial work** `re/aerials` (any `re/...aerial...` tag gets the ▲
+   badge on the archive/spoke strips).
+4. **Booking notes**: an Aerial Pass request lands in the booking's notes as
+   `AERIAL PASS requested (+$…) — confirm LAANC`; the admin deck's day strip
+   shows `└ Aerial Pass · confirm LAANC · batteries` on those shoots.
+5. Update proposal presets/contract language for drone deliverables when
+   ready (red-light — Kevin's PR).

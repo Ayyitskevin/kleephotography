@@ -38,19 +38,25 @@ async def view(request: Request, slug: str):
                         ORDER BY section_id, position, id""",
         (g["id"],),
     )
-    favs = {
-        r["asset_id"]
-        for r in db.all_("SELECT asset_id FROM favorites WHERE visitor_id=?", (visitor["id"],))
-    }
+    # Insertion order IS the pick order — the premiere numbers circled takes.
+    fav_rows = db.all_(
+        "SELECT asset_id FROM favorites WHERE visitor_id=? ORDER BY created_at, rowid",
+        (visitor["id"],),
+    )
+    favs = {r["asset_id"] for r in fav_rows}
+    fav_order = {r["asset_id"]: i + 1 for i, r in enumerate(fav_rows)}
     # Ready social-cut renditions per video asset -> extra download actions on
-    # the tile (9:16 / 1:1). Pending/failed rows stay admin-only.
+    # the tile (9:16 / 1:1). Pending rows surface as self-updating REC tiles on
+    # the reel row (hx-get polling below); failed rows stay admin-only.
     renditions: dict[int, list] = {}
+    renditions_pending: dict[int, list] = {}
     for r in db.all_(
         """SELECT r.* FROM asset_renditions r JOIN assets a ON a.id = r.asset_id
-           WHERE a.gallery_id=? AND r.status='ready' ORDER BY r.preset""",
+           WHERE a.gallery_id=? AND r.status IN ('ready','pending') ORDER BY r.preset""",
         (g["id"],),
     ):
-        renditions.setdefault(r["asset_id"], []).append(r)
+        bucket = renditions if r["status"] == "ready" else renditions_pending
+        bucket.setdefault(r["asset_id"], []).append(r)
     # this visitor's selection count per proofing section, for the progress label
     section_picks = {
         s["id"]: sum(1 for a in assets if a["section_id"] == s["id"] and a["id"] in favs)
@@ -73,9 +79,12 @@ async def view(request: Request, slug: str):
             "unsectioned": unsectioned,
             "assets": assets,
             "favs": favs,
+            "fav_order": fav_order,
             "renditions": renditions,
+            "renditions_pending": renditions_pending,
             "section_picks": section_picks,
             "visitor": visitor,
+            "total_bytes": sum(a["bytes"] or 0 for a in assets),
         },
     )
 
@@ -129,6 +138,36 @@ async def check_pin(request: Request, slug: str, pin: str = Form(...)):
     return resp
 
 
+def _takes_oob(visitor_id: int, toggled_id: int, gallery_id: int) -> str:
+    """OOB fragments after a fav/unfav: every circled take's number (pick order
+    shifts when a take is uncircled) + the sticky export rail's count. Ships
+    alongside the toggled tile's own span; ids missing from the page (drop
+    galleries, older markup) are ignored by htmx."""
+    rows = db.all_(
+        "SELECT asset_id FROM favorites WHERE visitor_id=? ORDER BY created_at, rowid",
+        (visitor_id,),
+    )
+    out = []
+    for i, r in enumerate(rows):
+        if r["asset_id"] == toggled_id:
+            continue  # the toggled tile gets its span as the primary fragment
+        out.append(
+            f'<span id="take-{r["asset_id"]}" hx-swap-oob="outerHTML" '
+            f'class="fav-btn faved sr-take is-circled">{i + 1}</span>'
+        )
+    n = len(rows)
+    label = f"{n} take{'s' if n != 1 else ''} circled" if n else "no takes circled yet"
+    out.append(f'<span id="sr-export-count" hx-swap-oob="innerHTML">{label}</span>')
+    total = db.one(
+        "SELECT COUNT(*) AS n FROM assets WHERE gallery_id=? AND status='ready'", (gallery_id,)
+    )["n"]
+    out.append(
+        f'<span class="gal2-progress" id="sr-picked-line" hx-swap-oob="innerHTML">'
+        f"{n} of {total} picked</span>"
+    )
+    return "".join(out)
+
+
 def _progress_oob(g_id: int, section_id: int | None, visitor_id: int) -> str:
     """OOB-swap fragment for the section heading's progress label, returned
     alongside the heart so it updates inline after every fav/unfav."""
@@ -173,7 +212,11 @@ async def toggle_fav(request: Request, slug: str, asset_id: int):
     if existing:
         db.run("DELETE FROM favorites WHERE visitor_id=? AND asset_id=?", (visitor["id"], asset_id))
         oob = _progress_oob(g["id"], a["section_id"], visitor["id"])
-        return Response('<span class="fav-btn">&#9825;</span>' + oob)
+        return Response(
+            f'<span id="take-{asset_id}" class="fav-btn sr-take">&#9675;</span>'
+            + _takes_oob(visitor["id"], asset_id, g["id"])
+            + oob
+        )
     # Proofing cap: refuse the fav if the visitor already hit the section's target.
     if a["proof_target"]:
         picks = db.one(
@@ -184,15 +227,42 @@ async def toggle_fav(request: Request, slug: str, asset_id: int):
         )["n"]
         if picks >= a["proof_target"]:
             return Response(
-                '<span class="fav-btn">&#9825;</span>',
+                f'<span id="take-{asset_id}" class="fav-btn sr-take">&#9675;</span>',
                 status_code=409,
                 headers={"HX-Trigger": f'{{"proof-cap":{{"target":{a["proof_target"]}}}}}'},
             )
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (visitor["id"], asset_id))
     if a["kind"] == "photo" and a["status"] == "ready":
         jobs.enqueue("social_crops", {"asset_id": asset_id})
+    n = db.one("SELECT COUNT(*) AS n FROM favorites WHERE visitor_id=?", (visitor["id"],))["n"]
     oob = _progress_oob(g["id"], a["section_id"], visitor["id"])
-    return Response('<span class="fav-btn faved">&#9829;</span>' + oob)
+    return Response(
+        f'<span id="take-{asset_id}" class="fav-btn faved sr-take is-circled">{n}</span>'
+        + _takes_oob(visitor["id"], asset_id, g["id"])
+        + oob
+    )
+
+
+@router.get("/{slug}/rendition-tile/{rendition_id}", response_class=HTMLResponse)
+async def rendition_tile(request: Request, slug: str, rendition_id: int):
+    """Self-updating REC tile on the premiere's reel row: polled via hx-get
+    every 8s while a social cut renders, swapping to the download chip when the
+    encode lands (same pattern as the ZIP wait). Script-free fragment; same
+    visitor + expiry gates as the favorite toggle."""
+    g = get_live_gallery(slug)
+    if is_expired(g):
+        raise HTTPException(status_code=410)
+    security.require_visitor(request, g["id"])
+    r = db.one(
+        """SELECT r.* FROM asset_renditions r JOIN assets a ON a.id = r.asset_id
+           WHERE r.id=? AND a.gallery_id=?""",
+        (rendition_id, g["id"]),
+    )
+    if not r:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request, "public/_rec_tile.html", {"g": g, "r": r, "preset": r["preset"].replace("x", ":")}
+    )
 
 
 # ── Timecoded review comments on video deliverables (Domain C slice 3) ───────

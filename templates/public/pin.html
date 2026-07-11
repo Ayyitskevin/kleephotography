@@ -1,14 +1,12 @@
 {% extends "base_cream.html" %}
 {% block title %}{{ g.title }} · {{ site_name }}{% endblock %}
+{% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
-<main class="center-card">
-  <h1>{{ g.title }}</h1>
-  {% if g.client_name %}<p class="muted">for {{ g.client_name }}</p>{% endif %}
-  <form method="post" action="/g/{{ g.slug }}/pin" class="pin-form">
-    <input type="text" name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4"
-           placeholder="4-digit PIN" autofocus required>
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
-    <button type="submit">View gallery</button>
-  </form>
-</main>
+{% with ticket_kicker="Admit one — private premiere",
+        ticket_title=g.title,
+        ticket_for=g.client_name,
+        ticket_cta="Take your seat",
+        form_action="/g/" ~ g.slug ~ "/pin" %}
+{% include "public/_ticket_gate.html" %}
+{% endwith %}
 {% endblock %}

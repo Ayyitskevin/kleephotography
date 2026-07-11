@@ -1,270 +1,133 @@
 {% extends "site/base_site.html" %}
+{# The Lobby (Screening Room 3a): marquee house reel with a live timecode,
+   three feature title cards on their film stocks, the ticker band, then the
+   credits footer (base_site). The archive filmstrip keeps a lightbox-able set
+   of real frames on the hub for browsers and crawlers alike. #}
 {% block title %}{{ site_name }} — Real Estate &middot; Portraits &middot; Food &amp; Beverage{% endblock %}
 {% block meta_description %}Photography &amp; film studio in Asheville, NC — real estate listings, portraits &amp; personal branding, and the food &amp; beverage work that made the name. Photo and video, delivered fast.{% endblock %}
-{% block navclass %}{% endblock %}
 {% block site_content %}
 
 <div class="scroll-progress" aria-hidden="true"><div data-progress-bar></div></div>
 
-{# ═══ HERO — editorial-dark (Claude Design) ══════════════════════════════════
-   Two-column: copy left, a tall signature frame right with an overlapping
-   vertical reel. The hero frame is fed by the first starred portfolio photo;
-   the reel by hero_reel. Both degrade to the slate frame when nothing is
-   starred yet. #}
-<section class="eh">
-  <div class="eh-grid" data-hero-grid>
-    <div class="eh-copy">
-      <p class="eh-kicker" data-reveal>Asheville &amp; Western North Carolina</p>
-      <h1 class="eh-title" data-reveal>The space, the face, <span class="eh-em">the plate.</span></h1>
-      <p class="eh-lede" data-reveal>A photography &amp; film studio in Asheville —
-         real estate, portraits, and food &amp; beverage. Three crafts, one
-         standard: work that sells what it shows.</p>
-      <div class="eh-actions" data-reveal>
-        <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
-          <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
-        <a class="elink" href="/work">See the work <span aria-hidden="true">&rarr;</span></a>
-      </div>
-    </div>
-    <div class="eh-media" data-hero-media>
-      <div class="eh-frame">
-        {% if featured %}
-        <img class="eh-frame-img" data-parallax="0.05"
-             src="/site/img/{{ featured[0].id }}?variant=web"
-             srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
-             sizes="(max-width: 860px) 92vw, 46vw" fetchpriority="high" decoding="async"
-             alt="{{ featured[0]|portfolio_alt }}">
-        {% endif %}
-        <span class="eh-frame-veil" aria-hidden="true"></span>
-        <figcaption class="eh-frame-cap">{{ featured[0].portfolio_tag|tag_label if featured and featured[0].portfolio_tag else 'Selected work' }} · Asheville</figcaption>
-      </div>
-      {% if hero_reel %}
-      <div class="eh-reel" data-hero-reel data-parallax="-0.06">
-        <video autoplay muted loop playsinline preload="metadata"
-               poster="/site/poster/{{ hero_reel.id }}">
-          <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
-        </video>
-        <span class="eh-reel-play" aria-hidden="true">&#9654;</span>
-      </div>
-      {% endif %}
-    </div>
+{# ═══ NOW SHOWING — the house reel on the marquee ════════════════════════════ #}
+<section class="sr-wrap sr-section" aria-label="Now showing">
+  <div class="sr-kickrow">
+    <p class="sr-mono sr-mono--signal">&#9679; Now showing <span class="sr-blink" aria-hidden="true">&#9646;</span></p>
+    <p class="sr-mono">House reel &middot; Asheville NC</p>
   </div>
-  <div class="eh-cue" aria-hidden="true"><span>Scroll</span><span class="eh-cue-arr">&darr;</span></div>
+  <figure class="sr-screen sr-screen--reel sr-corners4" data-sr-player>
+    <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+    {% if hero_reel %}
+    <video autoplay muted loop playsinline preload="metadata"
+           poster="/site/poster/{{ hero_reel.id }}" aria-label="House reel">
+      <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
+    </video>
+    {% elif featured %}
+    <img src="/site/img/{{ featured[0].id }}?variant=web"
+         srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
+         sizes="(max-width: 700px) 100vw, 1344px" fetchpriority="high" decoding="async"
+         alt="{{ featured[0]|portfolio_alt }}">
+    {% endif %}
+    <span class="sr-screen-scrim" aria-hidden="true"></span>
+    <div class="sr-screen-title">
+      <h1>The space. The face.<br>The plate.</h1>
+      <p class="sr-beat">&mdash; shot to sell, in three features &mdash;</p>
+    </div>
+    {% if hero_reel %}
+    <div class="sr-playerstrip" aria-hidden="true">
+      <span class="sr-tc-play">&#9654;</span>
+      <span data-sr-tc>00:00:00:00</span>
+      <i class="sr-progress"><b data-sr-bar></b></i>
+      {% if hero_reel.duration and hero_reel.duration|hms %}<span>{{ hero_reel.duration|hms }}</span>{% endif %}
+    </div>
+    {% endif %}
+  </figure>
 </section>
 
-{# ═══ THE THREE DOORS — one per specialty, each a full specialist page ═══════
-   The hub's core job: a visitor finds their vertical without scrolling past
-   the fold. Lead image = that specialty's newest starred photo (slate frame
-   when nothing is tagged yet). #}
-<section class="sp-sec sp-doors-sec" id="specialties">
-  <div class="sp-doors-head" data-reveal>
-    <p class="esec-kicker">Three specialties</p>
-    <h2 class="esec-h2">Pick your door.</h2>
+{# ═══ THREE FEATURES — title cards on film stock ═════════════════════════════ #}
+<section class="sr-wrap sr-section" aria-label="Three features" id="specialties">
+  <div class="sr-kickrow">
+    <p class="sr-mono">Three features &mdash; pick your screening</p>
   </div>
-  <div class="sp-doors">
+  <div class="sr-features">
     {% for d in doors %}
-    <a class="sp-door" data-reveal href="/{{ d.slug }}">
-      <div class="sp-door-media">
+    <a class="sr-card sp-door sr-stock-{{ d.key }}" href="/{{ d.slug }}">
+      <div class="sr-card-head">
+        <span class="sr-mono sr-mono--stock">{{ d.feature }} &middot; Stock {{ d.stock }}</span>
+        {% if d.n_photos or d.n_reels %}
+        <span class="sr-card-count">{% if d.n_photos %}{{ d.n_photos }} still{{ 's' if d.n_photos != 1 }}{% endif %}{% if d.n_photos and d.n_reels %} &middot; {% endif %}{% if d.n_reels %}{{ d.n_reels }} film{{ 's' if d.n_reels != 1 }}{% endif %}</span>
+        {% endif %}
+      </div>
+      <figure class="sr-card-media">
         {% if d.lead %}
         <img src="/site/img/{{ d.lead.id }}?variant=thumb" loading="lazy" decoding="async"
              srcset="/site/img/{{ d.lead.id }}?variant=thumb 480w, /site/img/{{ d.lead.id }}?variant=web 2048w"
-             sizes="(max-width: 860px) 92vw, 30vw" alt="{{ d.lead|portfolio_alt }}">
+             sizes="(max-width: 700px) 92vw, 440px" alt="{{ d.lead|portfolio_alt }}">
         {% endif %}
-        <span class="sp-door-veil" aria-hidden="true"></span>
-      </div>
-      <div class="sp-door-copy">
-        <h3>{{ d.name }}</h3>
-        <p>{{ d.line }}</p>
-        {% if d.n_photos or d.n_reels %}
-        <span class="sp-door-count">{% if d.n_photos %}{{ d.n_photos }} frame{{ 's' if d.n_photos != 1 }}{% endif %}{% if d.n_photos and d.n_reels %} · {% endif %}{% if d.n_reels %}{{ d.n_reels }} reel{{ 's' if d.n_reels != 1 }}{% endif %}</span>
-        {% endif %}
-        <span class="sp-door-cta">See the work <span aria-hidden="true">&rarr;</span></span>
-      </div>
+        <span class="sr-card-scrim" aria-hidden="true"></span>
+        <span class="sr-card-title">
+          <b>{{ d.screen_name }}</b>
+          <small>{{ d.line }}</small>
+        </span>
+      </figure>
     </a>
     {% endfor %}
   </div>
-  <p class="sp-doors-foot" data-reveal>Every specialty ships photo, film, or both —
-     one-off shoots or the monthly <a href="/services#svc-brand_partner">Brand
-     Partner</a> rhythm. <a href="/services">See services &amp; tiers &rarr;</a></p>
 </section>
 
-{# ═══ AS SEEN IN — auto-scrolling press marquee ══════════════════════════════ #}
-{% if press %}
-<section class="epress" aria-label="As seen in">
-  <p class="epress-label">As seen in</p>
-  <div class="epress-marquee">
-    <div class="epress-track">
-      {% for p in press %}<em>{{ p.outlet }}</em>{% endfor %}
-      {% for p in press %}<em aria-hidden="true">{{ p.outlet }}</em>{% endfor %}
+{# ═══ TICKER — the running marquee band ══════════════════════════════════════ #}
+<div class="sr-ticker" aria-label="Studio highlights">
+  <div class="sr-ticker-track">
+    {% for dup in [false, true] %}
+    <div class="sr-ticker-seq"{% if dup %} aria-hidden="true"{% endif %}>
+      <span>Same-week delivery</span><b>&#9670;</b>
+      {% if aerials_live() %}
+      <span>Photo + film + aerials, one visit</span><b>&#9670;</b>
+      <span>FAA Part 107 certified &mdash; drone for real estate</span><b>&#9670;</b>
+      {% else %}
+      <span>Photo + film, one visit</span><b>&#9670;</b>
+      {% endif %}
+      {% if press %}
+      <span>As seen in: {% for p in press %}{{ p.outlet }}{% if not loop.last %} &middot; {% endif %}{% endfor %}</span><b>&#9670;</b>
+      {% endif %}
+      <span>Asheville &rarr; Charlotte &rarr; Raleigh &rarr; Wilmington</span><b>&#9670;</b>
     </div>
+    {% endfor %}
   </div>
-  <a class="epress-more" href="/press">Press &amp; features <span aria-hidden="true">&rarr;</span></a>
-</section>
-{% endif %}
+</div>
 
-{# ═══ SELECTED WORK — editorial offset grid (lightbox tiles) ═════════════════
-   .tile + data-web is the lightbox hook (static/lightbox.js). Gated on
-   featured so nothing starred = no empty grid + no lightbox script. #}
+{# ═══ FROM THE ARCHIVE — recent frames on a filmstrip (lightbox tiles) ═══════ #}
 {% if featured %}
-<section class="ework" id="work">
-  <div class="ework-head" data-reveal>
-    <div class="ework-head-txt">
-      <p class="esec-kicker">Selected work</p>
-      <h2 class="esec-h2">Recent favorites, all three crafts.</h2>
-      <p class="esec-lede">Spaces, faces, and plates from recent shoots — the
-         frames clients ran with.</p>
-    </div>
-    <a class="elink ework-head-link" href="/portfolio">Full portfolio <span aria-hidden="true">&rarr;</span></a>
+<section class="sr-wrap sr-section" aria-label="From the archive" id="work">
+  <div class="sr-kickrow">
+    <p class="sr-mono">From the archive &mdash; recent frames</p>
+    <a class="sr-mono sr-mono--signal" href="/portfolio">Open the archive &rarr;</a>
   </div>
-  <div class="ework-grid">
+  <div class="sr-filmstrip">
     {% for a in featured[:6] %}
-    <figure class="tile ework-fig ework-fig-{{ loop.index }}" data-web="/site/img/{{ a.id }}">
+    <figure class="tile{{ ' sr-frame-wide' if loop.index is odd else ' sr-frame-tall' }}" data-web="/site/img/{{ a.id }}">
       <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-           srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
-           sizes="(max-width: 860px) 92vw, 30vw" alt="{{ a|portfolio_alt }}">
-      <figcaption class="ework-cap">
-        <span class="ework-cap-t">{{ a.portfolio_tag|tag_label if a.portfolio_tag else 'Selected work' }}</span>
-        {% if a.client_name %}<span class="ework-cap-s">{{ a.client_name }}</span>{% endif %}
-      </figcaption>
+           sizes="(max-width: 700px) 45vw, 260px" alt="{{ a|portfolio_alt }}">
+      <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
     </figure>
     {% endfor %}
   </div>
-</section>
-{% endif %}
-
-{# ═══ MOTION — feature reel + strip (portfolio-gated video routes) ═══════════ #}
-{% if reels %}
-<section class="emotion" id="motion">
-  <div class="emotion-head" data-reveal>
-    <div class="emotion-head-txt">
-      <p class="esec-kicker esec-kicker-gold">Motion</p>
-      <h2 class="esec-h2 esec-h2-cream">Motion that earns <span class="eem-gold">the scroll.</span></h2>
-    </div>
-    <p class="emotion-sub">The steam. The pour. The first cut. Built vertical for the feed.</p>
-  </div>
-  {% set feat = reels[0] %}
-  <figure class="emotion-feature" data-reveal>
-    <video autoplay muted loop playsinline preload="metadata" poster="/site/poster/{{ feat.id }}">
-      <source src="/site/vid/{{ feat.id }}" type="video/mp4">
-    </video>
-    <span class="emotion-veil" aria-hidden="true"></span>
-    <span class="emotion-play" aria-hidden="true">&#9654;</span>
-    <figcaption class="emotion-flabel">
-      <span>House reel</span>
-      {% if feat.portfolio_tag %}<span class="emotion-flabel-tag">{{ feat.portfolio_tag|tag_label }}</span>{% endif %}
-    </figcaption>
-  </figure>
-  {% if reels|length > 1 %}
-  <div class="emotion-strip">
-    {% for r in reels[1:5] %}
-    <figure class="emotion-clip">
-      <video autoplay muted loop playsinline preload="metadata" poster="/site/poster/{{ r.id }}">
-        <source src="/site/vid/{{ r.id }}" type="video/mp4">
-      </video>
-      <figcaption>{{ r.portfolio_tag|tag_label if r.portfolio_tag else 'Reel' }}</figcaption>
-    </figure>
-    {% endfor %}
-  </div>
+  {% if demo_gallery %}
+  <p class="sr-kickrow" style="margin-top: 14px;">
+    <a class="sr-mono sr-mono--signal" href="{{ demo_gallery.url }}">Prospect screening &mdash; try the sample gallery &rarr;</a>
+    {% if demo_gallery.pin %}<span class="sr-mono">PIN {{ demo_gallery.pin }}</span>
+    {% else %}<a class="sr-mono" href="/contact?prefill=demo_gallery">Ask for the PIN</a>{% endif %}
+  </p>
   {% endif %}
-  <p class="emotion-more" data-reveal><a class="elink" href="/reels">All reels <span aria-hidden="true">&rarr;</span></a></p>
 </section>
 {% endif %}
 
-{# ═══ DELIVERY — interactive proofing + crop switcher ════════════════════════
-   Zero new JS: static/site.js already wires [data-proof]/[data-crop]. The
-   proofing thumbs must keep the literal class "proof-thumb" (the counter reads
-   .proof-thumb.picked). Gated on featured for real frames. #}
-{% if featured %}
-<section class="edelivery" id="delivery">
-  <div class="edelivery-intro" data-reveal>
-    <p class="esec-kicker">After the shoot</p>
-    <h2 class="esec-h2">Delivery is the easy part.</h2>
-    <p class="esec-lede">A private gallery the day after the shoot. Proof, download,
-       post — every crop already sized.</p>
-  </div>
-  <div class="edelivery-grid" data-delivery-grid>
-    <div class="eproof" data-proof data-reveal>
-      <div class="eproof-head">
-        <span class="eproof-label">Proof &amp; favorite</span>
-        <span class="eproof-count"><b data-proof-count>0</b> of {{ featured[:6]|length }} selected</span>
-      </div>
-      <div class="eproof-track"><i data-proof-fill></i></div>
-      <div class="eproof-grid">
-        {% for a in featured[:6] %}
-        <button type="button" class="proof-thumb eproof-thumb" data-proof-thumb
-                aria-label="Favorite this frame">
-          <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-               alt="{{ a|portfolio_alt }}">
-          <span class="eproof-heart" aria-hidden="true">&#9825;</span>
-        </button>
-        {% endfor %}
-      </div>
-    </div>
-    <div class="ecrop" data-crop data-reveal>
-      <p class="ecrop-label">Social crops, auto-made</p>
-      <h3 class="ecrop-h3">One favorite. Every format.</h3>
-      <div class="ecrop-preview" data-crop-preview>
-        <img src="/site/img/{{ featured[0].id }}?variant=web" loading="lazy" decoding="async"
-             alt="{{ featured[0]|portfolio_alt }}">
-      </div>
-      <div class="ecrop-tabs" role="tablist" aria-label="Crop format">
-        <button type="button" class="ecrop-btn on" data-crop-btn data-ratio="1 / 1"
-                data-name="Square · 1:1" data-use="Instagram feed &amp; grid posts.">1:1</button>
-        <button type="button" class="ecrop-btn" data-crop-btn data-ratio="4 / 5"
-                data-name="Portrait · 4:5" data-use="Maximum feed real estate.">4:5</button>
-        <button type="button" class="ecrop-btn" data-crop-btn data-ratio="9 / 16"
-                data-name="Story · 9:16" data-use="Reels, Stories &amp; TikTok.">9:16</button>
-      </div>
-      <p class="ecrop-name" data-crop-name>Square · 1:1</p>
-      <p class="ecrop-use" data-crop-use>Instagram feed &amp; grid posts.</p>
-    </div>
-  </div>
-</section>
-{% endif %}
-
-{# ═══ TESTIMONIALS — real published reviews (Review/Person JSON-LD in include) #}
-<section class="etestimonials" data-reveal>
+{# ═══ WHAT CLIENTS SAY — Review JSON-LD rides the shared partial ═════════════ #}
+{% if testimonials %}
+<section class="sr-wrap sr-section" aria-label="Testimonials">
   {% include "site/_testimonials.html" %}
 </section>
-
-{# ═══ ABOUT — portrait + copy ═══════════════════════════════════════════════ #}
-<section class="eabout" id="about">
-  <div class="eabout-grid" data-about-grid>
-    <div class="eabout-media" data-reveal>
-      {% if featured %}
-      <img src="/site/img/{{ featured[-1].id }}?variant=web" loading="lazy" decoding="async"
-           sizes="(max-width: 860px) 92vw, 38vw" alt="{{ featured[-1]|portfolio_alt }}">
-      {% endif %}
-    </div>
-    <div class="eabout-copy" data-reveal>
-      <p class="esec-kicker">About</p>
-      <h2 class="esec-h2 eabout-h2">I'm Kevin Lee, and I'd love to work with you.</h2>
-      <p class="eabout-body">I shoot the spaces people want to live in, the faces
-         they trust, and the plates they crave — and the job is the same in all
-         three: make it look the way it feels at its best. We'll plan fast,
-         shoot around your day, and deliver work that earns its keep. Let's
-         win together.</p>
-      <a class="elink" href="/about">Read the full story <span aria-hidden="true">&rarr;</span></a>
-    </div>
-  </div>
-</section>
-
-{# ═══ CLOSING CTA ═══════════════════════════════════════════════════════════ #}
-<section class="ecta">
-  <div class="ecta-inner" data-reveal>
-    {% if demo_gallery %}
-    <p class="ecta-demo"><a href="{{ demo_gallery.url }}">Taste the sample gallery <span aria-hidden="true">&rarr;</span></a>
-      {% if demo_gallery.pin %}<span>PIN <b>{{ demo_gallery.pin }}</b></span>
-      {% else %}<a class="ecta-demo-ask" href="/contact?prefill=demo_gallery">(ask for the PIN)</a>{% endif %}
-    </p>
-    {% endif %}
-    <h2 class="ecta-h2">Let's make it look <span class="eem">the way it feels.</span></h2>
-    <div class="ecta-actions">
-      <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
-        <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
-      <a class="elink" href="/work">See past work <span aria-hidden="true">&rarr;</span></a>
-    </div>
-  </div>
-</section>
+{% endif %}
 
 {% if featured %}{% include "site/_lightbox.html" %}{% endif %}
 {% endblock %}

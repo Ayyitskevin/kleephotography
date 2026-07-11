@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi.templating import Jinja2Templates
 
-from . import config, db, specialties
+from . import config, db, features, specialties
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -49,6 +49,13 @@ templates.env.globals["og_image_id"] = _og_image_id
 templates.env.globals["instagram_url"] = config.INSTAGRAM_URL
 templates.env.globals["contact_email"] = config.CONTACT_EMAIL
 templates.env.globals["plausible_domain"] = config.PLAUSIBLE_DOMAIN
+# Callables (not frozen bools) so the flags read current config per render —
+# tests monkeypatch app.config.SCREENING_ROOM / AERIALS_LIVE and see it stick.
+templates.env.globals["sr_enabled"] = features.screening_room
+templates.env.globals["aerials_live"] = features.aerials_live
+# specialty key → film-stock code ('re' → '250D') for mono frame metadata
+templates.env.globals["sp_stock"] = {k: m["stock"] for k, m in specialties.SPECIALTIES.items()}
+templates.env.globals["aerial_pass_display"] = specialties.aerial_pass_display
 
 
 def _portfolio_alt(asset, site_name: str | None = None) -> str:

@@ -3,15 +3,15 @@
 {% block meta_description %}Where the work has run — press features and publications covering {{ site_name }}, in print and online.{% endblock %}
 {% block site_content %}
 
-<section class="page-hero">
-  <div class="page-hero-inner" data-reveal>
-    <p class="eyebrow">Press</p>
-    <h1>Where the work <span class="it-accent">has run.</span></h1>
-    <p class="lede">In print and online.</p>
+<section class="sr-wrap">
+  <div class="sr-pagehead">
+    <span class="sr-mono">As seen in</span>
+    <h1>Where the work <em>has run.</em></h1>
+    <p class="sr-beat">in print and online</p>
   </div>
 </section>
 
-<section class="page-body" data-reveal>
+<section class="page-body sr-wrap sr-section" data-reveal>
   {% if press %}
   <ul class="press-list">
     {% for p in press %}
@@ -33,14 +33,11 @@
 </section>
 
 {# CLOSING CTA #}
-<section class="cta">
-  <div class="cta-inner" data-reveal>
-    <h2>Let's make your food look <span class="it-accent">the way it tastes.</span></h2>
-    <p>Send your menu and your goal. Tailored proposal back within a business day.</p>
-    <div class="cta-actions">
-      <a class="btn-pill" href="/contact">Request a quote &rarr;</a>
-      <a class="btn-ghost" href="/portfolio">View the portfolio</a>
-    </div>
+<section class="sr-wrap sr-section" aria-label="Book">
+  <div class="sr-stats">
+    <div class="sr-stat"><b>Your story next?</b><small>Tailored proposal within a business day</small></div>
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/contact">Request a quote &rarr;</a></div>
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn sr-btn--ghost" href="/portfolio">Open the archive</a></div>
   </div>
 </section>
 {% endblock %}

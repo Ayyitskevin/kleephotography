@@ -1,8 +1,10 @@
 {% extends "base_cream.html" %}
 {% block title %}{{ p.title }} · {{ site_name }}{% endblock %}
+{% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
-<main class="gallery-main portal-main">
-  <header class="portal-header">
+<main class="gallery-main portal-main sr-wrap">
+  <header class="portal-header sr-pagehead">
+    <span class="sr-mono sr-mono--signal">Production pass &middot; one place for the whole shoot</span>
     <h1>{{ p.company or p.client_name }}</h1>
     <p class="muted">{{ p.title }} · {{ site_name }}
       · <a class="portal-share" href="{{ share_href }}">&#9993; Share</a></p>

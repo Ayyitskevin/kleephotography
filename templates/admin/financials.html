@@ -6,6 +6,7 @@
 {% block topbar %}
 <div class="pgtop">
   <div class="pgtop-lead">
+    {% if sr_enabled() %}<p class="gd-eyebrow">The ledger</p>{% endif %}
     <h1>Financials</h1>
     <p class="pgtop-sub">Every transaction, tax, and fee — accountant-ready</p>
   </div>
@@ -17,6 +18,17 @@
 {% block admin_body %}
 <div class="fin-wrap">
   {% include "admin/_money_nav.html" %}
+
+  {% if sr_enabled() and month_reel %}
+  <section class="sr-monthreel" aria-label="Collected by month, trailing six months" role="img">
+    {% for m in month_reel %}
+    <div class="sr-monthreel-col">
+      <i class="{{ 'is-current' if m.current }}" style="height: {{ m.pct }}%;"></i>
+      <small class="{{ 'is-current' if m.current }}">{{ m.label }}</small>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
 
   <section class="fin-summary">
     {% for c in cards %}
@@ -82,7 +94,7 @@
           <thead><tr>
             <th>Date</th><th>Client</th><th>Invoice</th><th>Service</th>
             <th class="fin-num">Amount</th><th class="fin-num">Tax</th>
-            <th class="fin-num">Fee</th><th class="fin-num">Net</th><th>Status</th>
+            <th class="fin-num">Fee</th><th class="fin-num">Net</th><th>Status</th><th class="fin-num">Act</th>
           </tr></thead>
           <tbody>
             {% for r in rows %}
@@ -96,9 +108,10 @@
               <td class="fin-num fin-soft">{{ r.fee }}</td>
               <td class="fin-num fin-net">{{ r.net }}</td>
               <td><span class="fin-pill fin-pill-{{ r.st }}">{{ r.status }}</span></td>
+              <td class="fin-num">{% if r.inv_id %}<a class="sr-ledger-act {{ 'is-warn' if r.st == 'out' }}" href="/admin/studio/invoices/{{ r.inv_id }}">{{ r.act }}</a>{% endif %}</td>
             </tr>
             {% else %}
-            <tr><td colspan="9" class="fin-empty-row">No transactions in this range.</td></tr>
+            <tr><td colspan="10" class="fin-empty-row">No transactions in this range.</td></tr>
             {% endfor %}
           </tbody>
         </table>

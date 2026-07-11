@@ -395,9 +395,10 @@ def test_full_gallery_flow(admin):
         assert r.headers["content-type"] == "application/zip"
         zf = zipfile.ZipFile(io.BytesIO(r.content))
         assert zf.namelist() == ["dish.jpg"]
-        # favorites ZIP: header button shows, bundle holds exactly the faved original
+        # favorites ZIP: the export rail offers "takes only" with a live count,
+        # and the bundle holds exactly the faved original
         page = pub.get(f"/g/{g['slug']}").text
-        assert f"/g/{g['slug']}/download/favorites" in page and "Favorites (1)" in page
+        assert f"/g/{g['slug']}/download/favorites" in page and "1 take circled" in page
         r = pub.get(f"/g/{g['slug']}/download/favorites")
         assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
         assert zipfile.ZipFile(io.BytesIO(r.content)).namelist() == ["dish.jpg"]
@@ -1612,18 +1613,22 @@ def test_tasks_board_view(admin):
     db.run("DELETE FROM tasks WHERE title IN ('Due-today board task','Undated board task')")
 
 
-def test_manage_nav_financials_expenses(admin):
-    # Financials and Expenses must appear as first-class links in the Manage
-    # sidebar (not palette-only), and their active-state guards must not overlap:
-    # on the income page only Financials is highlighted; on the expenses/mileage
-    # pages only Expenses is. A bad guard would light both at once and mislead.
+def test_manage_nav_financials_expenses(admin, monkeypatch):
+    # Deck rail (Screening Room): Money is a first-class rail stop, lit on every
+    # financials path (income AND expenses/mileage — one Ledger, tabs inside).
+    # The legacy sidebar behind the kill switch keeps the old split guards:
+    # Financials lights on income only, Expenses on expenses/mileage only.
+    from app import config
+
     inc = admin.get("/admin/financials").text
-    assert 'href="/admin/financials" title="Financials"' in inc
-    assert 'href="/admin/financials/expenses" title="Expenses"' in inc
-    # active financials link, inactive expenses link, on the income page
+    assert 'href="/admin/financials" title="Money" class="is-active"' in inc
+    exp = admin.get("/admin/financials/expenses").text
+    assert 'href="/admin/financials" title="Money" class="is-active"' in exp
+
+    monkeypatch.setattr(config, "SCREENING_ROOM", False)
+    inc = admin.get("/admin/financials").text
     assert 'href="/admin/financials" title="Financials" class="is-active"' in inc
     assert 'href="/admin/financials/expenses" title="Expenses"><' in inc
-
     exp = admin.get("/admin/financials/expenses").text
     assert 'href="/admin/financials/expenses" title="Expenses" class="is-active"' in exp
     assert 'href="/admin/financials" title="Financials"><' in exp
@@ -9787,9 +9792,10 @@ def test_specialty_pages(admin):
         # no re-shoot event type exists yet → CTA falls back to /book
         assert 'href="/book"' in r.text and 'href="/book/re-shoot"' not in r.text
 
-        # the hub renders one door per specialty, each linking to its spoke
+        # the hub renders one feature title card per specialty, each
+        # linking to its spoke (sp-door stays the stable hook class)
         r = pub.get("/")
-        assert r.text.count('class="sp-door"') == 3
+        assert r.text.count("sp-door") == 3
         for slug in ("real-estate", "portraits", "food-beverage"):
             assert f'href="/{slug}"' in r.text
 
@@ -9829,9 +9835,9 @@ def test_specialty_pages(admin):
             assert f'data-web="/site/img/{re_id}"' not in r.text
             assert f'data-web="/site/img/{fb_id}"' not in r.text
 
-            # the RE door now badges its single starred frame
+            # the RE title card now badges its single starred frame
             r = pub.get("/")
-            assert "1 frame" in r.text
+            assert "1 still" in r.text
 
         # once the conventional event type exists, the spoke CTA deep-links it
         admin.post(
@@ -10019,3 +10025,143 @@ def test_portal_motion_band(admin):
     finally:
         db.run("DELETE FROM portals WHERE slug=?", (prow["slug"],))
         db.run("UPDATE galleries SET client_id=NULL WHERE id=?", (g["id"],))
+
+
+def test_screening_room_rollout_flag(client, monkeypatch):
+    """Foundation wiring: body.sr rides the marketing pages when the rollout
+    flag is on (default), disappears when it's off, and the token layer is
+    served. Old themes must render either way — the tokens are body.sr-scoped."""
+    from app import config
+
+    # default: flag ON — the site body carries the sr scope
+    page = client.get("/").text
+    assert 'class="site-body sr"' in page
+    # tokens ship as their own sheet, linked from base.html
+    css = client.get("/static/screening-room-tokens.css")
+    assert css.status_code == 200
+    assert "body.sr" in css.text
+    assert "--sr-house" in css.text
+    assert "/static/screening-room-tokens.css" in page
+    # Plex Mono self-hosted, declared alongside the existing families
+    fonts = client.get("/static/fonts.css").text
+    assert "IBM Plex Mono" in fonts
+    assert client.get("/static/fonts/ibm-plex-mono-500-latin.woff2").status_code == 200
+
+    # kill switch: flag OFF — sr scope gone, page still renders
+    monkeypatch.setattr(config, "SCREENING_ROOM", False)
+    off = client.get("/")
+    assert off.status_code == 200
+    assert 'class="site-body"' in off.text
+    assert " sr" not in off.text.split("<body")[1].split(">")[0]
+
+    # unconverted/legal surfaces never opt in regardless of the flag
+    monkeypatch.setattr(config, "SCREENING_ROOM", True)
+    assert 'class="cream-theme"' in client.get("/admin/login").text
+
+
+def test_aerial_pass_booking_addon(monkeypatch, admin):
+    """The Aerial Pass add-on rides re- bookings via notes (zero-schema) and is
+    doubly gated: the checkbox only acts when the slug is re- AND aerials_live.
+    The /real-estate band + spec line ride the same flag."""
+    import datetime as dt
+
+    from app import config
+    from app import scheduling as S
+
+    eid = db.run(
+        """INSERT INTO event_types
+        (slug, name, duration_min, min_notice_hours, booking_window_days,
+         max_per_day, creates_notion_session, location, active)
+        VALUES (?,?,?,?,?,?,?,?,1)""",
+        ("re-aerial-test", "RE Aerial Test", 60, 1, 60, 0, 1, "On-site"),
+    )
+    for wd in range(5):
+        db.run(
+            "INSERT INTO availability_rules (event_type_id, weekday, start_min, "
+            "end_min) VALUES (?,?,?,?)",
+            (eid, wd, 540, 1020),
+        )
+    et = S.event_by_slug("re-aerial-test")
+    day = dt.date.today() + dt.timedelta(days=3)
+    while day.weekday() >= 5:
+        day += dt.timedelta(days=1)
+    slots = S.slots_for_day(et, day)
+    assert len(slots) >= 2
+
+    def book(start, flag, aerial="1"):
+        monkeypatch.setattr(config, "AERIALS_LIVE", flag)
+        with TestClient(app) as pub:
+            r = pub.post(
+                "/book/re-aerial-test",
+                data={
+                    "name": "Agent Ada",
+                    "email": f"ada+{flag}@brokerage.com",
+                    "start": start,
+                    "tz": "America/New_York",
+                    "notes": "Twilight if possible.",
+                    "aerial_pass": aerial,
+                },
+                follow_redirects=False,
+            )
+            assert r.status_code == 303, r.text
+        return db.one("SELECT * FROM bookings ORDER BY id DESC LIMIT 1")
+
+    try:
+        # flag ON: intake shows the add-on line and the note tag lands
+        monkeypatch.setattr(config, "AERIALS_LIVE", True)
+        with TestClient(app) as pub:
+            page = pub.get(
+                f"/book/re-aerial-test?year={day.year}&month={day.month}"
+                f"&day={day.isoformat()}&start={slots[0]['utc']}&tz=America/New_York"
+            ).text
+            assert 'name="aerial_pass"' in page
+            assert "+$150" in page  # placeholder rate from specialties.AERIAL_PASS_CENTS
+        b = book(slots[0]["utc"], True)
+        assert "AERIAL PASS requested (+$150 add-on)" in b["notes"]
+        assert "Twilight if possible." in b["notes"]
+
+        # flag OFF: checkbox is gone and a forged POST field is ignored
+        from app import ratelimit, security
+
+        ratelimit._hits.clear()
+        db.run("DELETE FROM pin_attempts WHERE gallery_id=?", (security.INQUIRY_BUCKET_BOOK,))
+        monkeypatch.setattr(config, "AERIALS_LIVE", False)
+        with TestClient(app) as pub:
+            page = pub.get(
+                f"/book/re-aerial-test?year={day.year}&month={day.month}"
+                f"&day={day.isoformat()}&start={slots[1]['utc']}&tz=America/New_York"
+            ).text
+            assert 'name="aerial_pass"' not in page
+        b = book(slots[1]["utc"], False)
+        assert "AERIAL PASS" not in (b["notes"] or "")
+    finally:
+        db.run("DELETE FROM bookings WHERE event_type_id=?", (eid,))
+        db.run("DELETE FROM availability_rules WHERE event_type_id=?", (eid,))
+        db.run("DELETE FROM event_types WHERE id=?", (eid,))
+
+
+def test_screening_room_behavior_hooks(admin):
+    """The Screening Room behaviors ship as delegated, CSP-safe hooks: chapter
+    seeking + bench culling live in behaviors.js (no inline handlers), the
+    bench rail carries the premiere check, the deck renders ON DECK, and the
+    ledger gets its month reel."""
+    js = admin.get("/static/behaviors.js").text
+    assert "data-seek" in js and "data-cull" in js
+
+    admin.post("/admin/galleries", data={"title": "Hook Check"}, follow_redirects=False)
+    g = db.one("SELECT * FROM galleries WHERE title='Hook Check' ORDER BY id DESC LIMIT 1")
+    try:
+        page = admin.get(f"/admin/galleries/{g['id']}").text
+        assert "Premiere check" in page
+        assert "curtain down (draft)" in page
+        assert "client not linked" in page
+
+        deck = admin.get("/admin/home").text
+        assert "On deck" in deck
+        assert "/admin/palette.json" in deck  # ⌘K command-runner bindings load lazily
+        assert admin.get("/admin/palette.json").json()["clients"] is not None
+
+        fin = admin.get("/admin/financials").text
+        assert "sr-monthreel" in fin
+    finally:
+        admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False)

@@ -63,6 +63,20 @@ def test_notion_variants():
 
 
 @pytest.mark.unit
+def test_screening_room_and_aerials_flags():
+    with patch("app.features.config") as mock_cfg:
+        mock_cfg.SCREENING_ROOM = True
+        mock_cfg.AERIALS_LIVE = False
+        assert features.screening_room() is True
+        assert features.aerials_live() is False
+
+        mock_cfg.SCREENING_ROOM = False
+        mock_cfg.AERIALS_LIVE = True
+        assert features.screening_room() is False
+        assert features.aerials_live() is True
+
+
+@pytest.mark.unit
 def test_demo_gallery_and_plausible():
     with patch("app.features.config") as mock_cfg:
         mock_cfg.DEMO_GALLERY_SLUG = "demo"

@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
-from .. import config, db, mailer, security, specialties
+from .. import config, db, features, mailer, security, specialties
 from ..render import ROOT, templates
 
 log = logging.getLogger("mise.public.site")
@@ -446,6 +446,36 @@ SPECIALTY_PAGES = {
         "exteriors, and walkthrough reels land here as they're delivered.",
         "cta_h1": "Got a listing",
         "cta_h2": "going live?",
+        # Screening Room (3b — "a listing premiere"): the walkthrough film IS
+        # the page. Chapter times are fractions of the real hero film's
+        # duration (no chapter schema); the aerial chapter and spec-line
+        # segment ride the aerials_live flag.
+        "sr": {
+            "nav_archive": "Listings screened",
+            "cta": "Book a listing",
+            "h2a": "Listings worth",
+            "h2b": "the drive.",
+            "spec": ["MLS next-day", "Film in 48h"],
+            "spec_aerial": "Aerial Pass {rate} — FAA Part 107",
+            "chapters": [
+                {"at": 0.0, "label": "The approach"},
+                {"at": 0.21, "label": "Kitchen & great room"},
+                {"at": 0.48, "label": "Primary suite"},
+                {"at": 0.62, "label": "Aerial orbit", "aerial": True},
+                {"at": 0.81, "label": "Twilight close"},
+            ],
+            "agents_cut": "vertical for social + hero for the listing page, "
+            "delivered together, 48 hours after the shoot.",
+            "agents_cut_aerial": "aerial establishing + vertical for social + "
+            "hero for the listing page, delivered together, 48 hours after "
+            "the shoot.",
+            "strip_label": "Stills — frames pulled from the film day",
+            "proof": [
+                ("18h", "avg. MLS turnaround"),
+                ("48h", "walkthrough film"),
+                ("1 link", "agent + seller share"),
+            ],
+        },
     },
     "pl": {
         "title": "Portrait & Lifestyle Photography",
@@ -540,6 +570,39 @@ SPECIALTY_PAGES = {
         "they're delivered — the calendar is open now.",
         "cta_h1": "Let's make time",
         "cta_h2": "for a session.",
+        # Screening Room (3k — reassurance psychology): direction promised up
+        # front, the nerves named and answered in the client's own words.
+        "sr": {
+            "nav_archive": "Sessions screened",
+            "cta": "Book a session",
+            "beat": "directed, never posed — you'll always know what to do with your hands",
+            "body": "Headshots, personal branding, families, and the moments "
+            "in between. Every frame is coached — where to look, when to "
+            "move — and delivered ready for wherever it's going: LinkedIn, "
+            "the company site, the mantel.",
+            "stats": [
+                ("10 min", "until most people relax"),
+                ("Same week", "private gallery"),
+            ],
+            "nerves": [
+                (
+                    "“I'm awkward in front of a camera.”",
+                    "That's most people — and my favorite kind of session. "
+                    "Everything is directed; you're never left posing in silence.",
+                ),
+                (
+                    "“What do I even wear?”",
+                    "Solid colors you already feel good in beat anything bought "
+                    "for the shoot. Bring one backup look; we pick together.",
+                ),
+                (
+                    "“Can you do our whole team?”",
+                    "One visit, matched lighting and framing — new hires slot in "
+                    "later without the team page looking stitched together.",
+                ),
+            ],
+            "frames_label": "Selected sessions — none of them born camera-ready",
+        },
     },
     "fb": {
         "title": "Food & Beverage Photography & Video",
@@ -637,8 +700,82 @@ SPECIALTY_PAGES = {
         "empty_body": "Menus, pours, and the rooms they live in land here as they're delivered.",
         "cta_h1": "Let's make your food look",
         "cta_h2": "the way it tastes.",
+        # Screening Room (3c + 3l): full-bleed opening title card, appetite
+        # grid, the process told as courses.
+        "sr": {
+            "nav_archive": "Menus screened",
+            "cta": "Book a shoot",
+            "presents": "Kevin Lee presents — Food & Beverage",
+            "h2a": "Your menu,",
+            "h2b": "selling itself.",
+            "beat": "the steam, the pour, the first cut — in the thirty seconds a dish looks alive",
+            "card_meta_l": "Stock 500T — appetite grade",
+            "card_meta_r": "Same-week gallery · crops 1:1 / 4:5 / 9:16",
+            "grid_label": "Recent menus — plates, pours & the rooms they live in",
+            "courses": [
+                (
+                    "First course — Scout",
+                    "We walk the menu together, agree the hero dishes and "
+                    "drinks, and build the shot list around your service window.",
+                ),
+                (
+                    "Main — Shoot fast",
+                    "Natural light first, styling honest, shot in the thirty "
+                    "seconds a dish looks alive. The kitchen never waits.",
+                ),
+                (
+                    "Dessert — Same week",
+                    "A private premiere within the week — full-res downloads, "
+                    "circled takes, crops already cut for every platform.",
+                ),
+            ],
+            "cta_final": "Book the kitchen's slot",
+        },
     },
 }
+
+
+def _sr_rate_cells(key: str) -> list[dict]:
+    """Rate cells for the spoke rails (#rates). Labels are the approved
+    Screening Room copy; every dollar figure is read from SERVICES so pricing
+    keeps its single source of truth."""
+
+    def tier(gkey: str, i: int) -> dict:
+        return next(s for s in SERVICES if s["key"] == gkey)["tiers"][i]
+
+    if key == "re":
+        return [
+            {"price": tier("real_estate", 0)["display_price"], "label": "Essentials — per listing"},
+            {
+                "price": tier("real_estate", 1)["display_price"],
+                "label": "Signature — photo + reel",
+                "pick": True,
+            },
+            {"price": tier("real_estate", 2)["display_price"], "label": "Premier — photo + film"},
+        ]
+    if key == "pl":
+        return [
+            {"price": tier("portraits", 0)["display_price"], "label": "Tier I — one look"},
+            {
+                "price": tier("portraits", 1)["display_price"],
+                "label": "Tier II — two looks",
+                "pick": True,
+            },
+            {"price": tier("portraits", 2)["display_price"], "label": "Tier III — extended"},
+        ]
+    return [
+        {"price": tier("photography", 0)["display_price"], "label": "Photo starter — half day"},
+        {
+            "price": tier("videography", 0)["display_price"],
+            "label": "Reel starter — hero + 3 cutdowns",
+        },
+        {
+            "price": tier("brand_partner", 1)["display_price"],
+            "unit": "/mo",
+            "label": "Brand partner — photo + reels monthly",
+            "pick": True,
+        },
+    ]
 
 
 def _portfolio_assets() -> list:
@@ -802,30 +939,36 @@ def _contact_prefill(request: Request) -> dict:
     return {"business": business, "message": message, "service": service, "tier": tier}
 
 
-# One-liner under each homepage specialty door. The F&B line keeps the
-# long-standing "makes people hungry" phrase on the home page.
+# Subtitle under each lobby title card (Screening Room 3a). The RE line gains
+# "& aerials" only once the Part 107 cert is live (aerials_live flag).
 DOOR_LINES = {
-    "re": "MLS-ready stills and walkthrough reels that move listings.",
-    "pl": "Headshots, branding, and families — directed, not posed.",
-    "fb": "Menus, pours, and rooms — photography that makes people hungry.",
+    "re": "real estate — stills & film",
+    "re_aerial": "real estate — stills, film & aerials",
+    "pl": "portraits — directed, never posed",
+    "fb": "food & beverage — the original craft",
 }
 
 
 def _specialty_doors() -> list[dict]:
-    """The homepage's three specialty doors: name, one-liner, that vertical's
-    newest starred photo as the lead image (None → slate frame), and honest
-    work counts (rendered only when non-zero — no vanity zeros)."""
+    """The lobby's three feature title cards: screen name, film-stock billing,
+    subtitle, that vertical's newest starred photo as the card artwork (None →
+    house-black card), and honest work counts (rendered only when non-zero —
+    no vanity zeros)."""
     assets = _portfolio_assets()
     reels = _portfolio_reels()
     doors = []
     for key, meta in specialties.SPECIALTIES.items():
         mine = [a for a in assets if specialties.specialty_key(a["portfolio_tag"]) == key]
+        line_key = "re_aerial" if key == "re" and features.aerials_live() else key
         doors.append(
             {
                 "key": key,
                 "slug": meta["slug"],
                 "name": meta["name"],
-                "line": DOOR_LINES[key],
+                "feature": meta["feature"],
+                "stock": meta["stock"],
+                "screen_name": meta["screen_name"],
+                "line": DOOR_LINES[line_key],
                 "lead": mine[0] if mine else None,
                 "n_photos": len(mine),
                 "n_reels": sum(
@@ -865,9 +1008,15 @@ async def portfolio(request: Request):
     # distinct tags actually in use, alphabetical — the subject filter chips
     tags = sorted({a["portfolio_tag"] for a in assets if a["portfolio_tag"]}, key=str.lower)
     # specialty chips render only for verticals that actually have starred work
+    # (chip = the film-stock label the Screening Room archive filters by)
     sp_counts = Counter(specialties.specialty_key(a["portfolio_tag"]) for a in assets)
     sp_chips = [
-        {"key": k, "name": m["name"], "count": sp_counts[k]}
+        {
+            "key": k,
+            "name": m["name"],
+            "count": sp_counts[k],
+            "chip": f"{m['stock']} — {m['screen_name'].removeprefix('The ')}",
+        }
         for k, m in specialties.SPECIALTIES.items()
         if sp_counts[k]
     ]
@@ -1095,7 +1244,12 @@ async def reels(request: Request):
     vids = _portfolio_reels()
     sp_counts = Counter(specialties.specialty_key(r["portfolio_tag"]) for r in vids)
     sp_chips = [
-        {"key": k, "name": m["name"], "count": sp_counts[k]}
+        {
+            "key": k,
+            "name": m["name"],
+            "count": sp_counts[k],
+            "chip": f"{m['stock']} — {m['screen_name'].removeprefix('The ')}",
+        }
         for k, m in specialties.SPECIALTIES.items()
         if sp_counts[k]
     ]
@@ -1148,6 +1302,8 @@ def _specialty_page(request: Request, key: str):
             "book_url": book_url,
             "faqs": page["faqs"],
             "faq_heading": "Good to know",
+            "rates": _sr_rate_cells(key),
+            "aerial_rate": specialties.aerial_pass_display(),
         },
     )
 

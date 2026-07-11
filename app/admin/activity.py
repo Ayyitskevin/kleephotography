@@ -4,7 +4,12 @@ import logging
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
 
 from .. import config, db, jobs, security
 from ..render import templates
@@ -199,6 +204,8 @@ async def home(request: Request):
         }
         for m in rev_months
     ]
+    # aerial flag: the Aerial Pass rides bookings.notes (zero-schema, see
+    # public/scheduling.py) — shoot cards in the day strip carry preflight
     horizon_shoots = db.all_(
         """SELECT p.id, p.title, c.name AS client_name, c.company,
                   CAST(julianday(p.shoot_date) -
@@ -209,7 +216,9 @@ async def home(request: Request):
                     WHEN '04' THEN 'Apr' WHEN '05' THEN 'May' WHEN '06' THEN 'Jun'
                     WHEN '07' THEN 'Jul' WHEN '08' THEN 'Aug' WHEN '09' THEN 'Sep'
                     WHEN '10' THEN 'Oct' WHEN '11' THEN 'Nov' WHEN '12' THEN 'Dec'
-                  END AS mon
+                  END AS mon,
+                  EXISTS(SELECT 1 FROM bookings b WHERE b.project_id=p.id
+                         AND b.notes LIKE '%AERIAL PASS%') AS aerial
            FROM projects p JOIN clients c ON c.id=p.client_id
            WHERE p.status != 'archived' AND p.shoot_date IS NOT NULL
              AND p.shoot_date >= date('now', 'localtime')
@@ -366,6 +375,88 @@ async def home(request: Request):
     }
     next_steps = [n for n in next_steps if n["key"] not in dismissed_today][:8]
 
+    # --- ON DECK (Screening Room 3h): the ONE ranked queue — money → replies
+    # → shipping → booking — merged from the read-only blocks above. Cards that
+    # correspond to a next_steps nudge carry its key so the existing dismiss
+    # endpoint doubles as "clear for today"; nothing here writes anything.
+    on_deck: list[dict] = []
+    nudge_by_key = {n["key"]: n for n in next_steps}
+
+    def _deck(lane, stock, title, meta, url, action, badge="", key=None, second=None):
+        if key is not None and key not in nudge_by_key:
+            key = None
+        else:
+            nudge_by_key.pop(key, None)
+        on_deck.append(
+            {
+                "lane": lane,
+                "stock": stock,
+                "title": title,
+                "meta": meta,
+                "url": url,
+                "action": action,
+                "badge": badge,
+                "key": key,
+                "second": second,
+            }
+        )
+
+    for r in open_invoices:
+        if not r["overdue"]:
+            continue
+        who = r["company"] or r["client_name"]
+        _deck(
+            "money",
+            "amber",
+            f"Nudge — {r['title']} · ${(r['total_cents'] or 0) // 100:,}",
+            f"{who} · due {r['due_date']}",
+            f"/admin/studio/invoices/{r['id']}",
+            "Nudge",
+            badge="LATE",
+            key=f"inv_overdue:{r['id']}",
+        )
+    for q in queue:
+        _deck(
+            "reply",
+            "pl",
+            f"Reply to {q['name']}",
+            q["context"],
+            f"/admin/inbox?sel={q['id']}",
+            "Reply",
+            badge=f"{q['age_days']}d",
+            key=f"inq_reply:{q['id']}",
+            second=q["second"],
+        )
+    for g in recent_galleries:
+        if g["published"] or not g["n_assets"]:
+            continue
+        _deck(
+            "shipping",
+            "fb",
+            f"Finish & publish — {g['title']}",
+            f"{g['client_company'] or g['client_name'] or 'no client linked'}"
+            f" · {g['n_assets']} asset{'s' if g['n_assets'] != 1 else ''} · draft",
+            f"/admin/galleries/{g['id']}",
+            "Open the bench",
+        )
+    # remaining nudges (retainers, proposal follow-ups, testimonials…) file in
+    # as booking-lane cards so no next-step ever falls off the deck
+    lane_for = {"retainer_send": "booking", "prop_followup": "booking"}
+    for n in nudge_by_key.values():
+        prefix = n["key"].split(":", 1)[0]
+        _deck(
+            lane_for.get(prefix, "booking"),
+            "ok" if n["tone"] == "info" else "amber",
+            n["text"],
+            "",
+            n["url"],
+            "Open",
+        )
+        on_deck[-1]["key"] = n["key"]
+    lane_rank = {"money": 0, "reply": 1, "shipping": 2, "booking": 3}
+    on_deck.sort(key=lambda c: lane_rank.get(c["lane"], 9))
+    on_deck = on_deck[:8]
+
     # --- Documents in flight (lifecycle: sent -> viewed -> signed/paid) ---
     docs_in_flight = db.all_(
         """SELECT 'Proposal' AS kind, pr.status,
@@ -458,7 +549,22 @@ async def home(request: Request):
             "oldest_wait_days": oldest_wait_days,
             "recent_galleries": recent_galleries,
             "revenue_months": revenue_months,
+            "on_deck": on_deck,
         },
+    )
+
+
+@router.get("/palette.json")
+async def palette_data():
+    """Client bindings for the ⌘K command runner — fetched lazily the first
+    time the palette opens so page renders stay lean. Read-only."""
+    return JSONResponse(
+        {
+            "clients": [
+                {"id": r["id"], "name": r["name"], "company": r["company"]}
+                for r in db.clients_for_select()
+            ]
+        }
     )
 
 
