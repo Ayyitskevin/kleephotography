@@ -82,6 +82,9 @@ def _tag_label(tag: str | None) -> str:
 
 
 templates.env.filters["tag_label"] = _tag_label
+# 're/exteriors' → 're'; unprefixed → 'fb' (legacy F&B). Drives the data-sp
+# specialty-filter attribute on portfolio/reels tiles.
+templates.env.filters["tag_specialty"] = specialties.specialty_key
 
 
 def _diff_tokens(value):

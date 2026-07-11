@@ -8531,3 +8531,7 @@ html[data-theme="dark"] .site-body .sp-doors-foot a { color: var(--accent); }
   html[data-theme="dark"] .site-body .sp-doors { grid-template-columns: 1fr; }
   html[data-theme="dark"] .site-body .sp-door { aspect-ratio: 4 / 3; }
 }
+
+/* /work specialty group headings (render only when >1 vertical has studies). */
+html[data-theme="dark"] .site-body .work-group-head { margin: 40px 0 18px; }
+html[data-theme="dark"] .site-body .work-group-head:first-child { margin-top: 0; }

@@ -1,14 +1,14 @@
 {% extends "site/base_site.html" %}
 {% block title %}Work — {{ site_name }}{% endblock %}
-{% block meta_description %}Client case studies — how restaurants, cafés, and bars put our food &amp; beverage photography to work across menus, social, and press.{% endblock %}
+{% block meta_description %}Client case studies across real estate, portraits, and food &amp; beverage — what we shot, and what happened after it went live.{% endblock %}
 {% block site_content %}
 
 <section class="page-hero page-hero-work">
   <div class="page-hero-inner" data-reveal>
     <p class="eyebrow">Work</p>
     <h1>Selected <span class="it-accent">case studies.</span></h1>
-    <p class="lede">Menus, dishes, drinks, and the rooms they live in — and
-       what happened after the photos went live.</p>
+    <p class="lede">Listings, brands, faces, and menus — and what happened
+       after the photos went live.</p>
   </div>
 
   {% if studies %}
@@ -37,8 +37,16 @@
 
 <main class="site-main flush-top">
   {% if studies %}
+  {% for grp in groups %}
+  {% set rest = grp.studies|rejectattr("id", "equalto", studies[0].id)|list %}
+  {% if rest %}
+  {% if groups|length > 1 %}
+  <div class="work-group-head" data-reveal>
+    <p class="esec-kicker">{{ grp.name }}</p>
+  </div>
+  {% endif %}
   <div class="work-editorial-grid" data-reveal>
-    {% for s in studies[1:] %}
+    {% for s in rest %}
     <a class="work-editorial-card" href="/work/{{ s.slug }}">
       <div class="work-editorial-img">
         {% if s.hero_id %}
@@ -55,6 +63,8 @@
     </a>
     {% endfor %}
   </div>
+  {% endif %}
+  {% endfor %}
   {% else %}
   {% include "site/_empty_portfolio.html" %}
   {% endif %}

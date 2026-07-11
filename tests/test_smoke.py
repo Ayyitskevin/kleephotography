@@ -3232,7 +3232,7 @@ def test_inquiry_form(monkeypatch):
                 "email": "sam@localhost",
                 "business": "Taqueria Luz",
                 "message": "Need a menu shoot in July.",
-                "service": "Photography",
+                "service": "Food & Beverage",
                 "dish_count": "12 dishes",
                 "usage": "Not sure",
                 "budget": "Under $1,000",
@@ -3242,8 +3242,8 @@ def test_inquiry_form(monkeypatch):
         assert 'value="Sam Owner"' in r.text and 'value="sam@localhost"' in r.text
         assert 'value="Taqueria Luz"' in r.text and "Need a menu shoot in July." in r.text
         assert 'value="12 dishes"' in r.text
-        # selects re-select the chosen option
-        assert '<option value="Photography" selected' in r.text
+        # selects re-select the chosen option (specialty options since the revamp)
+        assert '<option value="Food &amp; Beverage" selected' in r.text
         assert '<option value="Not sure" selected' in r.text
         assert '<option value="Under $1,000" selected' in r.text
         # nothing was stored for the rejected submission
@@ -4553,17 +4553,18 @@ def test_portfolio_tag_filter(admin):
         # filter chips render with per-tag counts + an "All" chip
         assert 'class="portfolio-filter"' in r.text
         assert 'data-filter=""' in r.text and ">All" in r.text  # 'All' chip
-        # alphabetical: Dishes (2) before Drinks (1)
-        assert r.text.index('data-filter="dishes"') < r.text.index('data-filter="drinks"')
+        # alphabetical: Dishes (2) before Drinks (1); tag filters are namespaced
+        assert r.text.index('data-filter="tag:dishes"') < r.text.index('data-filter="tag:drinks"')
         # per-tag counts visible
         assert ">Dishes" in r.text and "(2)" in r.text
         assert ">Drinks" in r.text and "(1)" in r.text
-        # tiles carry lowercased tag attrs
+        # tiles carry lowercased tag attrs + the derived specialty bucket
         assert 'data-tag="dishes"' in r.text
         assert 'data-tag="drinks"' in r.text
+        assert 'data-sp="fb"' in r.text  # legacy unprefixed tags = F&B
         # filter chip data-filter is lowercased to match
-        assert 'data-filter="dishes"' in r.text
-        assert 'data-filter="drinks"' in r.text
+        assert 'data-filter="tag:dishes"' in r.text
+        assert 'data-filter="tag:drinks"' in r.text
 
     # clearing a tag (empty string) → DB stores NULL, chip count drops
     admin.post(
@@ -4582,8 +4583,8 @@ def test_portfolio_tag_filter(admin):
     with TestClient(app) as pub:
         r = pub.get("/portfolio")
         # Dishes tag now has nothing → chip gone (we only show tags actually in use)
-        assert 'data-filter="dishes"' not in r.text
-        assert 'data-filter="drinks"' in r.text  # Drinks still has the lone tagged photo
+        assert 'data-filter="tag:dishes"' not in r.text
+        assert 'data-filter="tag:drinks"' in r.text  # Drinks still has the lone tagged photo
 
 
 def test_proofing_mode(admin):

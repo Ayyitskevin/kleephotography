@@ -192,14 +192,15 @@ SERVICES = [
 CONTACT_FAQS = [
     (
         "What does a typical project cost?",
-        "It depends on scope — a half-day menu refresh and a multi-day campaign "
-        "sit far apart. Send a few details and I will quote the right tier; full "
-        "ranges live on the Services page.",
+        "It depends on scope — a single listing, a half-day menu refresh, and a "
+        "multi-day campaign sit far apart. Send a few details and I will quote "
+        "the right tier; full ranges live on the Services page.",
     ),
     (
         "How soon can you shoot?",
-        "Usually within two to three weeks, sometimes sooner for a launch. Tell "
-        "me your target date and I will be honest about what is open.",
+        "Usually within two to three weeks, sometimes sooner for a launch or a "
+        "listing going live. Tell me your target date and I will be honest "
+        "about what is open.",
     ),
     (
         "Do you offer ongoing content?",
@@ -740,8 +741,15 @@ async def home(request: Request):
 @router.get("/portfolio", response_class=HTMLResponse)
 async def portfolio(request: Request):
     assets = _portfolio_assets()
-    # distinct tags actually in use, alphabetical — the filter chips
-    tags = sorted({a["portfolio_tag"] for a in assets if a["portfolio_tag"]})
+    # distinct tags actually in use, alphabetical — the subject filter chips
+    tags = sorted({a["portfolio_tag"] for a in assets if a["portfolio_tag"]}, key=str.lower)
+    # specialty chips render only for verticals that actually have starred work
+    sp_counts = Counter(specialties.specialty_key(a["portfolio_tag"]) for a in assets)
+    sp_chips = [
+        {"key": k, "name": m["name"], "count": sp_counts[k]}
+        for k, m in specialties.SPECIALTIES.items()
+        if sp_counts[k]
+    ]
     # Case studies also surface here as a "Featured clients" band; the dedicated
     # /work index + /work/{slug} detail pages are public + crawlable too.
     return templates.TemplateResponse(
@@ -750,6 +758,7 @@ async def portfolio(request: Request):
         {
             "assets": assets,
             "tags": tags,
+            "sp_chips": sp_chips if len(sp_chips) > 1 else [],
             "studies": _case_studies(),
             "demo_gallery": _demo_gallery(),
         },
@@ -918,10 +927,19 @@ async def submit_inquiry(
 
 @router.get("/work", response_class=HTMLResponse)
 async def work_index(request: Request):
+    studies = _case_studies()
+    csmap = _cs_specialty_map()
+    # Group by derived specialty (SPECIALTIES order). Headings only render
+    # when more than one group exists — a single-vertical archive stays flat.
+    groups = []
+    for key, meta in specialties.SPECIALTIES.items():
+        rows = [g for g in studies if csmap.get(g["id"], specialties.DEFAULT_KEY) == key]
+        if rows:
+            groups.append({"name": meta["name"], "slug": meta["slug"], "studies": rows})
     return templates.TemplateResponse(
         request,
         "site/work_index.html",
-        {"studies": _case_studies(), "demo_gallery": _demo_gallery()},
+        {"studies": studies, "groups": groups, "demo_gallery": _demo_gallery()},
     )
 
 
@@ -953,8 +971,21 @@ async def work_detail(request: Request, slug: str):
 
 @router.get("/reels", response_class=HTMLResponse)
 async def reels(request: Request):
+    vids = _portfolio_reels()
+    sp_counts = Counter(specialties.specialty_key(r["portfolio_tag"]) for r in vids)
+    sp_chips = [
+        {"key": k, "name": m["name"], "count": sp_counts[k]}
+        for k, m in specialties.SPECIALTIES.items()
+        if sp_counts[k]
+    ]
     return templates.TemplateResponse(
-        request, "site/reels.html", {"reels": _portfolio_reels(), "demo_gallery": _demo_gallery()}
+        request,
+        "site/reels.html",
+        {
+            "reels": vids,
+            "sp_chips": sp_chips if len(sp_chips) > 1 else [],
+            "demo_gallery": _demo_gallery(),
+        },
     )
 
 
