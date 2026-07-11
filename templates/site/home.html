@@ -1,207 +1,263 @@
 {% extends "site/base_site.html" %}
 {% block title %}{{ site_name }} — Food &amp; Beverage Photography{% endblock %}
 {% block meta_description %}Photography that makes people hungry — food &amp; beverage photography and videography for the restaurants, cafés, and bars of Asheville &amp; Western North Carolina.{% endblock %}
-{% block navclass %} nav-prep{% endblock %}
+{% block navclass %}{% endblock %}
 {% block site_content %}
 
 <div class="scroll-progress" aria-hidden="true"><div data-progress-bar></div></div>
 
-{# ═══ 4:45 PM — PREP LIGHT · the HUNGRY hero ═════════════════════════════════
-   The page is one dinner service: scrolling dims the lights from prep-cream to
-   candlelight. The headline letters are filled with a real starred photo via
-   background-clip: text (inline style carries the per-photo URL; the gradient
-   underneath is the loading/empty fallback, never the shipped look). #}
-<section class="ad-scene ad-prep">
-  <div class="ad-prep-inner">
-    <p class="ad-kicker" data-reveal>4:45 PM · prep light · one night at your restaurant</p>
-    <h1 class="ad-hungry-head" data-reveal>
-      <span class="ad-hungry-lede">Photography that makes people</span>
-      <span class="ad-hungry"{% if featured %} style="background-image: url('/site/img/{{ featured[0].id }}?variant=web'), linear-gradient(115deg, #B0653C 0%, #7A4A2E 30%, #C9A35B 52%, #8A6C36 68%, #5E4152 100%);"{% endif %}>HUNGRY<i aria-hidden="true">.</i></span>
-    </h1>
-    <div class="ad-hero-row" data-reveal>
-      <div class="ad-hero-actions">
-        <a class="btn-dinner" href="#ad-golden">Stay for dinner <span aria-hidden="true">&darr;</span></a>
-        <span class="ad-hero-trust">120+ menus · Asheville &amp; WNC · same-week delivery</span>
+{# ═══ HERO — editorial-dark (Claude Design) ══════════════════════════════════
+   Two-column: copy left, a tall signature frame right with an overlapping
+   vertical reel. The hero frame is fed by the first starred portfolio photo;
+   the reel by hero_reel. Both degrade to the slate frame when nothing is
+   starred yet. #}
+<section class="eh">
+  <div class="eh-grid" data-hero-grid>
+    <div class="eh-copy">
+      <p class="eh-kicker" data-reveal>Asheville &amp; Western North Carolina</p>
+      <h1 class="eh-title" data-reveal>We make your menu <span class="eh-em">sell itself.</span></h1>
+      <p class="eh-lede" data-reveal>For the restaurants, cafés, and bars of Western
+         North Carolina — shot to sell the seat.</p>
+      <div class="eh-actions" data-reveal>
+        <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
+          <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
+        <a class="elink" href="/portfolio">View the portfolio <span aria-hidden="true">&rarr;</span></a>
       </div>
-      <p class="ad-hero-note">Scroll and the lights go down — the way your photos
-         will meet the room: prep, golden hour, the pour, candlelight.</p>
+    </div>
+    <div class="eh-media" data-hero-media>
+      <div class="eh-frame">
+        {% if featured %}
+        <img class="eh-frame-img" data-parallax="0.05"
+             src="/site/img/{{ featured[0].id }}?variant=web"
+             srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
+             sizes="(max-width: 860px) 92vw, 46vw" fetchpriority="high" decoding="async"
+             alt="{{ featured[0]|portfolio_alt }}">
+        {% endif %}
+        <span class="eh-frame-veil" aria-hidden="true"></span>
+        <figcaption class="eh-frame-cap">Tasting menu · Asheville</figcaption>
+      </div>
+      {% if hero_reel %}
+      <div class="eh-reel" data-hero-reel data-parallax="-0.06">
+        <video autoplay muted loop playsinline preload="metadata"
+               poster="/site/poster/{{ hero_reel.id }}">
+          <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
+        </video>
+        <span class="eh-reel-play" aria-hidden="true">&#9654;</span>
+      </div>
+      {% endif %}
     </div>
   </div>
+  <div class="eh-cue" aria-hidden="true"><span>Scroll</span><span class="eh-cue-arr">&darr;</span></div>
 </section>
 
-{# AS SEEN IN — italic serif strip on the prep→golden transition #}
+{# ═══ AS SEEN IN — auto-scrolling press marquee ══════════════════════════════ #}
 {% if press %}
-<section class="ad-press" aria-label="As seen in">
-  {% for p in press %}<em>{{ p.outlet }}</em>{% endfor %}
+<section class="epress" aria-label="As seen in">
+  <p class="epress-label">As seen in</p>
+  <div class="epress-marquee">
+    <div class="epress-track">
+      {% for p in press %}<em>{{ p.outlet }}</em>{% endfor %}
+      {% for p in press %}<em aria-hidden="true">{{ p.outlet }}</em>{% endfor %}
+    </div>
+  </div>
+  <a class="epress-more" href="/press">Press &amp; features <span aria-hidden="true">&rarr;</span></a>
 </section>
 {% endif %}
 
-{# ═══ 6:10 PM — GOLDEN HOUR · tonight's menu (the course list) ═══════════════
-   Direction B's hero interaction, seated in the golden-hour band: hover or
-   click a course and the stage swaps to that course's photo. Falls back to the
-   static plates grid when Kevin has starred fewer than two distinct tags. #}
+{# ═══ SELECTED WORK — editorial offset grid (lightbox tiles) ═════════════════
+   .tile + data-web is the lightbox hook (static/lightbox.js). Gated on
+   featured so nothing starred = no empty grid + no lightbox script. #}
 {% if featured %}
-<section id="ad-golden" class="ad-scene ad-golden">
-  <div class="ad-scene-inner">
-    <p class="ad-kicker" data-reveal><span class="ad-roman">I.</span> 6:10 PM · golden hour</p>
-    <h2 class="ad-h2" data-reveal>The plates go out <span class="ad-it">looking like this.</span></h2>
-    {% if courses|length >= 2 %}
-    <div class="ad-courses" data-courses data-reveal>
-      <div class="ad-course-list" role="tablist" aria-label="Tonight's menu — pick a course">
-        <p class="ad-course-cue">Tonight's menu — pick a course</p>
-        {% for c in courses %}
-        <button type="button" class="ad-course{% if loop.first %} on{% endif %}"
-                data-course-btn="{{ loop.index0 }}" role="tab"
-                aria-selected="{{ 'true' if loop.first else 'false' }}">
-          <span class="ad-course-num">{{ "%02d"|format(loop.index) }}</span>
-          <span class="ad-course-name">{{ c.label }}</span>
-          {% if c.meta %}<span class="ad-course-meta">{{ c.meta }}</span>{% endif %}
+<section class="ework" id="work">
+  <div class="ework-head" data-reveal>
+    <div class="ework-head-txt">
+      <p class="esec-kicker">Selected work</p>
+      <h2 class="esec-h2">Plates that earn the double-take.</h2>
+      <p class="esec-lede">A few favorites from recent menus — plates, pours, and
+         the rooms they live in.</p>
+    </div>
+    <a class="elink ework-head-link" href="/portfolio">Full portfolio <span aria-hidden="true">&rarr;</span></a>
+  </div>
+  <div class="ework-grid">
+    {% for a in featured[:6] %}
+    <figure class="tile ework-fig ework-fig-{{ loop.index }}" data-web="/site/img/{{ a.id }}">
+      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+           srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
+           sizes="(max-width: 860px) 92vw, 30vw" alt="{{ a|portfolio_alt }}">
+      <figcaption class="ework-cap">
+        <span class="ework-cap-t">{{ a.portfolio_tag|capitalize if a.portfolio_tag else 'Selected work' }}</span>
+        {% if a.client_name %}<span class="ework-cap-s">{{ a.client_name }}</span>{% endif %}
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ═══ MOTION — feature reel + strip (portfolio-gated video routes) ═══════════ #}
+{% if reels %}
+<section class="emotion" id="motion">
+  <div class="emotion-head" data-reveal>
+    <div class="emotion-head-txt">
+      <p class="esec-kicker esec-kicker-gold">Motion</p>
+      <h2 class="esec-h2 esec-h2-cream">Motion that earns <span class="eem-gold">the scroll.</span></h2>
+    </div>
+    <p class="emotion-sub">The steam. The pour. The first cut. Built vertical for the feed.</p>
+  </div>
+  {% set feat = reels[0] %}
+  <figure class="emotion-feature" data-reveal>
+    <video autoplay muted loop playsinline preload="metadata" poster="/site/poster/{{ feat.id }}">
+      <source src="/site/vid/{{ feat.id }}" type="video/mp4">
+    </video>
+    <span class="emotion-veil" aria-hidden="true"></span>
+    <span class="emotion-play" aria-hidden="true">&#9654;</span>
+    <figcaption class="emotion-flabel">
+      <span>House reel</span>
+      {% if feat.portfolio_tag %}<span class="emotion-flabel-tag">{{ feat.portfolio_tag|capitalize }}</span>{% endif %}
+    </figcaption>
+  </figure>
+  {% if reels|length > 1 %}
+  <div class="emotion-strip">
+    {% for r in reels[1:5] %}
+    <figure class="emotion-clip">
+      <video autoplay muted loop playsinline preload="metadata" poster="/site/poster/{{ r.id }}">
+        <source src="/site/vid/{{ r.id }}" type="video/mp4">
+      </video>
+      <figcaption>{{ r.portfolio_tag|capitalize if r.portfolio_tag else 'Reel' }}</figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <p class="emotion-more" data-reveal><a class="elink" href="/reels">All reels <span aria-hidden="true">&rarr;</span></a></p>
+</section>
+{% endif %}
+
+{# ═══ DELIVERY — interactive proofing + crop switcher ════════════════════════
+   Zero new JS: static/site.js already wires [data-proof]/[data-crop]. The
+   proofing thumbs must keep the literal class "proof-thumb" (the counter reads
+   .proof-thumb.picked). Gated on featured for real frames. #}
+{% if featured %}
+<section class="edelivery" id="delivery">
+  <div class="edelivery-intro" data-reveal>
+    <p class="esec-kicker">After the shoot</p>
+    <h2 class="esec-h2">Delivery is the easy part.</h2>
+    <p class="esec-lede">A private gallery the day after the shoot. Proof, download,
+       post — every crop already sized.</p>
+  </div>
+  <div class="edelivery-grid" data-delivery-grid>
+    <div class="eproof" data-proof data-reveal>
+      <div class="eproof-head">
+        <span class="eproof-label">Proof &amp; favorite</span>
+        <span class="eproof-count"><b data-proof-count>0</b> of {{ featured[:6]|length }} selected</span>
+      </div>
+      <div class="eproof-track"><i data-proof-fill></i></div>
+      <div class="eproof-grid">
+        {% for a in featured[:6] %}
+        <button type="button" class="proof-thumb eproof-thumb" data-proof-thumb
+                aria-label="Favorite this frame">
+          <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+               alt="{{ a|portfolio_alt }}">
+          <span class="eproof-heart" aria-hidden="true">&#9825;</span>
         </button>
         {% endfor %}
       </div>
-      <div class="ad-course-stage">
-        {% for c in courses %}
-        <figure class="tile ad-course-panel{% if loop.first %} on{% endif %}"
-                data-course-panel="{{ loop.index0 }}" data-web="/site/img/{{ c.asset.id }}">
-          <img src="/site/img/{{ c.asset.id }}?variant=web"
-               {% if loop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async"
-               srcset="/site/img/{{ c.asset.id }}?variant=thumb 480w, /site/img/{{ c.asset.id }}?variant=web 2048w"
-               sizes="(max-width: 900px) 100vw, 55vw"
-               alt="{{ c.asset|portfolio_alt }}">
-          <figcaption class="ad-course-cap"><span>{{ c.label }}</span>{% if c.meta %}<em>{{ c.meta }}</em>{% endif %}</figcaption>
-        </figure>
-        {% endfor %}
+    </div>
+    <div class="ecrop" data-crop data-reveal>
+      <p class="ecrop-label">Social crops, auto-made</p>
+      <h3 class="ecrop-h3">One favorite. Every format.</h3>
+      <div class="ecrop-preview" data-crop-preview>
+        <img src="/site/img/{{ featured[0].id }}?variant=web" loading="lazy" decoding="async"
+             alt="{{ featured[0]|portfolio_alt }}">
       </div>
+      <div class="ecrop-tabs" role="tablist" aria-label="Crop format">
+        <button type="button" class="ecrop-btn on" data-crop-btn data-ratio="1 / 1"
+                data-name="Square · 1:1" data-use="Instagram feed &amp; grid posts.">1:1</button>
+        <button type="button" class="ecrop-btn" data-crop-btn data-ratio="4 / 5"
+                data-name="Portrait · 4:5" data-use="Maximum feed real estate.">4:5</button>
+        <button type="button" class="ecrop-btn" data-crop-btn data-ratio="9 / 16"
+                data-name="Story · 9:16" data-use="Reels, Stories &amp; TikTok.">9:16</button>
+      </div>
+      <p class="ecrop-name" data-crop-name>Square · 1:1</p>
+      <p class="ecrop-use" data-crop-use>Instagram feed &amp; grid posts.</p>
     </div>
-    {% else %}
-    <div class="ad-plates" data-reveal>
-      {% for a in featured[:3] %}
-      <figure class="tile ad-plate ad-plate-{{ loop.index }}" data-web="/site/img/{{ a.id }}">
-        <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-             srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
-             sizes="(max-width: 700px) 90vw, 40vw"
-             alt="{{ a|portfolio_alt }}">
-        {% if a.portfolio_tag %}
-        <figcaption class="ad-course-cap"><span>{{ a.portfolio_tag|capitalize }}</span>{% if a.client_name %}<em>{{ a.client_name }}</em>{% endif %}</figcaption>
-        {% endif %}
-      </figure>
-      {% endfor %}
-    </div>
-    {% endif %}
-    <p class="ad-more" data-reveal><a href="/portfolio">Every plate, at its peak &rarr;</a></p>
   </div>
 </section>
 {% endif %}
 
-{# ═══ 8:30 PM — DUSK · the pour, in motion ═══════════════════════════════════ #}
-{% if reels %}
-<section class="ad-scene ad-dusk" id="motion">
-  <div class="ad-scene-inner">
-    <p class="ad-kicker" data-reveal><span class="ad-roman">II.</span> 8:30 PM · dusk</p>
-    <h2 class="ad-h2" data-reveal>The pour goes <span class="ad-it ad-it-warm">vertical.</span></h2>
-    <div class="ad-reels" data-reveal>
-      {% for r in reels[:4] %}
-      <figure class="ad-reel{% if loop.index is even %} ad-reel-lift{% endif %}">
-        <video autoplay muted loop playsinline preload="metadata"
-               poster="/site/poster/{{ r.id }}">
-          <source src="/site/vid/{{ r.id }}" type="video/mp4">
-        </video>
-        <div class="ad-reel-meta">
-          <span>{{ r.portfolio_tag|capitalize if r.portfolio_tag else 'Reel' }}</span>
-          <span class="ad-reel-bar" aria-hidden="true"><i></i></span>
-        </div>
-      </figure>
-      {% endfor %}
-    </div>
-    <p class="ad-more" data-reveal><a href="/reels">All reels &rarr;</a></p>
+{# ═══ SERVICES — three ways to work together ════════════════════════════════ #}
+<section class="eservices" id="services">
+  <div class="eservices-intro" data-reveal>
+    <p class="esec-kicker">How we work</p>
+    <h2 class="esec-h2">Three ways to work together.</h2>
+  </div>
+  <div class="eservices-grid">
+    <a class="esvc" data-reveal href="/services">
+      <span class="esvc-num">01</span>
+      <h3 class="esvc-h3">Photography</h3>
+      <p class="esvc-body">Dishes, drinks, and the rooms they live in — lit to sell.</p>
+      <span class="esvc-tiers">Starter · Standard · Premium</span>
+      <span class="esvc-cta">Explore photography <span aria-hidden="true">&rarr;</span></span>
+    </a>
+    <a class="esvc" data-reveal href="/services">
+      <span class="esvc-num">02</span>
+      <h3 class="esvc-h3">Videography</h3>
+      <p class="esvc-body">Scroll-stopping loops and hero films that move people.</p>
+      <span class="esvc-tiers">Starter · Standard · Premium</span>
+      <span class="esvc-cta">Explore videography <span aria-hidden="true">&rarr;</span></span>
+    </a>
+    <a class="esvc" data-reveal href="/services#svc-brand_partner">
+      <span class="esvc-num">03</span>
+      <h3 class="esvc-h3">Brand Partner</h3>
+      <p class="esvc-body">A steady monthly drumbeat of content. One partner, on call.</p>
+      <span class="esvc-tiers">Monthly retainer</span>
+      <span class="esvc-cta">Become a partner <span aria-hidden="true">&rarr;</span></span>
+    </a>
   </div>
 </section>
-{% endif %}
 
-{# ═══ 10:15 PM — CANDLELIGHT · the menu comes to the table ═══════════════════
-   The prix-fixe card renders SERVICES (the same tiers/prices /services shows)
-   — reshaped server-side in _prix_fixe(), never re-typed here. #}
-<section class="ad-scene ad-candle{% if not reels %} ad-bridge{% endif %}" id="ad-menu">
-  <div class="ad-scene-inner">
-    <p class="ad-kicker ad-kicker-center ad-flicker" data-reveal><span class="ad-roman">III.</span> 10:15 PM · candlelight</p>
-    <h2 class="ad-h2 ad-h2-center" data-reveal>The menu comes <span class="ad-it ad-it-gold">to the table.</span></h2>
-    <div class="ad-menu-card" data-reveal>
-      <div class="ad-menu-head">
-        <p class="ad-menu-brand">{{ site_name }}</p>
-        <h3>Ways to work together</h3>
-        <p class="ad-menu-sub">quotes tailored within a business day</p>
-      </div>
-      {% for g in prix_fixe %}
-      <div class="ad-menu-group">
-        <div class="ad-menu-group-head">
-          <h4>{{ g.title }}</h4>
-          <span>{{ g.tagline }}</span>
-        </div>
-        {% for r in g.rows %}
-        <div class="ad-menu-row">
-          <span class="ad-menu-name">{{ r.name }}{% if r.star %}<i aria-hidden="true" title="Most picked">*</i>{% endif %}</span>
-          {% if r.desc %}<span class="ad-menu-desc">{{ r.desc }}</span>{% endif %}
-          <span class="ad-menu-dots" aria-hidden="true"></span>
-          <span class="ad-menu-price">{{ r.price }}</span>
-        </div>
-        {% endfor %}
-      </div>
-      {% endfor %}
-      <p class="ad-menu-foot"><i aria-hidden="true">*</i> most picked · every tier ends in a private same-week gallery</p>
-      <p class="ad-menu-link"><a href="/services">Full menu details &rarr;</a></p>
+{# ═══ TESTIMONIALS — real published reviews (Review/Person JSON-LD in include) #}
+<section class="etestimonials" data-reveal>
+  {% include "site/_testimonials.html" %}
+</section>
+
+{# ═══ ABOUT — portrait + copy ═══════════════════════════════════════════════ #}
+<section class="eabout" id="about">
+  <div class="eabout-grid" data-about-grid>
+    <div class="eabout-media" data-reveal>
+      {% if featured %}
+      <img src="/site/img/{{ featured[-1].id }}?variant=web" loading="lazy" decoding="async"
+           sizes="(max-width: 860px) 92vw, 38vw" alt="{{ featured[-1]|portfolio_alt }}">
+      {% endif %}
+    </div>
+    <div class="eabout-copy" data-reveal>
+      <p class="esec-kicker">About</p>
+      <h2 class="esec-h2 eabout-h2">I'm Kevin Lee, and I'd love to work with you.</h2>
+      <p class="eabout-body">I love a great plate, a perfect pour, and the room that
+         frames them — and my job is simple: make every plate look irresistible.
+         We'll scout the menu together, build a shot list, and move fast, always
+         around your service and never against it. Let's win together.</p>
+      <a class="elink" href="/about">Read the full story <span aria-hidden="true">&rarr;</span></a>
     </div>
   </div>
 </section>
 
-{# ═══ 11:45 PM — CLOSE · the gallery lands + reservations ════════════════════ #}
-<section class="ad-scene ad-close" id="ad-close">
-  <div class="ad-close-inner">
-    <p class="ad-kicker ad-kicker-center" data-reveal><span class="ad-roman">IV.</span> 11:45 PM · lights out — and the same week&hellip;</p>
-    <h2 class="ad-h2 ad-h2-center" data-reveal>&hellip;the gallery lands, and your menu starts <span class="ad-it ad-it-gold">selling itself.</span></h2>
+{# ═══ CLOSING CTA ═══════════════════════════════════════════════════════════ #}
+<section class="ecta">
+  <div class="ecta-inner" data-reveal>
     {% if demo_gallery %}
-    <p class="ad-demo" data-reveal><a href="{{ demo_gallery.url }}">Taste the sample gallery &rarr;</a>
+    <p class="ecta-demo"><a href="{{ demo_gallery.url }}">Taste the sample gallery <span aria-hidden="true">&rarr;</span></a>
       {% if demo_gallery.pin %}<span>PIN <b>{{ demo_gallery.pin }}</b></span>
-      {% else %}<a class="ad-demo-ask" href="/contact?prefill=demo_gallery">(ask for the PIN)</a>{% endif %}
+      {% else %}<a class="ecta-demo-ask" href="/contact?prefill=demo_gallery">(ask for the PIN)</a>{% endif %}
     </p>
     {% endif %}
-    {% include "site/_testimonials.html" %}
-    <div class="ad-reserve" data-reveal>
-      <a class="btn-gold" href="/book">Reserve your night <span aria-hidden="true">&rarr;</span></a>
-      <a class="btn-ghost-cream" href="/contact">Request a quote</a>
+    <h2 class="ecta-h2">Let's make your food look <span class="eem">the way it tastes.</span></h2>
+    <div class="ecta-actions">
+      <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
+        <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
+      <a class="elink" href="/work">See past work <span aria-hidden="true">&rarr;</span></a>
     </div>
   </div>
 </section>
 
 {% if featured %}{% include "site/_lightbox.html" %}{% endif %}
-
-{% if courses|length >= 2 %}
-<script nonce="{{ csp_nonce }}">
-  (function () {
-    /* Golden-hour course swap — same delegated-listener pattern as the
-       portfolio filter. Hover previews, click commits; CSS owns the fade. */
-    var wrap = document.querySelector("[data-courses]");
-    if (!wrap) return;
-    var btns = wrap.querySelectorAll("[data-course-btn]");
-    var panels = wrap.querySelectorAll("[data-course-panel]");
-    var show = function (idx) {
-      btns.forEach(function (b) {
-        var on = b.getAttribute("data-course-btn") === idx;
-        b.classList.toggle("on", on);
-        b.setAttribute("aria-selected", on ? "true" : "false");
-      });
-      panels.forEach(function (p) {
-        p.classList.toggle("on", p.getAttribute("data-course-panel") === idx);
-      });
-    };
-    wrap.addEventListener("click", function (e) {
-      var b = e.target.closest("[data-course-btn]");
-      if (b) show(b.getAttribute("data-course-btn"));
-    });
-    wrap.addEventListener("mouseover", function (e) {
-      var b = e.target.closest("[data-course-btn]");
-      if (b) show(b.getAttribute("data-course-btn"));
-    });
-  })();
-</script>
-{% endif %}
 {% endblock %}

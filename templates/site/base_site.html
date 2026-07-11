@@ -3,17 +3,12 @@
 {% block head %}
 <meta name="darkreader-lock">
 <meta name="color-scheme" content="light only">
-{# The marketing site is DARK-FIRST (After Dark × Direction B): candlelight is
-   the default and an explicit "light" choice is the override. Applied on <html>
-   before first paint so neither theme ever flashes. Shares the admin's
-   localStorage key so a visitor's (or Kevin's) choice is one preference across
-   the property — the admin keeps its own light-first default. #}
+{# The marketing site is a single always-dark editorial look (Claude Design):
+   set data-theme=dark on <html> before first paint so the slate palette never
+   flashes. No light variant — the money docs (base_cream) and the admin shell
+   keep their own themes; this only governs .site-body. #}
 <script nonce="{{ csp_nonce }}">
-  (function () {
-    var dark = true;
-    try { dark = localStorage.getItem("mise-theme") !== "light"; } catch (e) {}
-    if (dark) document.documentElement.setAttribute("data-theme", "dark");
-  })();
+  document.documentElement.setAttribute("data-theme", "dark");
 </script>
 <meta name="description" content="{% block meta_description %}Menus, dishes, drinks, and the rooms they live in — food &amp; beverage photography and videography for Asheville &amp; Western North Carolina.{% endblock %}">
 <link rel="canonical" href="{{ base_url }}{{ request.url.path }}">
@@ -115,38 +110,7 @@
   </div>
   <div class="footer-base">
     <span>&copy; 2026 {{ site_name }} · Kleephotography.com</span>
-    <button type="button" class="site-theme-toggle" id="site-theme-toggle"
-            aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
-      <span class="site-theme-toggle-icon" aria-hidden="true">☾</span>
-      <span class="site-theme-toggle-lbl">Dark</span>
-    </button>
     <span>Photography that makes people hungry.</span>
   </div>
 </footer>
-<script nonce="{{ csp_nonce }}">
-  (function () {
-    /* Dark-mode toggle: flips data-theme on <html>, persists to localStorage.
-       The pre-paint script in the head applies the saved choice on load. */
-    var tbtn = document.getElementById("site-theme-toggle");
-    if (!tbtn) return;
-    var sync = function () {
-      var dark = document.documentElement.getAttribute("data-theme") === "dark";
-      tbtn.setAttribute("aria-pressed", dark ? "true" : "false");
-      tbtn.querySelector(".site-theme-toggle-icon").textContent = dark ? "☀" : "☾";
-      tbtn.querySelector(".site-theme-toggle-lbl").textContent = dark ? "Light" : "Dark";
-    };
-    sync();
-    tbtn.addEventListener("click", function () {
-      var dark = document.documentElement.getAttribute("data-theme") === "dark";
-      if (dark) {
-        document.documentElement.removeAttribute("data-theme");
-        try { localStorage.setItem("mise-theme", "light"); } catch (e) {}
-      } else {
-        document.documentElement.setAttribute("data-theme", "dark");
-        try { localStorage.setItem("mise-theme", "dark"); } catch (e) {}
-      }
-      sync();
-    });
-  })();
-</script>
 {% endblock %}
