@@ -232,24 +232,24 @@
       <section class="gd-deliver">
         <h3>Deliver &amp; manage</h3>
         <a class="gd-deliver-row" href="{{ base_url }}/g/{{ g.slug }}" target="_blank" rel="noopener">
-          <span class="gd-deliver-ic" style="background:#e1f2e9;color:#2f7d57">&#8599;</span>
+          <span class="gd-deliver-ic" style="background:#20271a;color:#9cc178">&#8599;</span>
           <span class="gd-deliver-txt"><span class="gd-deliver-l">View as client</span><span class="gd-deliver-m">Open the live {{ 'transfer' if is_drop else 'gallery' }}</span></span>
           <span class="gd-deliver-arr">&rarr;</span>
         </a>
         {% if can_email %}
         <button type="button" class="gd-deliver-row" data-reveal="g-send-email">
-          <span class="gd-deliver-ic" style="background:#f7ecd2;color:#9a7a2c">&#9993;</span>
+          <span class="gd-deliver-ic" style="background:#2b2413;color:#d8a857">&#9993;</span>
           <span class="gd-deliver-txt"><span class="gd-deliver-l">Send delivery email</span><span class="gd-deliver-m">Delivery · proofing · final templates</span></span>
           <span class="gd-deliver-arr">&rarr;</span>
         </button>
         {% endif %}
         <button type="button" class="gd-deliver-row" data-reveal="g-settings">
-          <span class="gd-deliver-ic" style="background:#f3e3e5;color:#7C2F38">&#9881;</span>
+          <span class="gd-deliver-ic" style="background:#2e1a18;color:#d98a78">&#9881;</span>
           <span class="gd-deliver-txt"><span class="gd-deliver-l">{{ 'Transfer' if is_drop else 'Gallery' }} settings</span><span class="gd-deliver-m">PIN, expiry, captions{{ '' if is_drop else ', case study' }}</span></span>
           <span class="gd-deliver-arr">&rarr;</span>
         </button>
         <a class="gd-deliver-row" href="/admin/galleries/{{ g.id }}/activity">
-          <span class="gd-deliver-ic" style="background:#ddeef0;color:#2f6d8a">&#9636;</span>
+          <span class="gd-deliver-ic" style="background:#242424;color:#aba9a3">&#9636;</span>
           <span class="gd-deliver-txt"><span class="gd-deliver-l">Activity &amp; downloads</span><span class="gd-deliver-m">{{ n_views }} view{{ "s" if n_views != 1 }} · {{ n_downloads }} download{{ "s" if n_downloads != 1 }}</span></span>
           <span class="gd-deliver-arr">&rarr;</span>
         </a>
