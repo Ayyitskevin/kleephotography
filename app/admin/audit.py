@@ -43,11 +43,16 @@ _CATEGORY = {
 }
 
 # label/icon/colors lifted 1:1 from the Admin Audit prototype DCLogic.cat map.
+# Dark-panel tints (editorial-dark) — these feed the .audit-ic inline style
+# directly, so they can't be reached by CSS; match the same ok/honey/clay/
+# neutral status tokens the rest of the admin shell uses. money/gallery/auth
+# keep their original hue family (green->ok, gold->honey, maroon->clay);
+# "document" had no blue token to preserve, so it lands on neutral.
 _CAT_META = {
-    "money": {"label": "Money", "icon": "$", "bg": "#e1f2e9", "color": "#2f7d57"},
-    "document": {"label": "Documents", "icon": "✎", "bg": "#ddeef0", "color": "#2f6d8a"},
-    "gallery": {"label": "Galleries", "icon": "▦", "bg": "#f7ecd2", "color": "#9a7a2c"},
-    "auth": {"label": "Access", "icon": "⚷", "bg": "#f3e3e5", "color": "#7C2F38"},
+    "money": {"label": "Money", "icon": "$", "bg": "#20271a", "color": "#9cc178"},
+    "document": {"label": "Documents", "icon": "✎", "bg": "#242424", "color": "#aba9a3"},
+    "gallery": {"label": "Galleries", "icon": "▦", "bg": "#2b2413", "color": "#d8a857"},
+    "auth": {"label": "Access", "icon": "⚷", "bg": "#2e1a18", "color": "#d98a78"},
 }
 _FILTERS = ["all", "money", "document", "gallery", "auth"]
 

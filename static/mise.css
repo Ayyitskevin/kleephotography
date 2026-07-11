@@ -8323,3 +8323,96 @@ html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
 /* ── 6. Templates gallery + email templates (/admin/templates,
    /admin/studio/email-templates) — resolve entirely via §0 and existing
    PR-D/E token overrides; no page-specific rules needed. ─────────────────── */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PR-I — Settings / Reports / Press / Transfers / Audit (editorial dark)
+   Closes out the sequential admin-shell reskin. search.html, sent.html and
+   share.html needed no new rules at all — every class they use already
+   resolves via tokens/overrides shipped in PR-D through PR-H. ─────────────── */
+
+/* ── 1. Settings (/admin/settings) ────────────────────────────────────── */
+.admin-shell .set-badge-connected { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-line); }
+/* Fill already resolves via var(--terra); its hardcoded cream text is the
+   same rose-fill+cream-text AA fail fixed repeatedly elsewhere. */
+.admin-shell .set-badge-ready,
+.admin-shell a.set-badge-ready:hover { color: #0e1319; }
+.admin-shell .set-badge-off { background: var(--neutral-bg); color: var(--neutral); border-color: var(--neutral-line); }
+.admin-shell .set-badge-edge { background: var(--honey-bg); color: var(--honey); border-color: var(--honey-line); }
+.admin-shell .set-op-row { border-top-color: var(--line); }
+.admin-shell .set-op-value { background: var(--surface-sunk); }
+
+/* ── 2. Reports (/admin/reports) ──────────────────────────────────────── */
+.admin-shell .kpi-card,
+.admin-shell .rep-card { background: var(--surface); }
+.admin-shell .kpi-label,
+.admin-shell .kpi-trend-flat,
+.admin-shell .kpi-trend-cap { color: var(--ink-faint); }
+.admin-shell .kpi-trend-up { color: var(--ok); }
+/* .rep-seg's own hardcoded cream background is currently masked only by luck
+   (PR-F's later, equal-specificity .fin-range rule happens to win the same
+   property on this element) — make the fix explicit. */
+.admin-shell .rep-seg { background: var(--surface-sunk); }
+/* Sales-funnel stage identity: a categorical 7-way palette, not a pass/fail
+   semantic, so it keeps its own hues rather than collapsing onto --clay/--ok/
+   --honey — but several are now unreadable against --bg/--line (measured
+   project_closed ~1.1:1 against its own track). Brighten each while keeping
+   the same hue family; archived folds into --neutral since it's genuinely a
+   neutral/off state. */
+.admin-shell .stage-inquiry_received,  .admin-shell .funnel-inquiry_received  { border-left-color: #74897a; background: #74897a; }
+.admin-shell .stage-consultation_call, .admin-shell .funnel-consultation_call { border-left-color: #3f74c9; background: #3f74c9; }
+.admin-shell .stage-proposal_sent,     .admin-shell .funnel-proposal_sent     { border-left-color: #b8933d; background: #b8933d; }
+.admin-shell .stage-contract_signed,   .admin-shell .funnel-contract_signed   { border-left-color: #a8434f; background: #a8434f; }
+.admin-shell .stage-retainer_paid,     .admin-shell .funnel-retainer_paid     { border-left-color: #3fa06c; background: #3fa06c; }
+.admin-shell .stage-session_planning,  .admin-shell .funnel-session_planning  { border-left-color: #2f948e; background: #2f948e; }
+.admin-shell .stage-project_closed,    .admin-shell .funnel-project_closed    { border-left-color: #2f9e6b; background: #2f9e6b; }
+.admin-shell .stage-archived { border-left-color: var(--neutral); }
+/* .funnel-n (the count sitting directly on each fill) hardcodes white text —
+   fine against the old darker fills, but 5 of the 7 brightened fills above
+   read <4.5:1 with white (verified per-fill). Route each to whichever of
+   white/navy actually clears AA against its own fill; consultation_call and
+   contract_signed already pass with the base white and need no override. */
+.admin-shell .funnel-inquiry_received .funnel-n,
+.admin-shell .funnel-proposal_sent .funnel-n,
+.admin-shell .funnel-retainer_paid .funnel-n,
+.admin-shell .funnel-session_planning .funnel-n,
+.admin-shell .funnel-project_closed .funnel-n { color: #0e1319; }
+
+/* ── 3. Press (/admin/studio/press) ───────────────────────────────────── */
+/* No bare .ok{color} rule exists anywhere — the "published ●" dot (also used
+   by license.html/testimonials.html) just inherited plain ink. */
+.admin-shell .ok { color: var(--ok); }
+/* input[type="url"] was never added to the base typed-input rule or PR-E's
+   default-scope fix — falls through to browser-default white, resting and
+   focus alike. */
+.admin-shell input[type="url"] { background: var(--surface-sunk); color: var(--ink); border-color: var(--line); }
+.admin-shell input[type="url"]:focus { background: var(--surface); border-color: var(--line-strong); }
+
+/* ── 4. Transfers (/admin/transfers) ──────────────────────────────────── */
+.admin-shell .tr-drop { border-color: var(--line-strong); background: var(--surface-sunk); }
+.admin-shell .tr-drop-sub { color: var(--ink-faint); }
+.admin-shell .tr-seg { background: var(--surface-sunk); }
+/* .tr-seg's checked pill: var(--terra-deep) + cream text measures ~3.8:1 live
+   (verified, not assumed) — terra-deep can't clear 4.5:1 with any single text
+   color once the token points at the mid-range rose. Same fix as every other
+   terra-deep+cream instance this series has hit: route to the brighter
+   --terra + navy ink instead. */
+.admin-shell .tr-seg input:checked + span { background: var(--terra); color: #0e1319; }
+.admin-shell .tr-toggle { background: var(--neutral-bg); }
+/* .tr-send is a bare, unprefixed class — the same specificity gap already
+   fixed for .tk-add-form button/.fin-export-btn: it loses background/color/
+   border to the later, more-specific generic .admin-shell button rule.
+   Re-declare here so it wins, and swap cream text for navy since --clay now
+   resolves to a light dusty-coral, not the old oxblood. Hover is re-declared
+   explicitly too, so it isn't left reading PR-H's generic dark-surface hover
+   fix underneath navy text (unreadable) once the base fix lands. */
+.admin-shell .tr-send { background: var(--clay); color: #0e1319; border: 0; border-radius: 999px; padding: 0.95em; }
+.admin-shell .tr-send:hover { background: var(--clay); color: #0e1319; filter: brightness(0.92); }
+
+/* ── 5. Audit log (/admin/audit) ──────────────────────────────────────── */
+.admin-shell .audit-chip { background: var(--surface-sunk); }
+.admin-shell .audit-row { border-top-color: var(--line-faint); }
+/* .audit-chip.is-active: var(--terra-deep) + cream text measures ~3.8:1 live
+   (verified, not assumed — the audit's "already validated elsewhere" note was
+   wrong, no prior PR actually fixed this exact pairing). Same fix as .tr-seg
+   above: brighter --terra + navy ink. */
+.admin-shell .audit-chip.is-active { background: var(--terra); color: #0e1319; border-color: var(--terra); }
