@@ -36,6 +36,17 @@
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
 
+  // Reduced motion: ambient autoplay videos stop too — show the poster and
+  // hand playback to the visitor instead of forcing motion on them.
+  if (reduceMotion) {
+    document.querySelectorAll("video[autoplay]").forEach(function (v) {
+      v.removeAttribute("autoplay");
+      v.removeAttribute("loop");
+      v.setAttribute("controls", "");
+      try { v.pause(); } catch (e) { /* not started yet */ }
+    });
+  }
+
   // --- mobile menu ---
   var menuBtn = document.querySelector("[data-menu-btn]");
   var mobileMenu = document.querySelector("[data-mobile-menu]");

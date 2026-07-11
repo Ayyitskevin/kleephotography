@@ -90,6 +90,21 @@ async def view(request: Request, slug: str):
                        ORDER BY g.created_at DESC, a.id""",
         (p["client_id"],),
     )
+    # Delivered motion — ready videos across the client's live galleries. The
+    # gallery stays the playback/review/download surface (it carries the
+    # PIN/email gates); the portal lists the reels and routes into it.
+    motion = [
+        m
+        for m in db.all_(
+            """SELECT a.*, g.title AS gallery_title, g.slug AS gallery_slug
+               FROM assets a JOIN galleries g ON g.id=a.gallery_id
+               WHERE g.client_id=? AND g.published=1
+                 AND a.kind='video' AND a.status='ready'
+               ORDER BY g.created_at DESC, a.id""",
+            (p["client_id"],),
+        )
+        if m["gallery_id"] not in expired_gallery_ids
+    ]
     brand = db.all_(
         "SELECT * FROM brand_assets WHERE client_id=? ORDER BY created_at DESC", (p["client_id"],)
     )
@@ -151,6 +166,7 @@ async def view(request: Request, slug: str):
             "galleries": galleries,
             "expired_gallery_ids": expired_gallery_ids,
             "crops": crops,
+            "motion": motion,
             "brand": brand,
             "ratios": [ps["slug"] for ps in presets.active()],
             "prev_visit": prev_visit,

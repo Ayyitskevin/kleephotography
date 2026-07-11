@@ -4,6 +4,7 @@
   const stage = lb.querySelector(".lb-stage");
   const favBtn = lb.querySelector(".lb-fav");
   const dlLink = lb.querySelector(".lb-dl");
+  const dlMp4 = lb.querySelector(".lb-dl-mp4");
   const playBtn = lb.querySelector(".lb-play");
   const proofLabel = lb.querySelector(".lb-proof");
   const tiles = Array.from(document.querySelectorAll(".tile"));
@@ -103,7 +104,7 @@
   }
 
   function startShow() {
-    timer = setInterval(() => render(idx + 1), 4000);
+    timer = setInterval(() => step(1), 4000);
     playBtn.innerHTML = "❚❚";
   }
 
@@ -129,12 +130,29 @@
     proofLabel.hidden = false;
   }
 
+  // Filter-aware navigation: tiles hidden by the grid's active filter
+  // (.pf-hidden or any display:none) are skipped, so arrows/swipe/slideshow
+  // only visit what the visitor can currently see in the grid.
+  function visibleTile(t) { return t.offsetParent !== null; }
+  function step(dir) {
+    let i = idx;
+    for (let n = 0; n < tiles.length; n++) {
+      i = (i + dir + tiles.length) % tiles.length;
+      if (visibleTile(tiles[i])) return render(i);
+    }
+  }
+
   function render(i) {
     idx = (i + tiles.length) % tiles.length;
     const t = tiles[idx];
     syncFav(t);
     refreshProof(t);
     if (dlLink) dlLink.href = t.dataset.dl || "#";
+    // videos also offer the web-ready MP4 straight from the viewer
+    if (dlMp4) {
+      if (t.dataset.dlWeb) { dlMp4.href = t.dataset.dlWeb; dlMp4.hidden = false; }
+      else { dlMp4.hidden = true; dlMp4.href = "#"; }
+    }
     stage.innerHTML = "";
     if (t.dataset.kind === "video") {
       const v = document.createElement("video");
@@ -279,15 +297,15 @@
     el.hidden = !msg;
   }
   lb.querySelector(".lb-close").addEventListener("click", close);
-  lb.querySelector(".lb-prev").addEventListener("click", () => { stopShow(); render(idx - 1); });
-  lb.querySelector(".lb-next").addEventListener("click", () => { stopShow(); render(idx + 1); });
+  lb.querySelector(".lb-prev").addEventListener("click", () => { stopShow(); step(-1); });
+  lb.querySelector(".lb-next").addEventListener("click", () => { stopShow(); step(1); });
   lb.addEventListener("click", (e) => { if (e.target === lb) close(); });
 
   document.addEventListener("keydown", (e) => {
     if (lb.hidden) return;
     if (e.key === "Escape") close();
-    if (e.key === "ArrowLeft") { stopShow(); render(idx - 1); }
-    if (e.key === "ArrowRight") { stopShow(); render(idx + 1); }
+    if (e.key === "ArrowLeft") { stopShow(); step(-1); }
+    if (e.key === "ArrowRight") { stopShow(); step(1); }
     // Keep Tab inside the modal so focus can't wander back to the muted grid.
     if (e.key === "Tab") {
       const focusable = Array.from(
@@ -324,7 +342,7 @@
     x0 = null;
     // Horizontal swipe → navigate; vertical bias filters out scroll attempts
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-      stopShow(); render(idx + (dx < 0 ? 1 : -1));
+      stopShow(); step(dx < 0 ? 1 : -1);
       lastTap = 0;
       return;
     }

@@ -23,6 +23,7 @@
         data-web="/media/{{ g.slug }}/web/{{ a.id }}"
         data-fav="/g/{{ g.slug }}/fav/{{ a.id }}"
         data-dl="/g/{{ g.slug }}/download?asset_id={{ a.id }}"
+        {% if a.kind == 'video' %}data-dl-web="/g/{{ g.slug }}/download?asset_id={{ a.id }}&web=1"{% endif %}
         {% if a.section_id %}data-section="{{ a.section_id }}"{% endif %}
         {% if a.kind == 'video' %}data-poster="/media/{{ g.slug }}/poster/{{ a.id }}"{% endif %}>
   <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" loading="lazy" alt="{{ a.filename }}">
@@ -107,7 +108,8 @@
     <span class="lb-proof" hidden></span>
     <button class="lb-play" aria-label="Slideshow">&#9654;</button>
     <button class="lb-fav" aria-label="Favorite">&#9825;</button>
-    <a class="lb-dl" aria-label="Download" href="#">&#8595;</a>
+    <a class="lb-dl" aria-label="Download original" href="#">&#8595;</a>
+    <a class="lb-dl-mp4" aria-label="Download web-ready MP4" href="#" hidden>MP4</a>
   </div>
   <div class="lb-comments" hidden>
     <div class="vc-head">

@@ -440,6 +440,10 @@ SPECIALTY_PAGES = {
             ),
         ],
         "contact_service": "Real Estate",
+        "book_slug": "re-shoot",
+        "empty_head": "Real estate work is being curated for the site.",
+        "empty_body": "The listing pipeline is open — MLS-ready stills, twilight "
+        "exteriors, and walkthrough reels land here as they're delivered.",
         "cta_h1": "Got a listing",
         "cta_h2": "going live?",
     },
@@ -530,6 +534,10 @@ SPECIALTY_PAGES = {
             ),
         ],
         "contact_service": "Portraits",
+        "book_slug": "pl-session",
+        "empty_head": "Portrait sessions are being curated for the site.",
+        "empty_body": "Headshots, branding, and family sessions land here as "
+        "they're delivered — the calendar is open now.",
         "cta_h1": "Let's make time",
         "cta_h2": "for a session.",
     },
@@ -624,6 +632,9 @@ SPECIALTY_PAGES = {
             ),
         ],
         "contact_service": "Food & Beverage",
+        "book_slug": "fb-shoot",
+        "empty_head": "New food & beverage work is being curated for the site.",
+        "empty_body": "Menus, pours, and the rooms they live in land here as they're delivered.",
         "cta_h1": "Let's make your food look",
         "cta_h2": "the way it tastes.",
     },
@@ -662,9 +673,11 @@ def _portfolio_reels() -> list:
     players whose src + poster both 404 (and leak private asset IDs into the
     page). When nothing is starred we return [] and the templates fall back to
     their empty states (home hides the motion band; /reels shows the empty copy)."""
-    return db.all_("""SELECT * FROM assets
-                       WHERE portfolio=1 AND status='ready' AND kind='video'
-                       ORDER BY id DESC""")
+    return db.all_("""SELECT a.*, g.client_name, g.title AS gallery_title
+                       FROM assets a
+                       LEFT JOIN galleries g ON g.id = a.gallery_id
+                       WHERE a.portfolio=1 AND a.status='ready' AND a.kind='video'
+                       ORDER BY a.id DESC""")
 
 
 def _testimonials(gallery_id: int | None = None, limit: int | None = None) -> list:
@@ -799,22 +812,25 @@ DOOR_LINES = {
 
 
 def _specialty_doors() -> list[dict]:
-    """The homepage's three specialty doors: name, one-liner, and that
-    vertical's newest starred photo as the lead image (None → slate frame)."""
+    """The homepage's three specialty doors: name, one-liner, that vertical's
+    newest starred photo as the lead image (None → slate frame), and honest
+    work counts (rendered only when non-zero — no vanity zeros)."""
     assets = _portfolio_assets()
+    reels = _portfolio_reels()
     doors = []
     for key, meta in specialties.SPECIALTIES.items():
-        lead = next(
-            (a for a in assets if specialties.specialty_key(a["portfolio_tag"]) == key),
-            None,
-        )
+        mine = [a for a in assets if specialties.specialty_key(a["portfolio_tag"]) == key]
         doors.append(
             {
                 "key": key,
                 "slug": meta["slug"],
                 "name": meta["name"],
                 "line": DOOR_LINES[key],
-                "lead": lead,
+                "lead": mine[0] if mine else None,
+                "n_photos": len(mine),
+                "n_reels": sum(
+                    1 for r in reels if specialties.specialty_key(r["portfolio_tag"]) == key
+                ),
             }
         )
     return doors
@@ -841,7 +857,11 @@ async def home(request: Request):
 
 @router.get("/portfolio", response_class=HTMLResponse)
 async def portfolio(request: Request):
-    assets = _portfolio_assets()
+    # photos AND starred videos share the masonry — /services sells motion, so
+    # the archive shouldn't be stills-only. Videos play in the same lightbox.
+    assets = sorted(
+        [*_portfolio_assets(), *_portfolio_reels()], key=lambda r: r["id"], reverse=True
+    )
     # distinct tags actually in use, alphabetical — the subject filter chips
     tags = sorted({a["portfolio_tag"] for a in assets if a["portfolio_tag"]}, key=str.lower)
     # specialty chips render only for verticals that actually have starred work
@@ -1094,6 +1114,11 @@ def _specialty_page(request: Request, key: str):
     """Shared renderer for the three specialty spokes — same anatomy, distinct
     copy (SPECIALTY_PAGES) and specialty-filtered work/reels/studies."""
     page = SPECIALTY_PAGES[key]
+    # CTA deep-link: the moment Kevin creates the conventional event type in
+    # the live admin (ops/SPECIALTY-LAUNCH.md slugs), spokes route straight to
+    # its picker; until then they land on the /book index. No code redeploy.
+    et = db.one("SELECT slug FROM event_types WHERE slug=? AND active=1", (page["book_slug"],))
+    book_url = f"/book/{et['slug']}" if et else "/book"
     photos = [
         a for a in _portfolio_assets() if specialties.specialty_key(a["portfolio_tag"]) == key
     ]
@@ -1112,6 +1137,7 @@ def _specialty_page(request: Request, key: str):
         "site/specialty.html",
         {
             "sp": specialties.SPECIALTIES[key],
+            "sp_key": key,
             "page": page,
             "photos": photos,
             "reels": vids,
@@ -1119,6 +1145,7 @@ def _specialty_page(request: Request, key: str):
             "studies": studies[:4],
             "testimonials": quotes[:3],
             "demo_gallery": _demo_gallery(),
+            "book_url": book_url,
             "faqs": page["faqs"],
             "faq_heading": "Good to know",
         },
@@ -1145,10 +1172,14 @@ async def portfolio_image(asset_id: int, variant: str = "web"):
     """Unauthenticated — serves ONLY portfolio-flagged, ready photos."""
     if variant not in ("web", "thumb"):
         raise HTTPException(status_code=404)
+    # thumb serves both kinds (the transcode job writes thumb jpgs for videos —
+    # the /portfolio masonry needs them); web stays photo-only, a video's web
+    # rendition is the mp4 behind /site/vid.
+    kinds = ("photo", "video") if variant == "thumb" else ("photo",)
     a = db.one(
-        """SELECT * FROM assets WHERE id=? AND portfolio=1
-                  AND status='ready' AND kind='photo'""",
-        (asset_id,),
+        f"""SELECT * FROM assets WHERE id=? AND portfolio=1
+                  AND status='ready' AND kind IN ({",".join("?" * len(kinds))})""",
+        (asset_id, *kinds),
     )
     if not a:
         raise HTTPException(status_code=404)

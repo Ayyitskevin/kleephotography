@@ -80,6 +80,15 @@
           {% for s in sections %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
         </select>
         <button type="submit" class="gd-btn-sm">Move</button>
+        <span class="muted">· portfolio:</span>
+        <input type="text" name="portfolio_tag" list="tag-suggestions" placeholder="tag (optional)…"
+               style="width:9rem" title="Applied to the checked assets when starring; blank keeps existing tags">
+        <button type="submit" class="gd-btn-sm"
+                formaction="/admin/galleries/{{ g.id }}/assets/bulk-portfolio"
+                title="Star checked assets for the public portfolio, tagging them if a tag is set">&#9733; Star checked</button>
+        <button type="submit" class="gd-btn-sm" name="mode" value="unstar"
+                formaction="/admin/galleries/{{ g.id }}/assets/bulk-portfolio"
+                title="Remove checked assets from the public portfolio">Unstar</button>
       </form>
       {% endif %}
       <datalist id="tag-suggestions">

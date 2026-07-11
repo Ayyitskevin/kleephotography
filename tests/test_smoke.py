@@ -507,6 +507,8 @@ def test_video_pipeline_full_flow(admin):
         # the web-ready MP4 action alongside the original download
         assert 'class="dur-badge"' in page
         assert "icon-btn-mp4" in page
+        # the lightbox reaches the web MP4 too (tile data attr + viewer chip)
+        assert "data-dl-web=" in page and 'class="lb-dl-mp4"' in page
 
         # web-MP4 download: the email gate carries the web flag through, then
         # the transcoded H.264 serves as an attachment (video-only route)
@@ -9777,9 +9779,13 @@ def test_specialty_pages(admin):
         for path in ("/real-estate", "/portraits", "/food-beverage"):
             assert f"<loc>{cfg.BASE_URL}{path}</loc>" in sm.text
 
-        # nothing carries an re/ tag yet → the RE spoke falls back to the
-        # shared empty state instead of an empty grid
-        assert "empty-state" in pub.get("/real-estate").text
+        # nothing carries an re/ tag yet → the RE spoke falls back to its
+        # specialty empty state (copy-led, not the generic include)
+        r = pub.get("/real-estate")
+        assert "empty-state" in r.text
+        assert "Real estate work is being curated" in r.text
+        # no re-shoot event type exists yet → CTA falls back to /book
+        assert 'href="/book"' in r.text and 'href="/book/re-shoot"' not in r.text
 
         # the hub renders one door per specialty, each linking to its spoke
         r = pub.get("/")
@@ -9810,6 +9816,8 @@ def test_specialty_pages(admin):
             assert f'property="og:image" content="{cfg.BASE_URL}/site/img/{re_id}"' in r.text
             # prefix is stripped from the visible chip/caption label
             assert "re/exteriors" not in r.text and "Exteriors" in r.text
+            # with work present, the portfolio link opens pre-filtered
+            assert 'href="/portfolio#sp:re"' in r.text
 
             r = pub.get("/food-beverage")
             assert f'data-web="/site/img/{fb_id}"' in r.text
@@ -9820,8 +9828,22 @@ def test_specialty_pages(admin):
             r = pub.get("/portraits")
             assert f'data-web="/site/img/{re_id}"' not in r.text
             assert f'data-web="/site/img/{fb_id}"' not in r.text
+
+            # the RE door now badges its single starred frame
+            r = pub.get("/")
+            assert "1 frame" in r.text
+
+        # once the conventional event type exists, the spoke CTA deep-links it
+        admin.post(
+            "/admin/scheduling/event",
+            data={"name": "Real Estate Shoot", "slug": "re-shoot", "duration_min": 120},
+            follow_redirects=False,
+        )
+        with TestClient(app) as pub:
+            assert 'href="/book/re-shoot"' in pub.get("/real-estate").text
     finally:
         db.run("DELETE FROM assets WHERE id IN (?,?)", (re_id, fb_id))
+        db.run("DELETE FROM event_types WHERE slug='re-shoot'")
 
 
 def test_video_renditions_flow(admin):
@@ -9882,3 +9904,118 @@ def test_video_renditions_flow(admin):
         assert r.status_code == 200 and r.headers["content-type"] == "video/mp4"
         assert "_9x16.mp4" in r.headers.get("content-disposition", "")
         assert pub.get(f"/g/{g['slug']}/download/rendition/999999").status_code == 404
+
+
+def test_bulk_star_and_tag(admin):
+    g = db.one("SELECT * FROM galleries ORDER BY id LIMIT 1")
+    ids = []
+    for i in range(3):
+        aid = db.run(
+            "INSERT INTO assets (gallery_id, kind, filename, stored, status) VALUES (?,?,?,?,?)",
+            (g["id"], "photo", f"bulk{i}.jpg", f"beefcafe0{i}beefcafe.jpg", "ready"),
+        )
+        ids.append(aid)
+    try:
+        # star + tag two of the three in one sweep
+        r = admin.post(
+            f"/admin/galleries/{g['id']}/assets/bulk-portfolio",
+            data={"asset_ids": [str(ids[0]), str(ids[1])], "portfolio_tag": "re/exteriors"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        for aid in ids[:2]:
+            row = db.one("SELECT portfolio, portfolio_tag FROM assets WHERE id=?", (aid,))
+            assert row["portfolio"] == 1 and row["portfolio_tag"] == "re/exteriors"
+        assert db.one("SELECT portfolio FROM assets WHERE id=?", (ids[2],))["portfolio"] == 0
+
+        # starring without a tag keeps existing tags untouched
+        admin.post(
+            f"/admin/galleries/{g['id']}/assets/bulk-portfolio",
+            data={"asset_ids": [str(ids[0])]},
+            follow_redirects=False,
+        )
+        row = db.one("SELECT portfolio, portfolio_tag FROM assets WHERE id=?", (ids[0],))
+        assert row["portfolio"] == 1 and row["portfolio_tag"] == "re/exteriors"
+
+        # unstar sweep
+        admin.post(
+            f"/admin/galleries/{g['id']}/assets/bulk-portfolio",
+            data={"asset_ids": [str(i) for i in ids], "mode": "unstar"},
+            follow_redirects=False,
+        )
+        for aid in ids:
+            assert db.one("SELECT portfolio FROM assets WHERE id=?", (aid,))["portfolio"] == 0
+
+        # the bulk toolbar ships both portfolio actions
+        page = admin.get(f"/admin/galleries/{g['id']}").text
+        assert "bulk-portfolio" in page and "Star checked" in page and "Unstar" in page
+    finally:
+        db.run("DELETE FROM assets WHERE id IN (?,?,?)", (ids[0], ids[1], ids[2]))
+
+
+def test_portfolio_video_tiles(admin):
+    g, vid, photo = _ready_video(admin, title="Archive Motion", pin="9911")
+    admin.post(f"/admin/galleries/{g['id']}/assets/{vid['id']}/portfolio", follow_redirects=False)
+    admin.post(f"/admin/galleries/{g['id']}/assets/{photo['id']}/portfolio", follow_redirects=False)
+    try:
+        with TestClient(app) as pub:
+            r = pub.get("/portfolio")
+            # the starred video joins the masonry as a lightbox video tile
+            assert f'data-web="/site/vid/{vid["id"]}"' in r.text
+            assert 'data-kind="video"' in r.text
+            assert f'data-poster="/site/poster/{vid["id"]}"' in r.text
+            assert 'class="play-badge"' in r.text and 'class="dur-badge"' in r.text
+            # video thumbnails serve through the thumb variant; web stays
+            # photo-only (a video's web rendition is the mp4 behind /site/vid)
+            assert pub.get(f"/site/img/{vid['id']}?variant=thumb").status_code == 200
+            assert pub.get(f"/site/img/{vid['id']}?variant=web").status_code == 404
+            assert pub.get(f"/site/vid/{vid['id']}").status_code == 200
+
+            # /reels ships VideoObject JSON-LD + the sound toggle for the reel
+            r = pub.get("/reels")
+            assert '"@type": "VideoObject"' in r.text
+            assert f"/site/vid/{vid['id']}" in r.text
+            assert "data-sound-toggle" in r.text
+    finally:
+        admin.post(
+            f"/admin/galleries/{g['id']}/assets/{vid['id']}/portfolio", follow_redirects=False
+        )
+        admin.post(
+            f"/admin/galleries/{g['id']}/assets/{photo['id']}/portfolio", follow_redirects=False
+        )
+
+
+def test_portal_motion_band(admin):
+    g, vid, photo = _ready_video(admin, title="Motion Portal", pin="7788")
+    # client + portal, gallery linked to the client
+    admin.post(
+        "/admin/studio/clients",
+        data={"name": "Motion Client", "email": "motion@example.com"},
+        follow_redirects=False,
+    )
+    cid = db.one("SELECT id FROM clients ORDER BY id DESC LIMIT 1")["id"]
+    db.run("UPDATE galleries SET client_id=? WHERE id=?", (cid, g["id"]))
+    admin.post(f"/admin/studio/clients/{cid}/portal", follow_redirects=False)
+    admin.post(
+        f"/admin/studio/clients/{cid}/portal/publish",
+        data={"published": "true"},
+        follow_redirects=False,
+    )
+    prow = db.one("SELECT slug, pin FROM portals ORDER BY id DESC LIMIT 1")
+    try:
+        with TestClient(app) as pub:
+            r = pub.post(
+                f"/portal/{prow['slug']}/pin", data={"pin": prow["pin"]}, follow_redirects=False
+            )
+            assert r.status_code == 303
+            page = pub.get(f"/portal/{prow['slug']}").text
+            # delivered motion lists with duration + a route into the gallery
+            assert "Reels &amp; films" in page
+            assert f"/portal/{prow['slug']}/thumb/{vid['id']}" in page
+            assert f"/g/{g['slug']}" in page
+            assert 'class="dur-badge"' in page
+            # the portal thumb route serves the video's thumbnail
+            assert pub.get(f"/portal/{prow['slug']}/thumb/{vid['id']}").status_code == 200
+    finally:
+        db.run("DELETE FROM portals WHERE slug=?", (prow["slug"],))
+        db.run("UPDATE galleries SET client_id=NULL WHERE id=?", (g["id"],))

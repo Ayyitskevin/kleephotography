@@ -691,6 +691,40 @@ async def bulk_move_assets(request: Request, gallery_id: int):
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
+@router.post("/galleries/{gallery_id}/assets/bulk-portfolio")
+async def bulk_star_tag(request: Request, gallery_id: int):
+    """Bulk portfolio action for the checked assets: star them (optionally
+    tagging in the same sweep) or unstar them. This is the launch path for
+    tagging the archive per specialty — one checkbox sweep per batch instead
+    of a per-asset gear-menu round trip. Same kind guard as the single-asset
+    endpoints; an empty tag leaves existing tags untouched."""
+    get_gallery(gallery_id)
+    form = await request.form()
+    tag = (form.get("portfolio_tag") or "").strip()
+    unstar = form.get("mode") == "unstar"
+    with db.tx() as con:
+        for v in form.getlist("asset_ids"):
+            aid = int(v)
+            if unstar:
+                con.execute(
+                    "UPDATE assets SET portfolio=0 WHERE id=? AND gallery_id=?",
+                    (aid, gallery_id),
+                )
+            elif tag:
+                con.execute(
+                    """UPDATE assets SET portfolio=1, portfolio_tag=?
+                       WHERE id=? AND gallery_id=? AND kind IN ('photo', 'video')""",
+                    (tag, aid, gallery_id),
+                )
+            else:
+                con.execute(
+                    """UPDATE assets SET portfolio=1
+                       WHERE id=? AND gallery_id=? AND kind IN ('photo', 'video')""",
+                    (aid, gallery_id),
+                )
+    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+
+
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/move")
 async def reorder_asset(gallery_id: int, asset_id: int, dir: str = Form(...)):
     if dir not in ("left", "right"):
