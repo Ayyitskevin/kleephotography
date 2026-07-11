@@ -9788,11 +9788,13 @@ def test_specialty_pages(admin):
             assert "re/exteriors" not in r.text and "Exteriors" in r.text
 
             r = pub.get("/food-beverage")
-            assert f"/site/img/{fb_id}" in r.text
+            assert f'data-web="/site/img/{fb_id}"' in r.text
             assert f'data-web="/site/img/{re_id}"' not in r.text
 
+            # (grid attributes, not bare substrings — the sitewide JSON-LD
+            # image may legitimately reference any starred asset on any page)
             r = pub.get("/portraits")
-            assert f"/site/img/{re_id}" not in r.text
-            assert f"/site/img/{fb_id}" not in r.text
+            assert f'data-web="/site/img/{re_id}"' not in r.text
+            assert f'data-web="/site/img/{fb_id}"' not in r.text
     finally:
         db.run("DELETE FROM assets WHERE id IN (?,?)", (re_id, fb_id))
