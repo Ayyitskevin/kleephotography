@@ -7817,6 +7817,14 @@ html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
 .admin-shell .stu-card-act { background: #232e3d; color: #e7dfcd; }
 .admin-shell .stu-card-act:hover { background: #2c3949; color: #e7dfcd; }
 
+/* --card was never redefined at PR-D's default .admin-shell token block
+   (it added --surface/--surface-sunk/--card-bg but missed --card itself), so
+   it kept falling through to :root's white — every admin-shell rule using
+   var(--card) (inbox reply textarea, quick-reply chips, and others) rendered
+   a white field with light-grey text. Close the gap; #1e2a3c matches
+   --surface/--card-bg exactly, so this is a pure fix, not a new surface. */
+.admin-shell { --card: #1e2a3c; }
+
 /* ============================================================================
    EDITORIAL DARK — STUDIO BOARD, PROJECT ROOM, GALLERIES, INBOX (Revamp PR-E,
    Claude Design handoff2). Same rose+gold slate-navy system as PR-D, appended
