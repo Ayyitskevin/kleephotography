@@ -27,7 +27,10 @@ optional specialty prefix:
   always); the datalist now suggests the prefixed vocabulary.
 - **Case studies** inherit their specialty from the majority tag-prefix of
   their starred assets — star and tag the assets and the case study files
-  itself under the right vertical automatically.
+  itself under the right vertical automatically. A published case study with
+  **no** starred assets has no signal and groups under Food & Beverage (the
+  legacy default): star and tag at least one asset to place it. Even splits
+  resolve to the oldest starred asset's specialty.
 - Videos use the same tags. A video tagged `re/walkthrough` appears on
   /real-estate's motion band and under Real Estate on /reels.
 

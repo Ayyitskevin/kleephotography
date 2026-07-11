@@ -623,11 +623,17 @@ def _case_studies() -> list:
 def _cs_specialty_map() -> dict[int, str]:
     """gallery_id → specialty key for grouping case studies, derived as the
     majority tag-prefix of each gallery's portfolio-starred assets (unprefixed
-    tags = legacy F&B). Zero-schema by design: the gallery table has no
+    tags = legacy F&B; a gallery with no starred assets stays unmapped and the
+    callers' .get() default buckets it F&B — same legacy rule, documented in
+    ops/SPECIALTY-LAUNCH.md). Zero-schema by design: the gallery table has no
     category column, and the starred assets are what a case study displays
     anyway, so they're the honest signal of what kind of work it is."""
+    # ORDER BY makes ties deterministic: Counter.most_common keeps first-seen
+    # on equal counts, so an even split resolves to the oldest starred asset's
+    # specialty instead of whatever order SQLite happened to return rows in.
     rows = db.all_("""SELECT gallery_id, portfolio_tag FROM assets
-                      WHERE portfolio=1 AND status='ready'""")
+                      WHERE portfolio=1 AND status='ready'
+                      ORDER BY gallery_id, id""")
     votes: dict[int, Counter] = defaultdict(Counter)
     for r in rows:
         votes[r["gallery_id"]][specialties.specialty_key(r["portfolio_tag"])] += 1

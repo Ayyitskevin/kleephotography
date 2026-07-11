@@ -86,7 +86,12 @@
       else history.replaceState(null, "", location.pathname);
     }
     chips.forEach(c => c.addEventListener("click", () => apply(c.dataset.filter || "")));
-    const initial = (location.hash || "").slice(1);
+    let initial = (location.hash || "").slice(1);
+    // Pre-revamp bookmarks/shares used bare tag hashes (#dishes) — map them
+    // onto the namespaced filter so old links keep landing on the right view.
+    if (initial && !document.querySelector(`.pf-chip[data-filter="${CSS.escape(initial)}"]`)) {
+      initial = "tag:" + initial;
+    }
     if (initial && document.querySelector(`.pf-chip[data-filter="${CSS.escape(initial)}"]`)) {
       apply(initial);
     }
