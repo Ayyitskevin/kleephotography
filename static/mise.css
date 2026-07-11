@@ -7590,6 +7590,11 @@ html[data-theme="dark"] .site-body .stack-form button:not(.site-theme-toggle) {
   --terra-tint:    rgba(211, 126, 136, .14);
   --terra-tint-2:  rgba(211, 126, 136, .24);
   --gold:          #d0b162;   /* secondary accent — money actions, dark-ink text    */
+  --dash-gold:     #d0b162;   /* money-panel figures (.dash-money .pct, v4-goal) — a
+                                 separate token from --gold pre-dating this reskin;
+                                 redeclared here so it doesn't keep resolving to the
+                                 old #E0A43B amber and read as a second, mismatched
+                                 gold on the same card                             */
   --clay:          #d98a78;   --clay-bg: #2e1a18;   --clay-line: #4a2c28;
   --ok:            #9cc178;   --ok-bg:   #20271a;   --ok-line:   #354028;
   --honey:         #d8a857;   --honey-bg:#2b2413;   --honey-line:#473a1f;
@@ -7683,8 +7688,27 @@ html[data-theme="dark"] .site-body .stack-form button:not(.site-theme-toggle) {
    color — so a real mouse hover (as opposed to the JS-driven .sel class) fell
    through to the global .admin-shell a:hover rose-deep. Selection is what
    should carry emphasis here, not native hover. */
-.admin-shell .ns-pal-row:hover { color: #cdd0d4; }
-.ns-pal-row.sel { background: var(--gold); color: #0e1319; }
+/* :not(.sel) is load-bearing: the JS sets .sel via mousemove, so the mouse is
+   almost always physically resting on the currently-selected row — without
+   this exclusion, :hover would immediately override the dark-navy text .sel
+   needs for the gold fill with the muted-ink hover color, for every
+   mouse-driven selection. */
+.admin-shell .ns-pal-row:hover:not(.sel) { color: #cdd0d4; }
+/* .admin-shell prefix (3 classes) is load-bearing, not decorative: a bare
+   .ns-pal-row.sel (2 classes) loses to the pre-existing global
+   .admin-shell a:hover rule (2 classes + 1 element — b-component ties at 2,
+   so the element count breaks the tie) whenever the mouse actually rests on
+   the row, which — since the JS sets .sel via mousemove — is the ordinary
+   case for mouse-driven selection, not an edge case. Confirmed via a real
+   .hover() in Chromium: without this prefix the gold row showed deep-rose
+   text, not the intended dark navy. */
+.admin-shell .ns-pal-row.sel { background: var(--gold); color: #0e1319; }
+/* The legacy toggle-dark palette (html[data-theme="dark"], ~line 5744) sets
+   .ns-pal-row to a light ink color at higher specificity (adds the html +
+   [data-theme] selectors) than this rule alone can beat — it would win over
+   .sel's dark-navy text whenever that old toggle is on, leaving light text on
+   the gold highlight. Match its exact specificity shape so ours wins instead. */
+html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
 .ns-pal-ic { background: #161e28; color: #afbbca; }
 .ns-pal-row.sel .ns-pal-ic { background: rgba(14, 19, 25, .3); color: #0e1319; }
 .ns-pal-sub { color: #6b7480; }
@@ -7771,6 +7795,16 @@ html[data-theme="dark"] .site-body .stack-form button:not(.site-theme-toggle) {
 .admin-shell .dash-ring-cap, .admin-shell .dash-fig-cap,
 .admin-shell .dash-money-paid .lead, .admin-shell .dash-paid-row a { color: #8b96a3; }
 .admin-shell .dash-money-paid { border-top-color: rgba(175, 187, 202, .14); }
+/* .dash-paid-amt has a hardcoded #E0A43B (old amber) fallback rule elsewhere
+   that doesn't read the --dash-gold var at all — override explicitly so the
+   "recently paid" figure doesn't mismatch the ring/goal gold beside it. */
+.admin-shell .dash-paid-amt { color: var(--gold); }
+
+/* ── 11. Dashboard hero search — was still a hardcoded cream pill + forest
+   focus ring, unreached by the topbar recolor above (different selector). ── */
+.admin-shell .dash-search input { background: #161e28; border-color: #24303e; }
+.admin-shell .dash-search input:focus {
+  border-color: var(--terra); box-shadow: 0 0 0 3px var(--terra-tint); }
 
 /* ── 10. Activity strip + studio board pieces reused on the dashboard ─────── */
 .admin-shell .v4-activity-strip { background: var(--surface); border-color: var(--line); }
