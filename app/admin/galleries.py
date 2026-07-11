@@ -162,11 +162,16 @@ async def create_gallery(title: str = Form(...), client_name: str = Form("")):
 # Strict 1:1 with the Admin Transfers prototype: one derived status per card
 # (Active / Expiring / Downloaded / Expired) with its own icon + colour pair,
 # all honest projections of real columns (expiry, download count, asset count).
+# Dark-panel tints (editorial-dark) — these feed the .tr-card-ico/.tr-badge
+# inline style directly, so they can't be reached by CSS; match the same
+# ok/clay/honey/neutral status tokens the rest of the admin shell uses.
+# "Expiring" -> clay to match common.py's _STATUS_STYLE, which uses the same
+# word for the same meaning (gallery about to expire) on the gallery list.
 _TRANSFER_STYLE = {
-    "Active": ("#2f7d57", "#e1f2e9", "↑"),
-    "Expiring": ("#9a7a2c", "#f7ecd2", "↑"),
-    "Downloaded": ("#2f6d8a", "#ddeef0", "✓"),
-    "Expired": ("#8A9183", "#ecefe6", "⤓"),
+    "Active": ("#9cc178", "#20271a", "↑"),
+    "Expiring": ("#d98a78", "#2e1a18", "↑"),
+    "Downloaded": ("#d8a857", "#2b2413", "✓"),
+    "Expired": ("#aba9a3", "#242424", "⤓"),
 }
 
 
