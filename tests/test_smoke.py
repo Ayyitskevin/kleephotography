@@ -9882,3 +9882,50 @@ def test_video_renditions_flow(admin):
         assert r.status_code == 200 and r.headers["content-type"] == "video/mp4"
         assert "_9x16.mp4" in r.headers.get("content-disposition", "")
         assert pub.get(f"/g/{g['slug']}/download/rendition/999999").status_code == 404
+
+
+def test_bulk_star_and_tag(admin):
+    g = db.one("SELECT * FROM galleries ORDER BY id LIMIT 1")
+    ids = []
+    for i in range(3):
+        aid = db.run(
+            "INSERT INTO assets (gallery_id, kind, filename, stored, status) VALUES (?,?,?,?,?)",
+            (g["id"], "photo", f"bulk{i}.jpg", f"beefcafe0{i}beefcafe.jpg", "ready"),
+        )
+        ids.append(aid)
+    try:
+        # star + tag two of the three in one sweep
+        r = admin.post(
+            f"/admin/galleries/{g['id']}/assets/bulk-portfolio",
+            data={"asset_ids": [str(ids[0]), str(ids[1])], "portfolio_tag": "re/exteriors"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        for aid in ids[:2]:
+            row = db.one("SELECT portfolio, portfolio_tag FROM assets WHERE id=?", (aid,))
+            assert row["portfolio"] == 1 and row["portfolio_tag"] == "re/exteriors"
+        assert db.one("SELECT portfolio FROM assets WHERE id=?", (ids[2],))["portfolio"] == 0
+
+        # starring without a tag keeps existing tags untouched
+        admin.post(
+            f"/admin/galleries/{g['id']}/assets/bulk-portfolio",
+            data={"asset_ids": [str(ids[0])]},
+            follow_redirects=False,
+        )
+        row = db.one("SELECT portfolio, portfolio_tag FROM assets WHERE id=?", (ids[0],))
+        assert row["portfolio"] == 1 and row["portfolio_tag"] == "re/exteriors"
+
+        # unstar sweep
+        admin.post(
+            f"/admin/galleries/{g['id']}/assets/bulk-portfolio",
+            data={"asset_ids": [str(i) for i in ids], "mode": "unstar"},
+            follow_redirects=False,
+        )
+        for aid in ids:
+            assert db.one("SELECT portfolio FROM assets WHERE id=?", (aid,))["portfolio"] == 0
+
+        # the bulk toolbar ships both portfolio actions
+        page = admin.get(f"/admin/galleries/{g['id']}").text
+        assert "bulk-portfolio" in page and "Star checked" in page and "Unstar" in page
+    finally:
+        db.run("DELETE FROM assets WHERE id IN (?,?,?)", (ids[0], ids[1], ids[2]))
