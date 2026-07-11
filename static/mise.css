@@ -8333,9 +8333,15 @@ html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
 /* ── 1. Settings (/admin/settings) ────────────────────────────────────── */
 .admin-shell .set-badge-connected { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-line); }
 /* Fill already resolves via var(--terra); its hardcoded cream text is the
-   same rose-fill+cream-text AA fail fixed repeatedly elsewhere. */
+   same rose-fill+cream-text AA fail fixed repeatedly elsewhere. The hover
+   state's own background (var(--terra-deep), from the pre-PR-D rule) was
+   left untouched — navy text on terra-deep only measures ~4.26:1, still
+   short of AA, since terra-deep can't clear 4.5:1 with any single text
+   color. Route hover to the same brighter --terra fill as the resting
+   state so navy text actually passes (~6.3:1). */
 .admin-shell .set-badge-ready,
 .admin-shell a.set-badge-ready:hover { color: #0e1319; }
+.admin-shell a.set-badge-ready:hover { background: var(--terra); border-color: var(--terra); }
 .admin-shell .set-badge-off { background: var(--neutral-bg); color: var(--neutral); border-color: var(--neutral-line); }
 .admin-shell .set-badge-edge { background: var(--honey-bg); color: var(--honey); border-color: var(--honey-line); }
 .admin-shell .set-op-row { border-top-color: var(--line); }
@@ -8376,6 +8382,17 @@ html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
 .admin-shell .funnel-retainer_paid .funnel-n,
 .admin-shell .funnel-session_planning .funnel-n,
 .admin-shell .funnel-project_closed .funnel-n { color: #0e1319; }
+/* .stage-tag (the same 7 fills, used as the pipeline-stage label) inherits
+   the default --ink text color, which reads 1.5-3:1 against every one of
+   these bright fills (verified per-fill) — same failure shape as .funnel-n
+   above, same fix: route each stage to whichever of navy/white clears AA. */
+.admin-shell .stage-inquiry_received,
+.admin-shell .stage-proposal_sent,
+.admin-shell .stage-retainer_paid,
+.admin-shell .stage-session_planning,
+.admin-shell .stage-project_closed { color: #0e1319; }
+.admin-shell .stage-consultation_call,
+.admin-shell .stage-contract_signed { color: #fff; }
 
 /* ── 3. Press (/admin/studio/press) ───────────────────────────────────── */
 /* No bare .ok{color} rule exists anywhere — the "published ●" dot (also used
