@@ -2,13 +2,14 @@
 Inquiry form emails Kevin's inbox so Odysseus inquiry_intake picks it up unchanged."""
 
 import logging
+from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
-from .. import config, db, mailer, security
+from .. import config, db, mailer, security, specialties
 from ..render import ROOT, templates
 
 log = logging.getLogger("mise.public.site")
@@ -17,6 +18,9 @@ router = APIRouter()
 # Paths the noindex middleware leaves crawlable (matched by exact path or prefix "/").
 INDEXABLE = {
     "/",
+    "/real-estate",
+    "/portraits",
+    "/food-beverage",
     "/portfolio",
     "/work",
     "/about",
@@ -244,6 +248,291 @@ BOOK_FAQS = [
 FAQS = BOOK_FAQS  # default for templates that don't override
 templates.env.globals["faqs"] = FAQS
 
+# ── Specialty spokes ─────────────────────────────────────────────────────────
+# Copy for the three specialty landing pages (/real-estate, /portraits,
+# /food-beverage) — the "spokes" of the 3-vertical flagship IA. Work, reels,
+# case studies, and testimonials are filtered by the portfolio-tag prefix
+# convention (app/specialties.py). The F&B spoke inherits the pre-revamp home
+# copy nearly verbatim so the indexed F&B keywords keep a dedicated page when
+# the homepage broadens into the studio hub.
+SPECIALTY_PAGES = {
+    "re": {
+        "title": "Real Estate Photography & Video",
+        "meta": "Real estate photography and video for Asheville & Western "
+        "North Carolina — MLS-ready stills, twilight exteriors, and vertical "
+        "walkthrough reels that move listings.",
+        "kicker": "Real estate · Asheville & WNC",
+        "h1a": "Listings that look",
+        "h1b": "worth the drive.",
+        "lede": "Photography and film for agents and brokerages across Western "
+        "North Carolina — MLS-ready stills, twilight exteriors, and walkthrough "
+        "reels that move buyers before the first showing.",
+        "pills": [
+            "Photo · Video",
+            "MLS & Zillow-ready formats",
+            "Twilight exteriors",
+            "Full-res for print",
+        ],
+        "hero_caption": "Twilight exterior · Asheville",
+        "work_heading": "Selected listings.",
+        "work_sub": "Interiors that show, exteriors that stop the scroll.",
+        "motion_heading": "Walkthroughs that do the showing.",
+        "motion_sub": "Vertical reels for social; hero cuts for the listing page.",
+        "deliverables": [
+            (
+                "Stills that sell the space",
+                "Clean, bright interiors and true-color exteriors — composed "
+                "for MLS, Zillow, and your listing page, with full resolution "
+                "on hand for flyers and print.",
+            ),
+            (
+                "Motion that books showings",
+                "Vertical walkthrough reels for social and a hero walkthrough "
+                "cut for the listing — the drive-by a buyer takes from their "
+                "couch, shot in the same visit as the stills.",
+            ),
+            (
+                "Delivery agents can run with",
+                "One private gallery link: preview everything, download in the "
+                "sizes each platform wants, and share the same link with your "
+                "seller.",
+            ),
+        ],
+        "process": [
+            (
+                "Book the window",
+                "Pick a slot that fits the listing's light — bright-morning "
+                "interiors, twilight exteriors. Tell me the go-live date and "
+                "I'll work backwards from it.",
+            ),
+            (
+                "Shoot day",
+                "I move room to room fast and stage lightly as I go — a tidy "
+                "house is most of the battle, and sellers don't need to "
+                "disappear for long.",
+            ),
+            (
+                "Gallery, fast",
+                "A private gallery with MLS-and-social-ready files sized to "
+                "upload anywhere, plus full resolution for print.",
+            ),
+        ],
+        "faqs": [
+            (
+                "How fast can you turn a listing around?",
+                "Tell me the go-live date and I'll be straight about what's "
+                "possible — listings move fast and the calendar keeps room for "
+                "them. If it's urgent, say so on the booking form.",
+            ),
+            (
+                "Do you shoot video as well as photos?",
+                "Yes — vertical walkthrough reels for social and a horizontal "
+                "cut for the listing page, shot in the same visit as the "
+                "photos. Motion is where buyers linger.",
+            ),
+            (
+                "How should the property be prepped?",
+                "Clean, declutter, lights on, blinds open. I stage lightly as "
+                "I shoot — a tidy house is most of the battle, and I'll flag "
+                "anything worth moving before the camera comes out.",
+            ),
+            (
+                "What formats do I get?",
+                "Web-sized files that upload straight to MLS and portals, "
+                "social crops for the feed, and full resolution for print — "
+                "all in one gallery, all yours to download.",
+            ),
+        ],
+        "contact_service": "Real Estate",
+        "cta_h1": "Got a listing",
+        "cta_h2": "going live?",
+    },
+    "pl": {
+        "title": "Portrait & Lifestyle Photography",
+        "meta": "Portrait and lifestyle photography in Asheville, NC — "
+        "headshots, personal branding, families, and golden-hour sessions, "
+        "delivered same week in a private gallery.",
+        "kicker": "Portrait & lifestyle · Asheville & WNC",
+        "h1a": "Look like yourself —",
+        "h1b": "on your best day.",
+        "lede": "Headshots, personal branding, families, and the moments in "
+        "between — directed so nothing feels stiff, and delivered ready for "
+        "wherever they're going.",
+        "pills": [
+            "Headshots & personal branding",
+            "Families & couples",
+            "Studio or on-location",
+            "Golden-hour sessions",
+        ],
+        "hero_caption": "Golden hour · Asheville",
+        "work_heading": "Selected sessions.",
+        "work_sub": "Faces on their best day — none of them born camera-ready.",
+        "motion_heading": "Motion, in between the stills.",
+        "motion_sub": "Short loops that carry the feel a still can't.",
+        "deliverables": [
+            (
+                "Direction, not posing",
+                "Every frame is coached — where to look, what to do with your "
+                "hands — so the photos read like you on a good day, not a "
+                "stock photo.",
+            ),
+            (
+                "A gallery made for choosing",
+                "Proof, favorite, and download in one private link — pick the "
+                "frames you love and grab them full-res, cropped for LinkedIn, "
+                "web, and print.",
+            ),
+            (
+                "Consistent team headshots",
+                "Whole teams in one visit with matched lighting and framing — "
+                "new hires slot in later without the team page looking "
+                "stitched together.",
+            ),
+        ],
+        "process": [
+            (
+                "Plan the session",
+                "A short call to pick looks, locations, and what the photos "
+                "are for — LinkedIn, the company site, the mantel.",
+            ),
+            (
+                "The session",
+                "Directed and unhurried, in the studio or out in the light. "
+                "Most people relax inside ten minutes; the best frames come "
+                "right after.",
+            ),
+            (
+                "Same-week gallery",
+                "A private gallery to pick favorites and download finals — "
+                "with crops sized for profiles, sites, and print.",
+            ),
+        ],
+        "faqs": [
+            (
+                "I'm awkward in front of a camera — will this work?",
+                "That's most people, and it's my favorite kind of session. "
+                "Everything is directed: where to look, what to do with your "
+                "hands, when to move. You'll never be left posing in silence.",
+            ),
+            (
+                "What should I wear?",
+                "Solid colors and things you already feel good in beat "
+                "anything bought for the shoot. Bring one backup look and "
+                "we'll pick together before we start.",
+            ),
+            (
+                "Where do we shoot?",
+                "In the studio in Asheville or on location anywhere the light "
+                "is good — your office, a trailhead, downtown at golden hour. "
+                "We pick the spot to match where the photos will live.",
+            ),
+            (
+                "Can you photograph our whole team?",
+                "Yes — consistent headshots for a full team in one visit, "
+                "matched lighting and framing, so the site looks unified even "
+                "as new people join.",
+            ),
+        ],
+        "contact_service": "Portraits",
+        "cta_h1": "Let's make time",
+        "cta_h2": "for a session.",
+    },
+    "fb": {
+        "title": "Food & Beverage Photography & Video",
+        # Inherits the pre-revamp home meta so the indexed F&B positioning
+        # keeps a dedicated page — see the module comment above.
+        "meta": "Photography that makes people hungry — food & beverage "
+        "photography and videography for the restaurants, cafés, and bars of "
+        "Asheville & Western North Carolina.",
+        "kicker": "Food & beverage · Asheville & WNC",
+        "h1a": "We make your menu",
+        "h1b": "sell itself.",
+        "lede": "For the restaurants, cafés, and bars of Western North "
+        "Carolina — plates, pours, and the rooms they live in, shot to sell "
+        "the seat.",
+        "pills": [
+            "Menus, dishes & drinks",
+            "Reels built for the feed",
+            "Social crops 1:1 · 4:5 · 9:16",
+            "Same-week gallery",
+        ],
+        "hero_caption": "Tasting menu · Asheville",
+        "work_heading": "Plates that earn the double-take.",
+        "work_sub": "A few favorites from recent menus — plates, pours, and "
+        "the rooms they live in.",
+        "motion_heading": "Motion that earns the scroll.",
+        "motion_sub": "The steam. The pour. The first cut. Built vertical for the feed.",
+        "deliverables": [
+            (
+                "Plates at their peak",
+                "Menu heroes, drinks, and the rooms they live in — lit "
+                "honest, styled light, and shot in the thirty seconds a dish "
+                "looks alive.",
+            ),
+            (
+                "Motion that earns the scroll",
+                "The steam, the pour, the first cut — vertical reels built "
+                "for Instagram and TikTok, shot in the same visit as the "
+                "stills.",
+            ),
+            (
+                "Delivery that posts itself",
+                "A private same-week gallery: favorites, full-res downloads, "
+                "and social crops in 1:1, 4:5, and 9:16 — already sized for "
+                "every platform.",
+            ),
+        ],
+        "process": [
+            (
+                "Scout the menu",
+                "We go through the menu together, agree on the hero dishes "
+                "and drinks, and build a shot list around your service window.",
+            ),
+            (
+                "Shoot fast, on the day",
+                "Natural light first, styling minimal and honest. I work "
+                "around the kitchen — most full menus wrap between lunch and "
+                "dinner.",
+            ),
+            (
+                "Deliver same week",
+                "A private gallery lands within the week: full-res downloads, "
+                "favorites, and social crops already sized for every platform.",
+            ),
+        ],
+        "faqs": [
+            (
+                "Do you style the food?",
+                "Light, honest styling is included — the goal is for the dish "
+                "to look like what arrives at the table, at its best. For "
+                "elaborate set styling I can bring in a stylist and fold it "
+                "into the quote.",
+            ),
+            (
+                "What do I actually get, and when?",
+                "A private online gallery, usually within the week: "
+                "full-resolution downloads, your favorites, and social crops "
+                "in 1:1, 4:5, and 9:16 — already sized for every platform.",
+            ),
+            (
+                "Can you shoot during service?",
+                "Around it, always — we plan the shot list so the kitchen "
+                "never waits on a photographer, and most full menus wrap "
+                "between lunch and dinner.",
+            ),
+            (
+                "Do you shoot video too?",
+                "Yes — steam, pours, and first cuts built vertical for the "
+                "feed, plus brand films for launches. Photo and motion in the "
+                "same visit is the most efficient way to buy either.",
+            ),
+        ],
+        "contact_service": "Food & Beverage",
+        "cta_h1": "Let's make your food look",
+        "cta_h2": "the way it tastes.",
+    },
+}
+
 
 def _portfolio_assets() -> list:
     return db.all_("""SELECT a.*, g.client_name, g.title AS gallery_title
@@ -328,6 +617,20 @@ def _case_studies() -> list:
                        ORDER BY a.id DESC LIMIT 1) AS hero_id
                       FROM galleries g WHERE g.cs_published=1
                       ORDER BY g.created_at DESC""")
+
+
+def _cs_specialty_map() -> dict[int, str]:
+    """gallery_id → specialty key for grouping case studies, derived as the
+    majority tag-prefix of each gallery's portfolio-starred assets (unprefixed
+    tags = legacy F&B). Zero-schema by design: the gallery table has no
+    category column, and the starred assets are what a case study displays
+    anyway, so they're the honest signal of what kind of work it is."""
+    rows = db.all_("""SELECT gallery_id, portfolio_tag FROM assets
+                      WHERE portfolio=1 AND status='ready'""")
+    votes: dict[int, Counter] = defaultdict(Counter)
+    for r in rows:
+        votes[r["gallery_id"]][specialties.specialty_key(r["portfolio_tag"])] += 1
+    return {gid: c.most_common(1)[0][0] for gid, c in votes.items()}
 
 
 def _demo_gallery() -> dict | None:
@@ -675,6 +978,56 @@ async def reels(request: Request):
     )
 
 
+def _specialty_page(request: Request, key: str):
+    """Shared renderer for the three specialty spokes — same anatomy, distinct
+    copy (SPECIALTY_PAGES) and specialty-filtered work/reels/studies."""
+    page = SPECIALTY_PAGES[key]
+    photos = [
+        a for a in _portfolio_assets() if specialties.specialty_key(a["portfolio_tag"]) == key
+    ]
+    vids = [r for r in _portfolio_reels() if specialties.specialty_key(r["portfolio_tag"]) == key]
+    csmap = _cs_specialty_map()
+    studies = [g for g in _case_studies() if csmap.get(g["id"], specialties.DEFAULT_KEY) == key]
+    # Specialty-scoped quotes first (they ride on this vertical's case
+    # studies); top up with general ones so the block never renders thin.
+    quotes: list = []
+    for s in studies:
+        quotes += _testimonials(gallery_id=s["id"])
+    if len(quotes) < 3:
+        quotes += _testimonials(limit=3 - len(quotes))
+    return templates.TemplateResponse(
+        request,
+        "site/specialty.html",
+        {
+            "sp": specialties.SPECIALTIES[key],
+            "page": page,
+            "photos": photos,
+            "reels": vids,
+            "hero_reel": vids[0] if vids else None,
+            "studies": studies[:4],
+            "testimonials": quotes[:3],
+            "demo_gallery": _demo_gallery(),
+            "faqs": page["faqs"],
+            "faq_heading": "Good to know",
+        },
+    )
+
+
+@router.get("/real-estate", response_class=HTMLResponse)
+async def specialty_real_estate(request: Request):
+    return _specialty_page(request, "re")
+
+
+@router.get("/portraits", response_class=HTMLResponse)
+async def specialty_portraits(request: Request):
+    return _specialty_page(request, "pl")
+
+
+@router.get("/food-beverage", response_class=HTMLResponse)
+async def specialty_food_beverage(request: Request):
+    return _specialty_page(request, "fb")
+
+
 @router.get("/site/img/{asset_id}")
 async def portfolio_image(asset_id: int, variant: str = "web"):
     """Unauthenticated — serves ONLY portfolio-flagged, ready photos."""
@@ -776,6 +1129,9 @@ async def security_txt():
 async def sitemap():
     paths = [
         "/",
+        "/real-estate",
+        "/portraits",
+        "/food-beverage",
         "/portfolio",
         "/work",
         "/services",

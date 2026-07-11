@@ -1,0 +1,216 @@
+{% extends "site/base_site.html" %}
+{# Shared spoke template for /real-estate, /portraits, /food-beverage — one
+   anatomy, three sets of copy (site.SPECIALTY_PAGES) and specialty-filtered
+   work/reels/case studies. Reuses the home hero/work/motion primitives so the
+   spokes and the hub read as one editorial system. #}
+{# Top-level so the og block AND site_content both see it — a {% set %} inside
+   one block is invisible to the others (Jinja block scoping). #}
+{% set og_asset = photos[0] if photos else None %}
+{% block title %}{{ page.title }} — {{ site_name }}{% endblock %}
+{% block meta_description %}{{ page.meta }}{% endblock %}
+{% block og %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:title" content="{{ page.title }} — {{ site_name }}">
+<meta property="og:description" content="{{ page.meta }}">
+<meta property="og:url" content="{{ base_url }}/{{ sp.slug }}">
+{% if og_asset %}<meta property="og:image" content="{{ base_url }}/site/img/{{ og_asset.id }}">{% endif %}
+<meta name="twitter:card" content="{{ 'summary_large_image' if og_asset else 'summary' }}">
+{% endblock %}
+{% block site_content %}
+
+<div class="scroll-progress" aria-hidden="true"><div data-progress-bar></div></div>
+
+{# ═══ HERO — same signature two-column frame + reel as the hub ═══════════════ #}
+<section class="eh sp-hero">
+  <div class="eh-grid" data-hero-grid>
+    <div class="eh-copy">
+      <p class="eh-kicker" data-reveal>{{ page.kicker }}</p>
+      <h1 class="eh-title" data-reveal>{{ page.h1a }} <span class="eh-em">{{ page.h1b }}</span></h1>
+      <p class="eh-lede" data-reveal>{{ page.lede }}</p>
+      <ul class="sp-pills" data-reveal aria-label="At a glance">
+        {% for p in page.pills %}<li class="sp-pill">{{ p }}</li>{% endfor %}
+      </ul>
+      <div class="eh-actions" data-reveal>
+        <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
+          <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
+        <a class="elink" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote <span aria-hidden="true">&rarr;</span></a>
+      </div>
+    </div>
+    <div class="eh-media" data-hero-media>
+      <div class="eh-frame">
+        {% if photos %}
+        <img class="eh-frame-img" data-parallax="0.05"
+             src="/site/img/{{ photos[0].id }}?variant=web"
+             srcset="/site/img/{{ photos[0].id }}?variant=thumb 480w, /site/img/{{ photos[0].id }}?variant=web 2048w"
+             sizes="(max-width: 860px) 92vw, 46vw" fetchpriority="high" decoding="async"
+             alt="{{ photos[0]|portfolio_alt }}">
+        {% endif %}
+        <span class="eh-frame-veil" aria-hidden="true"></span>
+        <figcaption class="eh-frame-cap">{{ page.hero_caption }}</figcaption>
+      </div>
+      {% if hero_reel %}
+      <div class="eh-reel" data-hero-reel data-parallax="-0.06">
+        <video autoplay muted loop playsinline preload="metadata"
+               poster="/site/poster/{{ hero_reel.id }}">
+          <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
+        </video>
+        <span class="eh-reel-play" aria-hidden="true">&#9654;</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{# ═══ SELECTED WORK — specialty-filtered starred photos ══════════════════════ #}
+{% if photos %}
+<section class="ework" id="work">
+  <div class="ework-head" data-reveal>
+    <div class="ework-head-txt">
+      <p class="esec-kicker">Selected work</p>
+      <h2 class="esec-h2">{{ page.work_heading }}</h2>
+      <p class="esec-lede">{{ page.work_sub }}</p>
+    </div>
+    <a class="elink ework-head-link" href="/portfolio">Full portfolio <span aria-hidden="true">&rarr;</span></a>
+  </div>
+  <div class="ework-grid">
+    {% for a in photos[:6] %}
+    <figure class="tile ework-fig ework-fig-{{ loop.index }}" data-web="/site/img/{{ a.id }}">
+      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
+           srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
+           sizes="(max-width: 860px) 92vw, 30vw" alt="{{ a|portfolio_alt }}">
+      <figcaption class="ework-cap">
+        <span class="ework-cap-t">{{ a.portfolio_tag|tag_label if a.portfolio_tag else 'Selected work' }}</span>
+        {% if a.client_name %}<span class="ework-cap-s">{{ a.client_name }}</span>{% endif %}
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="ework">
+  {% include "site/_empty_portfolio.html" %}
+</section>
+{% endif %}
+
+{# ═══ MOTION — specialty reels ═══════════════════════════════════════════════ #}
+{% if reels %}
+<section class="emotion" id="motion">
+  <div class="emotion-head" data-reveal>
+    <div class="emotion-head-txt">
+      <p class="esec-kicker esec-kicker-gold">Motion</p>
+      <h2 class="esec-h2 esec-h2-cream">{{ page.motion_heading }}</h2>
+    </div>
+    <p class="emotion-sub">{{ page.motion_sub }}</p>
+  </div>
+  {% set feat = reels[0] %}
+  <figure class="emotion-feature" data-reveal>
+    <video autoplay muted loop playsinline preload="metadata" poster="/site/poster/{{ feat.id }}">
+      <source src="/site/vid/{{ feat.id }}" type="video/mp4">
+    </video>
+    <span class="emotion-veil" aria-hidden="true"></span>
+    <span class="emotion-play" aria-hidden="true">&#9654;</span>
+    <figcaption class="emotion-flabel">
+      <span>{{ sp.name }} reel</span>
+      {% if feat.portfolio_tag %}<span class="emotion-flabel-tag">{{ feat.portfolio_tag|tag_label }}</span>{% endif %}
+    </figcaption>
+  </figure>
+  {% if reels|length > 1 %}
+  <div class="emotion-strip">
+    {% for r in reels[1:5] %}
+    <figure class="emotion-clip">
+      <video autoplay muted loop playsinline preload="metadata" poster="/site/poster/{{ r.id }}">
+        <source src="/site/vid/{{ r.id }}" type="video/mp4">
+      </video>
+      <figcaption>{{ r.portfolio_tag|tag_label if r.portfolio_tag else 'Reel' }}</figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <p class="emotion-more" data-reveal><a class="elink" href="/reels">All reels <span aria-hidden="true">&rarr;</span></a></p>
+</section>
+{% endif %}
+
+{# ═══ DELIVERABLES — what you get ════════════════════════════════════════════ #}
+<section class="sp-sec sp-deliver-sec">
+  <div class="sp-deliver-intro" data-reveal>
+    <p class="esec-kicker">What you get</p>
+    <h2 class="esec-h2">Built for where it's going.</h2>
+  </div>
+  <div class="sp-deliver">
+    {% for title, body in page.deliverables %}
+    <article class="sp-dcard" data-reveal>
+      <span class="sp-dnum">{{ "%02d"|format(loop.index) }}</span>
+      <h3>{{ title }}</h3>
+      <p>{{ body }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+{# ═══ PROCESS ════════════════════════════════════════════════════════════════ #}
+<section class="sp-sec sp-proc">
+  <h2 class="eyebrow" data-reveal>How a shoot runs</h2>
+  <div class="proc-grid">
+    {% for title, body in page.process %}
+    <div class="proc-card" data-reveal>
+      <span class="proc-num">{{ "%02d"|format(loop.index) }}</span>
+      <h3>{{ title }}</h3>
+      <p>{{ body }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{# ═══ CASE STUDIES — specialty-grouped, derived from starred-asset tags ══════ #}
+{% if studies %}
+<section class="sp-sec sp-cs">
+  <div class="sp-cs-head" data-reveal>
+    <p class="esec-kicker">Case studies</p>
+    <h2 class="esec-h2">{{ sp.name }} work, in the wild.</h2>
+  </div>
+  <div class="work-editorial-grid" data-reveal>
+    {% for s in studies %}
+    <a class="work-editorial-card" href="/work/{{ s.slug }}">
+      <div class="work-editorial-img">
+        {% if s.hero_id %}
+        <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
+             srcset="/site/img/{{ s.hero_id }}?variant=thumb 480w, /site/img/{{ s.hero_id }}?variant=web 2048w"
+             sizes="(max-width: 700px) 100vw, 50vw"
+             alt="{{ s.cs_tagline or s.title }}">
+        {% else %}
+        <span class="placeholder">no hero photo starred yet</span>
+        {% endif %}
+      </div>
+      <h3>{{ s.cs_tagline or s.title }}</h3>
+      <p class="muted">{{ s.client_name or "" }}{% if s.client_name and s.cs_location %} · {% endif %}{{ s.cs_location or "" }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ═══ TESTIMONIALS ═══════════════════════════════════════════════════════════ #}
+<section class="etestimonials" data-reveal>
+  {% include "site/_testimonials.html" %}
+</section>
+
+{# ═══ FAQ ════════════════════════════════════════════════════════════════════ #}
+<section class="sp-sec faq-narrow">
+  {% include "site/_faq.html" %}
+</section>
+
+{# ═══ CLOSING CTA ════════════════════════════════════════════════════════════ #}
+<section class="ecta">
+  <div class="ecta-inner" data-reveal>
+    <h2 class="ecta-h2">{{ page.cta_h1 }} <span class="eem">{{ page.cta_h2 }}</span></h2>
+    <div class="ecta-actions">
+      <a class="ebtn ebtn-fill" data-magnetic href="/book">Book a shoot
+        <span class="ebtn-arr" data-arrow aria-hidden="true">&rarr;</span></a>
+      <a class="elink" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote <span aria-hidden="true">&rarr;</span></a>
+    </div>
+  </div>
+</section>
+
+{% if photos %}{% include "site/_lightbox.html" %}{% endif %}
+{% endblock %}

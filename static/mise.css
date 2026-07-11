@@ -8433,3 +8433,55 @@ html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
    wrong, no prior PR actually fixed this exact pairing). Same fix as .tr-seg
    above: brighter --terra + navy ink. */
 .admin-shell .audit-chip.is-active { background: var(--terra); color: #0e1319; border-color: var(--terra); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPECIALTY SPOKES (Revamp PR-J — 3-vertical flagship revamp, 2026-07-11).
+   /real-estate /portraits /food-beverage reuse the editorial-dark home
+   primitives (.eh hero, .ework grid, .emotion band, .ecta close); only the
+   hero spec-pill row, the deliverables cards, and shared spoke-section rhythm
+   are new. Scoped to the dark marketing layer like PR-A/B — money docs
+   (.cream-theme) and the admin shell are untouched.
+   ========================================================================== */
+
+/* Section rhythm — same padding formula as the enumerated home sections. */
+html[data-theme="dark"] .site-body .sp-sec {
+  padding: clamp(72px, 10vw, 140px) clamp(20px, 6vw, 88px);
+  max-width: 1408px; margin: 0 auto;
+}
+
+/* Hero spec pills — quiet capability chips under the lede. */
+html[data-theme="dark"] .site-body .sp-pills {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: 28px 0 0; padding: 0; list-style: none;
+}
+html[data-theme="dark"] .site-body .sp-pill {
+  border: 1px solid var(--line); color: var(--muted);
+  background: rgba(30, 42, 60, .45); border-radius: 999px;
+  padding: 7px 15px; font: 500 .78rem/1.2 var(--sans); letter-spacing: .05em;
+}
+
+/* Deliverables — three numbered cards on the card surface. */
+html[data-theme="dark"] .site-body .sp-deliver-intro { max-width: 720px; margin-bottom: 44px; }
+html[data-theme="dark"] .site-body .sp-deliver {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+}
+html[data-theme="dark"] .site-body .sp-dcard {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 30px 26px 32px;
+}
+html[data-theme="dark"] .site-body .sp-dnum {
+  display: block; font: 600 .74rem/1 var(--sans); letter-spacing: .22em;
+  color: var(--accent-lt); margin-bottom: 18px;
+}
+html[data-theme="dark"] .site-body .sp-dcard h3 {
+  margin: 0 0 10px; font-family: var(--serif); font-weight: 400;
+  font-size: 1.3rem; color: #e7dfcd;
+}
+html[data-theme="dark"] .site-body .sp-dcard p { margin: 0; color: var(--ink-soft); }
+
+/* Case-study group heading spacing. */
+html[data-theme="dark"] .site-body .sp-cs-head { max-width: 720px; margin-bottom: 44px; }
+
+@media (max-width: 900px) {
+  html[data-theme="dark"] .site-body .sp-deliver { grid-template-columns: 1fr; }
+}

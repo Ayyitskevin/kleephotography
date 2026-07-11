@@ -9734,3 +9734,58 @@ def test_webhook_ignores_unrelated_event_type(client, monkeypatch):
     body = _checkout_event("evt_other_1", 1, "full", 1, etype="payment_intent.created")
     r = _post_signed(client, body)
     assert r.status_code == 200 and r.json()["ignored"] == "payment_intent.created"
+
+
+def test_specialty_pages(admin):
+    g = db.one("SELECT * FROM galleries ORDER BY id LIMIT 1")
+    from app import config as cfg
+
+    with TestClient(app) as pub:
+        # all three spokes render, are indexable, and sit in the sitemap
+        for path in ("/real-estate", "/portraits", "/food-beverage"):
+            r = pub.get(path)
+            assert r.status_code == 200, path
+            assert "x-robots-tag" not in r.headers, path
+            assert 'content="index, follow"' in r.text
+            assert '"@type": "FAQPage"' in r.text  # FAQ JSON-LD rides on every spoke
+        sm = pub.get("/sitemap.xml")
+        for path in ("/real-estate", "/portraits", "/food-beverage"):
+            assert f"<loc>{cfg.BASE_URL}{path}</loc>" in sm.text
+
+        # nothing carries an re/ tag yet → the RE spoke falls back to the
+        # shared empty state instead of an empty grid
+        assert "empty-state" in pub.get("/real-estate").text
+
+    # plant two synthetic starred photos: one RE-prefixed, one legacy-tagged
+    # (unprefixed = F&B by convention)
+    re_id = db.run(
+        "INSERT INTO assets (gallery_id, kind, filename, stored, status, portfolio, "
+        "portfolio_tag) VALUES (?,?,?,?,?,?,?)",
+        (g["id"], "photo", "re.jpg", "cafefeed01cafefeed.jpg", "ready", 1, "re/exteriors"),
+    )
+    fb_id = db.run(
+        "INSERT INTO assets (gallery_id, kind, filename, stored, status, portfolio, "
+        "portfolio_tag) VALUES (?,?,?,?,?,?,?)",
+        (g["id"], "photo", "fb.jpg", "cafefeed02cafefeed.jpg", "ready", 1, "dishes"),
+    )
+    try:
+        with TestClient(app) as pub:
+            r = pub.get("/real-estate")
+            assert f'data-web="/site/img/{re_id}"' in r.text
+            assert f"/site/img/{fb_id}" not in r.text
+            # prefix-derived craft phrase lands in the alt text
+            assert "real estate photography by" in r.text
+            # the spoke og:image is its own specialty's lead asset
+            assert f'property="og:image" content="{cfg.BASE_URL}/site/img/{re_id}"' in r.text
+            # prefix is stripped from the visible chip/caption label
+            assert "re/exteriors" not in r.text and "Exteriors" in r.text
+
+            r = pub.get("/food-beverage")
+            assert f"/site/img/{fb_id}" in r.text
+            assert f'data-web="/site/img/{re_id}"' not in r.text
+
+            r = pub.get("/portraits")
+            assert f"/site/img/{re_id}" not in r.text
+            assert f"/site/img/{fb_id}" not in r.text
+    finally:
+        db.run("DELETE FROM assets WHERE id IN (?,?)", (re_id, fb_id))
