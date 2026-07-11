@@ -53,6 +53,9 @@ templates.env.globals["plausible_domain"] = config.PLAUSIBLE_DOMAIN
 # tests monkeypatch app.config.SCREENING_ROOM / AERIALS_LIVE and see it stick.
 templates.env.globals["sr_enabled"] = features.screening_room
 templates.env.globals["aerials_live"] = features.aerials_live
+# specialty key → film-stock code ('re' → '250D') for mono frame metadata
+templates.env.globals["sp_stock"] = {k: m["stock"] for k, m in specialties.SPECIALTIES.items()}
+templates.env.globals["aerial_pass_display"] = specialties.aerial_pass_display
 
 
 def _portfolio_alt(asset, site_name: str | None = None) -> str:

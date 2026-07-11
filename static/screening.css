@@ -341,14 +341,16 @@
 .sr .pf-chip[data-films-first][aria-pressed="true"] { background: var(--sr-amber);
   border-color: var(--sr-amber); color: var(--sr-house); }
 .sr .portfolio-masonry { column-gap: 10px; }
-.sr .portfolio-masonry .tile { border-radius: 0; background: var(--sr-house-deep); }
+.sr .portfolio-masonry .tile { border-radius: 0; background: var(--sr-house-deep);
+  position: relative; }
+/* mono frame metadata reads always-on (the legacy caption was hover-gated) */
+.sr .tile .portfolio-cap, .sr .tile .portfolio-cap small { display: block;
+  opacity: 1; visibility: visible; transform: none; }
 .sr .tile .portfolio-cap { position: absolute; left: 10px; bottom: 8px; right: 10px;
   margin: 0; padding: 0; background: none; font: 400 8.5px/1.5 var(--sr-mono);
   letter-spacing: 0.08em; text-transform: uppercase; color: rgba(236, 228, 211, 0.75);
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8); }
-.sr .tile .portfolio-cap small { display: inline; color: rgba(236, 228, 211, 0.55);
-  font-size: 8.5px; }
-.sr .tile .portfolio-cap small::before { content: " · "; }
+.sr .tile .portfolio-cap small { color: rgba(236, 228, 211, 0.55); font-size: 8.5px; }
 .sr .tile .play-badge { left: 10px; top: 10px; right: auto; bottom: auto;
   width: auto; height: auto; border-radius: 0; font: 700 9px/1 var(--sr-mono);
   letter-spacing: 0.14em; color: var(--sr-house); background: var(--sr-amber);
@@ -362,6 +364,31 @@
 .sr .portfolio-masonry.sr-films-first .tile { flex: 1 1 300px; margin: 0; }
 .sr .portfolio-masonry.sr-films-first .tile[data-kind="video"] { order: -1;
   border: 1px solid color-mix(in srgb, var(--sr-amber) 40%, transparent); }
+
+/* ── /reels — the projection booth ────────────────────────────────────────── */
+.sr .motion-feature { position: relative; border: 1px solid var(--sr-line-strong);
+  background: var(--sr-house-deep); border-radius: 0; overflow: hidden; }
+.sr .motion-feature video { display: block; width: 100%; }
+.sr .motion-feature-meta { display: flex; justify-content: space-between;
+  align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--sr-line);
+  position: static; background: none; }
+.sr .motion-feature-label { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--sr-amber); }
+.sr .motion-feature-meta p { margin: 4px 0 0; color: var(--sr-ink-soft); font-size: 12.5px; }
+.sr .motion-sound { background: none; border: 1px solid var(--sr-line-raised);
+  color: #d8cfba; font: 500 10px/1 var(--sr-mono); letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 10px 14px; cursor: pointer; border-radius: 0; }
+.sr .motion-sound[aria-pressed="true"] { border-color: var(--sr-amber); color: var(--sr-amber); }
+.sr .motion-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px; margin-top: 16px; }
+.sr .motion-reel { margin: 0; border: 1px solid var(--sr-line);
+  background: var(--sr-house-deep); border-radius: 0; overflow: hidden; }
+.sr .motion-reel video { display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: cover; }
+.sr .motion-reel-meta { display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px; font: 400 9px/1 var(--sr-mono); letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--sr-ink-faint); }
+.sr .motion-reel-bar { display: none; }
+.sr .pf-hidden { display: none !important; }
 
 /* ── screening view (lightbox goes full house) ────────────────────────────── */
 .sr .lightbox { background: rgba(4, 4, 5, 0.96); }
@@ -484,6 +511,170 @@
   object-fit: cover; }
 .sr .sr-sessions figure[data-kind="video"] { aspect-ratio: auto; border: 1px solid
   color-mix(in srgb, var(--sr-stock) 40%, transparent); }
+
+/* ── legacy class harmonization ───────────────────────────────────────────── */
+/* Pages not explicitly re-IA'd (work detail, booking flow, public forms, any
+   straggler bands) keep their markup; these remaps pull the shared legacy
+   classes onto the house tokens so every surface reads as one system. */
+.sr .page-hero, .sr .page-body, .sr .sec-inner { background: none; }
+.sr .eyebrow, .sr .esec-kicker, .sr .work-eyebrow, .sr .work-feature-eyebrow,
+.sr .cd-label { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .site-body h1, .sr h1, .sr h2, .sr h3 { font-family: var(--sr-sans); }
+.sr .page-hero h1, .sr .work-detail-head h1 { font-weight: 700;
+  letter-spacing: 0.03em; text-transform: uppercase; color: var(--sr-cream-strong); }
+.sr .it-accent { font-style: normal; color: var(--sr-stock); }
+.sr .lede, .sr .work-brief { color: var(--sr-ink-mute); }
+.sr .muted { color: var(--sr-ink-faint); }
+.sr .btn-saffron, .sr .btn-gold { background: var(--sr-stock); color: var(--sr-house);
+  border-radius: 0; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.sr .btn-ghost-dark { background: none; border: 1px solid rgba(236, 228, 211, 0.35);
+  color: var(--sr-cream); border-radius: 0; letter-spacing: 0.08em; text-transform: uppercase; }
+.sr .cta, .sr .cta-band, .sr .svc-foot-sec { background: none; }
+/* services board: tier cards go house-dark with a stock pick */
+.sr .svc { border-top: 1px solid var(--sr-line); padding-top: 28px; margin-top: 28px; }
+.sr .svc-head h2 { font: 700 22px/1.2 var(--sr-sans); letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--sr-cream); }
+.sr .svc-tag { font: 500 9px/1 var(--sr-mono); letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--sr-amber); border: 1px solid
+  color-mix(in srgb, var(--sr-amber) 45%, transparent); border-radius: 0;
+  background: none; padding: 5px 9px; }
+.sr .svc-tagline { color: var(--sr-ink-mute); }
+.sr .svc-tier { background: var(--sr-card); border: 1px solid var(--sr-line);
+  border-radius: 0; box-shadow: none; }
+.sr .svc-tier-mid { border-color: color-mix(in srgb, var(--sr-amber) 45%, transparent);
+  background: color-mix(in srgb, var(--sr-amber) 4%, var(--sr-card)); }
+.sr .svc-tier h3 { color: var(--sr-cream); text-transform: uppercase;
+  letter-spacing: 0.05em; font-size: 15px; }
+.sr .svc-sub { color: var(--sr-ink-faint); }
+.sr .svc-pick { background: var(--sr-amber); color: var(--sr-house); border-radius: 0;
+  font: 700 9px/1 var(--sr-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 5px 8px; }
+.sr .svc-price { font: 400 26px/1 var(--sr-mono); color: var(--sr-cream-strong); }
+.sr .svc-price .per { font-size: 12px; color: var(--sr-ink-faint); }
+.sr .svc-tier ul li { color: var(--sr-ink-mute); }
+.sr .svc-tier ul li::marker { color: var(--sr-stock); }
+.sr .svc-cta, .sr .svc-tier-mid .svc-cta { display: inline-flex; align-items: center;
+  justify-content: center; gap: 8px; background: none; border: 1px solid
+  color-mix(in srgb, var(--sr-amber) 45%, transparent); border-radius: 0;
+  color: var(--sr-amber); font: 700 11px/1 var(--sr-sans); letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 12px 18px; box-shadow: none; }
+.sr .svc-cta:hover, .sr .svc-tier-mid .svc-cta:hover { background: var(--sr-amber);
+  color: var(--sr-house); }
+/* press list */
+.sr .press-list { border-top: 1px solid var(--sr-line); }
+.sr .press-item { border-bottom: 1px solid var(--sr-line); }
+.sr .press-outlet { font: 700 13px/1.4 var(--sr-sans); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--sr-cream); }
+.sr .press-title { color: var(--sr-ink-soft); }
+.sr .press-title:hover { color: var(--sr-amber); }
+.sr .press-date { font-family: var(--sr-mono); font-size: 10px; }
+/* work index/detail */
+.sr .work-feature, .sr .work-editorial-card { background: var(--sr-card);
+  border: 1px solid var(--sr-line); border-radius: 0; box-shadow: none; }
+.sr .work-feature:hover, .sr .work-editorial-card:hover { border-color: var(--sr-stock); }
+.sr .work-feature-badge { background: var(--sr-amber); color: var(--sr-house);
+  border-radius: 0; font: 700 9px/1 var(--sr-mono); letter-spacing: 0.14em;
+  text-transform: uppercase; }
+.sr .work-editorial-card h3, .sr .work-feature-copy h2 { color: var(--sr-cream); }
+.sr .work-feature-link { color: var(--sr-amber); }
+.sr .work-back a { color: var(--sr-ink-faint); }
+.sr .work-credit-label { font-family: var(--sr-mono); letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .work-pullquote blockquote { font-family: var(--sr-serif); font-style: italic;
+  color: var(--sr-ink); }
+.sr .placeholder { background: var(--sr-house-deep); color: var(--sr-ink-ghost);
+  font-family: var(--sr-mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; }
+/* about page */
+.sr .ab-lead { color: var(--sr-ink); font-family: var(--sr-serif); }
+.sr .ab-body p { color: var(--sr-ink-mute); }
+.sr .about-photo img, .sr .contact-photo img, .sr .work-hero-frame img { border-radius: 0; }
+/* contact split */
+.sr .contact-card { background: var(--sr-card); border: 1px solid var(--sr-line);
+  border-radius: 0; box-shadow: none; }
+.sr .sr-contact-h1 { font: 700 clamp(30px, 3.4vw, 46px)/1.05 var(--sr-sans);
+  letter-spacing: 0.03em; text-transform: uppercase; color: var(--sr-cream-strong);
+  margin: 12px 0; }
+.sr .sr-contact-h1 em { font-style: normal; color: var(--sr-stock); }
+.sr .contact-detail a { color: var(--sr-amber); }
+.sr .sent-note h2 { color: var(--sr-ok); text-transform: none; }
+.sr .sent-note { color: var(--sr-ink-soft); }
+.sr .error { color: var(--sr-warn); }
+.sr .req { color: var(--sr-warn); }
+/* stack forms (contact / booking / public forms) */
+.sr .stack-form label { color: var(--sr-ink-soft); }
+.sr .stack-form button[type="submit"], .sr button[type="submit"] {
+  background: var(--sr-stock); color: var(--sr-house); border: 0; border-radius: 0;
+  font: 700 12px/1 var(--sr-sans); letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 15px 26px; cursor: pointer; }
+.sr .stack-form button[type="submit"]:hover, .sr button[type="submit"]:hover {
+  background: var(--sr-cream); color: var(--sr-house); }
+.sr .check-field { border: 1px solid var(--sr-line); border-radius: 0; }
+.sr .check-field legend { color: var(--sr-ink-soft); }
+/* booking flow — the box office (ticket language on the existing hooks) */
+.sr .book-form-card, .sr .book-card { background: var(--sr-card);
+  border: 1px solid var(--sr-line); border-radius: 0; box-shadow: none; }
+.sr .book-event-card a { background: none; border: 1px solid var(--sr-line-raised);
+  border-radius: 0; }
+.sr .book-event-card a:hover { border-color: var(--sr-amber); }
+.sr .book-event-card strong { color: var(--sr-cream); text-transform: uppercase;
+  letter-spacing: 0.05em; font-size: 13px; }
+.sr .book-event-meta { font: 400 9.5px/1.6 var(--sr-mono); letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--sr-ink-faint); }
+.sr .book-event-desc { color: var(--sr-ink-mute); }
+.sr .book-event-go { color: var(--sr-amber); }
+.sr .book-promises li { color: var(--sr-ink-soft); }
+.sr .book-promises li::marker, .sr .book-promises li::before { color: var(--sr-ok); }
+.sr .book-rail { border-right: 1px solid var(--sr-line); }
+.sr .book-rail-host { font: 500 9.5px/1 var(--sr-mono); letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .book-rail-title { color: var(--sr-cream-strong); text-transform: uppercase;
+  letter-spacing: 0.04em; }
+.sr .book-meta li, .sr .book-rail-desc { color: var(--sr-ink-mute); }
+.sr .book-step-h { color: var(--sr-cream); text-transform: uppercase;
+  letter-spacing: 0.05em; font-size: 15px; }
+.sr .book-cal-nav strong { color: var(--sr-cream); }
+.sr .book-cal-nav a { color: var(--sr-amber); }
+.sr .book-grid th { font: 500 9px/1 var(--sr-mono); letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .book-cell { border-radius: 0; }
+.sr .book-open a { background: color-mix(in srgb, var(--sr-amber) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sr-amber) 40%, transparent);
+  color: var(--sr-cream); border-radius: 0; }
+.sr .book-open a:hover { background: var(--sr-amber); color: var(--sr-house); }
+.sr .book-sel a { background: var(--sr-amber); color: var(--sr-house); }
+.sr .book-closed { color: var(--sr-ink-ghost); }
+.sr .book-slot { border: 1px solid var(--sr-line-raised); border-radius: 0;
+  color: var(--sr-cream); background: none; font-family: var(--sr-mono);
+  letter-spacing: 0.08em; }
+.sr .book-slot:hover { border-color: var(--sr-amber); color: var(--sr-amber); }
+.sr .book-slot-sel { background: var(--sr-amber); border-color: var(--sr-amber);
+  color: var(--sr-house); }
+.sr .book-intake { border: 1px solid var(--sr-line); border-radius: 0; }
+.sr .book-intake legend { color: var(--sr-ink-soft); }
+.sr .book-aerial { border: 1px solid rgba(127, 157, 184, 0.4); padding: 12px 14px;
+  background: rgba(127, 157, 184, 0.05); color: #9fb4c6; display: block; }
+.sr .book-manage-badge { border-radius: 0; font: 700 10px/1 var(--sr-mono);
+  letter-spacing: 0.2em; text-transform: uppercase; padding: 8px 12px;
+  display: inline-block; }
+.sr .book-manage-badge.book-ok { background: none; border: 1px solid var(--sr-ok-deep);
+  color: var(--sr-ok); }
+.sr .book-manage-badge.book-ok::before { content: "◆ ADMIT ONE — "; }
+.sr .book-manage-badge.book-off { background: none; border: 1px solid var(--sr-warn);
+  color: var(--sr-warn); }
+.sr .book-manage-detail dt { font: 500 9.5px/1 var(--sr-mono); letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .book-manage-detail dd { color: var(--sr-ink); }
+.sr .book-manage .btn { background: var(--sr-amber); color: var(--sr-house);
+  border-radius: 0; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.sr .book-manage .btn.btn-ghost { background: none; border: 1px solid
+  rgba(236, 228, 211, 0.35); color: var(--sr-cream); }
+.sr .book-manage .linkbtn.danger { color: var(--sr-warn); }
+/* generic pills that survive on booking/testimonial pages */
+.sr .sp-pill { border: 1px solid var(--sr-line-raised); border-radius: 0;
+  background: none; color: var(--sr-ink-soft); font: 500 10px/1 var(--sr-mono);
+  letter-spacing: 0.12em; text-transform: uppercase; }
 
 /* generic marketing scaffolding that survives from mise.css */
 .sr .site-main { background: none; }

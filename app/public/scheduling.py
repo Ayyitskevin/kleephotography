@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
-from .. import booking_notify, config, db, ics, scheduling, security
+from .. import booking_notify, config, db, features, ics, scheduling, security, specialties
 from ..render import templates
 
 log = logging.getLogger("mise.public.scheduling")
@@ -140,6 +140,7 @@ async def confirm_booking(
     parking_notes: str = Form(""),
     style_refs: str = Form(""),
     onsite_contact: str = Form(""),
+    aerial_pass: str = Form(""),
 ):
     et = scheduling.event_by_slug(slug)
     if not et:
@@ -149,6 +150,12 @@ async def confirm_booking(
     ip = security.client_ip(request)
     name, email = name.strip(), email.strip().lower()
     phone, notes = phone.strip()[:40], notes.strip()[:2000]
+    # The Aerial Pass add-on (re- event types, aerials_live-gated): zero-schema —
+    # it rides the booking's notes, so the admin deck + Notion session see it
+    # without a migration. Rate string comes from the ONE place (specialties).
+    if aerial_pass and slug.startswith("re-") and features.aerials_live():
+        tag = f"AERIAL PASS requested ({specialties.aerial_pass_display()} add-on) — confirm LAANC"
+        notes = f"{tag}\n{notes}".strip()[:2000]
 
     def repicker(msg: str, code: int = 400):
         ctx = _picker_ctx(et, request)

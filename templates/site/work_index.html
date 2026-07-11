@@ -3,12 +3,11 @@
 {% block meta_description %}Client case studies across real estate, portraits, and food &amp; beverage — what we shot, and what happened after it went live.{% endblock %}
 {% block site_content %}
 
-<section class="page-hero page-hero-work">
-  <div class="page-hero-inner" data-reveal>
-    <p class="eyebrow">Work</p>
-    <h1>Selected <span class="it-accent">case studies.</span></h1>
-    <p class="lede">Listings, brands, faces, and menus — and what happened
-       after the photos went live.</p>
+<section class="page-hero page-hero-work sr-wrap">
+  <div class="sr-pagehead" data-reveal>
+    <span class="sr-mono">In the wild</span>
+    <h1>Screenings, <em>after the credits.</em></h1>
+    <p class="sr-beat">listings, brands, faces, and menus &mdash; and what happened after the photos went live</p>
   </div>
 
   {% if studies %}
@@ -35,7 +34,7 @@
   {% endif %}
 </section>
 
-<main class="site-main flush-top">
+<main class="site-main flush-top sr-wrap">
   {% if studies %}
   {% for grp in groups %}
   {% set rest = grp.studies|rejectattr("id", "equalto", studies[0].id)|list %}
@@ -70,12 +69,10 @@
   {% endif %}
 </main>
 
-<section class="cta cta-band">
-  <div class="cta-inner" data-reveal>
-    <h2>Your shoot could be the <span class="it-accent">next one here.</span></h2>
-    <div class="cta-actions">
-      <a class="btn-pill" href="/book">Book a shoot &rarr;</a>
-    </div>
+<section class="sr-wrap sr-section" aria-label="Book">
+  <div class="sr-stats">
+    <div class="sr-stat"><b>Your shoot</b><small>could be the next screening here</small></div>
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Book a shoot &rarr;</a></div>
   </div>
 </section>
 {% endblock %}

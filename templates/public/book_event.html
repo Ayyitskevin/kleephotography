@@ -126,6 +126,11 @@
             <fieldset class="book-intake">
               <legend>Shoot details <span class="muted">(helps me prep — optional)</span></legend>
               {% if sp == 're' %}
+              {% if aerials_live() %}
+              <label class="check-opt book-aerial"><input type="checkbox" name="aerial_pass" value="1">
+                Add the Aerial Pass &mdash; drone stills + orbit clips, {{ aerial_pass_display() }} add-on
+                <span class="muted">(FAA Part 107 &middot; LAANC handled)</span></label>
+              {% endif %}
               <label>Property address
                 <input type="text" name="venue_address"></label>
               <label>Size &amp; rooms

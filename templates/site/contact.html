@@ -3,14 +3,14 @@
 {% block meta_description %}Request a quote — tell me about your menu, launch, or campaign and get a tailored proposal within a business day.{% endblock %}
 {% block site_content %}
 
-<section class="contact-wrap">
+<section class="contact-wrap sr-wrap sr-section">
   {# LEFT — sticky intro + real contact channels + a food frame #}
   <aside class="contact-aside" data-reveal>
-    <p class="eyebrow">Contact</p>
-    <h1>Work with <span class="it-accent">me.</span></h1>
-    <p class="lede">Tell me about your listing, your team, your restaurant, or
-       your brand — and what you need: photo, video, or both. I read every
-       message and reply within a business day.</p>
+    <span class="sr-mono">Request a quote</span>
+    <h1 class="sr-contact-h1">Work with <em>me.</em></h1>
+    <p class="sr-beat">tell me what we're selling &mdash; photo, film, or both</p>
+    <p class="sr-lede">Your listing, your team, your restaurant, or your
+       brand. I read every message and reply within a business day.</p>
 
     <div class="contact-details">
       {% if contact_email %}
@@ -90,7 +90,7 @@
   </div>
 </section>
 
-<section class="contact-faq faq-narrow">
+<section class="contact-faq faq-narrow sr-wrap sr-section">
   {% include "site/_faq.html" %}
 </section>
 {% endblock %}

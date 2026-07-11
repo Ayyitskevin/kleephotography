@@ -10052,3 +10052,84 @@ def test_screening_room_rollout_flag(client, monkeypatch):
     # unconverted/legal surfaces never opt in regardless of the flag
     monkeypatch.setattr(config, "SCREENING_ROOM", True)
     assert 'class="cream-theme"' in client.get("/admin/login").text
+
+
+def test_aerial_pass_booking_addon(monkeypatch, admin):
+    """The Aerial Pass add-on rides re- bookings via notes (zero-schema) and is
+    doubly gated: the checkbox only acts when the slug is re- AND aerials_live.
+    The /real-estate band + spec line ride the same flag."""
+    import datetime as dt
+
+    from app import config
+    from app import scheduling as S
+
+    eid = db.run(
+        """INSERT INTO event_types
+        (slug, name, duration_min, min_notice_hours, booking_window_days,
+         max_per_day, creates_notion_session, location, active)
+        VALUES (?,?,?,?,?,?,?,?,1)""",
+        ("re-aerial-test", "RE Aerial Test", 60, 1, 60, 0, 1, "On-site"),
+    )
+    for wd in range(5):
+        db.run(
+            "INSERT INTO availability_rules (event_type_id, weekday, start_min, "
+            "end_min) VALUES (?,?,?,?)",
+            (eid, wd, 540, 1020),
+        )
+    et = S.event_by_slug("re-aerial-test")
+    day = dt.date.today() + dt.timedelta(days=3)
+    while day.weekday() >= 5:
+        day += dt.timedelta(days=1)
+    slots = S.slots_for_day(et, day)
+    assert len(slots) >= 2
+
+    def book(start, flag, aerial="1"):
+        monkeypatch.setattr(config, "AERIALS_LIVE", flag)
+        with TestClient(app) as pub:
+            r = pub.post(
+                "/book/re-aerial-test",
+                data={
+                    "name": "Agent Ada",
+                    "email": f"ada+{flag}@brokerage.com",
+                    "start": start,
+                    "tz": "America/New_York",
+                    "notes": "Twilight if possible.",
+                    "aerial_pass": aerial,
+                },
+                follow_redirects=False,
+            )
+            assert r.status_code == 303, r.text
+        return db.one("SELECT * FROM bookings ORDER BY id DESC LIMIT 1")
+
+    try:
+        # flag ON: intake shows the add-on line and the note tag lands
+        monkeypatch.setattr(config, "AERIALS_LIVE", True)
+        with TestClient(app) as pub:
+            page = pub.get(
+                f"/book/re-aerial-test?year={day.year}&month={day.month}"
+                f"&day={day.isoformat()}&start={slots[0]['utc']}&tz=America/New_York"
+            ).text
+            assert 'name="aerial_pass"' in page
+            assert "+$150" in page  # placeholder rate from specialties.AERIAL_PASS_CENTS
+        b = book(slots[0]["utc"], True)
+        assert "AERIAL PASS requested (+$150 add-on)" in b["notes"]
+        assert "Twilight if possible." in b["notes"]
+
+        # flag OFF: checkbox is gone and a forged POST field is ignored
+        from app import ratelimit, security
+
+        ratelimit._hits.clear()
+        db.run("DELETE FROM pin_attempts WHERE gallery_id=?", (security.INQUIRY_BUCKET_BOOK,))
+        monkeypatch.setattr(config, "AERIALS_LIVE", False)
+        with TestClient(app) as pub:
+            page = pub.get(
+                f"/book/re-aerial-test?year={day.year}&month={day.month}"
+                f"&day={day.isoformat()}&start={slots[1]['utc']}&tz=America/New_York"
+            ).text
+            assert 'name="aerial_pass"' not in page
+        b = book(slots[1]["utc"], False)
+        assert "AERIAL PASS" not in (b["notes"] or "")
+    finally:
+        db.run("DELETE FROM bookings WHERE event_type_id=?", (eid,))
+        db.run("DELETE FROM availability_rules WHERE event_type_id=?", (eid,))
+        db.run("DELETE FROM event_types WHERE id=?", (eid,))

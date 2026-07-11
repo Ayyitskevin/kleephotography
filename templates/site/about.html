@@ -3,13 +3,14 @@
 {% block meta_description %}Meet Kevin Lee — photographer &amp; filmmaker in Asheville, NC, shooting real estate, portraits, and food &amp; beverage across Western North Carolina.{% endblock %}
 {% block site_content %}
 
-{# INTRO — headline + a real frame from the archive (no fabricated portrait) #}
-<section class="ab-intro">
-  <div class="ab-intro-grid">
+{# INTRO — credits-page treatment: the studio as an end-titles roll #}
+<section class="ab-intro sr-wrap">
+  <div class="ab-intro-grid sr-pagehead" style="border-bottom: 0;">
     <div data-reveal>
-      <p class="eyebrow">About</p>
+      <span class="sr-mono">The credits</span>
       <h1>I'm Kevin Lee — photographer &amp; filmmaker
-        <span class="it-accent">in Asheville.</span></h1>
+        <em>in Asheville.</em></h1>
+      <p class="sr-beat">a one-person production &mdash; shot{% if aerials_live() %} &middot; flown{% endif %} &middot; directed &middot; edited &middot; graded &middot; delivered</p>
     </div>
     {% if featured %}
     <div class="about-photo ab-photo" data-reveal>
@@ -23,7 +24,7 @@
 </section>
 
 {# BODY #}
-<section class="ab-body" data-reveal>
+<section class="ab-body sr-wrap" data-reveal>
   <p class="ab-lead">Food &amp; beverage built this studio — years of menus,
      pours, and kitchens taught me how to make a frame sell. Real estate and
      portraits run on the same muscle: the light, the timing, the thirty
@@ -36,25 +37,22 @@
      and story formats — already sized for every platform.</p>
 </section>
 
-{# PROCESS #}
-<section class="ab-proc">
-  <h2 class="eyebrow" data-reveal>How a shoot runs</h2>
-  <div class="proc-grid">
-    <div class="proc-card" data-reveal>
-      <span class="proc-num">01</span>
-      <h3>Plan it</h3>
+{# PROCESS — three acts #}
+<section class="ab-proc sr-wrap sr-section">
+  <div class="sr-kickrow"><p class="sr-mono">How a shoot runs</p></div>
+  <div class="sr-3up">
+    <div>
+      <p class="sr-3up-kick">Act I — Plan it</p>
       <p>Menu, listing, or look — we agree the shot list and the window
          before the day, so shoot time goes to shooting.</p>
     </div>
-    <div class="proc-card" data-reveal>
-      <span class="proc-num">02</span>
-      <h3>Shoot fast, on the day</h3>
+    <div>
+      <p class="sr-3up-kick">Act II — Shoot fast</p>
       <p>Natural light first, direction always. I work around your kitchen,
          your sellers, your schedule — never the other way around.</p>
     </div>
-    <div class="proc-card" data-reveal>
-      <span class="proc-num">03</span>
-      <h3>Deliver same week</h3>
+    <div>
+      <p class="sr-3up-kick">Act III — Deliver same week</p>
       <p>A private gallery lands within the week: full-res downloads, favorites,
          and social crops already sized for every platform.</p>
     </div>
@@ -62,28 +60,16 @@
 </section>
 
 {# SERVICE AREA + STATS (approved figures only) #}
-<section class="ab-stats">
-  <div class="ab-stats-grid" data-reveal>
-    <div class="ab-stats-lead">
-      <h2>Based in Asheville. On the road across Western North Carolina.</h2>
-      <p>Charlotte, Raleigh, and Wilmington are regulars too — travel is easy to
-         fold into a quote.</p>
-    </div>
-    <div class="ab-stat"><b>120+</b><span>Menus shot</span></div>
-    <div class="ab-stat"><b>Same week</b><span>Gallery delivery</span></div>
-    <div class="ab-stat"><b>8 yrs</b><span>Behind the lens</span></div>
+<section class="sr-wrap sr-section" aria-label="Service area">
+  <div class="sr-kickrow">
+    <p class="sr-mono">Based in Asheville &middot; on the road across WNC</p>
+    <span class="sr-mono">Asheville &rarr; Charlotte &rarr; Raleigh &rarr; Wilmington</span>
   </div>
-</section>
-
-{# CTA #}
-<section class="cta">
-  <div class="cta-inner" data-reveal>
-    <h2>Let's talk about <span class="it-accent">your next shoot.</span></h2>
-    <p>Send your listing, your menu, or your idea. Tailored proposal back within a business day.</p>
-    <div class="cta-actions">
-      <a class="btn-pill" href="/contact">Work with me &rarr;</a>
-      <a class="btn-ghost" href="/portfolio">View the portfolio</a>
-    </div>
+  <div class="sr-stats" data-reveal>
+    <div class="sr-stat"><b>120+</b><small>Menus shot</small></div>
+    <div class="sr-stat"><b>Same week</b><small>Gallery delivery</small></div>
+    <div class="sr-stat"><b>8 yrs</b><small>Behind the lens</small></div>
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/contact">Work with me &rarr;</a></div>
   </div>
 </section>
 {% endblock %}

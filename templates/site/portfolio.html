@@ -1,21 +1,29 @@
 {% extends "site/base_site.html" %}
-{% block title %}Portfolio — {{ site_name }}{% endblock %}
+{# The Archive (Screening Room 3d): stills & films on one projector grid —
+   mono frame metadata instead of captions, film-stock filter chips, films
+   sort first on the ▶ toggle, and the lightbox screens everything dark. #}
+{% block title %}The Archive — {{ site_name }}{% endblock %}
 {% block meta_description %}Selected work across real estate, portraits, and food &amp; beverage — exteriors, faces, dishes, and the rooms they live in, shot for listings, brands, and menus.{% endblock %}
 {% block site_content %}
 
-<section class="page-hero page-hero-portfolio">
-  <div class="page-hero-inner" data-reveal>
-    <p class="eyebrow">Portfolio</p>
-    <h1>The working <span class="it-accent">archive.</span></h1>
-    <p class="lede">Spaces, faces, and plates across Asheville and Western
-       North Carolina — filter by specialty or subject.</p>
+<section class="sr-wrap" aria-label="The archive">
+  <div class="sr-pagehead">
+    <span class="sr-mono">Every frame on file</span>
+    <h1>The Archive</h1>
+    <div class="sr-kickrow" style="margin-top: 10px;">
+      <p class="sr-beat" style="margin: 0;">spaces, faces, and plates across Asheville &amp; WNC — filter by stock or subject</p>
+      {% set n_stills = assets|selectattr("kind", "equalto", "photo")|list|length %}
+      {% set n_films = assets|selectattr("kind", "equalto", "video")|list|length %}
+      {% if assets %}<span class="sr-mono">{{ n_stills }} still{{ 's' if n_stills != 1 }}{% if n_films %} &middot; {{ n_films }} film{{ 's' if n_films != 1 }}{% endif %}</span>{% endif %}
+    </div>
   </div>
+
   {% if tags or sp_chips %}
-  <nav class="portfolio-filter" aria-label="Filter portfolio" data-reveal>
+  <nav class="portfolio-filter" aria-label="Filter portfolio">
     <button class="pf-chip pf-chip-active" data-filter="" aria-pressed="true">All
       <span class="muted">({{ assets|length }})</span></button>
     {% for c in sp_chips %}
-    <button class="pf-chip" data-filter="sp:{{ c.key }}" aria-pressed="false">{{ c.name }}
+    <button class="pf-chip sr-stock-{{ c.key }}" data-filter="sp:{{ c.key }}" aria-pressed="false">{{ c.chip }}
       <span class="muted">({{ c.count }})</span></button>
     {% endfor %}
     {% for tag in tags %}
@@ -23,11 +31,14 @@
     <button class="pf-chip" data-filter="tag:{{ tag|lower }}" aria-pressed="false">{{ tag|tag_label }}
       <span class="muted">({{ n }})</span></button>
     {% endfor %}
+    {% if n_films %}
+    <button class="pf-chip" data-films-first aria-pressed="false">&#9654; Films first</button>
+    {% endif %}
   </nav>
   {% endif %}
 </section>
 
-<main class="site-main flush-top">
+<main class="site-main flush-top sr-wrap">
   {% if assets %}
   <div class="portfolio-masonry">
     {% for a in assets %}
@@ -41,7 +52,7 @@
            sizes="(max-width: 700px) 100vw, 300px"
            {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
            alt="{{ a|portfolio_alt }}">
-      <span class="play-badge">&#9654;</span>
+      <span class="play-badge{% if a.portfolio_tag and 'aerial' in a.portfolio_tag %} sr-aerial{% endif %}">&#9654;{% if a.portfolio_tag and 'aerial' in a.portfolio_tag %} Aerial{% else %} Film{% endif %}</span>
       {% if a.duration and a.duration|hms %}<span class="dur-badge">{{ a.duration|hms }}</span>{% endif %}
       {% else %}
       <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
@@ -49,13 +60,12 @@
            sizes="(max-width: 700px) 100vw, 300px"
            {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
            alt="{{ a|portfolio_alt }}">
+      {% if a.portfolio_tag and 'aerial' in a.portfolio_tag %}<span class="sr-filmchip sr-aerial" aria-hidden="true">&#9650; Aerial</span>{% endif %}
       {% endif %}
-      {% if a.portfolio_tag %}
-      <figcaption class="portfolio-cap">{{ a.portfolio_tag|tag_label }}{% if a.client_name %}
-        <small>{{ a.client_name }}</small>{% elif a.gallery_title %}
-        <small>{{ a.gallery_title }}</small>{% endif %}
+      <figcaption class="portfolio-cap">{{ sp_stock[a.portfolio_tag|tag_specialty] }} &middot; FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %}
+        <small>{{ a.portfolio_tag|tag_label }}{% if a.client_name %} &middot; {{ a.client_name }}{% endif %}</small>{% elif a.client_name %}
+        <small>{{ a.client_name }}</small>{% endif %}
       </figcaption>
-      {% endif %}
     </figure>
     {% endfor %}
   </div>
@@ -64,12 +74,11 @@
   {% endif %}
 </main>
 
-<section class="cta cta-band">
-  <div class="cta-inner" data-reveal>
-    <h2>Let's add your shoot to <span class="it-accent">the archive.</span></h2>
-    <div class="cta-actions">
-      <a class="btn-pill" href="/book">Book a shoot &rarr;</a>
-    </div>
+<section class="sr-wrap sr-section" aria-label="Book">
+  <div class="sr-stats">
+    <div class="sr-stat"><b>One grid</b><small>stills &amp; films together</small></div>
+    <div class="sr-stat"><b>Three stocks</b><small>250D &middot; 800T &middot; 500T</small></div>
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Add your shoot to the archive &rarr;</a></div>
   </div>
 </section>
 
@@ -77,8 +86,9 @@
 {% if tags or sp_chips %}
 <script nonce="{{ csp_nonce }}">
   (function () {
+    const masonry = document.querySelector(".portfolio-masonry");
     const tiles = document.querySelectorAll(".portfolio-masonry .pf-masonry-tile");
-    const chips = document.querySelectorAll(".pf-chip");
+    const chips = document.querySelectorAll(".pf-chip[data-filter]");
     // Filters are namespaced: "" all · "sp:re" specialty · "tag:dishes" subject.
     function apply(f) {
       tiles.forEach(t => {
@@ -96,6 +106,14 @@
       else history.replaceState(null, "", location.pathname);
     }
     chips.forEach(c => c.addEventListener("click", () => apply(c.dataset.filter || "")));
+    // ▶ Films first: lift film tiles to the head of the grid (flex order via
+    // the sr-films-first class) — independent of the stock/subject filter.
+    const ff = document.querySelector("[data-films-first]");
+    if (ff && masonry) ff.addEventListener("click", () => {
+      const on = ff.getAttribute("aria-pressed") !== "true";
+      ff.setAttribute("aria-pressed", on ? "true" : "false");
+      masonry.classList.toggle("sr-films-first", on);
+    });
     let initial = (location.hash || "").slice(1);
     // Pre-revamp bookmarks/shares used bare tag hashes (#dishes) — map them
     // onto the namespaced filter so old links keep landing on the right view.

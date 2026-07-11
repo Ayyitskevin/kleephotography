@@ -3,19 +3,21 @@
 {% block meta_description %}Short-form video across real estate, portraits, and food &amp; beverage — walkthrough reels, brand films, and social motion by {{ site_name }}. Asheville &amp; Western North Carolina.{% endblock %}
 {% block site_content %}
 
-<section class="page-hero">
-  <div class="page-hero-inner" data-reveal>
-    <p class="eyebrow">Motion</p>
-    <h1>Motion that <span class="it-accent">earns the scroll.</span></h1>
-    <p class="lede">Walkthroughs, brand films, and the first cut — built vertical
-       for the feed, across all three specialties.</p>
+<section class="sr-wrap" aria-label="Films">
+  <div class="sr-pagehead">
+    <span class="sr-mono">The projection booth</span>
+    <h1>Films <em>first.</em></h1>
+    <div class="sr-kickrow" style="margin-top: 10px;">
+      <p class="sr-beat" style="margin: 0;">walkthroughs, brand films, and the first cut — built vertical for the feed</p>
+      {% if reels %}<span class="sr-mono">{{ reels|length }} film{{ 's' if reels|length != 1 }} &middot; <a class="sr-mono sr-mono--signal" href="/portfolio">full archive &rarr;</a></span>{% endif %}
+    </div>
   </div>
   {% if sp_chips %}
-  <nav class="portfolio-filter" aria-label="Filter reels by specialty" data-reveal>
+  <nav class="portfolio-filter" aria-label="Filter reels by specialty">
     <button class="pf-chip pf-chip-active" data-filter="" aria-pressed="true">All
       <span class="muted">({{ reels|length }})</span></button>
     {% for c in sp_chips %}
-    <button class="pf-chip" data-filter="{{ c.key }}" aria-pressed="false">{{ c.name }}
+    <button class="pf-chip sr-stock-{{ c.key }}" data-filter="{{ c.key }}" aria-pressed="false">{{ c.chip }}
       <span class="muted">({{ c.count }})</span></button>
     {% endfor %}
   </nav>
@@ -23,7 +25,7 @@
 </section>
 
 {% if reels %}
-<section class="motion-sec motion-page">
+<section class="motion-sec motion-page sr-wrap sr-section">
   <div class="sec-inner">
     <div class="motion-feature" data-sp="{{ reels[0].portfolio_tag|tag_specialty }}" data-reveal>
       <video autoplay muted loop playsinline preload="metadata"
@@ -58,25 +60,22 @@
   </div>
 </section>
 {% else %}
-<section class="reel-sec">
+<section class="reel-sec sr-wrap sr-section">
   <div class="sec-inner">
     {% include "site/_empty_portfolio.html" %}
   </div>
 </section>
 {% endif %}
 
-<section class="svc-foot-sec">
-  <div class="svc-foot-card" data-reveal>
-    <div>
-      <h2>Motion that earns the scroll.</h2>
-      <p>Tell me what you're selling and where you post — I'll send a reel
-         plan within a business day.</p>
-    </div>
-    <div class="svc-foot-actions">
-      <a class="btn-saffron" href="/book">Book a shoot &rarr;</a>
-      <a class="btn-ghost-dark" href="/services#svc-videography">See videography tiers</a>
-    </div>
+<section class="sr-wrap sr-section" aria-label="Book">
+  <div class="sr-stats">
+    <div class="sr-stat"><b>&#9654; Motion</b><small>that earns the scroll</small></div>
+    <div class="sr-stat"><b>1 visit</b><small>photo + film together</small></div>
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Book a shoot &rarr;</a></div>
   </div>
+  <p class="sr-kickrow" style="margin-top: 12px;">
+    <a class="sr-mono" href="/services#svc-videography">Videography tiers, in detail &rarr;</a>
+  </p>
 </section>
 
 {% if reels %}

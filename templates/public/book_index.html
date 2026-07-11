@@ -2,10 +2,10 @@
 {% block title %}Book a time — {{ site_name }}{% endblock %}
 {% block meta_description %}Book a call or a shoot — pick a date and get an instant confirmation with a calendar invite.{% endblock %}
 {% block site_content %}
-<section class="book-split">
+<section class="book-split sr-wrap sr-section">
   <aside class="book-aside" data-reveal>
-    <p class="eyebrow">Book a shoot</p>
-    <h1>Pick a date. <span class="it-accent">I'll handle the rest.</span></h1>
+    <span class="sr-mono">Box office</span>
+    <h1 class="sr-contact-h1">Pick a date. <em>I'll handle the rest.</em></h1>
     <p class="lede">
       {% if events %}Pick a time that works and you're booked on the spot — an
          instant confirmation and calendar invite land in your inbox, and I'll
@@ -53,7 +53,7 @@
   </div>
 </section>
 
-<section class="faq-narrow contact-faq">
+<section class="faq-narrow contact-faq sr-wrap sr-section">
   {% include "site/_faq.html" %}
 </section>
 {% endblock %}

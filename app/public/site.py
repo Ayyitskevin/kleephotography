@@ -1008,9 +1008,15 @@ async def portfolio(request: Request):
     # distinct tags actually in use, alphabetical — the subject filter chips
     tags = sorted({a["portfolio_tag"] for a in assets if a["portfolio_tag"]}, key=str.lower)
     # specialty chips render only for verticals that actually have starred work
+    # (chip = the film-stock label the Screening Room archive filters by)
     sp_counts = Counter(specialties.specialty_key(a["portfolio_tag"]) for a in assets)
     sp_chips = [
-        {"key": k, "name": m["name"], "count": sp_counts[k]}
+        {
+            "key": k,
+            "name": m["name"],
+            "count": sp_counts[k],
+            "chip": f"{m['stock']} — {m['screen_name'].removeprefix('The ')}",
+        }
         for k, m in specialties.SPECIALTIES.items()
         if sp_counts[k]
     ]
@@ -1238,7 +1244,12 @@ async def reels(request: Request):
     vids = _portfolio_reels()
     sp_counts = Counter(specialties.specialty_key(r["portfolio_tag"]) for r in vids)
     sp_chips = [
-        {"key": k, "name": m["name"], "count": sp_counts[k]}
+        {
+            "key": k,
+            "name": m["name"],
+            "count": sp_counts[k],
+            "chip": f"{m['stock']} — {m['screen_name'].removeprefix('The ')}",
+        }
         for k, m in specialties.SPECIALTIES.items()
         if sp_counts[k]
     ]
