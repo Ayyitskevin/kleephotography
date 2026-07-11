@@ -9968,6 +9968,12 @@ def test_portfolio_video_tiles(admin):
             assert pub.get(f"/site/img/{vid['id']}?variant=thumb").status_code == 200
             assert pub.get(f"/site/img/{vid['id']}?variant=web").status_code == 404
             assert pub.get(f"/site/vid/{vid['id']}").status_code == 200
+
+            # /reels ships VideoObject JSON-LD + the sound toggle for the reel
+            r = pub.get("/reels")
+            assert '"@type": "VideoObject"' in r.text
+            assert f"/site/vid/{vid['id']}" in r.text
+            assert "data-sound-toggle" in r.text
     finally:
         admin.post(
             f"/admin/galleries/{g['id']}/assets/{vid['id']}/portfolio", follow_redirects=False

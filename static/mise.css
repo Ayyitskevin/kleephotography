@@ -8549,3 +8549,13 @@ html[data-theme="dark"] .site-body .sp-door-count {
   display: block; margin: 0 0 12px; font: 600 .72rem/1 var(--sans);
   letter-spacing: .08em; text-transform: uppercase; color: var(--accent-lt);
 }
+
+/* Reels sound toggle — quiet chip on the feature reel's meta bar. */
+html[data-theme="dark"] .site-body .motion-sound {
+  border: 1px solid var(--line); background: rgba(30, 42, 60, .55);
+  color: var(--ink-soft); border-radius: 999px; padding: 7px 14px;
+  font: 600 .78rem/1 var(--sans); letter-spacing: .04em; cursor: pointer;
+}
+html[data-theme="dark"] .site-body .motion-sound[aria-pressed="true"] {
+  background: var(--accent-lt); border-color: var(--accent-lt); color: #0e1319;
+}
