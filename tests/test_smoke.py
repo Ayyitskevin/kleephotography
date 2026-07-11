@@ -9319,8 +9319,10 @@ def test_dashboard_nudge_dismiss_clears_for_today(admin):
     )
     key = f"inq_reply:{iid}"
     try:
-        # the stale inquiry surfaces as a checkable nudge
-        assert key in admin.get("/admin/home").text
+        # the stale inquiry surfaces as a checkable nudge and an ON DECK card
+        before = admin.get("/admin/home").text
+        assert key in before
+        assert "Reply to Nudge Test Co" in before
 
         # an unknown nudge prefix is rejected (validated input, R18)
         bad = admin.post(
@@ -9332,7 +9334,11 @@ def test_dashboard_nudge_dismiss_clears_for_today(admin):
         ok = admin.post("/admin/home/nudge/dismiss", data={"key": key}, follow_redirects=False)
         assert ok.status_code == 303
         assert db.one("SELECT 1 FROM dismissed_nudges WHERE nudge_key=?", (key,))
-        assert key not in admin.get("/admin/home").text
+        after = admin.get("/admin/home").text
+        assert key not in after
+        # the deck honors the snooze too: ◯ / the mobile swipe say "until
+        # tomorrow", so the whole card leaves the deck for the rest of the day
+        assert "Reply to Nudge Test Co" not in after
     finally:
         db.run("DELETE FROM dismissed_nudges WHERE nudge_key=?", (key,))
         db.run("DELETE FROM inquiries WHERE id=?", (iid,))
@@ -10155,6 +10161,7 @@ def test_screening_room_behavior_hooks(admin):
     ledger gets its month reel."""
     js = admin.get("/static/behaviors.js").text
     assert "data-seek" in js and "data-cull" in js
+    assert "data-deck-swipe" in js  # mobile one-hand deck (3j)
 
     admin.post("/admin/galleries", data={"title": "Hook Check"}, follow_redirects=False)
     g = db.one("SELECT * FROM galleries WHERE title='Hook Check' ORDER BY id DESC LIMIT 1")
@@ -10168,6 +10175,10 @@ def test_screening_room_behavior_hooks(admin):
         assert "On deck" in deck
         assert "/admin/palette.json" in deck  # ⌘K command-runner bindings load lazily
         assert admin.get("/admin/palette.json").json()["clients"] is not None
+        # phone mode ships server-side as hidden hooks; JS unhides them ≤860px
+        assert "data-deck-swipe" in deck
+        assert "data-deck-nav" in deck and "data-deck-count" in deck
+        assert "Swipe &larr; done" in deck or "Swipe ← done" in deck
 
         fin = admin.get("/admin/financials").text
         assert "sr-monthreel" in fin

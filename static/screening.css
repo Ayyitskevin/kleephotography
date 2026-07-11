@@ -1420,6 +1420,41 @@ body.sr-admin .admin-shell, body.sr-admin {
   .sr-admin .sr-deck { padding: 14px; }
   .sr-admin .sr-deck-grid { grid-template-columns: 1fr; }
   .sr-admin .sr-ondeck { position: static; }
+
+  /* ON DECK in one hand (3j): behaviors.js flips the list to .is-stack and
+     deals one card at a time — the current card fills the screen, follows
+     the finger (transform set inline mid-drag), and flies off on commit.
+     Without JS the class never lands and the plain stacked list remains. */
+  .sr-admin .sr-ondeck-cards.is-stack { overflow: hidden; }
+  .sr-admin .sr-ondeck-cards.is-stack .sr-deckcard { display: none; }
+  .sr-admin .sr-ondeck-cards.is-stack .sr-deckcard.is-current { display: flex;
+    flex-direction: column; min-height: 46vh; padding: 22px 18px;
+    touch-action: pan-y; will-change: transform; }
+  .sr-admin .is-stack .sr-deckcard.is-flying { transition: transform 0.25s ease,
+    opacity 0.25s ease; opacity: 0; }
+  .sr-admin .is-stack .sr-deckcard-head { flex-direction: column; gap: 6px; }
+  .sr-admin .is-stack .sr-deckcard-title { font-size: 21px; line-height: 1.2; }
+  .sr-admin .is-stack .sr-deckcard small { white-space: normal; font-size: 12.5px;
+    line-height: 1.6; margin-top: 8px; }
+  .sr-admin .is-stack .sr-deckcard-actions { margin-top: auto; flex-wrap: wrap;
+    padding-top: 18px; }
+  .sr-admin .is-stack .sr-deckcard-go { flex: 1 1 100%; text-align: center;
+    padding: 15px 11px; font-size: 11px; }
+  .sr-admin .is-stack .sr-deckcard-2nd { flex: 1; text-align: center; padding: 12px 10px; }
+  .sr-admin .is-stack .sr-deckcard-snooze { margin-left: 0; flex: 1; display: flex; }
+  .sr-admin .is-stack .sr-deckcard-snooze button { flex: 1; border: 1px solid
+    var(--sr-line-raised); padding: 10px 0; }
+  .sr-admin .sr-decknav { display: flex; align-items: center;
+    justify-content: space-between; gap: 10px; margin-top: 10px; }
+  .sr-admin .sr-decknav[hidden] { display: none; }
+  .sr-admin .sr-decknav-btn { background: none; border: 1px solid var(--sr-line-raised);
+    color: var(--sr-ink-soft); font: 500 9.5px/1 var(--sr-mono); letter-spacing: 0.12em;
+    text-transform: uppercase; padding: 10px 14px; cursor: pointer; }
+  .sr-admin .sr-decknav [data-deck-count] { font-size: 9.5px; letter-spacing: 0.2em;
+    color: var(--sr-amber); text-transform: uppercase; }
+  .sr-admin .sr-swipehint { text-align: center; margin: 12px 0 0; font-size: 9px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--sr-ink-ghost); }
+  .sr-admin .sr-swipehint[hidden] { display: none; }
 }
 
 /* ── responsive (mock frames: 1440 desktop · 390 mobile) ──────────────────── */

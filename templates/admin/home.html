@@ -104,7 +104,7 @@
         <b class="sr-mono sr-mono--signal">On deck</b>
         <span class="sr-mono">Ranked · {{ on_deck|length }}</span>
       </div>
-      <div class="sr-ondeck-cards">
+      <div class="sr-ondeck-cards" data-deck-swipe>
         {% for c in on_deck %}
         <div class="sr-deckcard sr-deckcard--{{ c.stock }}{% if loop.first %} is-top{% endif %}">
           <div class="sr-deckcard-head">
@@ -127,6 +127,16 @@
         <p class="dash-empty">Deck clear — nothing needs you right now.</p>
         {% endfor %}
       </div>
+
+      {# phone mode (3j): behaviors.js unhides these and deals the queue one
+         card at a time — swipe or the buttons; both stay hidden on desktop
+         and without JS, where the deck remains the plain stacked list #}
+      <div class="sr-decknav" data-deck-nav hidden>
+        <button type="button" class="sr-decknav-btn" data-deck-prev aria-label="Previous card">&larr; Back</button>
+        <span class="sr-mono" data-deck-count aria-live="polite"></span>
+        <button type="button" class="sr-decknav-btn" data-deck-next>Skip &rarr;</button>
+      </div>
+      <p class="sr-swipehint sr-mono" data-deck-hint hidden>Swipe &larr; done &middot; swipe &rarr; snooze</p>
 
       {# day strip — the week ahead, preflight on aerial shoots #}
       <div class="sr-daystrip">

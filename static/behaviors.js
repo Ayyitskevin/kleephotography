@@ -84,6 +84,91 @@
      data-confirm guard still fires). Every key submits one of the tile's
      EXISTING forms — no new endpoints; the page reload restores the active
      frame from the location hash. */
+  /* data-deck-swipe — ON DECK in one hand (Screening Room 3j). At phone width
+     the ranked queue deals one card at a time: swipe left = done, swipe right
+     = snooze. Both submit the card's existing snooze form — the deck's only
+     dismissal endpoint (a nudge sleeps until tomorrow either way; anything
+     truly done clears itself server-side once paid/replied/shipped). Cards
+     without a snooze key just advance. The Back/Skip buttons cover browsing
+     without gestures; on desktop or without JS the deck stays a plain list. */
+  var deck = document.querySelector("[data-deck-swipe]");
+  if (deck) {
+    var deckCards = Array.prototype.slice.call(deck.querySelectorAll(".sr-deckcard"));
+    var deckNav = document.querySelector("[data-deck-nav]");
+    var deckHint = document.querySelector("[data-deck-hint]");
+    var deckCount = document.querySelector("[data-deck-count]");
+    var deckMq = window.matchMedia("(max-width: 860px)");
+    if (deckCards.length) {
+      var deckCur = 0;
+      var deckPaint = function () {
+        deckCards.forEach(function (c, i) {
+          c.classList.toggle("is-current", i === deckCur);
+          if (i !== deckCur) { c.classList.remove("is-flying"); c.style.transform = ""; }
+        });
+        if (deckCount) deckCount.textContent = (deckCur + 1) + " of " + deckCards.length;
+      };
+      var deckStep = function (dir) {
+        deckCur = (deckCur + dir + deckCards.length) % deckCards.length;
+        deckPaint();
+      };
+      var deckMode = function () {
+        var on = deckMq.matches;
+        deck.classList.toggle("is-stack", on);
+        if (deckNav) deckNav.hidden = !on;
+        if (deckHint) deckHint.hidden = !on;
+        if (on) deckPaint();
+        else deckCards.forEach(function (c) {
+          c.classList.remove("is-current", "is-flying");
+          c.style.transform = "";
+        });
+      };
+      if (deckMq.addEventListener) deckMq.addEventListener("change", deckMode);
+      else if (deckMq.addListener) deckMq.addListener(deckMode);
+      deckMode();
+
+      var prevBtn = document.querySelector("[data-deck-prev]");
+      var nextBtn = document.querySelector("[data-deck-next]");
+      if (prevBtn) prevBtn.addEventListener("click", function () { deckStep(-1); });
+      if (nextBtn) nextBtn.addEventListener("click", function () { deckStep(1); });
+
+      /* the gesture: the card follows the finger horizontally (touch-action:
+         pan-y leaves vertical page scroll native); past the threshold it
+         flies off and acts, otherwise it springs back */
+      var drag = null;
+      deck.addEventListener("touchstart", function (e) {
+        if (!deck.classList.contains("is-stack") || e.touches.length !== 1) return;
+        var card = e.target.closest ? e.target.closest(".sr-deckcard.is-current") : null;
+        if (!card) return;
+        drag = { card: card, x: e.touches[0].clientX, y: e.touches[0].clientY, on: false };
+        card.classList.remove("is-flying");
+      }, { passive: true });
+      deck.addEventListener("touchmove", function (e) {
+        if (!drag) return;
+        var dx = e.touches[0].clientX - drag.x;
+        var dy = e.touches[0].clientY - drag.y;
+        if (!drag.on) {
+          if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+          drag.on = true;
+        }
+        drag.card.style.transform = "translateX(" + dx + "px) rotate(" + dx / 28 + "deg)";
+      }, { passive: true });
+      deck.addEventListener("touchend", function (e) {
+        if (!drag) return;
+        var d = drag; drag = null;
+        var dx = e.changedTouches[0].clientX - d.x;
+        if (!d.on || Math.abs(dx) < 90) { d.card.style.transform = ""; return; }
+        var dir = dx > 0 ? 1 : -1;
+        d.card.classList.add("is-flying");
+        d.card.style.transform = "translateX(" + dir * 130 + "%) rotate(" + dir * 9 + "deg)";
+        var form = d.card.querySelector("form.sr-deckcard-snooze");
+        window.setTimeout(function () {
+          if (form) { if (form.requestSubmit) form.requestSubmit(); else form.submit(); }
+          else deckStep(1);
+        }, 200);
+      }, { passive: true });
+    }
+  }
+
   var cullGrid = document.querySelector("[data-cull]");
   if (cullGrid) {
     var tiles = Array.prototype.slice.call(cullGrid.querySelectorAll(".gd-tile"));
