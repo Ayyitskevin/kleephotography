@@ -183,6 +183,18 @@
                     data-confirm="Delete {{ a.filename }}?">
                 <button class="link danger">Delete file</button>
               </form>
+              {% if a.kind == 'video' and a.status == 'ready' and not is_drop %}
+              {% set rends = renditions.get(a.id, []) %}
+              <div class="gd-mrow" title="Aspect renditions for social — 9:16 and 1:1 cut from the original">
+                <span class="muted">Social cuts</span>
+                {% for r in rends %}
+                <span class="muted">{{ r.preset.replace('x', ':') }}&nbsp;{% if r.status == 'ready' %}&#10003;{% elif r.status == 'failed' %}&#10007;{% else %}…{% endif %}</span>
+                {% endfor %}
+                <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/renditions" class="inline">
+                  <button class="link">{% if rends %}rebuild{% else %}build{% endif %}</button>
+                </form>
+              </div>
+              {% endif %}
               {% if a.kind == 'video' %}
               {% set thread = video_comments.get(a.id, []) %}
               <details class="avc-panel">

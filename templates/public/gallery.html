@@ -38,6 +38,10 @@
     {% if a.kind == 'video' %}
     <a class="icon-btn icon-btn-mp4" href="/g/{{ g.slug }}/download?asset_id={{ a.id }}&web=1"
        title="Download web-ready MP4">MP4</a>
+    {% for r in renditions.get(a.id, []) %}
+    <a class="icon-btn icon-btn-mp4" href="/g/{{ g.slug }}/download/rendition/{{ r.id }}"
+       title="Download {{ r.preset.replace('x', ':') }} social cut">{{ r.preset.replace('x', ':') }}</a>
+    {% endfor %}
     {% endif %}
     <a class="icon-btn" href="/g/{{ g.slug }}/download?asset_id={{ a.id }}"
        title="Download original">&#8595;</a>

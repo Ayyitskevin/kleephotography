@@ -78,6 +78,44 @@ def _h_video(p: dict) -> None:
     )
 
 
+def renditions_dir(gallery_id: int) -> Path:
+    return config.MEDIA_DIR / str(gallery_id) / "renditions"
+
+
+def _h_renditions(p: dict) -> None:
+    """Social-cut renditions (9:16 / 1:1) for a ready video — renders every
+    pending asset_renditions row for the asset from the camera original (full
+    quality source; the web proxy is already downscaled). Per-row try/except:
+    one failed encode marks that row failed and moves on rather than aborting
+    the sibling preset — failures stay visible as admin chips, and the build
+    button re-queues failed rows."""
+    asset = db.one(
+        "SELECT * FROM assets WHERE id=? AND kind='video' AND status='ready'", (p["asset_id"],)
+    )
+    if not asset:
+        return
+    out_dir = renditions_dir(asset["gallery_id"])
+    out_dir.mkdir(parents=True, exist_ok=True)
+    src = _gallery_dirs(asset["gallery_id"])["original"] / asset["stored"]
+    rows = db.all_(
+        "SELECT * FROM asset_renditions WHERE asset_id=? AND status='pending'", (asset["id"],)
+    )
+    for r in rows:
+        out = out_dir / r["stored"]
+        try:
+            info = video.rendition(str(src), str(out), r["preset"], config.VIDEO_CRF)
+        except Exception:
+            log.exception(
+                "rendition %s (%s) failed for asset %s", r["id"], r["preset"], asset["id"]
+            )
+            db.run("UPDATE asset_renditions SET status='failed' WHERE id=?", (r["id"],))
+            continue
+        db.run(
+            "UPDATE asset_renditions SET status='ready', width=?, height=?, bytes=? WHERE id=?",
+            (info["width"], info["height"], out.stat().st_size, r["id"]),
+        )
+
+
 def crops_dir(gallery_id: int) -> Path:
     return config.MEDIA_DIR / str(gallery_id) / "crops"
 
@@ -142,6 +180,7 @@ HANDLERS = {
     "image_derivatives": _h_image,
     "social_crops": _h_crops,
     "video_transcode": _h_video,
+    "video_renditions": _h_renditions,
     "zip_build": _h_zip,
     "notion_sync_invoice": lambda p: notion_sync.sync_invoice(p["invoice_id"]),
     "notion_sync_gallery": lambda p: notion_sync.sync_gallery(p["gallery_id"]),
