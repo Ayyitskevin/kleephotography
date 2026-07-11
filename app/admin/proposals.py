@@ -153,6 +153,38 @@ PRESETS = {
             {"label": "Standing portal + concierge scheduling", "qty": 1, "unit_cents": 0},
         ],
     },
+    # ── Real Estate ─────────────────────────────────────────────────────────
+    # PLACEHOLDER ANCHORS — set from a market scan, not by Kevin yet. Adjust
+    # unit_cents (and the mirrored /services display prices) before first use.
+    "realestate_essentials": {
+        "title": "Real Estate — Essentials",
+        "items": [
+            {"label": "Listing photo session (up to 1.5 hrs)", "qty": 1, "unit_cents": 25000},
+            {"label": "Up to 25 edited, MLS-ready images", "qty": 1, "unit_cents": 0},
+            {"label": "Web + print resolution files", "qty": 1, "unit_cents": 0},
+            {"label": "Online gallery delivery", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "realestate_signature": {
+        "title": "Real Estate — Signature",
+        "items": [
+            {"label": "Listing photo session (up to 2.5 hrs)", "qty": 1, "unit_cents": 45000},
+            {"label": "Up to 40 edited, MLS-ready images", "qty": 1, "unit_cents": 0},
+            {"label": "Twilight exterior set", "qty": 1, "unit_cents": 0},
+            {"label": "Vertical walkthrough reel (30–60s)", "qty": 1, "unit_cents": 0},
+            {"label": "Online gallery delivery", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    "realestate_premier": {
+        "title": "Real Estate — Premier",
+        "items": [
+            {"label": "Extended listing session (photo + film)", "qty": 1, "unit_cents": 85000},
+            {"label": "Up to 60 edited, MLS-ready images", "qty": 1, "unit_cents": 0},
+            {"label": "Walkthrough film (1–2 min) + vertical reel", "qty": 1, "unit_cents": 0},
+            {"label": "Twilight exterior set", "qty": 1, "unit_cents": 0},
+            {"label": "Online gallery + full-res print files", "qty": 1, "unit_cents": 0},
+        ],
+    },
     # ── Portrait Sessions ───────────────────────────────────────────────────
     "portrait_starter": {
         "title": "Portrait Session — Tier I",
