@@ -8045,3 +8045,112 @@ html[data-theme="dark"] .admin-shell .ns-pal-row.sel { color: #0e1319; }
 .admin-shell .ib-reply-btn:hover, .admin-shell .ib-reply-send:hover {
   background: var(--terra); color: #0e1319; opacity: .9;
 }
+
+/* ============================================================================
+   EDITORIAL DARK — FINANCIALS SUITE (Revamp PR-F, Claude Design handoff2).
+   Same rose+gold slate-navy system as PR-D/E. Covers financials.html,
+   financials_clients/expenses/mileage/receipts.html, recurring.html, and the
+   admin-side document editors invoice/contract/proposal/license(s).html —
+   NOT templates/public/* (the client-facing signed documents), which stay on
+   .cream-theme and are untouched. Appended last so it wins by source order
+   over the light base rules and the legacy toggle-dark palette, same
+   tradeoff as PR-D/E. ========================================================== */
+
+/* Financials/expenses/mileage/receipts/clients override {% block topbar %}
+   directly with a bare <div class="pgtop"> instead of the normal <header
+   class="admin-topbar pgtop"> (via _topbar.html), so PR-D's .admin-topbar
+   background fix never reached them — they still show the translucent
+   cream backdrop, the exact "still light" pattern already fixed once for
+   .dash-search/.pgtop-link elsewhere in this series. */
+.admin-shell .pgtop { background: rgba(14, 19, 25, .82); }
+
+/* ── 0. .doc-accepted (contract.html "✓ Signed by…" confirmation) is an
+   unscoped shared class that reads var(--accent) — a token PR-D never
+   redefined for .admin-shell, so it still resolves to the old forest green.
+   It's a success confirmation, same semantic as every other "signed/paid"
+   badge in this system, so route it to --ok rather than closing the whole
+   --accent gap (untested blast radius elsewhere: scheduling, form_builder). */
+.admin-shell .doc-accepted { border-color: var(--ok); color: var(--ok); }
+
+/* ── 1. Summary stat cards (.fin-card, shared by all 5 bookkeeping pages).
+   Modifiers are applied via Jinja (class="fin-card fin-card-{{ c.tone }}"),
+   so tone-warn/-ok/-dark all render live — confirmed via app/admin/
+   financials.py's "tone" values, not dead CSS. -dark is the headline/net
+   figure card and hardcodes a rose fill; cream/teal text on it fails at any
+   rose shade (terra ~2.6:1, terra-deep ~3.8:1 — the mock's own contrast
+   audit confirms the same "solid accent fill + light text" shape fails
+   every time it tried it). Route to --terra + navy ink, matching every
+   other rose-fill fix already made in this series. */
+.admin-shell .fin-card-dark { background: var(--terra); border-color: var(--terra); }
+.admin-shell .fin-card-dark .fin-card-label,
+.admin-shell .fin-card-dark .fin-card-sub,
+.admin-shell .fin-card-dark .fin-card-val { color: #0e1319; }
+.admin-shell .fin-card-warn .fin-card-val { color: var(--honey); }
+.admin-shell .fin-card-ok .fin-card-val { color: var(--ok); }
+
+/* ── 2. Range/format toggles + export/download/form buttons — same rose or
+   clay fill + cream text pattern repeated across every financials page. ── */
+.admin-shell .fin-range,
+.admin-shell .fin-seg,
+.admin-shell .pnl-bar,
+.admin-shell .fin-bycat-bar { background: var(--surface-sunk); }
+.admin-shell .fin-range-on,
+.admin-shell a.fin-range-on:hover,
+.admin-shell .fin-seg input:checked + span { background: var(--terra); color: #0e1319; }
+.admin-shell .fin-export-btn { color: #0e1319; }
+.admin-shell .fin-dl { background: var(--terra); color: #0e1319; }
+.admin-shell .fin-form button,
+.admin-shell .fin-upload-form button { background: var(--terra); color: #0e1319; }
+.admin-shell .fin-del:hover { background: var(--clay-bg); }
+/* Explicit safety net for the plain (untyped) fin-form/upload-form inputs —
+   PR-E's generic override only targets typed inputs (text/number/date/…),
+   and these forms mix in <select> plus a couple of untyped fields. */
+.admin-shell .fin-form input, .admin-shell .fin-form select,
+.admin-shell .fin-upload-form input, .admin-shell .fin-upload-form select {
+  background: var(--surface-sunk);
+}
+
+/* ── 3. Ledger table — body text hardcodes near-black ink; hover is a no-op
+   against the panel's own dark bg (the mock has this exact same bug: a
+   hover state identical to the resting background). ────────────────────── */
+.admin-shell .fin-tbl td { color: var(--ink); }
+.admin-shell .fin-tbl tbody tr:hover { background: var(--surface-sunk); }
+.admin-shell .fin-net { color: var(--ok); }
+.admin-shell .fin-pill-paid { color: var(--ok); background: var(--ok-bg); }
+.admin-shell .fin-pill-out { color: var(--honey); background: var(--honey-bg); }
+
+/* ── 4. Receipts grid — thumb gradient + status badges. The fake-paper
+   rectangle (.rc-paper) and its printed-line marks (.rc-line/.rc-line-bar)
+   stay literal white/cream on purpose — it's a skeuomorphic "paper receipt"
+   icon, meant to read as a physical scan sitting on the dark thumb tray,
+   not a themed UI surface. ───────────────────────────────────────────────── */
+.admin-shell .rc-thumb { background: linear-gradient(160deg, #0e1319, #1c2530); }
+.admin-shell .rc-badge-on { color: var(--ok); background: var(--ok-bg); }
+.admin-shell .rc-badge-off { color: var(--honey); background: var(--honey-bg); }
+.admin-shell .rc-del { background: var(--surface); }
+
+/* ── 5. Admin invoice designer (.inv-*) — already var-driven from an earlier
+   revamp, so it inherited the new palette almost for free; only a few
+   hardcoded status/state colors were missed. ─────────────────────────────── */
+/* Base status pill (covers "sent"/"viewed"/anything not paid or draft) reads
+   terra-deep text on a 14%-alpha rose tint composited over the paper's own
+   navy panel — effective contrast ≈2.7:1, fails. Route the generic/pending
+   case to honey, matching every other "awaiting action" tone in this system;
+   .is-paid/.is-draft's own modifiers (below) still win by specificity. */
+.admin-shell .inv-status { color: var(--honey); background: var(--honey-bg); }
+.admin-shell .inv-status.is-paid { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+/* Gold text directly on the rose brand-mark fill is its own contrast fail
+   (~2.1:1) — gold reads fine as text on navy (the same pairing every other
+   gold-lockup in this system already uses), so flip which one is the fill. */
+.admin-shell .inv-brand-mark { background: #0e1319; }
+/* "is-current" step used a pale-yellow fill (#fff8e7) — a glaring light
+   patch on the new dark rail; route it to the honey tint already used for
+   "in progress / pending" states elsewhere (badges, room-pill). */
+.admin-shell .inv-step.is-current > span { background: var(--honey-bg); color: var(--honey); }
+.admin-shell .inv-step.is-done > span { background: var(--terra); color: #0e1319; }
+/* Invoice's "Save draft" is the generic button.primary class (not the
+   .stack-form submit already fixed in PR-E, which doesn't reach it here —
+   this button isn't inside a .stack-form) — same rose-fill + near-white-text
+   failure (~2.8:1 resting, ~4.4:1 hover, both under 4.5:1). */
+.admin-shell button.primary, .admin-shell button[type="submit"].primary { color: #0e1319; }
+.admin-shell button.primary:hover { color: #0e1319; }
