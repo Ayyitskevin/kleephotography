@@ -1204,6 +1204,45 @@ body.sr.sr-admin { background: var(--sr-panel); color: var(--sr-ink);
 .sr-admin .fin-dl { background: var(--sr-amber); color: var(--sr-house);
   border-radius: 0; border: 0; font-weight: 700; }
 
+/* focused project + the shared admin panel vocabulary (sweep) */
+.sr-admin .pgtop { background: var(--sr-panel);
+  border-bottom: 1px solid var(--sr-line-faint); }
+.sr-admin .pgtop h1 { color: var(--sr-cream); letter-spacing: 0.03em; }
+.sr-admin .pgtop-sub { color: var(--sr-ink-faint); }
+.sr-admin .pgtop-link { color: var(--sr-amber); }
+.sr-admin .pgtop-new { background: var(--sr-amber); color: var(--sr-house);
+  border-radius: 0; font-weight: 700; }
+.sr-admin .panel, .sr-admin .gd-live, .sr-admin .gd-rail section,
+.sr-admin .fin-wrap section { border-radius: 0; }
+.sr-admin .panel { background: var(--sr-card); border: 1px solid var(--sr-line-faint);
+  box-shadow: none; }
+.sr-admin .room-pill { border-radius: 0; font: 700 9px/1 var(--sr-mono);
+  letter-spacing: 0.14em; text-transform: uppercase; background: #241d10;
+  color: var(--sr-amber); border: 1px solid rgba(227, 154, 45, 0.4); }
+.sr-admin .room-lbl { font: 500 9px/1.4 var(--sr-mono); letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--sr-ink-faint); }
+.sr-admin .room-lbl.is-now { color: var(--sr-amber); }
+.sr-admin .timeline-when { font-family: var(--sr-mono); color: var(--sr-ink-ghost); }
+.sr-admin .timeline-text { color: var(--sr-ink); }
+.sr-admin .kind-badge { border-radius: 0; font-family: var(--sr-mono);
+  letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .gd-status { border-radius: 0; font: 700 9px/1 var(--sr-mono);
+  letter-spacing: 0.14em; text-transform: uppercase; }
+.sr-admin .gd-status.is-live { background: var(--sr-ok-deep); color: var(--sr-house); }
+.sr-admin .gd-status.is-draft { background: var(--sr-line-raised); color: var(--sr-ink); }
+.sr-admin .gd-pill { border-radius: 0; border: 1px solid var(--sr-line-raised);
+  background: none; color: var(--sr-ink-soft); font-family: var(--sr-mono);
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .gd-pill.is-active { background: var(--sr-cream); border-color: var(--sr-cream);
+  color: var(--sr-house); }
+.sr-admin .gd-stat { background: var(--sr-card); border: 1px solid var(--sr-line-faint);
+  border-radius: 0; }
+.sr-admin .gd-stat-n { color: var(--sr-cream-strong); font-family: var(--sr-mono); }
+.sr-admin .gd-stat-l { color: var(--sr-ink-ghost); font: 500 9px/1.4 var(--sr-mono);
+  letter-spacing: 0.16em; text-transform: uppercase; }
+.sr-admin .gd-tile { border-radius: 0; background: var(--sr-house-deep); }
+.sr-admin .gd-btn-sm { border-radius: 0; }
+
 /* deck on the phone: rail becomes the 5-tab bottom bar */
 @media (max-width: 860px) {
   .sr-admin .admin-shell { flex-direction: column; }

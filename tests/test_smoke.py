@@ -10138,3 +10138,30 @@ def test_aerial_pass_booking_addon(monkeypatch, admin):
         db.run("DELETE FROM bookings WHERE event_type_id=?", (eid,))
         db.run("DELETE FROM availability_rules WHERE event_type_id=?", (eid,))
         db.run("DELETE FROM event_types WHERE id=?", (eid,))
+
+
+def test_screening_room_behavior_hooks(admin):
+    """The Screening Room behaviors ship as delegated, CSP-safe hooks: chapter
+    seeking + bench culling live in behaviors.js (no inline handlers), the
+    bench rail carries the premiere check, the deck renders ON DECK, and the
+    ledger gets its month reel."""
+    js = admin.get("/static/behaviors.js").text
+    assert "data-seek" in js and "data-cull" in js
+
+    admin.post("/admin/galleries", data={"title": "Hook Check"}, follow_redirects=False)
+    g = db.one("SELECT * FROM galleries WHERE title='Hook Check' ORDER BY id DESC LIMIT 1")
+    try:
+        page = admin.get(f"/admin/galleries/{g['id']}").text
+        assert "Premiere check" in page
+        assert "curtain down (draft)" in page
+        assert "client not linked" in page
+
+        deck = admin.get("/admin/home").text
+        assert "On deck" in deck
+        assert "/admin/palette.json" in deck  # ⌘K command-runner bindings load lazily
+        assert admin.get("/admin/palette.json").json()["clients"] is not None
+
+        fin = admin.get("/admin/financials").text
+        assert "sr-monthreel" in fin
+    finally:
+        admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False)
