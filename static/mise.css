@@ -8535,3 +8535,11 @@ html[data-theme="dark"] .site-body .sp-doors-foot a { color: var(--accent); }
 /* /work specialty group headings (render only when >1 vertical has studies). */
 html[data-theme="dark"] .site-body .work-group-head { margin: 40px 0 18px; }
 html[data-theme="dark"] .site-body .work-group-head:first-child { margin-top: 0; }
+
+/* Video tile duration badge + web-MP4 action (client gallery, cream theme). */
+.tile .dur-badge {
+  position: absolute; right: 8px; bottom: 8px; z-index: 2;
+  background: rgba(0, 0, 0, .62); color: #fff; border-radius: 6px;
+  padding: 4px 7px; font: 600 .72rem/1 var(--sans, sans-serif); letter-spacing: .04em;
+}
+.tile .icon-btn-mp4 { font: 700 .62rem/1 var(--sans, sans-serif); letter-spacing: .04em; }

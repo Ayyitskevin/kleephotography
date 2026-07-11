@@ -138,6 +138,25 @@ def _localtime(utc_str, fmt="%a %b %-d · %-I:%M %p", tz=None):
 templates.env.filters["localtime"] = _localtime
 
 
+def _hms(seconds) -> str:
+    """94.6 → '1:35' (or 'h:mm:ss') — duration badge for delivered video tiles.
+    Empty string for missing/zero durations so the badge simply doesn't render."""
+    try:
+        s = int(round(float(seconds or 0)))
+    except (TypeError, ValueError):
+        return ""
+    if s <= 0:
+        return ""
+    m, sec = divmod(s, 60)
+    if m >= 60:
+        h, m = divmod(m, 60)
+        return f"{h}:{m:02d}:{sec:02d}"
+    return f"{m}:{sec:02d}"
+
+
+templates.env.filters["hms"] = _hms
+
+
 def _usd(cents) -> str:
     """Cents → '1234.56' for client documents (invoices/proposals/receipts).
     No leading '$' — templates own the currency glyph so '-$' etc. stay literal."""

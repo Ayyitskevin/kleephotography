@@ -503,6 +503,29 @@ def test_video_pipeline_full_flow(admin):
         assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
         assert pub.get(f"/media/{g['slug']}/poster/999999").status_code == 404
 
+        # duration badge renders from the probed duration, and the tile offers
+        # the web-ready MP4 action alongside the original download
+        assert 'class="dur-badge"' in page
+        assert "icon-btn-mp4" in page
+
+        # web-MP4 download: the email gate carries the web flag through, then
+        # the transcoded H.264 serves as an attachment (video-only route)
+        r = pub.get(f"/g/{g['slug']}/download", params={"asset_id": a["id"], "web": 1})
+        assert 'name="web" value="1"' in r.text
+        r = pub.post(
+            f"/g/{g['slug']}/email",
+            # same address the photo-flow test captures — test_captured_emails
+            # asserts exactly one unique captured email across the suite
+            data={"email": "chef@bistro.com", "asset_id": a["id"], "web": 1},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        assert r.headers["location"].endswith(f"/download/web/{a['id']}")
+        r = pub.get(f"/g/{g['slug']}/download/web/{a['id']}")
+        assert r.status_code == 200 and r.headers["content-type"] == "video/mp4"
+        assert "_web.mp4" in r.headers.get("content-disposition", "")
+        assert pub.get(f"/g/{g['slug']}/download/web/999999").status_code == 404
+
 
 def _ready_video(admin, title="Reel Review", pin="1234"):
     """Create a published gallery with one ready video + one photo; return

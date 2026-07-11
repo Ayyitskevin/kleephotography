@@ -7,7 +7,7 @@
   <div class="gal2-hero-scrim" aria-hidden="true"></div>
   <div class="gal2-hero-inner">
     <div>
-      <p class="gal2-kicker">{{ site_name }} · table for two, held under</p>
+      <p class="gal2-kicker">{{ site_name }} · private gallery</p>
       <h1>{{ g.title }}{% if g.client_name %}<br><span class="gal2-hero-sub">{{ g.client_name }}</span>{% endif %}</h1>
       <div class="gal2-hero-actions">
         <a class="btn" href="/g/{{ g.slug }}/download">&#8595; Download all</a>
@@ -26,15 +26,21 @@
         {% if a.section_id %}data-section="{{ a.section_id }}"{% endif %}
         {% if a.kind == 'video' %}data-poster="/media/{{ g.slug }}/poster/{{ a.id }}"{% endif %}>
   <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" loading="lazy" alt="{{ a.filename }}">
-  {% if a.kind == 'video' %}<span class="play-badge">&#9654;</span>{% endif %}
+  {% if a.kind == 'video' %}<span class="play-badge">&#9654;</span>
+  {% if a.duration and a.duration|hms %}<span class="dur-badge">{{ a.duration|hms }}</span>{% endif %}
+  {% endif %}
   <div class="tile-actions">
     <button class="icon-btn" hx-post="/g/{{ g.slug }}/fav/{{ a.id }}" hx-swap="innerHTML"
             title="Favorite">
       {% if a.id in favs %}<span class="fav-btn faved">&#9829;</span>
       {% else %}<span class="fav-btn">&#9825;</span>{% endif %}
     </button>
+    {% if a.kind == 'video' %}
+    <a class="icon-btn icon-btn-mp4" href="/g/{{ g.slug }}/download?asset_id={{ a.id }}&web=1"
+       title="Download web-ready MP4">MP4</a>
+    {% endif %}
     <a class="icon-btn" href="/g/{{ g.slug }}/download?asset_id={{ a.id }}"
-       title="Download">&#8595;</a>
+       title="Download original">&#8595;</a>
   </div>
 </figure>
 {% endmacro %}
@@ -77,13 +83,13 @@
   <div class="gal2-cta">
     <div>
       <p class="gal2-cta-kicker">To the friend holding this link</p>
-      <h2>Love these? <span class="gal2-it">Your menu could be next.</span></h2>
-      <p>Food &amp; beverage photography for Asheville &amp; Western North Carolina.
-         Tailored proposal within a business day.</p>
+      <h2>Love these? <span class="gal2-it">Your shoot could be next.</span></h2>
+      <p>Real estate, portraits, and food &amp; beverage — photography &amp; film for
+         Asheville &amp; Western North Carolina. Tailored proposal within a business day.</p>
     </div>
     <a class="btn" href="/contact?prefill=gallery_question&gallery={{ g.title | urlencode }}">Reserve a shoot &rarr;</a>
   </div>
-  <p class="gal2-credit">Delivered by {{ site_name }} · Photography that makes people hungry ·
+  <p class="gal2-credit">Delivered by {{ site_name }} · The space, the face, the plate ·
     <a href="/">kleephotography.com</a></p>
 </main>
 
