@@ -5726,17 +5726,18 @@ def test_services_page():
     with TestClient(app) as pub:
         r = pub.get("/services")
         assert r.status_code == 200
-        # all three categories + their tiers render
+        # every specialty group + its tiers render (titles are HTML-escaped —
+        # the specialty groups carry '&' since the per-specialty catalog)
         for s in SERVICES:
-            assert s["title"] in r.text, s["key"]
+            assert s["title"].replace("&", "&amp;") in r.text, s["key"]
             for t in s["tiers"]:
                 # every tier name should appear at least 3 times (once per category)
                 # but we just need each card present per service
                 assert f">{t['name']}</h3>" in r.text
-        # tier count is 9 (3 categories × 3 tiers)
-        assert r.text.count("svc-tier ") + r.text.count('svc-tier"') >= 9
-        # middle tier flagged as "Most picked" (UX nudge), 3 times
-        assert r.text.count("Most picked") == 3
+        # tier count: every specialty group renders 3 tiers
+        assert r.text.count("svc-tier ") + r.text.count('svc-tier"') >= 3 * len(SERVICES)
+        # middle tier flagged as "Most picked" (UX nudge), once per group
+        assert r.text.count("Most picked") == len(SERVICES)
         # Prototype copy: public tier cards show marketing display prices.
         for s in SERVICES:
             for t in s["tiers"]:
