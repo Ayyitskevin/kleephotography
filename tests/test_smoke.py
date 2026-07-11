@@ -1344,8 +1344,11 @@ def test_contract_lifecycle(admin):
     assert r.status_code == 400
 
     with TestClient(app) as pub:
-        # view flips sent → viewed
-        assert pub.get(f"/c/{d['slug']}").status_code == 200
+        # view flips sent → viewed; the e-sign surface NEVER opts into the
+        # Screening Room scope (legal document — stays on the cream theme)
+        page = pub.get(f"/c/{d['slug']}")
+        assert page.status_code == 200
+        assert 'class="cream-theme"' in page.text
         assert db.one("SELECT status FROM contracts WHERE id=?", (d["id"],))["status"] == "viewed"
 
         # tampered body refuses signature (integrity check)
@@ -10054,9 +10057,14 @@ def test_screening_room_rollout_flag(client, monkeypatch):
     assert 'class="site-body"' in off.text
     assert " sr" not in off.text.split("<body")[1].split(">")[0]
 
-    # unconverted/legal surfaces never opt in regardless of the flag
+    # the admin gate is the crew-pass ticket when the flag is on, and falls
+    # back to the cream login card when it's off (auth logic untouched)
     monkeypatch.setattr(config, "SCREENING_ROOM", True)
+    login = client.get("/admin/login").text
+    assert "sr-ticket" in login and 'action="/admin/login"' in login
+    monkeypatch.setattr(config, "SCREENING_ROOM", False)
     assert 'class="cream-theme"' in client.get("/admin/login").text
+    monkeypatch.setattr(config, "SCREENING_ROOM", True)
 
 
 def test_aerial_pass_booking_addon(monkeypatch, admin):

@@ -33,6 +33,7 @@
         <div class="room-title">
           <h2>{{ p.company or p.client_name }} — {{ p.title }}</h2>
           <span class="room-pill">{{ stage_label.get(p.status, p.status) }}</span>
+          {% if stock_chip %}<span class="sr-stockchip sr-mono">{{ stock_chip }}</span>{% endif %}
         </div>
         <p class="room-sub">{{ p.client_name }}{% if p.client_email %} · {{ p.client_email }}{% endif %}{% if p.shoot_date %} · shoot {{ p.shoot_date }}{% endif %}{% if _gal %} · {{ _gal.title }}{% endif %}</p>
       </div>
@@ -71,6 +72,37 @@
         {% if not loop.last %}<span class="room-line{% if loop.index0 < _cur %} is-done{% endif %}" aria-hidden="true"></span>{% endif %}
       </div>
       {% endfor %}
+    </div>
+
+    {# ── The focused row (3h): delivery workbench · money · the wire ────── #}
+    <div class="sr-focus-grid">
+      {% with d=delivery %}{% include "admin/_delivery_check.html" %}{% endwith %}
+      <div class="sr-focus-stack">
+        <section class="panel sr-moneycard">
+          <div class="panel-head"><h2>The money on this one</h2></div>
+          {% set paid_cents = payments | sum(attribute='amount_cents') %}
+          {% if in_play %}
+          <div class="sr-moneycard-row"><span>{{ (_inv.title if _inv else (_prop.title if _prop else p.title)) }}</span><b>${{ in_play|usd0 }}</b></div>
+          <div class="sr-moneycard-row is-sub"><span>{% if paid_cents %}{{ 'deposit paid · balance open' if paid_cents < in_play else 'paid in full' }}{% else %}nothing collected yet{% endif %}</span><span class="{{ 'is-in' if paid_cents }}">{% if paid_cents %}${{ paid_cents|usd0 }} in{% else %}$0 in{% endif %}</span></div>
+          {% else %}
+          <p class="muted">No money in play yet — draft a proposal or go straight to an invoice.</p>
+          {% endif %}
+          <form method="post" action="/admin/studio/projects/{{ p.id }}/invoices" class="inline-form">
+            <button type="submit" class="sr-moneycard-cta">Draft {{ 'final ' if paid_cents and in_play and paid_cents < in_play }}invoice — 1 tap</button>
+            <span class="muted">seeds line items from the accepted proposal when there is one; nothing sends itself</span>
+          </form>
+        </section>
+        <section class="panel sr-wirecard">
+          <div class="panel-head"><h2>Wire — latest</h2></div>
+          {% if timeline %}
+          <div class="sr-wirecard-list">
+            {% for e in timeline[:3] %}
+            <span><b>{{ e.ts[:16] }}</b> {{ e.text }}</span>
+            {% endfor %}
+          </div>
+          {% else %}<p class="muted">Quiet — sends, views, signatures, and payments land here.</p>{% endif %}
+        </section>
+      </div>
     </div>
 
     <div class="room-grid">

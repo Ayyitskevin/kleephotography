@@ -1009,6 +1009,40 @@ body.sr.sr-admin { background: var(--sr-panel); color: var(--sr-ink);
 @keyframes sr-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sr-admin .sr-rail-pulse { animation: none; } }
 
+/* Re-point the legacy admin variable set at the house tokens: every mise
+   component that reads var(--surface)/var(--line)/var(--terra)… converts
+   wholesale, so long-tail pages can't leak the old palettes. Radii collapse
+   to the house's hard corners; shadows go ambient-only. */
+body.sr-admin .admin-shell, body.sr-admin {
+  --bg: var(--sr-panel); --bg-glow: var(--sr-panel);
+  --surface: var(--sr-card); --surface-sunk: var(--sr-house-deep);
+  --surface-rail: var(--sr-card);
+  --ink: var(--sr-ink); --ink-soft: var(--sr-ink-soft);
+  --ink-faint: var(--sr-ink-faint); --ink-ghost: var(--sr-ink-ghost);
+  --terra: var(--sr-amber); --terra-deep: #8a5e1c;
+  --terra-tint: rgba(227, 154, 45, 0.08); --terra-tint-2: rgba(227, 154, 45, 0.16);
+  --ok: var(--sr-ok); --ok-bg: rgba(127, 192, 154, 0.08);
+  --ok-line: rgba(74, 140, 106, 0.5);
+  --honey: var(--sr-amber); --honey-bg: rgba(227, 154, 45, 0.08);
+  --honey-line: rgba(227, 154, 45, 0.35);
+  --neutral: var(--sr-ink-mute); --neutral-bg: #141311;
+  --neutral-line: var(--sr-line-raised);
+  --clay: var(--sr-warn); --clay-bg: rgba(201, 111, 74, 0.08);
+  --clay-line: rgba(201, 111, 74, 0.4);
+  --line: var(--sr-line-faint); --line-strong: var(--sr-line-strong);
+  --line-faint: #141311;
+  --r-sm: 0; --r: 0; --r-lg: 0;
+  --shadow-sm: none; --shadow: none;
+  --shadow-lg: 0 24px 90px -32px rgba(0, 0, 0, 0.95);
+  --font-display: var(--sr-sans); --font-ui: var(--sr-sans);
+  --accent: var(--sr-amber); --accent-lt: var(--sr-amber); --gold: var(--sr-amber);
+  --cream: var(--sr-cream); --muted: var(--sr-ink-faint);
+  --card: var(--sr-card); --paper2: var(--sr-card);
+  --espresso: var(--sr-house-deep); --espresso2: var(--sr-card);
+  --sans: var(--sr-sans); --serif: var(--sr-serif);
+  background: var(--sr-panel);
+}
+
 /* topbar */
 .sr-admin .admin-topbar { background: var(--sr-panel);
   border-bottom: 1px solid var(--sr-line-faint); }
@@ -1242,6 +1276,136 @@ body.sr.sr-admin { background: var(--sr-panel); color: var(--sr-ink);
   letter-spacing: 0.16em; text-transform: uppercase; }
 .sr-admin .gd-tile { border-radius: 0; background: var(--sr-house-deep); }
 .sr-admin .gd-btn-sm { border-radius: 0; }
+
+/* focused project (3h): workbench · money · wire */
+.sr-admin .sr-stockchip { border: 1px solid rgba(210, 145, 63, 0.4);
+  color: var(--sr-stock-fb); padding: 4px 9px; letter-spacing: 0.14em; }
+.sr-admin .sr-focus-grid { display: grid; grid-template-columns: 1.5fr 1fr;
+  gap: 16px; margin: 0 0 16px; align-items: start; }
+.sr-admin .sr-focus-stack { display: flex; flex-direction: column; gap: 12px; }
+.sr-admin .sr-workbench-list { display: flex; flex-direction: column; gap: 10px;
+  font-size: 12.5px; padding: 4px 0 14px; }
+.sr-admin .sr-workbench-list .is-ok { color: var(--sr-ok); }
+.sr-admin .sr-workbench-list .is-warn { color: var(--sr-warn); }
+.sr-admin .sr-workbench-list .is-warn a { color: var(--sr-warn);
+  text-decoration: underline; }
+.sr-admin .sr-workbench-list .is-dim { color: var(--sr-ink-mute); }
+.sr-admin .sr-workbench-list .is-recline { color: var(--sr-amber); display: flex;
+  align-items: center; gap: 10px; flex-wrap: wrap; }
+.sr-admin .sr-progressline { flex: 1; min-width: 90px; height: 2px;
+  background: #26241f; position: relative; font-style: normal; }
+.sr-admin .sr-progressline b { position: absolute; left: 0; top: 0; bottom: 0;
+  background: var(--sr-amber); }
+.sr-admin .sr-workbench-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+.sr-admin .sr-moneycard-row { display: flex; justify-content: space-between;
+  gap: 12px; font-size: 12.5px; color: #d8cfba; margin-bottom: 6px; }
+.sr-admin .sr-moneycard-row b { font-family: var(--sr-mono); }
+.sr-admin .sr-moneycard-row.is-sub { font-size: 11.5px; color: var(--sr-ink-mute); }
+.sr-admin .sr-moneycard-row .is-in { color: var(--sr-ok); }
+.sr-admin .sr-moneycard-cta { background: none; border: 1px solid
+  rgba(227, 154, 45, 0.45); color: var(--sr-amber); font: 500 9.5px/1 var(--sr-mono);
+  letter-spacing: 0.12em; text-transform: uppercase; padding: 9px 13px;
+  cursor: pointer; border-radius: 0; }
+.sr-admin .sr-moneycard-cta:hover { background: var(--sr-amber);
+  color: var(--sr-house); }
+.sr-admin .sr-wirecard-list { display: flex; flex-direction: column; gap: 8px;
+  font-size: 11.5px; color: var(--sr-ink-soft); }
+.sr-admin .sr-wirecard-list b { font-family: var(--sr-mono); font-weight: 400;
+  font-size: 9.5px; color: var(--sr-ink-ghost); margin-right: 6px; }
+@media (max-width: 1000px) { .sr-admin .sr-focus-grid { grid-template-columns: 1fr; } }
+
+/* inbox — the reply queue in house clothes */
+.sr-admin .ib { background: var(--sr-panel); }
+.sr-admin .ib-threads, .sr-admin .ib-convo, .sr-admin .ib-context {
+  background: var(--sr-panel); border-color: var(--sr-line-faint); }
+.sr-admin .ib-threads-head h1 { color: var(--sr-cream); letter-spacing: 0.04em; }
+.sr-admin .ib-tab { border-radius: 0; color: var(--sr-ink-faint);
+  font: 600 11px/1 var(--sr-sans); letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .ib-tab.is-active { color: var(--sr-amber); border-color: var(--sr-amber); }
+.sr-admin .ib-tab-n { background: var(--sr-line-faint); color: var(--sr-ink);
+  border-radius: 0; font-family: var(--sr-mono); }
+.sr-admin .ib-row { border-bottom: 1px solid var(--sr-line-faint); border-radius: 0; }
+.sr-admin .ib-row.is-active { background: #1c1911; border-left: 2px solid var(--sr-amber); }
+.sr-admin .ib-row-name { color: var(--sr-cream); }
+.sr-admin .ib-row-time { color: var(--sr-ink-ghost); font-family: var(--sr-mono);
+  font-size: 9px; }
+.sr-admin .ib-preview { color: var(--sr-ink-faint); }
+.sr-admin .ib-chan { border-radius: 0; font-family: var(--sr-mono); font-size: 8.5px;
+  letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .ib-dot { background: var(--sr-amber); }
+.sr-admin .ib-av { border-radius: 0; font-family: var(--sr-mono); }
+.sr-admin .ib-convo-name h2 { color: var(--sr-cream); }
+.sr-admin .ib-convo-sub, .sr-admin .ib-convo-when { color: var(--sr-ink-faint); }
+.sr-admin .ib-bubble { background: var(--sr-card); border: 1px solid var(--sr-line-faint);
+  color: var(--sr-ink); border-radius: 0; }
+.sr-admin .ib-bubble-out { background: #1c1911;
+  border-color: rgba(227, 154, 45, 0.35); color: #d8cfba; }
+.sr-admin .ib-bubble-meta { color: var(--sr-ink-ghost); font-family: var(--sr-mono);
+  font-size: 9px; letter-spacing: 0.08em; }
+.sr-admin .ib-reply { background: var(--sr-card); border-top: 1px solid var(--sr-line-faint); }
+.sr-admin .ib-snippet { border: 1px solid var(--sr-line-raised); border-radius: 0;
+  background: none; color: var(--sr-ink-soft); cursor: pointer; }
+.sr-admin .ib-snippet:hover { border-color: var(--sr-amber); color: var(--sr-amber); }
+.sr-admin .ib-reply-send { background: var(--sr-amber); color: var(--sr-house);
+  border: 0; border-radius: 0; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; cursor: pointer; }
+.sr-admin .ib-reply-note { color: var(--sr-ink-ghost); }
+.sr-admin .ib-reply-sent { color: var(--sr-ok); }
+.sr-admin .ib-act { border: 1px solid var(--sr-line-raised); border-radius: 0;
+  background: none; color: var(--sr-ink-soft); }
+.sr-admin .ib-act:hover { border-color: var(--sr-amber); color: var(--sr-cream); }
+.sr-admin .ib-act-primary { background: var(--sr-amber); border-color: var(--sr-amber);
+  color: var(--sr-house); font-weight: 700; }
+.sr-admin .ib-ctx-label, .sr-admin .ib-ctx-k, .sr-admin .ib-ctx-rk {
+  font: 500 9px/1.4 var(--sr-mono); letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--sr-ink-ghost); }
+.sr-admin .ib-ctx-rv { color: var(--sr-ink); }
+.sr-admin .ib-context h3 { color: var(--sr-cream); }
+.sr-admin .ib-stage { border-radius: 0; font-family: var(--sr-mono);
+  letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .ib-blank, .sr-admin .ib-empty-list { color: var(--sr-ink-ghost); }
+
+/* activity / audit / today — the mono ledger treatment */
+.sr-admin .audit-feed { border: 1px solid var(--sr-line-faint);
+  background: var(--sr-card); }
+.sr-admin .audit-row { border-bottom: 1px solid #141311; font-family: var(--sr-mono);
+  font-size: 11px; }
+.sr-admin .audit-time { color: var(--sr-ink-ghost); }
+.sr-admin .audit-title { color: var(--sr-ink); font-family: var(--sr-sans); }
+.sr-admin .audit-actor { color: var(--sr-ink-faint); }
+.sr-admin .audit-amount { color: var(--sr-cream-strong); font-variant-numeric: tabular-nums; }
+.sr-admin .audit-detail { color: var(--sr-ink-faint); }
+.sr-admin .audit-chip { border: 1px solid var(--sr-line-raised); border-radius: 0;
+  background: none; color: var(--sr-ink-soft); font: 500 9.5px/1 var(--sr-mono);
+  letter-spacing: 0.12em; text-transform: uppercase; }
+.sr-admin .audit-chip.is-active { background: var(--sr-cream); border-color: var(--sr-cream);
+  color: var(--sr-house); }
+.sr-admin .audit-chip-n { color: inherit; opacity: 0.7; }
+.sr-admin .audit-ic { color: var(--sr-amber); }
+.sr-admin .audit-foot, .sr-admin .audit-note { color: var(--sr-ink-ghost); }
+.sr-admin .today-quiet { border: 1px dashed var(--sr-line-raised);
+  color: var(--sr-ink-faint); background: none; }
+.sr-admin .list .warn { color: var(--sr-warn); }
+.sr-admin .list .neg { color: var(--sr-warn); }
+.sr-admin .inquiry-msg { background: var(--sr-house-deep);
+  border: 1px solid var(--sr-line-faint); color: var(--sr-ink); }
+.sr-admin .sched-table td, .sr-admin .sched-table th { border-color: #141311; }
+.sr-admin .sched-note td { color: var(--sr-ink-faint); font-family: var(--sr-mono);
+  font-size: 10.5px; }
+.sr-admin .sched-off { opacity: 0.55; }
+.sr-admin .sr-preflight { display: inline-block; margin-left: 8px;
+  font: 700 8.5px/1 var(--sr-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--sr-house); background: var(--sr-stock-re); padding: 4px 7px; }
+.sr-admin .linkbtn { color: var(--sr-amber); background: none; border: 0; cursor: pointer; }
+.sr-admin .linkbtn.danger { color: var(--sr-warn); }
+.sr-admin .badge { border-radius: 0; font-family: var(--sr-mono); font-size: 9px;
+  letter-spacing: 0.12em; text-transform: uppercase; }
+.sr-admin .studio-view-toggle button { border-radius: 0; border: 1px solid
+  var(--sr-line-raised); background: none; color: var(--sr-ink-soft); }
+.sr-admin .studio-view-toggle button.is-active { background: var(--sr-cream);
+  border-color: var(--sr-cream); color: var(--sr-house); }
+/* the crew-pass password input reads left-aligned (not PIN-spaced) */
+.sr .sr-pw-input { letter-spacing: 0.2em; text-indent: 0; text-align: center; }
 
 /* deck on the phone: rail becomes the 5-tab bottom bar */
 @media (max-width: 860px) {
