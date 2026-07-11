@@ -9822,3 +9822,63 @@ def test_specialty_pages(admin):
             assert f'data-web="/site/img/{fb_id}"' not in r.text
     finally:
         db.run("DELETE FROM assets WHERE id IN (?,?)", (re_id, fb_id))
+
+
+def test_video_renditions_flow(admin):
+    import time
+
+    g, vid, photo = _ready_video(admin, title="Rendition Reel", pin="4321")
+    with TestClient(app) as pub:
+        # photos can't get renditions
+        r = admin.post(
+            f"/admin/galleries/{g['id']}/assets/{photo['id']}/renditions",
+            follow_redirects=False,
+        )
+        assert r.status_code == 404
+
+        # queue social cuts for the video; both preset rows appear
+        r = admin.post(
+            f"/admin/galleries/{g['id']}/assets/{vid['id']}/renditions",
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        rows = db.all_("SELECT * FROM asset_renditions WHERE asset_id=?", (vid["id"],))
+        assert {x["preset"] for x in rows} == {"9x16", "1x1"}
+
+        # the job renders both from the original (real ffmpeg, no mocks)
+        for _ in range(200):
+            rows = db.all_("SELECT * FROM asset_renditions WHERE asset_id=?", (vid["id"],))
+            if rows and all(x["status"] == "ready" for x in rows):
+                break
+            time.sleep(0.2)
+        assert all(x["status"] == "ready" for x in rows)
+        by = {x["preset"]: x for x in rows}
+        assert (by["9x16"]["width"], by["9x16"]["height"]) == (1080, 1920)
+        assert (by["1x1"]["width"], by["1x1"]["height"]) == (1080, 1080)
+        assert all(x["bytes"] > 0 for x in rows)
+
+        # re-running the build is idempotent — still exactly two rows
+        admin.post(
+            f"/admin/galleries/{g['id']}/assets/{vid['id']}/renditions",
+            follow_redirects=False,
+        )
+        n = db.one("SELECT COUNT(*) AS n FROM asset_renditions WHERE asset_id=?", (vid["id"],))
+        assert n["n"] == 2
+
+        # client side: tile offers the cuts once ready; download is email-gated
+        pub.post(f"/g/{g['slug']}/pin", data={"pin": "4321"}, follow_redirects=False)
+        page = pub.get(f"/g/{g['slug']}").text
+        rid = by["9x16"]["id"]
+        assert f"/g/{g['slug']}/download/rendition/{rid}" in page
+        assert ">9:16<" in page
+        r = pub.get(f"/g/{g['slug']}/download/rendition/{rid}", follow_redirects=False)
+        assert r.status_code == 303  # email gate first
+        pub.post(
+            f"/g/{g['slug']}/email",
+            data={"email": "chef@bistro.com", "asset_id": vid["id"]},
+            follow_redirects=False,
+        )
+        r = pub.get(f"/g/{g['slug']}/download/rendition/{rid}")
+        assert r.status_code == 200 and r.headers["content-type"] == "video/mp4"
+        assert "_9x16.mp4" in r.headers.get("content-disposition", "")
+        assert pub.get(f"/g/{g['slug']}/download/rendition/999999").status_code == 404

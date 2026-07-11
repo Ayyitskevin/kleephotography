@@ -42,6 +42,15 @@ async def view(request: Request, slug: str):
         r["asset_id"]
         for r in db.all_("SELECT asset_id FROM favorites WHERE visitor_id=?", (visitor["id"],))
     }
+    # Ready social-cut renditions per video asset -> extra download actions on
+    # the tile (9:16 / 1:1). Pending/failed rows stay admin-only.
+    renditions: dict[int, list] = {}
+    for r in db.all_(
+        """SELECT r.* FROM asset_renditions r JOIN assets a ON a.id = r.asset_id
+           WHERE a.gallery_id=? AND r.status='ready' ORDER BY r.preset""",
+        (g["id"],),
+    ):
+        renditions.setdefault(r["asset_id"], []).append(r)
     # this visitor's selection count per proofing section, for the progress label
     section_picks = {
         s["id"]: sum(1 for a in assets if a["section_id"] == s["id"] and a["id"] in favs)
@@ -64,6 +73,7 @@ async def view(request: Request, slug: str):
             "unsectioned": unsectioned,
             "assets": assets,
             "favs": favs,
+            "renditions": renditions,
             "section_picks": section_picks,
             "visitor": visitor,
         },

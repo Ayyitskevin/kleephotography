@@ -7,7 +7,18 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from .. import argus_analyze, audit, config, db, jobs, mailer, platekit, plutus_recommend, security
+from .. import (
+    argus_analyze,
+    audit,
+    config,
+    db,
+    jobs,
+    mailer,
+    platekit,
+    plutus_recommend,
+    security,
+    video,
+)
 from ..public.gallery import _cascade_status, resolve_comment_parent, video_comment_thread
 from ..render import templates
 from . import common
@@ -335,6 +346,13 @@ async def gallery_detail(request: Request, gallery_id: int):
     video_comments = {
         a["id"]: video_comment_thread(a["id"]) for a in assets if a["kind"] == "video"
     }
+    renditions: dict[int, list] = {}
+    for r in db.all_(
+        """SELECT r.* FROM asset_renditions r JOIN assets a ON a.id = r.asset_id
+           WHERE a.gallery_id=? ORDER BY r.preset""",
+        (gallery_id,),
+    ):
+        renditions.setdefault(r["asset_id"], []).append(r)
     hero_asset_ids: set[int] = set()
     raw_heroes = g["argus_hero_asset_ids"]
     if raw_heroes:
@@ -361,6 +379,7 @@ async def gallery_detail(request: Request, gallery_id: int):
             "n_views": n_views,
             "n_downloads": n_downloads,
             "video_comments": video_comments,
+            "renditions": renditions,
             "argus_enabled": argus_analyze.is_enabled(),
             "argus_url": config.ARGUS_URL,
             "plutus_enabled": plutus_recommend.is_enabled(),
@@ -706,6 +725,34 @@ async def set_cover(gallery_id: int, asset_id: int):
         raise HTTPException(status_code=404)
     new = None if g["cover_asset_id"] == asset_id else asset_id
     db.run("UPDATE galleries SET cover_asset_id=? WHERE id=?", (new, gallery_id))
+    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+
+
+@router.post("/galleries/{gallery_id}/assets/{asset_id}/renditions")
+async def build_renditions(gallery_id: int, asset_id: int):
+    """Queue the social-cut renditions (9:16 / 1:1) for a ready video. Idempotent:
+    INSERT OR IGNORE per preset; failed rows re-queue as pending so the button
+    doubles as a retry. Encoding happens in the job pool off-request."""
+    get_gallery(gallery_id)
+    a = db.one(
+        """SELECT * FROM assets WHERE id=? AND gallery_id=?
+           AND kind='video' AND status='ready'""",
+        (asset_id, gallery_id),
+    )
+    if not a:
+        raise HTTPException(status_code=404)
+    stem = Path(a["stored"]).stem
+    for preset in video.RENDITION_PRESETS:
+        db.run(
+            "INSERT OR IGNORE INTO asset_renditions (asset_id, preset, stored) VALUES (?,?,?)",
+            (asset_id, preset, f"{stem}_{preset}.mp4"),
+        )
+    db.run(
+        "UPDATE asset_renditions SET status='pending' WHERE asset_id=? AND status='failed'",
+        (asset_id,),
+    )
+    jobs.enqueue("video_renditions", {"asset_id": asset_id})
+    log.info("renditions queued for asset %s (gallery %s)", asset_id, gallery_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
