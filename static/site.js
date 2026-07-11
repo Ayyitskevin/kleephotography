@@ -97,6 +97,25 @@
     sync();
   }
 
+  // --- magnetic buttons (fine-pointer + motion-safe only) ---
+  if (!reduceMotion && window.matchMedia &&
+      window.matchMedia("(pointer: fine)").matches) {
+    document.querySelectorAll("[data-magnetic]").forEach(function (el) {
+      var arrow = el.querySelector("[data-arrow]");
+      el.addEventListener("mousemove", function (e) {
+        var r = el.getBoundingClientRect();
+        var dx = e.clientX - (r.left + r.width / 2);
+        var dy = e.clientY - (r.top + r.height / 2);
+        el.style.transform = "translate(" + (dx * 0.18) + "px," + (dy * 0.22) + "px)";
+        if (arrow) arrow.style.transform = "translateX(4px)";
+      });
+      el.addEventListener("mouseleave", function () {
+        el.style.transform = "";
+        if (arrow) arrow.style.transform = "";
+      });
+    });
+  }
+
   // --- delivery: social-crop switcher ---
   var crop = document.querySelector("[data-crop]");
   if (crop) {
