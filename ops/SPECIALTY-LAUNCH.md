@@ -94,23 +94,28 @@ Suggested setup (durations/buffers are starting points — adjust to taste):
    of the old home copy — it's all green-light template work.
 
 
-## The Aerial Pass — launch checklist (flip the day the Part 107 cert lands)
+## The Aerial Pass — LAUNCHED 2026-07-12
 
-Everything ships dark behind `MISE_AERIALS_LIVE` (default off). To launch:
+`MISE_AERIALS_LIVE` now **defaults ON** (`app/config.py`); the next deploy
+takes the offering live with no `.env` edit. Setting
+`MISE_AERIALS_LIVE=false` in flow's `.env` is the kill switch that hides it
+everywhere at once (band, booking add-on, ticker, credits, ▲ badges).
 
-1. **Rate is set**: `app/specialties.py` → `AERIAL_PASS_CENTS = 30000`
-   (**$300**, set by Kevin 2026-07-12). Still the ONE place — the
-   /real-estate band, booking intake label, and booking-note tag all read
-   it; change it here if the rate ever moves.
-2. **Flip the flag**: `MISE_AERIALS_LIVE=true` in flow's `.env`, restart.
-   That turns on, all at once: the Aerial Pass band + spec-line segment +
-   aerial chapter on /real-estate, the aerial ticker line on the lobby,
-   "flown" in the credits footer, the Aerial Pass checkbox on `re-` booking
-   intakes, and ▲ AERIAL badges on aerial-tagged tiles.
+Live state:
+
+1. **Rate**: `app/specialties.py` → `AERIAL_PASS_CENTS = 30000` (**$300**,
+   set by Kevin 2026-07-12). Still the ONE place — the /real-estate band,
+   booking intake label, and booking-note tag all read it; change it here
+   if the rate ever moves.
+2. **What renders**: the Aerial Pass band + spec-line segment + aerial
+   chapter on /real-estate, the aerial ticker line on the lobby, "flown" in
+   the credits footer, the Aerial Pass checkbox on `re-` booking intakes,
+   and ▲ AERIAL badges on aerial-tagged tiles.
 3. **Tag aerial work** `re/aerials` (any `re/...aerial...` tag gets the ▲
    badge on the archive/spoke strips).
 4. **Booking notes**: an Aerial Pass request lands in the booking's notes as
-   `AERIAL PASS requested (+$…) — confirm LAANC`; the admin deck's day strip
-   shows `└ Aerial Pass · confirm LAANC · batteries` on those shoots.
-5. Update proposal presets/contract language for drone deliverables when
-   ready (red-light — Kevin's PR).
+   `AERIAL PASS requested (+$300 add-on) — confirm LAANC`; the admin deck's
+   day strip shows `└ Aerial Pass · confirm LAANC · batteries` on those
+   shoots.
+5. Still open: proposal presets/contract language for drone deliverables
+   (red-light — Kevin's PR).
