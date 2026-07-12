@@ -10184,3 +10184,46 @@ def test_screening_room_behavior_hooks(admin):
         assert "sr-monthreel" in fin
     finally:
         admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False)
+
+
+def test_premiere_plays_once_per_browser(admin, monkeypatch):
+    """The premiere title card is a ceremony that plays on the first admitted
+    visit; after that a seen-cookie (set only after PIN admission, scoped to
+    the gallery path) compresses it to a welcome-back strip. Display-only:
+    the kill switch keeps the full card on every visit, and nothing
+    server-side depends on the cookie."""
+    from app import config
+
+    admin.post("/admin/galleries", data={"title": "Premiere Once"}, follow_redirects=False)
+    g = db.one("SELECT * FROM galleries WHERE title='Premiere Once' ORDER BY id DESC LIMIT 1")
+    admin.post(
+        f"/admin/galleries/{g['id']}/settings",
+        data={"title": "Premiere Once", "pin": "4321", "published": "true"},
+    )
+    try:
+        with TestClient(app) as pub:
+            # the PIN gate itself never marks the premiere as seen
+            gate = pub.get(f"/g/{g['slug']}")
+            assert gate.status_code == 200 and "PIN" in gate.text
+            assert f"sr_seen_g{g['id']}" not in ";".join(gate.headers.get_list("set-cookie"))
+            pub.post(f"/g/{g['slug']}/pin", data={"pin": "4321"}, follow_redirects=False)
+
+            # first admitted visit: the full ceremony, and the seen-cookie lands
+            first = pub.get(f"/g/{g['slug']}")
+            assert "a private premiere" in first.text
+            assert "Welcome back" not in first.text
+            assert f"sr_seen_g{g['id']}" in ";".join(first.headers.get_list("set-cookie"))
+
+            # second visit: compact welcome-back strip, straight to the frames
+            again = pub.get(f"/g/{g['slug']}")
+            assert "Welcome back" in again.text
+            assert "the screening room is open" in again.text
+            assert "a private premiere" not in again.text
+
+            # kill switch: the cream fallback keeps the full card on every visit
+            monkeypatch.setattr(config, "SCREENING_ROOM", False)
+            cream = pub.get(f"/g/{g['slug']}")
+            assert "a private premiere" in cream.text
+            assert "Welcome back" not in cream.text
+    finally:
+        admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False)

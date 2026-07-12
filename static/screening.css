@@ -730,6 +730,14 @@
   flex-wrap: wrap; }
 .sr .sr-premiere-foot { position: absolute; bottom: 18px; left: 0; right: 0;
   text-align: center; letter-spacing: 0.24em; z-index: 2; }
+/* second visit: the ceremony played once — compact welcome-back strip */
+.sr .sr-premiere-card--again { min-height: 0; }
+.sr .sr-premiere-card--again .sr-premiere-inner { padding: 34px 20px 30px; }
+.sr .sr-premiere-card--again .sr-premiere-inner .sr-mono { margin-bottom: 12px;
+  letter-spacing: 0.3em; }
+.sr .sr-premiere-card--again .sr-premiere-inner h1 {
+  font-size: clamp(22px, 3vw, 34px); margin-bottom: 8px; }
+.sr .sr-premiere-card--again .sr-beat { margin-bottom: 18px; }
 
 /* reel row: hero film + cutdowns + REC tiles */
 .sr .sr-reelrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
