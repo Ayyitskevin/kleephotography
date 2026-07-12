@@ -21,7 +21,9 @@ groups of commits on ONE draft PR; Kevin merges):
   body.sr-scoped redesign wins without specificity wars — non-sr surfaces are
   untouched. IBM Plex Mono self-hosted (400/500/700, latin+ext) in fonts.css.
   Flags: `MISE_SCREENING_ROOM` (default ON — the kill switch back to the
-  legacy look) and `MISE_AERIALS_LIVE` (default OFF) in config/features.
+  legacy look) and `MISE_AERIALS_LIVE` (default ON since 2026-07-12 —
+  Kevin launched aerials at $300; =false is the kill switch) in
+  config/features.
 - **Marketing:** home = the Lobby (house reel + live mono timecode via
   data-sr-player in site.js, three feature title cards, ticker, credits
   footer); spokes = 3b/3k/3c+3l (RE premiere hero with data-seek chapter

@@ -63,10 +63,11 @@ SHOWCASE_SEED = _b("MISE_SHOWCASE_SEED", "true")
 # surfaces. Ships ON; setting MISE_SCREENING_ROOM=false is the kill switch back
 # to the pre-redesign palette (markup IA stays, tokens stop applying).
 SCREENING_ROOM = _b("MISE_SCREENING_ROOM", "true")
-# Aerial/drone services (FAA Part 107 — in certification). OFF until the cert
-# lands: hides the Aerial Pass band on /real-estate, the booking add-on line,
-# and the aerial ticker/nav copy. Flip via env the day the certificate arrives.
-AERIALS_LIVE = _b("MISE_AERIALS_LIVE", "false")
+# Aerial/drone services (FAA Part 107). LAUNCHED 2026-07-12 at Kevin's ask —
+# ships ON: the Aerial Pass band on /real-estate, the $300 booking add-on line,
+# and the aerial ticker/nav copy all render. MISE_AERIALS_LIVE=false is the
+# kill switch that hides the offering everywhere at once.
+AERIALS_LIVE = _b("MISE_AERIALS_LIVE", "true")
 
 # Business-local timezone for the scheduler. Availability is authored in this
 # zone; booking instants are stored UTC and converted per-day (DST-safe). Change
