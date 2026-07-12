@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from .. import config, db, mailer, security
+from .. import config, db, jobs, mailer, security
 from ..render import templates
 
 log = logging.getLogger("mise.public.forms")
@@ -144,6 +144,7 @@ async def submit_form(request: Request, slug: str):
                 log.exception("lead %s stored but email failed", inquiry_id)
         else:
             log.error("lead %s stored — mailer not configured, no email", inquiry_id)
+        jobs.enqueue("notion_sync_inquiry", {"inquiry_id": inquiry_id})
 
     sid = db.run(
         "INSERT INTO form_submissions (form_id, name, email, data, inquiry_id) VALUES (?,?,?,?,?)",

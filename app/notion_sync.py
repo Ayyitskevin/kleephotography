@@ -284,3 +284,80 @@ def sync_session_for_booking(booking_id: int) -> None:
             (sid, b["project_id"]),
         )
     log.info("notion session created for booking %s as page %s", booking_id, sid)
+
+
+def _inquiry_status(q) -> str:
+    """Triage state as a single display word — converted wins over dismissed
+    (studio.py refuses to dismiss a converted inquiry, so both set = legacy)."""
+    if q["converted_at"]:
+        return "Converted"
+    if q["dismissed_at"]:
+        return "Dismissed"
+    return "New"
+
+
+def _inquiry_props(q) -> dict:
+    return {
+        "Name": {"title": [{"text": {"content": q["name"]}}]},
+        "Email": {"email": q["email"]},
+        "Phone": {"phone_number": q["phone"] or None},
+        "Business": {"rich_text": [{"text": {"content": q["business"] or ""}}]},
+        "Niche": {"select": {"name": q["service"]} if q["service"] else None},
+        "Kind": {"select": {"name": q["kind"]}},
+        "Message": {"rich_text": [{"text": {"content": (q["message"] or "")[:1900]}}]},
+        "Submitted": {"date": {"start": q["created_at"].replace(" ", "T") + "Z"}},
+        "Status": {"select": {"name": _inquiry_status(q)}},
+        "Mise ID": {"number": q["id"]},
+    }
+
+
+def sync_inquiry(inquiry_id: int, dry_run: bool = False) -> dict | None:
+    """One-way mirror of an inquiry into the Notion 'Leads' database (WINDOW
+    doctrine — display only, never read back). Dormant unless NOTION_TOKEN and
+    NOTION_LEADS_DB are both set. First call creates the page and stamps its id
+    on the inquiry; later calls (convert/dismiss/undo) patch Status in place, so
+    the Notion view tracks triage without ever becoming a second writer of lead
+    truth — Mise's inquiries table stays the system of record.
+
+    dry_run=True builds and returns the exact plan with ZERO network calls and
+    ZERO db writes — scripts/leads-dryrun.py and the tests use it to show what
+    WOULD be written and where.
+
+    Expected Leads DB properties (Kevin creates + shares the DB with the Mise
+    integration): Name (title), Email (email), Phone (phone_number), Business
+    (rich_text), Niche (select), Kind (select), Message (rich_text), Submitted
+    (date), Status (select), Mise ID (number)."""
+    q = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
+    if not q:
+        raise ValueError(f"inquiry {inquiry_id} not found")
+    props = _inquiry_props(q)
+    armed = bool(config.NOTION_TOKEN and config.NOTION_LEADS_DB)
+    if dry_run:
+        plan = {
+            "armed": armed,
+            "action": "patch" if q["notion_page_id"] else "create",
+            "target": (
+                f"notion page {q['notion_page_id']}"
+                if q["notion_page_id"]
+                else f"notion leads db {config.NOTION_LEADS_DB or '<MISE_NOTION_LEADS_DB unset>'}"
+            ),
+            "properties": {"Status": props["Status"]} if q["notion_page_id"] else props,
+        }
+        log.info("notion lead DRY RUN inquiry %s: %s", inquiry_id, json.dumps(plan, indent=2))
+        return plan
+    if not armed:
+        log.info(
+            "notion lead sync skipped for inquiry %s (token=%s db=%s)",
+            inquiry_id,
+            bool(config.NOTION_TOKEN),
+            bool(config.NOTION_LEADS_DB),
+        )
+        return None
+    if q["notion_page_id"]:
+        _patch_page(q["notion_page_id"], {"Status": props["Status"]})
+        log.info("notion lead %s status patched (%s)", inquiry_id, _inquiry_status(q))
+    else:
+        page_id = _create_page(config.NOTION_LEADS_DB, props)
+        db.run("UPDATE inquiries SET notion_page_id=? WHERE id=?", (page_id, inquiry_id))
+        log.info("notion lead %s mirrored as page %s", inquiry_id, page_id)
+    return None

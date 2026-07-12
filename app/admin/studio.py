@@ -633,6 +633,7 @@ async def inquiry_unconvert(inquiry_id: int, return_to: str = Form("")):
               WHERE id=?""",
         (inquiry_id,),
     )
+    jobs.enqueue("notion_sync_inquiry", {"inquiry_id": inquiry_id})
     log.info("inquiry %s unconverted (spawned client/project untouched)", inquiry_id)
     return _redirect(return_to, "/admin/studio")
 
@@ -650,6 +651,7 @@ async def inquiry_dismiss(inquiry_id: int, return_to: str = Form("")):
     if inq["converted_at"]:
         raise HTTPException(status_code=400, detail="converted inquiries cannot be dismissed")
     db.run("UPDATE inquiries SET dismissed_at=datetime('now') WHERE id=?", (inquiry_id,))
+    jobs.enqueue("notion_sync_inquiry", {"inquiry_id": inquiry_id})
     log.info("inquiry %s dismissed (archived)", inquiry_id)
     return _redirect(return_to, "/admin/studio")
 
@@ -662,6 +664,7 @@ async def inquiry_undismiss(inquiry_id: int, return_to: str = Form("")):
     if not inq:
         raise HTTPException(status_code=404)
     db.run("UPDATE inquiries SET dismissed_at=NULL WHERE id=?", (inquiry_id,))
+    jobs.enqueue("notion_sync_inquiry", {"inquiry_id": inquiry_id})
     log.info("inquiry %s undismissed (restored)", inquiry_id)
     return _redirect(return_to, "/admin/studio")
 
@@ -709,6 +712,7 @@ async def inquiry_to_client(inquiry_id: int, return_to: str = Form("")):
               converted_client_id=?, converted_project_id=? WHERE id=?""",
         (cid, pid, inquiry_id),
     )
+    jobs.enqueue("notion_sync_inquiry", {"inquiry_id": inquiry_id})
     if pid:
         return _redirect(return_to, f"/admin/studio/projects/{pid}")
     return _redirect(return_to, f"/admin/studio/clients/{cid}")
@@ -740,6 +744,7 @@ async def inquiry_to_quote(inquiry_id: int, return_to: str = Form("")):
               converted_client_id=?, converted_project_id=? WHERE id=?""",
         (cid, pid, inquiry_id),
     )
+    jobs.enqueue("notion_sync_inquiry", {"inquiry_id": inquiry_id})
     log.info("inquiry %s → project %s + draft proposal %s", inquiry_id, pid, prop_id)
     return _redirect(return_to, f"/admin/studio/proposals/{prop_id}")
 

@@ -90,6 +90,12 @@ NOTION_BOOKINGS_DB = os.environ.get("MISE_NOTION_BOOKINGS_DB", "")
 # integration must be shared on it). The per-event-type creates_notion_session
 # flag is the second gate. Sessions DB id: see the Notion "Sessions" database.
 NOTION_SESSIONS_DB = os.environ.get("MISE_NOTION_SESSIONS_DB", "")
+# One-way inquiry→Notion "Leads" mirror (WINDOW doctrine — display only, never
+# read back). Empty = dormant: the contact/lead-form flow still stores the row
+# and emails Kevin, it just skips the Notion mirror. Arming needs Kevin to
+# create a Leads database, share it with the Mise integration, and drop its id
+# here — same posture as the Bookings mirror above.
+NOTION_LEADS_DB = os.environ.get("MISE_NOTION_LEADS_DB", "")
 
 # Google Calendar (Phase B) — OAuth web-app creds for the single business account.
 # Empty client id/secret = dormant: the scheduler works without calendar sync and

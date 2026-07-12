@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
-from .. import config, db, features, mailer, security, specialties
+from .. import config, db, features, jobs, mailer, security, specialties
 from ..render import ROOT, templates
 
 log = logging.getLogger("mise.public.site")
@@ -1182,6 +1182,7 @@ async def submit_inquiry(
             log.error("inquiry %s stored but email failed: %s", iid, e)
     else:
         log.error("inquiry %s stored — mailer not configured, no email sent", iid)
+    jobs.enqueue("notion_sync_inquiry", {"inquiry_id": iid})
     log.info("inquiry %s received", iid)
     return templates.TemplateResponse(
         request,
