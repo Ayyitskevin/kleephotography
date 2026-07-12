@@ -46,14 +46,13 @@ SPECIALTIES: dict[str, dict] = {
 DEFAULT_KEY = "fb"  # unprefixed tags = legacy F&B (everything pre-revamp)
 
 # The Aerial Pass add-on rate, in ONE place (booking intake label, the
-# /real-estate band, proposal copy all read this). $150 is a PLACEHOLDER —
-# Kevin sets the real number before MISE_AERIALS_LIVE flips on
-# (ops/SPECIALTY-LAUNCH.md carries the launch checklist).
-AERIAL_PASS_CENTS = 15000
+# /real-estate band, proposal copy all read this). $300 set by Kevin
+# 2026-07-12 (ops/SPECIALTY-LAUNCH.md carries the launch checklist).
+AERIAL_PASS_CENTS = 30000
 
 
 def aerial_pass_display() -> str:
-    """'+$150' — the add-on chip wherever the Aerial Pass is offered."""
+    """'+$300' — the add-on chip wherever the Aerial Pass is offered."""
     return f"+${AERIAL_PASS_CENTS // 100}"
 
 
