@@ -134,18 +134,29 @@
       /* the gesture: the card follows the finger horizontally (touch-action:
          pan-y leaves vertical page scroll native); past the threshold it
          flies off and acts, otherwise it springs back */
+      /* one finger owns the drag: track its identifier so a second finger
+         landing or lifting mid-gesture can neither move the card nor commit
+         the swipe with the wrong coordinates; touchcancel (system gesture,
+         notification shade) resets cleanly */
       var drag = null;
+      var findTouch = function (list, id) {
+        for (var i = 0; i < list.length; i++) if (list[i].identifier === id) return list[i];
+        return null;
+      };
       deck.addEventListener("touchstart", function (e) {
-        if (!deck.classList.contains("is-stack") || e.touches.length !== 1) return;
+        if (drag || !deck.classList.contains("is-stack") || e.touches.length !== 1) return;
         var card = e.target.closest ? e.target.closest(".sr-deckcard.is-current") : null;
         if (!card) return;
-        drag = { card: card, x: e.touches[0].clientX, y: e.touches[0].clientY, on: false };
+        drag = { card: card, id: e.touches[0].identifier,
+                 x: e.touches[0].clientX, y: e.touches[0].clientY, on: false };
         card.classList.remove("is-flying");
       }, { passive: true });
       deck.addEventListener("touchmove", function (e) {
-        if (!drag) return;
-        var dx = e.touches[0].clientX - drag.x;
-        var dy = e.touches[0].clientY - drag.y;
+        if (!drag || !deck.classList.contains("is-stack")) return;
+        var t = findTouch(e.touches, drag.id);
+        if (!t) return;
+        var dx = t.clientX - drag.x;
+        var dy = t.clientY - drag.y;
         if (!drag.on) {
           if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
           drag.on = true;
@@ -154,17 +165,34 @@
       }, { passive: true });
       deck.addEventListener("touchend", function (e) {
         if (!drag) return;
+        var t = findTouch(e.changedTouches, drag.id);
+        if (!t) return; /* some other finger lifted — ours is still down */
         var d = drag; drag = null;
-        var dx = e.changedTouches[0].clientX - d.x;
-        if (!d.on || Math.abs(dx) < 90) { d.card.style.transform = ""; return; }
+        var dx = t.clientX - d.x;
+        if (!d.on || !deck.classList.contains("is-stack") || Math.abs(dx) < 90) {
+          d.card.style.transform = "";
+          return;
+        }
         var dir = dx > 0 ? 1 : -1;
         d.card.classList.add("is-flying");
         d.card.style.transform = "translateX(" + dir * 130 + "%) rotate(" + dir * 9 + "deg)";
         var form = d.card.querySelector("form.sr-deckcard-snooze");
         window.setTimeout(function () {
           if (form) { if (form.requestSubmit) form.requestSubmit(); else form.submit(); }
-          else deckStep(1);
+          else {
+            /* nothing to snooze on this card — reset it so a one-card deck
+               springs back instead of staying flown-out blank, then advance */
+            d.card.classList.remove("is-flying");
+            d.card.style.transform = "";
+            deckStep(1);
+          }
         }, 200);
+      }, { passive: true });
+      deck.addEventListener("touchcancel", function () {
+        if (!drag) return;
+        drag.card.classList.remove("is-flying");
+        drag.card.style.transform = "";
+        drag = null;
       }, { passive: true });
     }
   }

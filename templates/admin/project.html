@@ -33,7 +33,7 @@
         <div class="room-title">
           <h2>{{ p.company or p.client_name }} — {{ p.title }}</h2>
           <span class="room-pill">{{ stage_label.get(p.status, p.status) }}</span>
-          {% if stock_chip %}<span class="sr-stockchip sr-mono">{{ stock_chip }}</span>{% endif %}
+          {% if stock_chip and sr_enabled() %}<span class="sr-stockchip sr-mono">{{ stock_chip }}</span>{% endif %}
         </div>
         <p class="room-sub">{{ p.client_name }}{% if p.client_email %} · {{ p.client_email }}{% endif %}{% if p.shoot_date %} · shoot {{ p.shoot_date }}{% endif %}{% if _gal %} · {{ _gal.title }}{% endif %}</p>
       </div>
@@ -74,7 +74,10 @@
       {% endfor %}
     </div>
 
-    {# ── The focused row (3h): delivery workbench · money · the wire ────── #}
+    {# ── The focused row (3h): delivery workbench · money · the wire ──────
+       Screening Room IA — the kill switch restores the pre-redesign page,
+       so the whole row rides sr_enabled(), not just its styling. #}
+    {% if sr_enabled() %}
     <div class="sr-focus-grid">
       {% with d=delivery %}{% include "admin/_delivery_check.html" %}{% endwith %}
       <div class="sr-focus-stack">
@@ -88,7 +91,10 @@
           <p class="muted">No money in play yet — draft a proposal or go straight to an invoice.</p>
           {% endif %}
           <form method="post" action="/admin/studio/projects/{{ p.id }}/invoices" class="inline-form">
-            <button type="submit" class="sr-moneycard-cta">Draft {{ 'final ' if paid_cents and in_play and paid_cents < in_play }}invoice — 1 tap</button>
+            {# same no-field POST as the invoices panel below: seeds a DRAFT
+               from the accepted proposal (full line items — never a computed
+               balance) and lands in the editor. Label must not promise more. #}
+            <button type="submit" class="sr-moneycard-cta">Draft invoice — 1 tap</button>
             <span class="muted">seeds line items from the accepted proposal when there is one; nothing sends itself</span>
           </form>
         </section>
@@ -104,6 +110,7 @@
         </section>
       </div>
     </div>
+    {% endif %}
 
     <div class="room-grid">
 

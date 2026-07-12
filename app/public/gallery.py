@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from .. import audit, config, db, jobs, reopen_notify, security
+from .. import audit, config, db, features, jobs, reopen_notify, security
 from ..render import templates
 
 log = logging.getLogger("mise.public.gallery")
@@ -94,14 +94,19 @@ async def view(request: Request, slug: str):
             "first_visit": seen_cookie not in request.cookies,
         },
     )
-    resp.set_cookie(
-        seen_cookie,
-        "1",
-        max_age=60 * 60 * 24 * 180,
-        path=f"/g/{slug}",
-        httponly=True,
-        samesite="lax",
-    )
+    # Only mark the premiere seen while the ceremony actually renders — with
+    # the kill switch off nothing played, so nothing is burned; secure rides
+    # the same COOKIE_SECURE policy as every other cookie in the app.
+    if features.screening_room():
+        resp.set_cookie(
+            seen_cookie,
+            "1",
+            max_age=60 * 60 * 24 * 180,
+            path=f"/g/{slug}",
+            httponly=True,
+            samesite="lax",
+            secure=config.COOKIE_SECURE,
+        )
     return resp
 
 

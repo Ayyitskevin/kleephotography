@@ -17,6 +17,9 @@
       <i class="sr-progressline" aria-hidden="true"><b style="width: {{ d.pct }}%;"></b></i>
       <small class="sr-mono">{{ d.pct }}%</small></span>
     {% endif %}
+    {% if d.failed %}
+    <span class="is-warn">&#10007; {{ d.failed }} file{{ 's' if d.failed != 1 }} failed — <a href="/admin/galleries/{{ d.gallery.id }}">retry from the bench</a></span>
+    {% endif %}
     {% if not d.client_linked %}
     <span class="is-warn">&#10007; no client linked — <a href="/admin/galleries/{{ d.gallery.id }}">link on the bench</a></span>
     {% endif %}

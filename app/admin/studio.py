@@ -1250,6 +1250,7 @@ def _delivery_check(p) -> dict | None:
         return None
     counts = db.one(
         """SELECT COUNT(*) AS total, COALESCE(SUM(status='ready'), 0) AS ready,
+                  COALESCE(SUM(status='failed'), 0) AS failed,
                   COALESCE(SUM(kind='video'), 0) AS films
            FROM assets WHERE gallery_id=?""",
         (g["id"],),
@@ -1261,13 +1262,19 @@ def _delivery_check(p) -> dict | None:
         (g["id"],),
     )["n"]
     total, ready = counts["total"] or 0, counts["ready"] or 0
+    failed = counts["failed"] or 0
     return {
         "gallery": g,
         "total": total,
         "ready": ready,
+        "failed": failed,
         "films": counts["films"] or 0,
         "pct": round(ready * 100 / total) if total else 0,
-        "processing": (total - ready) + pending_r,
+        # Only encodes that can still finish count as running — a failed asset
+        # stays failed until it's retried from the bench, so it must not keep
+        # the fragment polling forever. (Failed renditions likewise: only
+        # 'pending' rows are counted at all.)
+        "processing": max(total - ready - failed, 0) + pending_r,
         "pending_renditions": pending_r,
         "client_linked": bool(g["client_id"]),
         "sections": db.one("SELECT COUNT(*) AS n FROM sections WHERE gallery_id=?", (g["id"],))[
@@ -1284,7 +1291,8 @@ def _project_stock_chip(project_id: int) -> str:
     bk = db.one(
         """SELECT et.slug AS et_slug FROM bookings b
            JOIN event_types et ON et.id = b.event_type_id
-           WHERE b.project_id=? ORDER BY b.id DESC LIMIT 1""",
+           WHERE b.project_id=? AND b.status != 'cancelled'
+           ORDER BY b.id DESC LIMIT 1""",
         (project_id,),
     )
     if not bk:

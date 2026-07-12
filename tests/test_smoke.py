@@ -10227,3 +10227,62 @@ def test_premiere_plays_once_per_browser(admin, monkeypatch):
             assert "Welcome back" not in cream.text
     finally:
         admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False)
+
+
+def test_focused_project_delivery_check(admin, monkeypatch):
+    """The focused-project delivery workbench (Screening Room 3h): admin-gated,
+    read-only over the linked gallery, and it only polls while an encode can
+    still FINISH — a permanently failed asset must not keep the fragment
+    polling forever. The whole focused row rides the kill switch."""
+    from app import config
+
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Workbench Co",))
+    pid = db.run("INSERT INTO projects (client_id, title) VALUES (?,?)", (cid, "Workbench Project"))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("WorkbenchSlug1", "Workbench", "5678"),
+    )
+    url = f"/admin/studio/projects/{pid}/delivery-check"
+    try:
+        # gated like every other studio route
+        with TestClient(app) as anon:
+            assert anon.get(url, follow_redirects=False).status_code in (303, 401, 403)
+
+        # no gallery linked yet → the hint, and no polling
+        frag = admin.get(url).text
+        assert "No gallery linked yet" in frag
+        assert "hx-get" not in frag
+
+        db.run("UPDATE projects SET gallery_id=? WHERE id=?", (gid, pid))
+
+        # linked, everything settled → checklist renders, still no polling
+        frag = admin.get(url).text
+        assert "PIN + expiry review" in frag
+        assert "hx-get" not in frag
+
+        # a failed encode surfaces as a warning but must NOT poll forever
+        aid = db.run(
+            "INSERT INTO assets (gallery_id, kind, filename, stored, bytes, status) "
+            "VALUES (?,?,?,?,?,?)",
+            (gid, "photo", "x.jpg", "x.jpg", 1, "failed"),
+        )
+        frag = admin.get(url).text
+        assert "1 file failed" in frag
+        assert "hx-get" not in frag
+
+        # a live encode DOES poll
+        db.run("UPDATE assets SET status='pending' WHERE id=?", (aid,))
+        frag = admin.get(url).text
+        assert "hx-get" in frag and "every 8s" in frag
+
+        # the focused row honors the kill switch on the full project page
+        page = admin.get(f"/admin/studio/projects/{pid}")
+        assert page.status_code == 200 and "The money on this one" in page.text
+        monkeypatch.setattr(config, "SCREENING_ROOM", False)
+        page = admin.get(f"/admin/studio/projects/{pid}")
+        assert page.status_code == 200 and "The money on this one" not in page.text
+    finally:
+        db.run("DELETE FROM assets WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+        db.run("DELETE FROM projects WHERE id=?", (pid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))
