@@ -92,7 +92,7 @@
      without a snooze key just advance. The Back/Skip buttons cover browsing
      without gestures; on desktop or without JS the deck stays a plain list. */
   var deck = document.querySelector("[data-deck-swipe]");
-  if (deck) {
+  if (deck && document.body.classList.contains("sr-admin")) {
     var deckCards = Array.prototype.slice.call(deck.querySelectorAll(".sr-deckcard"));
     var deckNav = document.querySelector("[data-deck-nav]");
     var deckHint = document.querySelector("[data-deck-hint]");
