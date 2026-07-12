@@ -1044,8 +1044,9 @@ body.sr-admin .admin-shell, body.sr-admin {
   --shadow-lg: 0 24px 90px -32px rgba(0, 0, 0, 0.95);
   --font-display: var(--sr-sans); --font-ui: var(--sr-sans);
   --accent: var(--sr-amber); --accent-lt: var(--sr-amber); --gold: var(--sr-amber);
+  --dash-gold: var(--sr-amber);
   --cream: var(--sr-cream); --muted: var(--sr-ink-faint);
-  --card: var(--sr-card); --paper2: var(--sr-card);
+  --card: var(--sr-card); --card-bg: var(--sr-card); --paper2: var(--sr-card);
   --espresso: var(--sr-house-deep); --espresso2: var(--sr-card);
   --sans: var(--sr-sans); --serif: var(--sr-serif);
   background: var(--sr-panel);

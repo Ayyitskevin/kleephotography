@@ -84,9 +84,13 @@
         <section class="panel sr-moneycard">
           <div class="panel-head"><h2>The money on this one</h2></div>
           {% set paid_cents = payments | sum(attribute='amount_cents') %}
+          {# paid/balance wording compares against SENT-or-later invoices only —
+             in_play includes drafts (it's "what this is worth"), and drafting
+             one must not flip a fully-paid project back to "balance open" #}
+          {% set owed_cents = invoices | rejectattr('status', 'equalto', 'draft') | list | sum(attribute='total_cents') %}
           {% if in_play %}
           <div class="sr-moneycard-row"><span>{{ (_inv.title if _inv else (_prop.title if _prop else p.title)) }}</span><b>${{ in_play|usd0 }}</b></div>
-          <div class="sr-moneycard-row is-sub"><span>{% if paid_cents %}{{ 'deposit paid · balance open' if paid_cents < in_play else 'paid in full' }}{% else %}nothing collected yet{% endif %}</span><span class="{{ 'is-in' if paid_cents }}">{% if paid_cents %}${{ paid_cents|usd0 }} in{% else %}$0 in{% endif %}</span></div>
+          <div class="sr-moneycard-row is-sub"><span>{% if paid_cents and owed_cents %}{{ 'deposit paid · balance open' if paid_cents < owed_cents else 'paid in full' }}{% elif paid_cents %}collected{% else %}nothing collected yet{% endif %}</span><span class="{{ 'is-in' if paid_cents }}">{% if paid_cents %}${{ paid_cents|usd0 }} in{% else %}$0 in{% endif %}</span></div>
           {% else %}
           <p class="muted">No money in play yet — draft a proposal or go straight to an invoice.</p>
           {% endif %}
