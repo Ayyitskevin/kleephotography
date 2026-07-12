@@ -9,6 +9,23 @@
 {% set films = assets|selectattr("kind", "equalto", "video")|list %}
 {% set n_stills = assets|length - films|length %}
 
+{% if sr_enabled() and not first_visit %}
+{# Second visit: the ceremony played once — returning clients get a compact
+   welcome-back strip and land straight in their frames. Seen-cookie only. #}
+<header class="sr-premiere-card sr-premiere-card--again sr-corners4">
+  <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+  <div class="sr-premiere-inner">
+    <p class="sr-mono sr-mono--signal">Welcome back{% if g.client_name %}, {{ g.client_name }}{% endif %} &middot; the screening room is open</p>
+    <h1>{{ g.title }}</h1>
+    <p class="sr-beat">{% if assets %}{{ n_stills }} frame{{ 's' if n_stills != 1 }}{% if films %} &middot; {{ films|length }} film{{ 's' if films|length != 1 }}{% endif %}{% endif %}{% if favs %} &middot; {{ favs|length }} circled so far{% endif %}</p>
+    <div class="sr-premiere-actions">
+      {% if films %}<a class="sr-btn sr-btn--ghost" href="#reel">&#9654; Roll the reel</a>{% endif %}
+      {% if n_stills %}<a class="sr-btn" href="#frames">Back to the frames &darr;</a>{% endif %}
+      <a class="sr-btn sr-btn--ghost" href="/g/{{ g.slug }}/download">&darr; Download all</a>
+    </div>
+  </div>
+</header>
+{% else %}
 <header class="sr-premiere-card sr-corners4">
   <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
   {% if g.cover_asset_id %}<div class="sr-premiere-bg" style="background-image:url('/media/{{ g.slug }}/web/{{ g.cover_asset_id }}')" aria-hidden="true"></div>{% endif %}
@@ -25,6 +42,7 @@
   </div>
   <p class="sr-premiere-foot sr-mono">{% if g.expires_at %}Screening open until {{ g.expires_at }} &middot; {% endif %}admitted with PIN &middot;&middot;&middot;&middot;</p>
 </header>
+{% endif %}
 
 {% macro takebtn(a) %}
 <button class="icon-btn sr-take-btn" hx-post="/g/{{ g.slug }}/fav/{{ a.id }}" hx-swap="innerHTML"

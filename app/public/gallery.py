@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from .. import audit, config, db, jobs, reopen_notify, security
+from .. import audit, config, db, features, jobs, reopen_notify, security
 from ..render import templates
 
 log = logging.getLogger("mise.public.gallery")
@@ -69,7 +69,13 @@ async def view(request: Request, slug: str):
             by_section[a["section_id"]].append(a)
         else:
             unsectioned.append(a)
-    return templates.TemplateResponse(
+    # Premiere on second visit (Screening Room): the full title-card ceremony
+    # plays once per browser; after that a seen-cookie compresses it to a
+    # "welcome back" strip so returning clients land straight in their frames.
+    # Display-only — the cookie is set only after PIN admission, scoped to this
+    # gallery's path, and nothing server-side ever depends on it.
+    seen_cookie = f"sr_seen_g{g['id']}"
+    resp = templates.TemplateResponse(
         request,
         "public/gallery.html",
         {
@@ -85,8 +91,23 @@ async def view(request: Request, slug: str):
             "section_picks": section_picks,
             "visitor": visitor,
             "total_bytes": sum(a["bytes"] or 0 for a in assets),
+            "first_visit": seen_cookie not in request.cookies,
         },
     )
+    # Only mark the premiere seen while the ceremony actually renders — with
+    # the kill switch off nothing played, so nothing is burned; secure rides
+    # the same COOKIE_SECURE policy as every other cookie in the app.
+    if features.screening_room():
+        resp.set_cookie(
+            seen_cookie,
+            "1",
+            max_age=60 * 60 * 24 * 180,
+            path=f"/g/{slug}",
+            httponly=True,
+            samesite="lax",
+            secure=config.COOKIE_SECURE,
+        )
+    return resp
 
 
 def _view_drop(request: Request, g):

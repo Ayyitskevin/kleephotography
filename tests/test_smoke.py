@@ -1344,8 +1344,11 @@ def test_contract_lifecycle(admin):
     assert r.status_code == 400
 
     with TestClient(app) as pub:
-        # view flips sent → viewed
-        assert pub.get(f"/c/{d['slug']}").status_code == 200
+        # view flips sent → viewed; the e-sign surface NEVER opts into the
+        # Screening Room scope (legal document — stays on the cream theme)
+        page = pub.get(f"/c/{d['slug']}")
+        assert page.status_code == 200
+        assert 'class="cream-theme"' in page.text
         assert db.one("SELECT status FROM contracts WHERE id=?", (d["id"],))["status"] == "viewed"
 
         # tampered body refuses signature (integrity check)
@@ -9316,8 +9319,10 @@ def test_dashboard_nudge_dismiss_clears_for_today(admin):
     )
     key = f"inq_reply:{iid}"
     try:
-        # the stale inquiry surfaces as a checkable nudge
-        assert key in admin.get("/admin/home").text
+        # the stale inquiry surfaces as a checkable nudge and an ON DECK card
+        before = admin.get("/admin/home").text
+        assert key in before
+        assert "Reply to Nudge Test Co" in before
 
         # an unknown nudge prefix is rejected (validated input, R18)
         bad = admin.post(
@@ -9329,7 +9334,11 @@ def test_dashboard_nudge_dismiss_clears_for_today(admin):
         ok = admin.post("/admin/home/nudge/dismiss", data={"key": key}, follow_redirects=False)
         assert ok.status_code == 303
         assert db.one("SELECT 1 FROM dismissed_nudges WHERE nudge_key=?", (key,))
-        assert key not in admin.get("/admin/home").text
+        after = admin.get("/admin/home").text
+        assert key not in after
+        # the deck honors the snooze too: ◯ / the mobile swipe say "until
+        # tomorrow", so the whole card leaves the deck for the rest of the day
+        assert "Reply to Nudge Test Co" not in after
     finally:
         db.run("DELETE FROM dismissed_nudges WHERE nudge_key=?", (key,))
         db.run("DELETE FROM inquiries WHERE id=?", (iid,))
@@ -10054,8 +10063,12 @@ def test_screening_room_rollout_flag(client, monkeypatch):
     assert 'class="site-body"' in off.text
     assert " sr" not in off.text.split("<body")[1].split(">")[0]
 
-    # unconverted/legal surfaces never opt in regardless of the flag
+    # the admin gate is the crew-pass ticket when the flag is on, and falls
+    # back to the cream login card when it's off (auth logic untouched)
     monkeypatch.setattr(config, "SCREENING_ROOM", True)
+    login = client.get("/admin/login").text
+    assert "sr-ticket" in login and 'action="/admin/login"' in login
+    monkeypatch.setattr(config, "SCREENING_ROOM", False)
     assert 'class="cream-theme"' in client.get("/admin/login").text
 
 
@@ -10140,13 +10153,16 @@ def test_aerial_pass_booking_addon(monkeypatch, admin):
         db.run("DELETE FROM event_types WHERE id=?", (eid,))
 
 
-def test_screening_room_behavior_hooks(admin):
+def test_screening_room_behavior_hooks(admin, monkeypatch):
     """The Screening Room behaviors ship as delegated, CSP-safe hooks: chapter
     seeking + bench culling live in behaviors.js (no inline handlers), the
     bench rail carries the premiere check, the deck renders ON DECK, and the
     ledger gets its month reel."""
+    from app import config
+
     js = admin.get("/static/behaviors.js").text
     assert "data-seek" in js and "data-cull" in js
+    assert "data-deck-swipe" in js  # mobile one-hand deck (3j)
 
     admin.post("/admin/galleries", data={"title": "Hook Check"}, follow_redirects=False)
     g = db.one("SELECT * FROM galleries WHERE title='Hook Check' ORDER BY id DESC LIMIT 1")
@@ -10160,8 +10176,178 @@ def test_screening_room_behavior_hooks(admin):
         assert "On deck" in deck
         assert "/admin/palette.json" in deck  # ⌘K command-runner bindings load lazily
         assert admin.get("/admin/palette.json").json()["clients"] is not None
+        # phone mode ships server-side as hidden hooks; JS unhides them ≤860px
+        assert "data-deck-swipe" in deck
+        assert "data-deck-nav" in deck and "data-deck-count" in deck
+        assert "Swipe &larr; done" in deck or "Swipe ← done" in deck
+        # the swipe behavior keys off the sr-admin body class, which the kill
+        # switch removes — pin the precondition the JS gate relies on
+        monkeypatch.setattr(config, "SCREENING_ROOM", False)
+        assert "sr-admin" not in admin.get("/admin/home").text
+        monkeypatch.setattr(config, "SCREENING_ROOM", True)
 
         fin = admin.get("/admin/financials").text
         assert "sr-monthreel" in fin
     finally:
         admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False)
+
+
+def test_premiere_plays_once_per_browser(admin, monkeypatch):
+    """The premiere title card is a ceremony that plays on the first admitted
+    visit; after that a seen-cookie (set only after PIN admission, scoped to
+    the gallery path) compresses it to a welcome-back strip. Display-only:
+    the kill switch keeps the full card on every visit, and nothing
+    server-side depends on the cookie."""
+    from app import config
+
+    admin.post("/admin/galleries", data={"title": "Premiere Once"}, follow_redirects=False)
+    g = db.one("SELECT * FROM galleries WHERE title='Premiere Once' ORDER BY id DESC LIMIT 1")
+    admin.post(
+        f"/admin/galleries/{g['id']}/settings",
+        data={"title": "Premiere Once", "pin": "4321", "published": "true"},
+    )
+    try:
+        with TestClient(app) as pub:
+            # the PIN gate itself never marks the premiere as seen
+            gate = pub.get(f"/g/{g['slug']}")
+            assert gate.status_code == 200 and "PIN" in gate.text
+            assert f"sr_seen_g{g['id']}" not in ";".join(gate.headers.get_list("set-cookie"))
+            pub.post(f"/g/{g['slug']}/pin", data={"pin": "4321"}, follow_redirects=False)
+
+            # first admitted visit: the full ceremony, and the seen-cookie lands
+            # with the load-bearing attributes (path-scoped, HttpOnly)
+            first = pub.get(f"/g/{g['slug']}")
+            assert "a private premiere" in first.text
+            assert "Welcome back" not in first.text
+            seen = [
+                c
+                for c in first.headers.get_list("set-cookie")
+                if c.startswith(f"sr_seen_g{g['id']}=")
+            ]
+            assert len(seen) == 1
+            assert f"Path=/g/{g['slug']}" in seen[0] and "HttpOnly" in seen[0]
+
+            # second visit: compact welcome-back strip, straight to the frames
+            again = pub.get(f"/g/{g['slug']}")
+            assert "Welcome back" in again.text
+            assert "the screening room is open" in again.text
+            assert "a private premiere" not in again.text
+
+            # kill switch: the cream fallback keeps the full card on every visit
+            monkeypatch.setattr(config, "SCREENING_ROOM", False)
+            cream = pub.get(f"/g/{g['slug']}")
+            assert "a private premiere" in cream.text
+            assert "Welcome back" not in cream.text
+
+        # flag OFF must not burn the ceremony: a browser that visited while
+        # the kill switch was down still gets its first premiere (and only
+        # then the compact strip) once the flag comes back up
+        with TestClient(app) as pub2:
+            pub2.post(f"/g/{g['slug']}/pin", data={"pin": "4321"}, follow_redirects=False)
+            off = pub2.get(f"/g/{g['slug']}")
+            assert f"sr_seen_g{g['id']}" not in ";".join(off.headers.get_list("set-cookie"))
+            monkeypatch.setattr(config, "SCREENING_ROOM", True)
+            assert "a private premiere" in pub2.get(f"/g/{g['slug']}").text
+            assert "Welcome back" in pub2.get(f"/g/{g['slug']}").text
+    finally:
+        # published galleries refuse deletion on purpose — unpublish first so
+        # the cleanup actually runs instead of silently 400ing and leaking a
+        # live gallery into the shared session DB
+        admin.post(
+            f"/admin/galleries/{g['id']}/settings",
+            data={"title": "Premiere Once", "pin": "4321"},
+        )
+        admin.post(f"/admin/galleries/{g['id']}/delete", follow_redirects=False)
+        assert db.one("SELECT 1 FROM galleries WHERE id=?", (g["id"],)) is None
+
+
+def test_focused_project_delivery_check(admin, monkeypatch):
+    """The focused-project delivery workbench (Screening Room 3h): admin-gated,
+    read-only over the linked gallery, and it only polls while an encode can
+    still FINISH — a permanently failed asset must not keep the fragment
+    polling forever. The whole focused row rides the kill switch."""
+    from app import config
+
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Workbench Co",))
+    pid = db.run("INSERT INTO projects (client_id, title) VALUES (?,?)", (cid, "Workbench Project"))
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("WorkbenchSlug1", "Workbench", "5678"),
+    )
+    url = f"/admin/studio/projects/{pid}/delivery-check"
+    try:
+        # gated like every other studio route
+        with TestClient(app) as anon:
+            assert anon.get(url, follow_redirects=False).status_code in (303, 401, 403)
+
+        # no gallery linked yet → the hint, and no polling
+        frag = admin.get(url).text
+        assert "No gallery linked yet" in frag
+        assert "hx-get" not in frag
+
+        db.run("UPDATE projects SET gallery_id=? WHERE id=?", (gid, pid))
+
+        # linked, everything settled → checklist renders, still no polling
+        frag = admin.get(url).text
+        assert "PIN + expiry review" in frag
+        assert "hx-get" not in frag
+
+        # a failed encode surfaces as a warning but must NOT poll forever
+        aid = db.run(
+            "INSERT INTO assets (gallery_id, kind, filename, stored, bytes, status) "
+            "VALUES (?,?,?,?,?,?)",
+            (gid, "photo", "x.jpg", "x.jpg", 1, "failed"),
+        )
+        frag = admin.get(url).text
+        assert "1 file failed" in frag
+        assert "hx-get" not in frag
+
+        # a live encode DOES poll
+        db.run("UPDATE assets SET status='pending' WHERE id=?", (aid,))
+        frag = admin.get(url).text
+        assert "hx-get" in frag and "every 8s" in frag
+
+        # stock chip: derived from the newest non-cancelled booking's event
+        # slug prefix — a cancelled re- booking must not survive as the chip
+        eid = db.run(
+            """INSERT INTO event_types
+            (slug, name, duration_min, min_notice_hours, booking_window_days,
+             max_per_day, creates_notion_session, location, active)
+            VALUES (?,?,?,?,?,?,?,?,1)""",
+            ("re-chip-test", "RE Chip Test", 60, 1, 60, 0, 0, "On-site"),
+        )
+        bid = db.run(
+            """INSERT INTO bookings (token, event_type_id, project_id, name, email,
+                                     start_utc, end_utc, status)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (
+                "chiptok1",
+                eid,
+                pid,
+                "Chip",
+                "chip@x.com",
+                "2026-08-01 15:00:00",
+                "2026-08-01 16:00:00",
+                "confirmed",
+            ),
+        )
+        monkeypatch.setattr(config, "SCREENING_ROOM", True)
+        page = admin.get(f"/admin/studio/projects/{pid}").text
+        assert "250D" in page  # re- slug → Feature 01 stock
+        db.run("UPDATE bookings SET status='cancelled' WHERE id=?", (bid,))
+        page = admin.get(f"/admin/studio/projects/{pid}").text
+        assert "250D" not in page
+
+        # the focused row honors the kill switch on the full project page
+        page = admin.get(f"/admin/studio/projects/{pid}")
+        assert page.status_code == 200 and "The money on this one" in page.text
+        monkeypatch.setattr(config, "SCREENING_ROOM", False)
+        page = admin.get(f"/admin/studio/projects/{pid}")
+        assert page.status_code == 200 and "The money on this one" not in page.text
+    finally:
+        db.run("DELETE FROM bookings WHERE project_id=?", (pid,))
+        db.run("DELETE FROM event_types WHERE slug='re-chip-test'")
+        db.run("DELETE FROM assets WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+        db.run("DELETE FROM projects WHERE id=?", (pid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))

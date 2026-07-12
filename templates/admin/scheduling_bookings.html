@@ -32,7 +32,10 @@
       {% for b in upcoming %}
         <tr>
           <td>{{ b.start_utc | localtime }}</td>
-          <td>{{ b.event_name }}</td>
+          <td>{{ b.event_name }}
+            {% if b.notes and 'AERIAL PASS' in b.notes %}
+            <span class="sr-preflight" title="Aerial Pass requested — preflight before the day">&#9650; Aerial &middot; LAANC &middot; batt &times;3</span>
+            {% endif %}</td>
           <td>{{ b.name }}</td>
           <td><a href="mailto:{{ b.email }}">{{ b.email }}</a>{% if b.phone %}<br>{{ b.phone }}{% endif %}</td>
           <td>

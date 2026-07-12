@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from .. import clients, config, db, jobs, platekit, pricing, security, usage_vocab
+from .. import clients, config, db, jobs, platekit, pricing, security, specialties, usage_vocab
 from ..render import templates
 from . import common
 
@@ -1238,6 +1238,83 @@ async def create_project(client_id: int, title: str = Form(...)):
     return RedirectResponse(f"/admin/studio/projects/{pid}", status_code=303)
 
 
+def _delivery_check(p) -> dict | None:
+    """Read-only delivery-workbench state for the focused project (Screening
+    Room 3h): the linked gallery's readiness at a glance — frames processed,
+    encodes still running (files + social cuts), client link, PIN + expiry.
+    Shared by project_detail and the self-updating fragment below."""
+    if not p["gallery_id"]:
+        return None
+    g = db.one("SELECT * FROM galleries WHERE id=?", (p["gallery_id"],))
+    if not g:
+        return None
+    counts = db.one(
+        """SELECT COUNT(*) AS total, COALESCE(SUM(status='ready'), 0) AS ready,
+                  COALESCE(SUM(status='failed'), 0) AS failed,
+                  COALESCE(SUM(kind='video'), 0) AS films
+           FROM assets WHERE gallery_id=?""",
+        (g["id"],),
+    )
+    pending_r = db.one(
+        """SELECT COUNT(*) AS n FROM asset_renditions r
+           JOIN assets a ON a.id = r.asset_id
+           WHERE a.gallery_id=? AND r.status='pending'""",
+        (g["id"],),
+    )["n"]
+    total, ready = counts["total"] or 0, counts["ready"] or 0
+    failed = counts["failed"] or 0
+    return {
+        "gallery": g,
+        "total": total,
+        "ready": ready,
+        "failed": failed,
+        "films": counts["films"] or 0,
+        "pct": round(ready * 100 / total) if total else 0,
+        # Only encodes that can still finish count as running — a failed asset
+        # stays failed until it's retried from the bench, so it must not keep
+        # the fragment polling forever. (Failed renditions likewise: only
+        # 'pending' rows are counted at all.)
+        "processing": max(total - ready - failed, 0) + pending_r,
+        "pending_renditions": pending_r,
+        "client_linked": bool(g["client_id"]),
+        "sections": db.one("SELECT COUNT(*) AS n FROM sections WHERE gallery_id=?", (g["id"],))[
+            "n"
+        ],
+        "cover": bool(g["cover_asset_id"]),
+    }
+
+
+def _project_stock_chip(project_id: int) -> str:
+    """Film-stock billing for the project header, derived from the newest
+    booking's event-type slug prefix (re-/pl-/fb-). Empty when the project has
+    no booking — nothing is invented."""
+    bk = db.one(
+        """SELECT et.slug AS et_slug FROM bookings b
+           JOIN event_types et ON et.id = b.event_type_id
+           WHERE b.project_id=? AND b.status != 'cancelled'
+           ORDER BY b.id DESC LIMIT 1""",
+        (project_id,),
+    )
+    if not bk:
+        return ""
+    slug = bk["et_slug"] or ""
+    key = "re" if slug.startswith("re-") else ("pl" if slug.startswith("pl-") else "fb")
+    m = specialties.SPECIALTIES[key]
+    return f"{m['stock']} — {m['screen_name']}"
+
+
+@router.get("/projects/{project_id}/delivery-check", response_class=HTMLResponse)
+async def project_delivery_check(request: Request, project_id: int):
+    """Self-updating delivery workbench fragment — hx-get polled every ~8s
+    while the linked gallery still has encodes running. Script-free."""
+    p = get_project(project_id)
+    return templates.TemplateResponse(
+        request,
+        "admin/_delivery_check.html",
+        {"p": p, "d": _delivery_check(p), "base_url": config.BASE_URL},
+    )
+
+
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
 async def project_detail(request: Request, project_id: int):
     p = get_project(project_id)
@@ -1300,6 +1377,9 @@ async def project_detail(request: Request, project_id: int):
             "shot_priorities": usage_vocab.SHOT_PRIORITIES,
             "statuses": PROJECT_STATUSES,
             "base_url": config.BASE_URL,
+            "payments": payments,
+            "delivery": _delivery_check(p),
+            "stock_chip": _project_stock_chip(project_id),
         },
     )
 

@@ -51,10 +51,33 @@ groups of commits on ONE draft PR; Kevin merges):
   login · one favorite toggle — a missed CSP spot fails silently, check the
   console. Rollback: `MISE_SCREENING_ROOM=false` restores the legacy look
   without a revert; full revert = revert the merge.
-- Deliberately deferred (documented in the PR body): full focused-project
-  rebuild of /admin/studio/projects/{id} (journey timeline restyled only),
-  per-page pixel work on long-tail admin surfaces (harmonized to house
-  tokens, not redesigned), swipe gestures on the mobile deck.
+- **Completion round (2026-07-12, same branch, second draft PR after the
+  first merged as #46): NOTHING remains deferred.** Kevin asked for the
+  deferred list to be completed to completion; it was:
+  - Focused project (3h) full anatomy on /admin/studio/projects/{id}:
+    delivery workbench (`templates/admin/_delivery_check.html`, polls
+    `GET /admin/studio/projects/{id}/delivery-check` every 8s only while
+    encodes run), money card (paid-vs-total + 1-tap draft invoice via the
+    existing invoice endpoint), wire card (latest timeline), stock chip
+    from the booking's event-slug prefix. Read-only over existing rows.
+  - Long-tail admin sweep, verified with a 28-page 1440px screenshot
+    sweep: crew-pass login ticket (kill switch falls back to the cream
+    card; auth untouched), inbox queue, activity/audit/today mono-ledger,
+    scheduling Aerial-Pass preflight badge, and a systemic
+    `body.sr-admin` re-map of the legacy variable set so unmapped
+    components convert wholesale.
+  - Mobile deck (3j): at ≤860px ON DECK deals one card at a time —
+    swipe ← done / swipe → snooze (both submit the existing
+    `/admin/home/nudge/dismiss` form; no new endpoints), Back/Skip
+    buttons + "1 of N" counter, progressive enhancement via
+    `data-deck-swipe` in behaviors.js (desktop/no-JS keep the list).
+    Included fix: dismissing now clears the whole card from the deck for
+    the rest of the local day (the ◯ says "snooze until tomorrow" and now
+    means it); it re-ranks tomorrow if the condition holds.
+  - Premiere on second visit: the gallery title-card ceremony plays once
+    per browser (seen-cookie `sr_seen_g{id}`, set only after PIN
+    admission, path-scoped, display-only); repeat visits get a compact
+    "welcome back" strip. Kill switch keeps the full card every visit.
 
 ## 0a. STATUS 2026-07-11 — 3-specialty flagship revamp (in flight)
 

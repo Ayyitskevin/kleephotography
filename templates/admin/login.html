@@ -1,9 +1,35 @@
 {% extends "base_cream.html" %}
+{# The crew pass (Screening Room): the admin login is a ticket stub on the
+   house, same anatomy as the client gates. Form action, field names, lockout
+   copy, and Cloudflare note are identical — auth logic is red-light and
+   untouched. Kill switch falls back to the cream login card. #}
 {% block title %}Admin · {{ site_name }}{% endblock %}
+{% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
 {% block cream_head %}
 <link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
 {% endblock %}
 {% block content %}
+{% if sr_enabled() %}
+<main class="center-card sr-gate">
+  <p class="sr-gate-brand sr-mono">{{ site_name.split(' Photography')[0] }} &mdash; photo &times; film</p>
+  <div class="sr-ticket">
+    <span class="sr-ticket-notch sr-ticket-notch--l" aria-hidden="true"></span>
+    <span class="sr-ticket-notch sr-ticket-notch--r" aria-hidden="true"></span>
+    <p class="sr-ticket-kicker">Crew only — the command deck</p>
+    <h1 class="sr-ticket-title">Studio admin</h1>
+    <p class="sr-ticket-for">one operator &middot; every screening</p>
+    <form method="post" action="/admin/login" class="pin-form sr-ticket-form">
+      <label class="sr-ticket-label" for="login-pw">Password</label>
+      <input id="login-pw" class="sr-pin-input sr-pw-input" type="password" name="password"
+             autofocus required autocomplete="current-password" placeholder="••••••••">
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <button type="submit" class="sr-ticket-go">Take the deck</button>
+    </form>
+  </div>
+  <p class="sr-gate-help">Also gated by Cloudflare Access &middot; per-IP lockout after 5 tries</p>
+  <p class="sr-gate-help sr-mono">Self-hosted &middot; {{ base_url|replace("https://", "")|replace("http://", "") }}</p>
+</main>
+{% else %}
 <main class="login-wrap">
   <div class="login-stack">
     <div class="login-brand">
@@ -26,4 +52,5 @@
     <p class="login-foot">Self-hosted · {{ base_url|replace("https://", "")|replace("http://", "") }}</p>
   </div>
 </main>
+{% endif %}
 {% endblock %}

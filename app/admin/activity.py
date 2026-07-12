@@ -383,6 +383,11 @@ async def home(request: Request):
     nudge_by_key = {n["key"]: n for n in next_steps}
 
     def _deck(lane, stock, title, meta, url, action, badge="", key=None, second=None):
+        # Honor the snooze: ◯ (and the mobile swipe) say "until tomorrow", so a
+        # card whose nudge was dismissed today leaves the deck for the rest of
+        # the local day — it re-ranks tomorrow if the condition still holds.
+        if key is not None and key in dismissed_today:
+            return
         if key is not None and key not in nudge_by_key:
             key = None
         else:
