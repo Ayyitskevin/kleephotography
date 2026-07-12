@@ -98,10 +98,10 @@ Suggested setup (durations/buffers are starting points — adjust to taste):
 
 Everything ships dark behind `MISE_AERIALS_LIVE` (default off). To launch:
 
-1. **Set the real rate** in `app/specialties.py` → `AERIAL_PASS_CENTS`
-   (the shipped `15000` = **$150 is a placeholder**). This is the ONE place —
-   the /real-estate band, booking intake label, and booking-note tag all read
-   it.
+1. **Rate is set**: `app/specialties.py` → `AERIAL_PASS_CENTS = 30000`
+   (**$300**, set by Kevin 2026-07-12). Still the ONE place — the
+   /real-estate band, booking intake label, and booking-note tag all read
+   it; change it here if the rate ever moves.
 2. **Flip the flag**: `MISE_AERIALS_LIVE=true` in flow's `.env`, restart.
    That turns on, all at once: the Aerial Pass band + spec-line segment +
    aerial chapter on /real-estate, the aerial ticker line on the lobby,

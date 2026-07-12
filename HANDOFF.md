@@ -30,7 +30,7 @@ groups of commits on ONE draft PR; Kevin merges):
   chips (250D/800T/500T + ▶ films first), reels, services/about/contact/
   press/work/booking restyled. Aerial add-on: checkbox on re- intakes →
   bookings.notes tag (zero schema); rate single-sourced in
-  `specialties.AERIAL_PASS_CENTS` (**$150 PLACEHOLDER — Kevin sets it**).
+  `specialties.AERIAL_PASS_CENTS` (**$300 — set by Kevin 2026-07-12**).
 - **Client:** ticket-stub PIN gates (shared `_ticket_gate.html`; PIN logic
   untouched), premiere gallery (Reel One row, circled takes = favorites
   numbered in pick order, sticky export rail w/ OOB count, REC tiles polling
