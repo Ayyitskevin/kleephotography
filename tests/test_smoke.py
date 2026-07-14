@@ -3117,6 +3117,7 @@ def test_contact_prefill():
         r = pub.get("/contact")
         assert r.status_code == 200 and 'name="business"' in r.text
         assert "additional formats" not in r.text
+        assert "Listing / brokerage" in r.text
 
         # gallery_formats kind → friendly canned message + business carried
         r = pub.get("/contact?prefill=gallery_formats&business=Cafe+Lune&count=12")
@@ -3144,6 +3145,14 @@ def test_contact_prefill():
         # missing gallery name → falls through without prefilled message
         r = pub.get("/contact?prefill=gallery_question")
         assert "question about" not in r.text
+
+        # services-page deep link → project type + canned tier message
+        r = pub.get("/contact?service=Real+Estate&tier=Signature")
+        assert r.status_code == 200
+        assert 'value="Real Estate" selected' in r.text or (
+            'value="Real Estate"' in r.text and "selected" in r.text
+        )
+        assert "Signature tier for Real Estate" in r.text
 
 
 def test_pipeline_dashboard(admin):
@@ -5748,13 +5757,18 @@ def test_services_page():
         assert r.text.count("svc-tier ") + r.text.count('svc-tier"') >= 3 * len(SERVICES)
         # middle tier flagged as "Most picked" (UX nudge), once per group
         assert r.text.count("Most picked") == len(SERVICES)
-        # Prototype copy: public tier cards show marketing display prices.
+        # Prototype copy: public tier cards show marketing display prices
+        # (F&B/Brand Partner may sit below PRESET floors until the pricing PR).
         for s in SERVICES:
+            assert s["contact_service"]  # deep-link target for /contact
             for t in s["tiers"]:
                 assert t["display_price"] in r.text, (s["key"], t["name"])
                 assert t["subtitle"] in r.text, (s["key"], t["name"])
-        # Tier + foot CTAs route to /book; secondary "See past work" → /work.
-        assert r.text.count('href="/book"') >= 10
+        # Tier CTAs deep-link to /contact with service+tier prefill; foot
+        # keeps Book a shoot → /book; secondary "See past work" → /work.
+        assert "contact?service=" in r.text
+        assert "tier=" in r.text
+        assert 'href="/book"' in r.text
         assert 'href="/work"' in r.text
         # nav from any other site page links to /services
         assert 'href="/services"' in pub.get("/").text

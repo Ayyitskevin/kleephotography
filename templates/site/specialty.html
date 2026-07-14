@@ -16,6 +16,12 @@
 <a href="#rates">Rates</a>
 <a href="{{ book_url }}" class="nav-cta">{{ page.sr.cta }}</a>
 {% endblock %}
+{% block sticky_cta %}
+<div class="sticky-cta">
+  <span class="sticky-cta-msg">Ready when you are.</span>
+  <a class="btn-gold" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
+</div>
+{% endblock %}
 {% block og %}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{ site_name }}">

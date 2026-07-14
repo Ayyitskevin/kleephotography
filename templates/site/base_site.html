@@ -54,9 +54,9 @@
   </a>
   <nav aria-label="Site">
     {% block nav_items %}
-    <a href="/real-estate">The Space</a>
-    <a href="/portraits">The Face</a>
-    <a href="/food-beverage">The Plate</a>
+    <a href="/real-estate">The Space — Real Estate</a>
+    <a href="/portraits">The Face — Portraits</a>
+    <a href="/food-beverage">The Plate — Food &amp; Bev</a>
     <a href="/portfolio">Archive</a>
     <a href="/book" class="nav-cta">Book a shoot</a>
     {% endblock %}
@@ -82,11 +82,14 @@
 </div>
 
 {# Sticky mobile CTA — the one persistent money path (<=700px, CSS-gated).
-   Pure markup + mise.css; no script, so CSP is untouched. #}
+   Pure markup + mise.css; no script, so CSP is untouched. Spokes and /book
+   override sticky_cta so the bar matches the page's primary action. #}
+{% block sticky_cta %}
 <div class="sticky-cta">
   <span class="sticky-cta-msg">Ready when you are.</span>
   <a class="btn-gold" href="/contact">Request a quote &rarr;</a>
 </div>
+{% endblock %}
 
 {# Credits footer (Screening Room 3a) — a one-person production, end titles.
    "flown" joins the credit roll only once the Part 107 cert is live. The

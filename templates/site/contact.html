@@ -1,6 +1,6 @@
 {% extends "site/base_site.html" %}
 {% block title %}Contact — {{ site_name }}{% endblock %}
-{% block meta_description %}Request a quote — tell me about your menu, launch, or campaign and get a tailored proposal within a business day.{% endblock %}
+{% block meta_description %}Request a quote — tell me about your listing, portrait session, or food &amp; beverage project and get a tailored proposal within a business day.{% endblock %}
 {% block site_content %}
 
 <section class="contact-wrap sr-wrap sr-section">
@@ -50,7 +50,7 @@
              value="{{ prefill.email if prefill else '' }}"></label>
       <label>Business <input type="text" name="business"
              value="{{ prefill.business if prefill else '' }}"
-             placeholder="Restaurant / café / brand name"></label>
+             placeholder="Listing / brokerage, restaurant, or brand name"></label>
       <label>Project type
         <select name="service">
           <option value="">Not sure yet — help me choose</option>
@@ -63,7 +63,7 @@
              value="{{ prefill.shoot_date if prefill else '' }}"></label>
       <label>What's the scope? <input type="text" name="dish_count"
              value="{{ prefill.dish_count if prefill else '' }}"
-             placeholder="e.g. 12 dishes, 3,200 sq ft listing, team of 8"></label>
+             placeholder="e.g. 3,200 sq ft listing, team of 8, 12 dishes"></label>
       <label>Usage / licensing
         <select name="usage">
           <option value="">Standard — web &amp; social</option>

@@ -4,6 +4,12 @@
 {% block robots %}<meta name="robots" content="noindex, follow">{% endblock %}
 {% block title %}{{ e.name }} — {{ site_name }}{% endblock %}
 {% block meta_description %}{{ e.description or 'Book ' ~ e.name ~ ' — pick a time and get an instant confirmation with a calendar invite.' }}{% endblock %}
+{% block sticky_cta %}
+<div class="sticky-cta">
+  <span class="sticky-cta-msg">Pick a time that works.</span>
+  <a class="btn-gold" href="#main">Book a shoot &rarr;</a>
+</div>
+{% endblock %}
 {% block site_content %}
 {# Detect the visitor's timezone once and reload with it, so slot times show in
    their local time. No tz param -> business timezone (graceful fallback). The

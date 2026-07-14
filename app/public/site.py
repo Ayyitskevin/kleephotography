@@ -34,17 +34,21 @@ INDEXABLE = {
 }
 
 # Public services + tier cards for /services, grouped by specialty. Mirrors the
-# admin proposal PRESETS in both deliverables and price (price_cents = the
-# shoot-day anchor from app/admin/proposals.py PRESETS — the market-researched
-# floor; final quotes are still tailored on the booking form). The booking
-# dropdown itself stays price-free. Order matters: the public page renders
-# these in nav order. The F&B groups keep their pre-revamp keys
-# (photography/videography) so the #svc-… anchors linked from reels/footer
-# never break.
+# admin proposal PRESETS in deliverables. price_cents is the shoot-day anchor
+# from app/admin/proposals.py PRESETS (market-researched floor); display_price
+# is the public board figure. F&B + Brand Partner still show pre-revamp
+# marketing prices below the PRESET floors — reconcile in the red-light
+# pricing PR (see ops/SPECIALTY-LAUNCH.md). Final quotes are still tailored
+# on the booking form. The booking dropdown itself stays price-free. Order
+# matters: the public page renders these in nav order. contact_service maps
+# each group onto the /contact form's Project type options. The F&B groups
+# keep their pre-revamp keys (photography/videography) so the #svc-… anchors
+# linked from reels/footer never break.
 SERVICES = [
     {
         "key": "real_estate",
         "title": "Real Estate",
+        "contact_service": "Real Estate",
         "tagline": "Listings, photo and film — MLS-ready stills, twilight "
         "exteriors, and walkthrough reels that move buyers.",
         "monthly": False,
@@ -92,6 +96,7 @@ SERVICES = [
     {
         "key": "portraits",
         "title": "Portrait & Lifestyle",
+        "contact_service": "Portraits",
         "tagline": "Headshots, personal branding, families — directed, not "
         "posed, and delivered ready for wherever they're going.",
         "monthly": False,
@@ -137,6 +142,7 @@ SERVICES = [
     {
         "key": "photography",
         "title": "Food & Beverage — Photography",
+        "contact_service": "Food & Beverage",
         "tagline": "Menus, dishes, drinks, and the rooms they live in. "
         "Every tier delivers a private same-week gallery with social crops baked in.",
         "monthly": False,
@@ -185,6 +191,7 @@ SERVICES = [
     {
         "key": "videography",
         "title": "Food & Beverage — Videography",
+        "contact_service": "Food & Beverage",
         "tagline": "Short-form social motion that earns the scroll, plus hero "
         "brand films for launches and campaigns.",
         "monthly": False,
@@ -233,6 +240,7 @@ SERVICES = [
     {
         "key": "brand_partner",
         "title": "Brand Partner",
+        "contact_service": "Brand Partner (monthly retainer)",
         "tagline": "A monthly content rhythm with a built-in discount versus "
         "ad-hoc. Deliverables auto-draft each month — never auto-sent or charged.",
         "monthly": True,
