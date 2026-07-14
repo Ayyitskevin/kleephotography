@@ -3116,6 +3116,7 @@ def test_contact_prefill():
         # no prefill → form renders blank (no canned message)
         r = pub.get("/contact")
         assert r.status_code == 200 and 'name="business"' in r.text
+        assert "<span data-scope-label>Project scope</span>" in r.text
         assert "additional formats" not in r.text
         assert "Listing / brokerage" in r.text
 
@@ -3153,6 +3154,11 @@ def test_contact_prefill():
             'value="Real Estate"' in r.text and "selected" in r.text
         )
         assert "Signature tier for Real Estate" in r.text
+        assert "<span data-scope-label>Listing / property scope</span>" in r.text
+        assert "3,200 sq ft · 4 bed 3 bath" in r.text
+
+        r = pub.get("/contact?service=Portraits")
+        assert "<span data-scope-label>Subject / team scope</span>" in r.text
 
 
 def test_pipeline_dashboard(admin):
@@ -3290,6 +3296,7 @@ def test_inquiry_form(monkeypatch):
             data={
                 "name": "Sam Owner",
                 "email": "sam@localhost",
+                "phone": "(828) 555-0199",
                 "business": "Taqueria Luz",
                 "message": "Need a menu shoot in July.",
                 "service": "Food & Beverage",
@@ -3300,10 +3307,12 @@ def test_inquiry_form(monkeypatch):
         )
         assert r.status_code == 400
         assert 'value="Sam Owner"' in r.text and 'value="sam@localhost"' in r.text
+        assert 'value="(828) 555-0199"' in r.text
         assert 'value="Taqueria Luz"' in r.text and "Need a menu shoot in July." in r.text
         assert 'value="12 dishes"' in r.text
+        assert "<span data-scope-label>Dishes / setups</span>" in r.text
         # selects re-select the chosen option (specialty options since the revamp)
-        assert '<option value="Food &amp; Beverage" selected' in r.text
+        assert "selected>Food &amp; Beverage — photo / video</option>" in r.text
         assert '<option value="Not sure" selected' in r.text
         assert '<option value="Under $1,000" selected' in r.text
         # nothing was stored for the rejected submission
@@ -3315,30 +3324,61 @@ def test_inquiry_form(monkeypatch):
             data={
                 "name": "Sam Owner",
                 "email": "sam@taqueria.com",
+                "phone": "828-555-0102",
                 "business": "Taqueria Luz",
                 "message": "Need a menu shoot in July.",
+                "service": "Real Estate",
+                "dish_count": "3,200 sq ft · 4 bed 3 bath",
             },
         )
         assert r.status_code == 200 and "Thanks" in r.text
         assert 'href="/book">Need a time now?' in r.text
         q = db.one("SELECT * FROM inquiries ORDER BY id DESC LIMIT 1")
         assert q["name"] == "Sam Owner" and q["emailed"] == 1
+        assert q["phone"] == "828-555-0102"
+        assert "Listing / property scope: 3,200 sq ft · 4 bed 3 bath" in q["message"]
+        assert "Dishes / setups" not in q["message"]
         to, subject, body, reply_to = sent[0]
         assert to == "kevin@example.com" and reply_to == "sam@taqueria.com"
-        assert "Taqueria Luz" in body and "menu shoot" in body
+        assert "Taqueria Luz" in body and "menu shoot" in body and "828-555-0102" in body
+        assert "Listing / property scope" in body and "Dishes / setups" not in body
+        ack_to, ack_subject, ack_body, ack_reply_to = sent[1]
+        assert ack_to == "sam@taqueria.com" and ack_reply_to == ""
+        assert "what happens next" in ack_subject.lower()
+        assert f"{config.BASE_URL}/services" in ack_body
+        assert f"{config.BASE_URL}/book" in ack_body
 
-        # SMTP failure: row kept with emailed=0, visitor still thanked
-        def boom(*a, **kw):
-            raise OSError("smtp down")
+        # Visitor acknowledgement is best-effort and does not change the
+        # successful response or the admin notification's emailed flag.
+        delivered = []
 
-        monkeypatch.setattr(mailer, "send", boom)
+        def fail_ack(to, subject, body, reply_to=""):
+            delivered.append((to, subject, body, reply_to))
+            if to == "pat@cafe.com":
+                raise OSError("visitor delivery failed")
+
+        monkeypatch.setattr(mailer, "send", fail_ack)
         r = pub.post(
             "/contact",
             data={"name": "Pat", "email": "pat@cafe.com", "message": "Brand partner info?"},
         )
         assert r.status_code == 200 and "Thanks" in r.text
         q = db.one("SELECT * FROM inquiries ORDER BY id DESC LIMIT 1")
-        assert q["name"] == "Pat" and q["emailed"] == 0
+        assert q["name"] == "Pat" and q["emailed"] == 1 and q["phone"] == ""
+        assert [call[0] for call in delivered] == ["kevin@example.com", "pat@cafe.com"]
+
+        # Total SMTP failure: row kept with emailed=0, visitor still thanked.
+        def boom(*a, **kw):
+            raise OSError("smtp down")
+
+        monkeypatch.setattr(mailer, "send", boom)
+        r = pub.post(
+            "/contact",
+            data={"name": "Lee", "email": "lee@cafe.com", "message": "Portrait session?"},
+        )
+        assert r.status_code == 200 and "Thanks" in r.text
+        q = db.one("SELECT * FROM inquiries ORDER BY id DESC LIMIT 1")
+        assert q["name"] == "Lee" and q["emailed"] == 0
 
 
 def test_inquiries_admin_view(admin):

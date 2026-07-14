@@ -951,6 +951,17 @@ def _contact_prefill(request: Request) -> dict:
     return {"business": business, "message": message, "service": service, "tier": tier}
 
 
+def _contact_scope(service: str) -> tuple[str, str]:
+    """Human-facing scope copy while the legacy dish_count field stays stable."""
+    if service == "Real Estate":
+        return "Listing / property scope", "e.g. 3,200 sq ft · 4 bed 3 bath"
+    if service == "Portraits":
+        return "Subject / team scope", "e.g. just me · team of 8 · family of 5"
+    if service in ("Food & Beverage", "Brand Partner (monthly retainer)"):
+        return "Dishes / setups", "e.g. 8–10 dishes · 3 drink setups"
+    return "Project scope", "e.g. property size, team size, or number of setups"
+
+
 # Subtitle under each lobby title card (Screening Room 3a). The RE line gains
 # "& aerials" only once the Part 107 cert is live (aerials_live flag).
 DOOR_LINES = {
@@ -1102,6 +1113,7 @@ async def contact(request: Request):
     """Optional ?prefill=<kind>&service=&tier= for cross-surface deep links
     (parsed in _contact_prefill straight off the query string)."""
     pf = _contact_prefill(request)
+    scope_label, scope_placeholder = _contact_scope(pf["service"])
     return templates.TemplateResponse(
         request,
         "site/contact.html",
@@ -1109,6 +1121,8 @@ async def contact(request: Request):
             "sent": False,
             "error": None,
             "prefill": pf,
+            "scope_label": scope_label,
+            "scope_placeholder": scope_placeholder,
             "featured": _portfolio_assets()[:1],
             "faqs": CONTACT_FAQS,
             "faq_heading": "Good to know",
@@ -1127,6 +1141,7 @@ async def submit_inquiry(
     service: str = Form(""),
     shoot_date: str = Form(""),
     dish_count: str = Form(""),
+    phone: str = Form(""),
     usage: str = Form(""),
     budget: str = Form(""),
 ):
@@ -1147,6 +1162,7 @@ async def submit_inquiry(
         # Re-render with an error AND every submitted value echoed back, so a
         # typo or throttle never wipes a visitor's typed quote request (the
         # template reads these off `prefill`).
+        scope_label, scope_placeholder = _contact_scope(service.strip())
         return templates.TemplateResponse(
             request,
             "site/contact.html",
@@ -1161,9 +1177,12 @@ async def submit_inquiry(
                     "service": service.strip(),
                     "shoot_date": shoot_date.strip(),
                     "dish_count": dish_count.strip(),
+                    "phone": phone.strip(),
                     "usage": usage.strip(),
                     "budget": budget.strip(),
                 },
+                "scope_label": scope_label,
+                "scope_placeholder": scope_placeholder,
                 "featured": _portfolio_assets()[:1],
                 "faqs": CONTACT_FAQS,
                 "faq_heading": "Good to know",
@@ -1190,12 +1209,14 @@ async def submit_inquiry(
     # into a project without re-typing); the rest fold into the message + email
     # body so Odysseus inquiry_intake keeps parsing one plain-text block unchanged.
     service, shoot_date = service.strip(), shoot_date.strip()
+    phone = phone.strip()[:40]
+    scope_label, _ = _contact_scope(service)
     details = [
         (lbl, v.strip())
         for lbl, v in (
             ("Project type", service),
             ("Target date", shoot_date),
-            ("Dishes / setups", dish_count),
+            (scope_label, dish_count),
             ("Usage / licensing", usage),
             ("Budget range", budget),
         )
@@ -1206,14 +1227,24 @@ async def submit_inquiry(
         full_message += "\n\n— Project details —\n" + "\n".join(f"{lbl}: {v}" for lbl, v in details)
     security.inquiry_record(ip, security.INQUIRY_BUCKET_CONTACT)
     iid = db.run(
-        """INSERT INTO inquiries (name, email, business, message, service, shoot_date)
-                    VALUES (?,?,?,?,?,?)""",
-        (name, email, business.strip() or None, full_message, service or None, shoot_date or None),
+        """INSERT INTO inquiries
+                    (name, email, business, message, service, shoot_date, phone)
+                    VALUES (?,?,?,?,?,?,?)""",
+        (
+            name,
+            email,
+            business.strip() or None,
+            full_message,
+            service or None,
+            shoot_date or None,
+            phone,
+        ),
     )
     if mailer.configured():
         body = (
             f"New inquiry via kleephotography.com\n\n"
             f"Name: {name}\nEmail: {email}\n"
+            f"Phone: {phone or '—'}\n"
             f"Business: {business.strip() or '—'}\n\n{full_message}\n"
         )
         try:
@@ -1221,6 +1252,19 @@ async def submit_inquiry(
             db.run("UPDATE inquiries SET emailed=1 WHERE id=?", (iid,))
         except Exception as e:
             log.error("inquiry %s stored but email failed: %s", iid, e)
+        acknowledgement = (
+            f"Hi {name},\n\n"
+            "Thanks for reaching out — your inquiry made it through. I review "
+            "every project personally and will reply within one business day "
+            "with availability, any follow-up questions, and the best next step.\n\n"
+            f"See services and starting rates: {config.BASE_URL}/services\n"
+            f"Ready to choose a time? {config.BASE_URL}/book\n\n"
+            f"Kevin\n{config.SITE_NAME}\n"
+        )
+        try:
+            mailer.send(email, "Your inquiry is in — what happens next", acknowledgement)
+        except Exception as e:
+            log.warning("inquiry %s acknowledgement email failed: %s", iid, e)
     else:
         log.error("inquiry %s stored — mailer not configured, no email sent", iid)
     jobs.enqueue("notion_sync_inquiry", {"inquiry_id": iid})

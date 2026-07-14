@@ -187,6 +187,13 @@
     if (select && select.matches && select.matches("select[data-autosubmit]") && select.form) {
       select.form.submit();
     }
+    if (select && select.matches && select.matches("select[name='service']") && select.form) {
+      var option = select.options[select.selectedIndex];
+      var label = select.form.querySelector("[data-scope-label]");
+      var input = select.form.querySelector("[data-scope-input]");
+      if (option && label) label.textContent = option.dataset.scopeLabel;
+      if (option && input) input.placeholder = option.dataset.scopePlaceholder;
+    }
   });
 
   document.addEventListener(

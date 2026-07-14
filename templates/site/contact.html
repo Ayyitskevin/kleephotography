@@ -49,22 +49,26 @@
              value="{{ prefill.name if prefill else '' }}"></label>
       <label>Email <input type="email" name="email" required
              value="{{ prefill.email if prefill else '' }}"></label>
+      <label>Phone <span class="muted">(optional)</span>
+        <input type="tel" name="phone"
+               value="{{ prefill.phone if prefill else '' }}"></label>
       <label>Business <input type="text" name="business"
              value="{{ prefill.business if prefill else '' }}"
              placeholder="Listing / brokerage, restaurant, or brand name"></label>
       <label>Project type
         <select name="service">
-          <option value="">Not sure yet — help me choose</option>
-          <option value="Real Estate"{% if prefill and prefill.service == 'Real Estate' %} selected{% endif %}>Real Estate — photo / video</option>
-          <option value="Portraits"{% if prefill and prefill.service == 'Portraits' %} selected{% endif %}>Portraits &amp; Lifestyle</option>
-          <option value="Food &amp; Beverage"{% if prefill and prefill.service == 'Food & Beverage' %} selected{% endif %}>Food &amp; Beverage — photo / video</option>
-          <option value="Brand Partner (monthly retainer)"{% if prefill and prefill.service == 'Brand Partner (monthly retainer)' %} selected{% endif %}>Brand Partner (monthly retainer)</option>
+          <option value="" data-scope-label="Project scope" data-scope-placeholder="e.g. property size, team size, or number of setups">Not sure yet — help me choose</option>
+          <option value="Real Estate" data-scope-label="Listing / property scope" data-scope-placeholder="e.g. 3,200 sq ft · 4 bed 3 bath"{% if prefill and prefill.service == 'Real Estate' %} selected{% endif %}>Real Estate — photo / video</option>
+          <option value="Portraits" data-scope-label="Subject / team scope" data-scope-placeholder="e.g. just me · team of 8 · family of 5"{% if prefill and prefill.service == 'Portraits' %} selected{% endif %}>Portraits &amp; Lifestyle</option>
+          <option value="Food &amp; Beverage" data-scope-label="Dishes / setups" data-scope-placeholder="e.g. 8–10 dishes · 3 drink setups"{% if prefill and prefill.service == 'Food & Beverage' %} selected{% endif %}>Food &amp; Beverage — photo / video</option>
+          <option value="Brand Partner (monthly retainer)" data-scope-label="Dishes / setups" data-scope-placeholder="e.g. 8–10 dishes · 3 drink setups"{% if prefill and prefill.service == 'Brand Partner (monthly retainer)' %} selected{% endif %}>Brand Partner (monthly retainer)</option>
         </select></label>
       <label>Target date <input type="date" name="shoot_date"
              value="{{ prefill.shoot_date if prefill else '' }}"></label>
-      <label>What's the scope? <input type="text" name="dish_count"
+      <label><span data-scope-label>{{ scope_label }}</span>
+        <input type="text" name="dish_count" data-scope-input
              value="{{ prefill.dish_count if prefill else '' }}"
-             placeholder="e.g. 3,200 sq ft listing, team of 8, 12 dishes"></label>
+             placeholder="{{ scope_placeholder }}"></label>
       <label>Usage / licensing
         <select name="usage">
           <option value="">Standard — web &amp; social</option>
