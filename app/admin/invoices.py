@@ -9,8 +9,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import config, db, jobs, security
 from ..render import templates
 from . import common
+from .lookups import get_project
 from .proposals import MAX_ITEM_ROWS, parse_items
-from .studio import get_project
 
 log = logging.getLogger("mise.admin.invoices")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])

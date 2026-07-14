@@ -20,8 +20,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, caption_ai, config, db, security
 from ..render import templates
+from .lookups import get_project
 from .proposals import MAX_ITEM_ROWS, parse_items
-from .studio import get_project
 
 log = logging.getLogger("mise.admin.recurring")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])

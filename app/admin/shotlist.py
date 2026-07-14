@@ -21,7 +21,7 @@ from fastapi.responses import RedirectResponse
 
 from .. import audit, db, security
 from ..usage_vocab import SHOT_CATEGORIES, SHOT_PRIORITIES
-from .studio import get_project
+from .lookups import get_project
 
 log = logging.getLogger("mise.admin.shotlist")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])

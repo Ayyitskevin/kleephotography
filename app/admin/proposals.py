@@ -10,7 +10,7 @@ from .. import config, db, security
 from ..render import templates
 from . import common
 from .contracts import render_template
-from .studio import get_project
+from .lookups import get_project
 
 log = logging.getLogger("mise.admin.proposals")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])

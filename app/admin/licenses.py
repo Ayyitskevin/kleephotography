@@ -17,7 +17,7 @@ from .. import audit, clients, config, db, pricing, security
 from ..render import templates
 from ..usage_vocab import CHANNELS
 from . import common
-from .studio import get_client
+from .lookups import get_client
 
 log = logging.getLogger("mise.admin.licenses")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])

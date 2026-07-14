@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, security
 from ..render import templates
-from .studio import get_project
+from .lookups import get_project
 
 log = logging.getLogger("mise.admin.contracts")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])

@@ -15,20 +15,10 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from .. import clients, config, db, jobs, platekit, pricing, security, specialties, usage_vocab
 from ..render import templates
 from . import common
+from .lookups import PROJECT_STATUSES, get_client, get_project
 
 log = logging.getLogger("mise.admin.studio")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])
-
-PROJECT_STATUSES = [
-    "inquiry_received",
-    "consultation_call",
-    "proposal_sent",
-    "contract_signed",
-    "retainer_paid",
-    "session_planning",
-    "project_closed",
-    "archived",
-]
 
 # A project sitting this many days in its current stage is flagged "stalled" on
 # the kanban (terminal stages — project_closed/archived — are never flagged).
@@ -41,18 +31,6 @@ BRAND_EXTS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".eps", ".ai", "
 # vector EPS/PDF/AI and archives can't be pasted onto a JPEG).
 KIT_EXTS = {".png", ".webp", ".jpg", ".jpeg"}
 KIT_POSITIONS = {"tl", "tc", "tr", "ml", "c", "mr", "bl", "bc", "br"}
-
-
-def get_client(client_id: int) -> "db.sqlite3.Row":
-    return db.get_or_404("SELECT * FROM clients WHERE id=?", (client_id,))
-
-
-def get_project(project_id: int) -> "db.sqlite3.Row":
-    return db.get_or_404(
-        """SELECT p.*, c.name AS client_name, c.company, c.email AS client_email
-                  FROM projects p JOIN clients c ON c.id=p.client_id WHERE p.id=?""",
-        (project_id,),
-    )
 
 
 def _today() -> dt.date:

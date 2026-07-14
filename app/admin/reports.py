@@ -8,7 +8,7 @@ from .. import db, security
 from ..render import templates
 from . import common
 from .financials import _RANGE_LABELS, _RANGES, _range_bounds, _usd0
-from .studio import PROJECT_STATUSES
+from .lookups import PROJECT_STATUSES
 
 log = logging.getLogger("mise.admin.reports")
 router = APIRouter(prefix="/admin/reports", dependencies=[Depends(security.require_admin)])
