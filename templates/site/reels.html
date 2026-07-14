@@ -14,7 +14,8 @@
   </div>
   {% if sp_chips %}
   <nav class="portfolio-filter" aria-label="Filter reels by specialty"
-       data-pf data-pf-mode="sp" data-pf-items="[data-sp]">
+       data-pf data-pf-mode="sp" data-pf-items=".motion-page [data-sp]"
+       data-pf-container=".motion-page">
     <button class="pf-chip pf-chip-active" data-filter="" aria-pressed="true">All
       <span class="muted">({{ reels|length }})</span></button>
     {% for c in sp_chips %}
@@ -60,6 +61,7 @@
     {% endif %}
   </div>
 </section>
+<p class="pf-empty sr-wrap sr-section" data-pf-empty role="status" aria-live="polite" hidden></p>
 {% else %}
 <section class="reel-sec sr-wrap sr-section">
   <div class="sec-inner">

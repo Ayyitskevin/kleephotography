@@ -18,6 +18,9 @@
   const filmsFirstSel = root.dataset.pfFilmsFirst || "";
   const masonry = masonrySel ? document.querySelector(masonrySel) : null;
   const filmsFirst = filmsFirstSel ? document.querySelector(filmsFirstSel) : null;
+  const empty = document.querySelector("[data-pf-empty]");
+  const containerSel = root.dataset.pfContainer || "";
+  const container = containerSel ? document.querySelector(containerSel) : null;
 
   function match(el, f) {
     if (!f) return true;
@@ -28,14 +31,24 @@
   }
 
   function apply(f) {
+    let visible = 0;
     items.forEach((el) => {
-      el.classList.toggle("pf-hidden", f !== "" && !match(el, f));
+      const show = f === "" || match(el, f);
+      el.classList.toggle("pf-hidden", !show);
+      if (show) visible += 1;
     });
     chips.forEach((c) => {
       const on = (c.dataset.filter || "") === (f || "");
       c.classList.toggle("pf-chip-active", on);
       c.setAttribute("aria-pressed", on ? "true" : "false");
     });
+    if (empty) {
+      empty.hidden = visible > 0;
+      empty.textContent = f
+        ? "No matching work yet. Try another filter or view the full archive."
+        : "";
+    }
+    if (container) container.hidden = visible === 0;
     if (useHash) {
       if (f) history.replaceState(null, "", "#" + f);
       else history.replaceState(null, "", location.pathname);

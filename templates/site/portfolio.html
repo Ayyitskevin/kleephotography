@@ -73,10 +73,40 @@
     </figure>
     {% endfor %}
   </div>
+  <p class="pf-empty" data-pf-empty role="status" aria-live="polite" hidden></p>
   {% else %}
   {% include "site/_empty_portfolio.html" %}
   {% endif %}
 </main>
+
+{% if studies %}
+<section class="featured-clients sr-wrap sr-section" aria-label="Featured clients">
+  <div class="sr-kickrow">
+    <p class="sr-mono">Featured clients</p>
+    <a class="sr-mono sr-mono--signal" href="/work">All case studies &rarr;</a>
+  </div>
+  <h2>The work behind the frames.</h2>
+  <p class="sr-lede">A closer look at the listings, people, and plates built for real clients.</p>
+  <div class="work-editorial-grid" data-reveal>
+    {% for s in studies[:3] %}
+    <a class="work-editorial-card" href="/work/{{ s.slug }}">
+      <div class="work-editorial-img">
+        {% if s.hero_id %}
+        <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
+             srcset="/site/img/{{ s.hero_id }}?variant=thumb 480w, /site/img/{{ s.hero_id }}?variant=web 2048w"
+             sizes="(max-width: 700px) 100vw, 33vw"
+             alt="{{ s.cs_tagline or s.title }}">
+        {% else %}
+        <span class="placeholder">Case study</span>
+        {% endif %}
+      </div>
+      <h3>{{ s.cs_tagline or s.title }}</h3>
+      <p class="muted">{{ s.client_name or "" }}{% if s.client_name and s.cs_location %} · {% endif %}{{ s.cs_location or "" }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
 <section class="sr-wrap sr-section" aria-label="Book">
   <div class="sr-stats">

@@ -178,4 +178,37 @@
       });
     });
   }
+
+  // --- small public form / player helpers ---
+  // Keep these public-facing handlers here rather than loading behaviors.js,
+  // which also carries admin and client-gallery interactions.
+  document.addEventListener("change", function (event) {
+    var select = event.target;
+    if (select && select.matches && select.matches("select[data-autosubmit]") && select.form) {
+      select.form.submit();
+    }
+  });
+
+  document.addEventListener(
+    "submit",
+    function (event) {
+      var form = event.target;
+      if (!form || !form.matches || !form.matches("form[data-confirm]")) return;
+      if (!window.confirm(form.getAttribute("data-confirm") || "Are you sure?")) {
+        event.preventDefault();
+      }
+    },
+    true
+  );
+
+  document.addEventListener("click", function (event) {
+    var chip = event.target.closest && event.target.closest("[data-seek]");
+    if (!chip) return;
+    var scope = chip.closest("[data-seek-scope]") || document;
+    var video = scope.querySelector("video");
+    var seconds = parseFloat(chip.getAttribute("data-seek"));
+    if (!video || isNaN(seconds)) return;
+    video.currentTime = seconds;
+    video.play().catch(function () {});
+  });
 })();

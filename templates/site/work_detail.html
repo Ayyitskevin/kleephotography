@@ -117,9 +117,9 @@
 
 <section class="cta cta-band">
   <div class="cta-inner" data-reveal>
-    <h2>Like the look? Let's shoot your menu.</h2>
+    <h2>{{ cta.heading }}</h2>
     <div class="cta-actions">
-      <a class="btn-pill" href="/book">Book a shoot &rarr;</a>
+      <a class="btn-pill" href="/contact?service={{ cta.service|urlencode }}">{{ cta.label }} &rarr;</a>
       <a class="btn-ghost" href="/work">More work</a>
     </div>
   </div>

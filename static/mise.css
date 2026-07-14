@@ -309,6 +309,7 @@ button.link.ok { color: #2e8b57; }
 .pf-chip-active .muted { color: rgba(255,255,255,0.6); }
 .pf-chip .muted { margin-left: 0.3rem; font-size: 0.8em; }
 .pf-hidden { display: none !important; }
+.pf-empty { margin: 1.25rem 0; color: var(--muted); }
 
 /* Share-card debugger (/admin/share) */
 .share-row { display: flex; gap: 18px; background: var(--card);

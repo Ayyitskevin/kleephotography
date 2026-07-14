@@ -3199,6 +3199,17 @@ def test_marketing_site(admin):
             assert "htmx.min.js" not in r.text, path
             assert "behaviors.js" not in r.text, path
             assert "details_persist.js" not in r.text, path
+        # Lean marketing JS retains the few booking/spoke handlers public pages need.
+        js = pub.get("/static/site.js").text
+        assert "select[data-autosubmit]" in js
+        assert "form[data-confirm]" in js
+        assert 'closest("[data-seek]")' in js
+        home = pub.get("/").text
+        assert 'href="/book">Book a shoot' in home
+        assert "Ready for your close-up?" in home
+        book = pub.get("/book").text
+        assert "Instant confirmation" in book
+        assert "Calendar invite in your inbox" in book
         assert "x-robots-tag" in pub.get(f"/g/{g['slug']}").headers
         # client gallery still gets the HTMX shell via base_cream → base.html
         assert "htmx.min.js" in pub.get(f"/g/{g['slug']}").text
@@ -3309,6 +3320,7 @@ def test_inquiry_form(monkeypatch):
             },
         )
         assert r.status_code == 200 and "Thanks" in r.text
+        assert 'href="/book">Need a time now?' in r.text
         q = db.one("SELECT * FROM inquiries ORDER BY id DESC LIMIT 1")
         assert q["name"] == "Sam Owner" and q["emailed"] == 1
         to, subject, body, reply_to = sent[0]
@@ -4331,6 +4343,10 @@ def test_case_studies(admin):
         assert f'href="/work/{g["slug"]}"' in r.text
         assert f"/site/img/{photos[0]['id']}" in r.text
         assert 'content="index, follow"' in r.text and "x-robots-tag" not in r.headers
+        # /portfolio surfaces published studies as a trust-building band.
+        portfolio = pub.get("/portfolio").text
+        assert "Featured clients" in portfolio
+        assert f'href="/work/{g["slug"]}"' in portfolio
 
         # /work/{slug} renders brief, credits, location, photo, and OG/SEO meta
         r = pub.get(f"/work/{g['slug']}")
@@ -4361,6 +4377,10 @@ def test_case_studies(admin):
         assert f'rel="canonical" href="{cfg.BASE_URL}/work/{g["slug"]}"' in r.text
         assert '"@type": "Article"' in r.text
         assert '"@type": "BreadcrumbList"' in r.text
+        # Untagged legacy work maps to F&B, so its CTA stays menu-specific
+        # and carries a structured service prefill.
+        assert "shoot your menu." in r.text
+        assert 'href="/contact?service=Food%20%26%20Beverage"' in r.text
 
         # sitemap now lists the case study; robots.txt unchanged (no exclusion needed)
         sm = pub.get("/sitemap.xml").text
@@ -4606,6 +4626,7 @@ def test_portfolio_tag_filter(admin):
         assert 'class="portfolio-filter"' in r.text
         assert "data-pf" in r.text
         assert "/static/portfolio-filter.js?v=" in r.text
+        assert "data-pf-empty" in r.text
         assert 'data-filter=""' in r.text and ">All" in r.text  # 'All' chip
         # alphabetical: Dishes (2) before Drinks (1); tag filters are namespaced
         assert r.text.index('data-filter="tag:dishes"') < r.text.index('data-filter="tag:drinks"')

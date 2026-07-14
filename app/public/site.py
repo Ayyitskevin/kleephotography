@@ -321,6 +321,12 @@ BOOK_PROMISES = [
     "Same-week gallery after the shoot",
 ]
 
+BOOK_ACTIVE_PROMISES = [
+    "Instant confirmation",
+    "Calendar invite in your inbox",
+    "Prep details before the shoot",
+]
+
 BOOK_FAQS = [
     (
         "How far in advance should I book?",
@@ -1262,6 +1268,24 @@ async def work_detail(request: Request, slug: str):
     )
     credit_items = _parse_cs_credits(g["cs_credits"])
     testimonials = _testimonials(gallery_id=g["id"])
+    specialty_key = _cs_specialty_map().get(g["id"], specialties.DEFAULT_KEY)
+    cta = {
+        "re": {
+            "heading": "Like the look? Let's shoot your listing.",
+            "label": "Request a listing quote",
+            "service": "Real Estate",
+        },
+        "pl": {
+            "heading": "Like the look? Let's plan your session.",
+            "label": "Request a portrait quote",
+            "service": "Portraits",
+        },
+        "fb": {
+            "heading": "Like the look? Let's shoot your menu.",
+            "label": "Request a food & beverage quote",
+            "service": "Food & Beverage",
+        },
+    }[specialty_key]
     return templates.TemplateResponse(
         request,
         "site/work_detail.html",
@@ -1271,6 +1295,7 @@ async def work_detail(request: Request, slug: str):
             "credit_items": credit_items,
             "testimonials": testimonials,
             "pull_quote": testimonials[0] if testimonials else None,
+            "cta": cta,
         },
     )
 

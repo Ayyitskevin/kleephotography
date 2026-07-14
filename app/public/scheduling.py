@@ -97,7 +97,7 @@ def _picker_ctx(et, request: Request, *, is_reschedule=False, token=""):
 
 @router.get("/book", response_class=HTMLResponse)
 async def book_index(request: Request):
-    from .site import BOOK_FAQS, BOOK_PROMISES, _portfolio_assets
+    from .site import BOOK_ACTIVE_PROMISES, BOOK_FAQS, BOOK_PROMISES, _portfolio_assets
 
     events = scheduling.active_event_types()
     book_photo = _portfolio_assets()[:1]
@@ -108,7 +108,7 @@ async def book_index(request: Request):
             "events": events,
             "faqs": BOOK_FAQS,
             "faq_heading": "Common questions",
-            "book_promises": BOOK_PROMISES,
+            "book_promises": BOOK_ACTIVE_PROMISES if events else BOOK_PROMISES,
             "book_photo": book_photo[0] if book_photo else None,
         },
     )
