@@ -22,7 +22,7 @@ groups of commits on ONE draft PR; Kevin merges):
   untouched. IBM Plex Mono self-hosted (400/500/700, latin+ext) in fonts.css.
   Flags: `MISE_SCREENING_ROOM` (default ON — the kill switch back to the
   legacy look) and `MISE_AERIALS_LIVE` (default ON since 2026-07-12 —
-  Kevin launched aerials at $300; =false is the kill switch) in
+  Kevin launched aerials at $150; =false is the kill switch) in
   config/features.
 - **Marketing:** home = the Lobby (house reel + live mono timecode via
   data-sr-player in site.js, three feature title cards, ticker, credits
@@ -32,7 +32,7 @@ groups of commits on ONE draft PR; Kevin merges):
   chips (250D/800T/500T + ▶ films first), reels, services/about/contact/
   press/work/booking restyled. Aerial add-on: checkbox on re- intakes →
   bookings.notes tag (zero schema); rate single-sourced in
-  `specialties.AERIAL_PASS_CENTS` (**$300 — set by Kevin 2026-07-12**).
+  `specialties.AERIAL_PASS_CENTS` (**$150 — set by Kevin 2026-07-13**).
 - **Client:** ticket-stub PIN gates (shared `_ticket_gate.html`; PIN logic
   untouched), premiere gallery (Reel One row, circled takes = favorites
   numbered in pick order, sticky export rail w/ OOB count, REC tiles polling

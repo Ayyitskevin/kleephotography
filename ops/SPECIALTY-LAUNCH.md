@@ -103,8 +103,8 @@ everywhere at once (band, booking add-on, ticker, credits, ▲ badges).
 
 Live state:
 
-1. **Rate**: `app/specialties.py` → `AERIAL_PASS_CENTS = 30000` (**$300**,
-   set by Kevin 2026-07-12). Still the ONE place — the /real-estate band,
+1. **Rate**: `app/specialties.py` → `AERIAL_PASS_CENTS = 15000` (**$150**,
+   set by Kevin 2026-07-13). Still the ONE place — the /real-estate band,
    booking intake label, and booking-note tag all read it; change it here
    if the rate ever moves.
 2. **What renders**: the Aerial Pass band + spec-line segment + aerial
@@ -114,7 +114,7 @@ Live state:
 3. **Tag aerial work** `re/aerials` (any `re/...aerial...` tag gets the ▲
    badge on the archive/spoke strips).
 4. **Booking notes**: an Aerial Pass request lands in the booking's notes as
-   `AERIAL PASS requested (+$300 add-on) — confirm LAANC`; the admin deck's
+   `AERIAL PASS requested (+$150 add-on) — confirm LAANC`; the admin deck's
    day strip shows `└ Aerial Pass · confirm LAANC · batteries` on those
    shoots.
 5. Still open: proposal presets/contract language for drone deliverables

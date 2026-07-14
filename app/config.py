@@ -70,7 +70,7 @@ SHOWCASE_SEED = _b("MISE_SHOWCASE_SEED", "true")
 # to the pre-redesign palette (markup IA stays, tokens stop applying).
 SCREENING_ROOM = _b("MISE_SCREENING_ROOM", "true")
 # Aerial/drone services (FAA Part 107). LAUNCHED 2026-07-12 at Kevin's ask —
-# ships ON: the Aerial Pass band on /real-estate, the $300 booking add-on line,
+# ships ON: the Aerial Pass band on /real-estate, the $150 booking add-on line,
 # and the aerial ticker/nav copy all render. MISE_AERIALS_LIVE=false is the
 # kill switch that hides the offering everywhere at once.
 AERIALS_LIVE = _b("MISE_AERIALS_LIVE", "true")

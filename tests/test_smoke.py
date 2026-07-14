@@ -10158,9 +10158,9 @@ def test_aerial_pass_booking_addon(monkeypatch, admin):
                 f"&day={day.isoformat()}&start={slots[0]['utc']}&tz=America/New_York"
             ).text
             assert 'name="aerial_pass"' in page
-            assert "+$300" in page  # the rate from specialties.AERIAL_PASS_CENTS
+            assert "+$150" in page  # the rate from specialties.AERIAL_PASS_CENTS
         b = book(slots[0]["utc"], True)
-        assert "AERIAL PASS requested (+$300 add-on)" in b["notes"]
+        assert "AERIAL PASS requested (+$150 add-on)" in b["notes"]
         assert "Twilight if possible." in b["notes"]
 
         # flag OFF: checkbox is gone and a forged POST field is ignored
