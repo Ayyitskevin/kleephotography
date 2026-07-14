@@ -117,5 +117,8 @@ Live state:
    `AERIAL PASS requested (+$150 add-on) — confirm LAANC`; the admin deck's
    day strip shows `└ Aerial Pass · confirm LAANC · batteries` on those
    shoots.
-5. Still open: proposal presets/contract language for drone deliverables
-   (red-light — Kevin's PR).
+5. **Proposals:** `aerial_pass` preset + Premier includes Aerial Pass as a $0
+   line (see `app/admin/proposals.py`). Still open for attorney review: RE/portrait
+   SoW brackets and a dedicated Aerial Pass contract/addendum clause — draft
+   templates exist (`real_estate_services`, `portrait_services`) but are not
+   final legal text.

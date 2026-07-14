@@ -29,7 +29,15 @@ router = APIRouter(prefix="/admin/templates", dependencies=[Depends(security.req
 # grouping and blurbs live here. A new preset shows up automatically once it is
 # added to a group below — no second source of truth for the content itself.
 PROPOSAL_GROUPS = [
-    ("Real Estate", ["realestate_essentials", "realestate_signature", "realestate_premier"]),
+    (
+        "Real Estate",
+        [
+            "realestate_essentials",
+            "realestate_signature",
+            "realestate_premier",
+            "aerial_pass",
+        ],
+    ),
     ("Photography", ["photo_starter", "photo_standard", "photo_premium"]),
     ("Videography", ["video_starter", "video_standard", "video_premium"]),
     ("Brand Partner — Monthly", ["retainer_starter", "retainer_standard", "retainer_premium"]),
