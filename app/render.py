@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -9,16 +10,23 @@ from . import config, db, features, specialties
 from .public.site_catalog import marketing_meta
 
 ROOT = Path(__file__).resolve().parent.parent
+_STATIC_REV_TTL_SECONDS = 5.0
+_static_rev_cache = {"expires": 0.0, "value": 0}
 
 
 def _static_rev() -> int:
     """Newest mtime among top-level /static files — the cache-buster appended to
-    every static URL. Recomputed per render (not frozen at startup) because
-    CSS/JS deploys land via `git pull` with no service restart: a startup-frozen
-    value would keep emitting the old `?v=` and browsers would serve stale CSS."""
-    return int(
+    every static URL. Cached only briefly because CSS/JS deploys land via
+    `git pull` without a service restart; changed files are detected within the
+    five-second TTL while ordinary template renders avoid repeated directory scans."""
+    now = time.monotonic()
+    if now < _static_rev_cache["expires"]:
+        return _static_rev_cache["value"]
+    value = int(
         max((f.stat().st_mtime for f in (ROOT / "static").glob("*") if f.is_file()), default=0)
     )
+    _static_rev_cache.update(value=value, expires=now + _STATIC_REV_TTL_SECONDS)
+    return value
 
 
 templates = Jinja2Templates(

@@ -78,6 +78,30 @@ def test_healthz_reports_storage_warning_without_failing(client, monkeypatch):
 
 
 @pytest.mark.integration
+def test_static_revision_cache_refreshes_within_ttl(tmp_path, monkeypatch):
+    import os
+
+    from app import render
+
+    static = tmp_path / "static"
+    static.mkdir()
+    asset = static / "site.js"
+    asset.write_text("one")
+    os.utime(asset, (100, 100))
+    clock = [10.0]
+    monkeypatch.setattr(render, "ROOT", tmp_path)
+    monkeypatch.setattr(render.time, "monotonic", lambda: clock[0])
+    render._static_rev_cache.update(value=0, expires=0.0)
+
+    assert render._static_rev() == 100
+    os.utime(asset, (200, 200))
+    assert render._static_rev() == 100
+    clock[0] += render._STATIC_REV_TTL_SECONDS
+    assert render._static_rev() == 200
+    render._static_rev_cache["expires"] = 0.0
+
+
+@pytest.mark.integration
 def test_security_headers(client):
     # clickjacking + MIME-sniffing protection on every response (R18)
     r = client.get("/healthz")
