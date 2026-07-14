@@ -75,8 +75,12 @@
       <figcaption>
         <span class="muted">{{ a.gallery_title }}</span>
         <span class="crop-links">
-          {% for r in ratios %}
-          <a href="/portal/{{ p.slug }}/crop/{{ a.id }}/{{ r }}">{{ r.replace('x', ':') }}</a>
+          {% for link in a.crop_links %}
+          {% if link.ready %}
+          <a href="/portal/{{ p.slug }}/crop/{{ a.id }}/{{ link.slug }}">{{ link.slug.replace('x', ':') }}</a>
+          {% else %}
+          <span class="muted crop-pending">{{ link.slug.replace('x', ':') }} preparing…</span>
+          {% endif %}
           {% endfor %}
         </span>
       </figcaption>

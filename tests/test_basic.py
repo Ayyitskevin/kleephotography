@@ -680,3 +680,77 @@ def test_unhandled_exception_alerts_and_500(monkeypatch):
             rt for rt in app.router.routes if getattr(rt, "path", None) != "/__test_boom"
         ]
     assert fired and "RuntimeError" in fired[0][0]
+
+
+@pytest.mark.integration
+def test_financials_csv_include_paid_checkbox(client):
+    """Unchecking Paid in the export panel must omit paid rows — the old default
+    of inc_paid='on' made an absent checkbox still export payments."""
+    from app import config, db
+
+    client.post("/admin/login", data={"password": config.ADMIN_PASSWORD}, follow_redirects=False)
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("CSV Co",))
+    pid = db.run("INSERT INTO projects (client_id, title) VALUES (?,?)", (cid, "Paid Job"))
+    paid_iid = db.run(
+        """INSERT INTO invoices (project_id, slug, title, line_items, total_cents, status,
+           created_at) VALUES (?,?,?,?,?,?,datetime('now'))""",
+        (pid, "csv-paid", "Paid Job", "[]", 50000, "paid"),
+    )
+    out_iid = db.run(
+        """INSERT INTO invoices (project_id, slug, title, line_items, total_cents, status,
+           created_at) VALUES (?,?,?,?,?,?,datetime('now'))""",
+        (pid, "csv-out", "Open Job", "[]", 75000, "sent"),
+    )
+    db.run(
+        """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
+           amount_cents, kind, created_at) VALUES (?,?,?,?,?,datetime('now'))""",
+        (paid_iid, "evt_csv", "cs_csv", 50000, "full"),
+    )
+    try:
+        both = client.get("/admin/financials/income.csv?range=ytd&inc_paid=on&inc_out=on").text
+        assert "Paid" in both and "Outstanding" in both
+        out_only = client.get("/admin/financials/income.csv?range=ytd&inc_out=on").text
+        assert "Outstanding" in out_only and "Paid" not in out_only
+        paid_only = client.get("/admin/financials/income.csv?range=ytd&inc_paid=on").text
+        assert "Paid" in paid_only and "Outstanding" not in paid_only
+    finally:
+        db.run("DELETE FROM payments WHERE invoice_id=?", (paid_iid,))
+        db.run("DELETE FROM invoices WHERE id IN (?,?)", (paid_iid, out_iid))
+        db.run("DELETE FROM projects WHERE id=?", (pid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))
+
+
+@pytest.mark.integration
+def test_portal_crop_links_show_preparing_while_jobs_run(client):
+    """Social-crop ratio links must not 404 while encode jobs are still running."""
+    from app import db
+
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Crop UX Co",))
+    pid = db.run(
+        "INSERT INTO portals (client_id, slug, pin, published) VALUES (?,?,?,1)",
+        (cid, "crop-ux", "2468"),
+    )
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published, client_id) VALUES (?,?,?,1,?)",
+        ("crop-ux-g", "Crop UX", "1234", cid),
+    )
+    aid = db.run(
+        """INSERT INTO assets (gallery_id, filename, stored, kind, status)
+           VALUES (?,?,?,?,?)""",
+        (gid, "hero.jpg", "hero.jpg", "photo", "ready"),
+    )
+    vid = db.run("INSERT INTO visitors (gallery_id, token) VALUES (?,?)", (gid, "crop-ux-vis"))
+    db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (vid, aid))
+    try:
+        client.post("/portal/crop-ux/pin", data={"pin": "2468"}, follow_redirects=False)
+        page = client.get("/portal/crop-ux").text
+        assert "preparing" in page
+        assert f"/portal/crop-ux/crop/{aid}/" not in page
+    finally:
+        db.run("DELETE FROM favorites WHERE visitor_id=?", (vid,))
+        db.run("DELETE FROM visitors WHERE id=?", (vid,))
+        db.run("DELETE FROM assets WHERE id=?", (aid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+        db.run("DELETE FROM portals WHERE id=?", (pid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))
+        client.cookies.clear()

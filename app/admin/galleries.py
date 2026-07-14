@@ -883,7 +883,7 @@ async def delete_gallery(gallery_id: int, force: bool = Form(False)):
     for z in config.ZIP_DIR.glob(f"g{gallery_id}-s*.zip"):
         z.unlink(missing_ok=True)
     log.info("gallery %s deleted", gallery_id)
-    dest = "/admin/transfers" if g["type"] == "drop" else "/admin"
+    dest = "/admin/transfers" if g["type"] == "drop" else "/admin/galleries"
     return RedirectResponse(dest, status_code=303)
 
 

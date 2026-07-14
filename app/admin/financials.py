@@ -240,7 +240,7 @@ async def income(request: Request, range: str = "quarter"):
 
 @router.get("/income.csv", response_class=PlainTextResponse)
 async def income_csv(
-    range: str = "quarter", inc_paid: str = "on", inc_out: str = "", fmt: str = "itemized"
+    range: str = "quarter", inc_paid: str = "", inc_out: str = "", fmt: str = "itemized"
 ):
     """Collected cash + open AR in range — accountant-ready. Real data only;
     no fabricated tax or processing-fee columns (Mise stores neither). The

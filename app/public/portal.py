@@ -45,6 +45,15 @@ def _pin_bucket(portal_id: int) -> int:
     return PIN_OFFSET - portal_id
 
 
+def _crop_link_status(asset: "db.sqlite3.Row", ratio_slugs: list[str]) -> list[dict]:
+    """Per-ratio readiness for portal crop links — avoids 404s while jobs run."""
+    base = jobs.crops_dir(asset["gallery_id"])
+    stem = Path(asset["stored"]).stem
+    return [
+        {"slug": slug, "ready": (base / f"{stem}_{slug}.jpg").is_file()} for slug in ratio_slugs
+    ]
+
+
 def _cookie_name(portal_id: int) -> str:
     return f"mise_p{portal_id}"
 
@@ -158,6 +167,12 @@ async def view(request: Request, slug: str):
         f"photos, and brand assets.\n"
     )
     share_href = f"mailto:?subject={share_subject}&body={share_body}"
+    ratio_slugs = [ps["slug"] for ps in presets.active()]
+    crop_tiles = []
+    for a in crops:
+        tile = dict(a)
+        tile["crop_links"] = _crop_link_status(a, ratio_slugs)
+        crop_tiles.append(tile)
     return templates.TemplateResponse(
         request,
         "public/portal.html",
@@ -165,10 +180,10 @@ async def view(request: Request, slug: str):
             "p": p,
             "galleries": galleries,
             "expired_gallery_ids": expired_gallery_ids,
-            "crops": crops,
+            "crops": crop_tiles,
             "motion": motion,
             "brand": brand,
-            "ratios": [ps["slug"] for ps in presets.active()],
+            "ratios": ratio_slugs,
             "prev_visit": prev_visit,
             "changes": changes,
             "fav_summary": fav_summary,
