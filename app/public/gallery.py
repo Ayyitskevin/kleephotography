@@ -5,6 +5,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from .. import audit, config, db, features, jobs, reopen_notify, security
+from ..gallery_comments import cascade_status, resolve_comment_parent, video_comment_thread
 from ..render import templates
 
 log = logging.getLogger("mise.public.gallery")
@@ -323,55 +324,6 @@ async def rendition_tile(request: Request, slug: str, rendition_id: int):
 # ── Timecoded review comments on video deliverables (Domain C slice 3) ───────
 
 
-def video_comment_thread(asset_id: int) -> list[dict]:
-    """Visible (non-hidden) thread for one video asset, ordered for display.
-    Flat list; the client/admin renderers nest it by parent_id. author_role is
-    the only identity surfaced — no visitor email/PII leaks into the thread."""
-    rows = db.all_(
-        """SELECT id, parent_id, timecode, body, author_role, status, created_at
-                      FROM video_comments
-                      WHERE asset_id=? AND deleted_at IS NULL
-                      ORDER BY timecode, created_at, id""",
-        (asset_id,),
-    )
-    return [dict(r) for r in rows]
-
-
-def _cascade_status(con, root_id: int, status: str) -> None:
-    """Set status on a thread root AND its whole subtree in one recursive UPDATE,
-    so a thread never carries mixed status. Runs on the caller's tx connection.
-    Shared by the admin open⇄resolved transition and the client-reply auto-reopen."""
-    con.execute(
-        """WITH RECURSIVE sub(id) AS (
-             SELECT id FROM video_comments WHERE id=?
-             UNION ALL
-             SELECT vc.id FROM video_comments vc JOIN sub ON vc.parent_id=sub.id)
-           UPDATE video_comments SET status=?
-           WHERE id IN (SELECT id FROM sub)""",
-        (root_id, status),
-    )
-
-
-def resolve_comment_parent(asset_id: int, parent_raw) -> tuple[int | None, float]:
-    """Validate an optional reply target and return (parent_id, timecode).
-    A reply inherits its parent's timecode (denormalized at insert) so the tree
-    needs no join to sort. Top-level returns (None, -1.0) → caller uses the
-    posted timecode. Raises 400 if the parent is bogus or on another asset."""
-    if not parent_raw:
-        return None, -1.0
-    try:
-        pid = int(parent_raw)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="bad parent_id")
-    p = db.one(
-        "SELECT timecode FROM video_comments WHERE id=? AND asset_id=? AND deleted_at IS NULL",
-        (pid, asset_id),
-    )
-    if not p:
-        raise HTTPException(status_code=400, detail="reply target not found")
-    return pid, float(p["timecode"])
-
-
 def _maybe_reopen_on_reply(con, reply_id: int):
     """A client reply resurfaces a thread the studio already resolved (transitions
     are admin-only, so a reply is the client's only recourse against an early
@@ -396,7 +348,7 @@ def _maybe_reopen_on_reply(con, reply_id: int):
         return None
     if (root["status"] or "open") != "resolved":
         return None
-    _cascade_status(con, root["id"], "open")
+    cascade_status(con, root["id"], "open")
     audit.log(
         con,
         "video_comment",

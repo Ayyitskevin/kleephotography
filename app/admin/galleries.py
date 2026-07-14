@@ -20,7 +20,7 @@ from .. import (
     specialties,
     video,
 )
-from ..public.gallery import _cascade_status, resolve_comment_parent, video_comment_thread
+from ..gallery_comments import cascade_status, resolve_comment_parent, video_comment_thread
 from ..render import templates
 from . import common
 
@@ -995,7 +995,7 @@ def _transition_comment(comment_id: int, *, want: str, to: str):
     if (c["status"] or "open") != want:  # illegal transition (already in target state)
         raise HTTPException(status_code=409, detail=f"comment is not {want}")
     with db.tx() as con:
-        _cascade_status(con, comment_id, to)
+        cascade_status(con, comment_id, to)
         audit.log(
             con,
             "video_comment",
