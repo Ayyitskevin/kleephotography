@@ -14,7 +14,18 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import alerts, bootstrap, config, csrf, db, jobs, ratelimit, scheduler, service_api
+from . import (
+    alerts,
+    bootstrap,
+    config,
+    csrf,
+    db,
+    jobs,
+    ops_monitor,
+    ratelimit,
+    scheduler,
+    service_api,
+)
 from .admin import (
     activity,
     audit,
@@ -217,7 +228,32 @@ async def unhandled_errors(request: Request, exc: Exception):
 
 @app.get("/healthz")
 async def healthz():
-    return {"ok": True, "service": "mise", "jobs_pending": jobs.pending_count()}
+    payload = {
+        "ok": True,
+        "service": "mise",
+        "db_connected": False,
+        "jobs_pending": None,
+        "jobs_failed": None,
+        "disk_free_gb": None,
+        "disk_low": None,
+        "backup_present": None,
+        "backup_age_hours": None,
+        "backup_stale": None,
+    }
+    try:
+        payload.update(ops_monitor.storage_status())
+    except Exception:
+        log.exception("healthz storage check failed")
+    try:
+        db.one("SELECT 1 AS ok")
+        payload["db_connected"] = True
+        payload["jobs_pending"] = jobs.pending_count()
+        payload["jobs_failed"] = db.one("SELECT COUNT(*) AS n FROM jobs WHERE status='failed'")["n"]
+    except Exception:
+        log.exception("healthz database check failed")
+        payload["ok"] = False
+        return JSONResponse(payload, status_code=503)
+    return payload
 
 
 for r in (

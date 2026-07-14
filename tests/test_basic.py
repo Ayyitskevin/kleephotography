@@ -28,7 +28,53 @@ def client():
 @pytest.mark.integration
 def test_healthz(client):
     r = client.get("/healthz")
+    body = r.json()
+    assert r.status_code == 200 and body["ok"] is True
+    assert body["db_connected"] is True
+    assert isinstance(body["jobs_pending"], int)
+    assert isinstance(body["jobs_failed"], int)
+    assert isinstance(body["disk_free_gb"], float)
+    assert isinstance(body["backup_present"], bool)
+    assert "backup_age_hours" in body
+
+
+@pytest.mark.integration
+def test_healthz_returns_503_only_for_database_failure(client, monkeypatch):
+    from app import db
+
+    real_one = db.one
+
+    def fail_probe(sql, params=()):
+        if sql == "SELECT 1 AS ok":
+            raise OSError("database unavailable")
+        return real_one(sql, params)
+
+    monkeypatch.setattr(db, "one", fail_probe)
+    r = client.get("/healthz")
+    assert r.status_code == 503
+    assert r.json()["ok"] is False
+    assert r.json()["db_connected"] is False
+
+
+@pytest.mark.integration
+def test_healthz_reports_storage_warning_without_failing(client, monkeypatch):
+    from app import ops_monitor
+
+    monkeypatch.setattr(
+        ops_monitor,
+        "storage_status",
+        lambda: {
+            "disk_free_gb": 0.25,
+            "disk_low": True,
+            "backup_present": False,
+            "backup_age_hours": None,
+            "backup_stale": True,
+        },
+    )
+    r = client.get("/healthz")
     assert r.status_code == 200 and r.json()["ok"] is True
+    assert r.json()["disk_low"] is True
+    assert r.json()["backup_stale"] is True
 
 
 @pytest.mark.integration

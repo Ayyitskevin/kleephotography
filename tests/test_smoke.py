@@ -2565,7 +2565,7 @@ def test_ops_monitor_heartbeat(monkeypatch, tmp_path):
     import os
     import time as _time
 
-    from app import alerts, config, ops_monitor
+    from app import alerts, config, db, ops_monitor
 
     sent = []
 
@@ -2582,17 +2582,23 @@ def test_ops_monitor_heartbeat(monkeypatch, tmp_path):
     monkeypatch.setattr(alerts.config, "TELEGRAM_CHAT_ID", "c")
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     alerts._ops_last.clear()
+    failed_job = db.run(
+        "INSERT INTO jobs (kind, payload, status, error) VALUES (?,?,?,?)",
+        ("healthcheck-test", "{}", "failed", "simulated"),
+    )
 
-    # disk under the floor + no backups dir → two distinct alerts
+    # Disk under the floor, no backup, and a failed job → distinct alerts.
     monkeypatch.setattr(config, "MIN_FREE_GB", 10**9)
     ops_monitor.sweep()
     assert any("Low disk" in s for s in sent)
     assert any("No database backup" in s for s in sent)
+    assert any("background job has failed" in s for s in sent)
 
-    # both conditions persist but are throttled → a second sweep sends nothing new
+    # Persistent conditions are throttled → a second sweep sends nothing new.
     sent.clear()
     ops_monitor.sweep()
     assert sent == []
+    db.run("DELETE FROM jobs WHERE id=?", (failed_job,))
 
     # disk healthy now; a backup that exists but is stale → backup_stale fires
     sent.clear()
