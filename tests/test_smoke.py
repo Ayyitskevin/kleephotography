@@ -3562,12 +3562,40 @@ def test_booking_flow(monkeypatch, admin):
         assert any(to == "kevin@example.com" for to, *_ in sent)
 
         # double-book the same instant → 409 (slot taken), no second booking
+        submitted = {
+            "name": "Dup Visitor",
+            "email": "Dup@cafe.com",
+            "phone": "555-0188",
+            "notes": "Keep the blue napkins.",
+            "start": start,
+            "tz": "America/New_York",
+            "venue_address": "88 Race Lane",
+            "dish_count": "12 plated dishes",
+            "parking_notes": "Use the west loading bay",
+            "style_refs": "moody evening references",
+            "onsite_contact": "Dee 555-0142",
+        }
         r = pub.post(
             "/book/fb-shoot",
-            data={"name": "Dup", "email": "d@cafe.com", "start": start, "tz": "America/New_York"},
+            data=submitted,
         )
         assert r.status_code == 409
         assert n_bookings("confirmed") == 1
+        assert f'value="{start}"' in r.text
+        assert day.isoformat() in r.text
+        assert slots[0]["label"] in r.text
+        for value in (
+            submitted["name"],
+            submitted["email"],
+            submitted["phone"],
+            submitted["notes"],
+            submitted["venue_address"],
+            submitted["dish_count"],
+            submitted["parking_notes"],
+            submitted["style_refs"],
+            submitted["onsite_contact"],
+        ):
+            assert value in r.text
 
     # the booking auto-linked a Studio client + project (real-shoot event type)
     assert b["client_id"] and b["project_id"]
@@ -4068,6 +4096,36 @@ def test_client_booking_reschedule_leaves_one_confirmed(monkeypatch):
         assert db.one("SELECT status FROM bookings WHERE id=?", (old_id,))["status"] == "cancelled"
         new = next(row for row in rows if row["token"] == new_token)
         assert new["status"] == "confirmed" and new["reschedule_of"] == old_id
+        assert confirmed == [new["id"]]
+
+        # If releasing the current booking fails, the newly held replacement is
+        # compensated before notifications/calendar side effects can fire.
+        real_cancel = S.cancel
+
+        def fail_current_cancel(cancel_token, reason=""):
+            if cancel_token == new_token:
+                return False
+            return real_cancel(cancel_token, reason)
+
+        monkeypatch.setattr(S, "cancel", fail_current_cancel)
+        with TestClient(app) as pub:
+            response = pub.post(
+                f"/booking/{new_token}/reschedule",
+                data={"start": "2026-09-14 16:00:00", "tz": "America/New_York"},
+                follow_redirects=False,
+            )
+
+        assert response.status_code == 409
+        assert "replacement booking was cancelled" in response.text
+        rows = db.all_(
+            "SELECT id, token, status, reschedule_of FROM bookings WHERE event_type_id=?",
+            (eid,),
+        )
+        assert sum(row["status"] == "confirmed" for row in rows) == 1
+        assert next(row for row in rows if row["token"] == new_token)["status"] == "confirmed"
+        replacement = max(rows, key=lambda row: row["id"])
+        assert replacement["status"] == "cancelled"
+        assert replacement["reschedule_of"] == new["id"]
         assert confirmed == [new["id"]]
     finally:
         db.run("DELETE FROM bookings WHERE event_type_id=?", (eid,))

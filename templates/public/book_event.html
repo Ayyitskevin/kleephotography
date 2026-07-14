@@ -46,7 +46,7 @@
   ['Australia/Sydney','Sydney'],
 ] %}
 {# resolve the selected slot's visitor-local label for the confirm step #}
-{% set ns = namespace(label='') %}
+{% set ns = namespace(label=selected_slot_label) %}
 {% if sel_start and slots %}{% for s in slots %}{% if s.utc == sel_start %}{% set ns.label = s.label %}{% endif %}{% endfor %}{% endif %}
 <main class="site-main book-page">
   <div class="book-card{% if sel_start %} book-card-confirm{% endif %}">
@@ -117,12 +117,12 @@
             <p class="muted">Your name and details carry over from the original booking.</p>
             <button type="submit">Confirm new time</button>
           {% else %}
-            <label>Name <input type="text" name="name" required></label>
-            <label>Email <input type="email" name="email" required></label>
+            <label>Name <input type="text" name="name" value="{{ submitted.name }}" required></label>
+            <label>Email <input type="email" name="email" value="{{ submitted.email }}" required></label>
             <label>Phone <span class="muted">(optional)</span>
-              <input type="tel" name="phone"></label>
+              <input type="tel" name="phone" value="{{ submitted.phone }}"></label>
             <label>Anything I should know? <span class="muted">(optional)</span>
-              <textarea name="notes" rows="3"></textarea></label>
+              <textarea name="notes" rows="3">{{ submitted.notes }}</textarea></label>
             {% if e.creates_notion_session %}
             {# Intake labels follow the event-type slug prefix convention
                (ops/SPECIALTY-LAUNCH.md): 're-…' real estate, 'pl-…' portrait &
@@ -133,42 +133,42 @@
               <legend>Shoot details <span class="muted">(helps me prep — optional)</span></legend>
               {% if sp == 're' %}
               {% if aerials_live() %}
-              <label class="check-opt book-aerial"><input type="checkbox" name="aerial_pass" value="1">
+              <label class="check-opt book-aerial"><input type="checkbox" name="aerial_pass" value="1"{% if submitted.aerial_pass %} checked{% endif %}>
                 Add the Aerial Pass &mdash; drone stills + orbit clips, {{ aerial_pass_display() }} add-on
                 <span class="muted">(FAA Part 107 &middot; LAANC handled)</span></label>
               {% endif %}
               <label>Property address
-                <input type="text" name="venue_address"></label>
+                <input type="text" name="venue_address" value="{{ submitted.venue_address }}"></label>
               <label>Size &amp; rooms
-                <input type="text" name="dish_count" placeholder="e.g. 3,200 sq ft · 4 bed 3 bath"></label>
+                <input type="text" name="dish_count" value="{{ submitted.dish_count }}" placeholder="e.g. 3,200 sq ft · 4 bed 3 bath"></label>
               <label>Access &amp; parking notes
-                <input type="text" name="parking_notes"></label>
+                <input type="text" name="parking_notes" value="{{ submitted.parking_notes }}"></label>
               <label>On-site contact <span class="muted">(name + number on the day)</span>
-                <input type="text" name="onsite_contact"></label>
+                <input type="text" name="onsite_contact" value="{{ submitted.onsite_contact }}"></label>
               <label>Listing link or references <span class="muted">(links or a few words)</span>
-                <textarea name="style_refs" rows="2"></textarea></label>
+                <textarea name="style_refs" rows="2">{{ submitted.style_refs }}</textarea></label>
               {% elif sp == 'pl' %}
               <label>Session location <span class="muted">(studio, your office, outdoors…)</span>
-                <input type="text" name="venue_address"></label>
+                <input type="text" name="venue_address" value="{{ submitted.venue_address }}"></label>
               <label>Who's being photographed?
-                <input type="text" name="dish_count" placeholder="e.g. just me · team of 8 · family of 5"></label>
+                <input type="text" name="dish_count" value="{{ submitted.dish_count }}" placeholder="e.g. just me · team of 8 · family of 5"></label>
               <label>Parking &amp; access notes
-                <input type="text" name="parking_notes"></label>
+                <input type="text" name="parking_notes" value="{{ submitted.parking_notes }}"></label>
               <label>On-site contact <span class="muted">(if it isn't you)</span>
-                <input type="text" name="onsite_contact"></label>
+                <input type="text" name="onsite_contact" value="{{ submitted.onsite_contact }}"></label>
               <label>Looks &amp; references <span class="muted">(links or a few words)</span>
-                <textarea name="style_refs" rows="2"></textarea></label>
+                <textarea name="style_refs" rows="2">{{ submitted.style_refs }}</textarea></label>
               {% else %}
               <label>Venue / shoot address
-                <input type="text" name="venue_address"></label>
+                <input type="text" name="venue_address" value="{{ submitted.venue_address }}"></label>
               <label>How many dishes or setups?
-                <input type="text" name="dish_count" placeholder="e.g. 8–10 dishes"></label>
+                <input type="text" name="dish_count" value="{{ submitted.dish_count }}" placeholder="e.g. 8–10 dishes"></label>
               <label>Parking &amp; loading notes
-                <input type="text" name="parking_notes"></label>
+                <input type="text" name="parking_notes" value="{{ submitted.parking_notes }}"></label>
               <label>On-site contact <span class="muted">(name + number on the day)</span>
-                <input type="text" name="onsite_contact"></label>
+                <input type="text" name="onsite_contact" value="{{ submitted.onsite_contact }}"></label>
               <label>Style references <span class="muted">(links or a few words)</span>
-                <textarea name="style_refs" rows="2"></textarea></label>
+                <textarea name="style_refs" rows="2">{{ submitted.style_refs }}</textarea></label>
               {% endif %}
             </fieldset>
             {% endif %}

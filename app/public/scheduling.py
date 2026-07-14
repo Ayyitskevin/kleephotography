@@ -57,18 +57,39 @@ def _month_ctx(et, year: int, month: int, today: dt.date, visitor_tz: str) -> di
     }
 
 
-def _picker_ctx(et, request: Request, *, is_reschedule=False, token=""):
+def _picker_ctx(
+    et,
+    request: Request,
+    *,
+    is_reschedule=False,
+    token="",
+    submitted_start="",
+    submitted_tz="",
+):
     """Shared context for the day/slot picker (new booking and reschedule)."""
     q = request.query_params
     today = _today_local()
+    submitted_instant = None
+    if submitted_start:
+        try:
+            submitted_instant = dt.datetime.strptime(submitted_start, "%Y-%m-%d %H:%M:%S").replace(
+                tzinfo=dt.UTC
+            )
+        except ValueError:
+            pass
     try:
-        year = int(q.get("year") or today.year)
-        month = int(q.get("month") or today.month)
+        submitted_day = (
+            submitted_instant.astimezone(ZoneInfo(config.TIMEZONE)).date()
+            if submitted_instant
+            else None
+        )
+        year = submitted_day.year if submitted_day else int(q.get("year") or today.year)
+        month = submitted_day.month if submitted_day else int(q.get("month") or today.month)
         if not (1 <= month <= 12 and today.year <= year <= today.year + 3):
             year, month = today.year, today.month
     except ValueError:
         year, month = today.year, today.month
-    visitor_tz = (q.get("tz") or "").strip()
+    visitor_tz = (submitted_tz or q.get("tz") or "").strip()
     ctx = {
         "e": et,
         "is_reschedule": is_reschedule,
@@ -77,18 +98,28 @@ def _picker_ctx(et, request: Request, *, is_reschedule=False, token=""):
         "slots": None,
         "sel_day": None,
         "sel_start": None,
+        "selected_slot_label": "",
+        "submitted": {},
     }
     ctx.update(_month_ctx(et, year, month, today, visitor_tz))
 
-    sel_day = (q.get("day") or "").strip()
-    if sel_day and sel_day in ctx["avail"]:
+    sel_day = submitted_day.isoformat() if submitted_day else (q.get("day") or "").strip()
+    if sel_day and (submitted_start or sel_day in ctx["avail"]):
         day = dt.date.fromisoformat(sel_day)
         slots = scheduling.slots_for_day(et, day, visitor_tz)
         ctx["sel_day"] = sel_day
         ctx["slots"] = slots
-        sel_start = (q.get("start") or "").strip()
-        if sel_start and any(s["utc"] == sel_start for s in slots):
+        sel_start = submitted_start or (q.get("start") or "").strip()
+        if submitted_start or (sel_start and any(s["utc"] == sel_start for s in slots)):
             ctx["sel_start"] = sel_start
+    elif submitted_start:
+        ctx["sel_start"] = submitted_start
+    if submitted_instant:
+        try:
+            display_tz = ZoneInfo(visitor_tz or config.TIMEZONE)
+        except Exception:
+            display_tz = ZoneInfo(config.TIMEZONE)
+        ctx["selected_slot_label"] = submitted_instant.astimezone(display_tz).strftime("%-I:%M %p")
     return ctx
 
 
@@ -148,6 +179,18 @@ async def confirm_booking(
     if website.strip():  # honeypot — silently "succeed"
         return RedirectResponse("/book", status_code=303)
     ip = security.client_ip(request)
+    submitted = {
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "notes": notes,
+        "venue_address": venue_address,
+        "dish_count": dish_count,
+        "parking_notes": parking_notes,
+        "style_refs": style_refs,
+        "onsite_contact": onsite_contact,
+        "aerial_pass": aerial_pass,
+    }
     name, email = name.strip(), email.strip().lower()
     phone, notes = phone.strip()[:40], notes.strip()[:2000]
     # The Aerial Pass add-on (re- event types, aerials_live-gated): zero-schema —
@@ -158,9 +201,10 @@ async def confirm_booking(
         notes = f"{tag}\n{notes}".strip()[:2000]
 
     def repicker(msg: str, code: int = 400):
-        ctx = _picker_ctx(et, request)
+        ctx = _picker_ctx(et, request, submitted_start=start, submitted_tz=tz)
         ctx["form_action"] = f"/book/{slug}"
         ctx["error"] = msg
+        ctx["submitted"] = submitted
         return templates.TemplateResponse(request, "public/book_event.html", ctx, status_code=code)
 
     if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_BOOK):
@@ -291,13 +335,34 @@ async def do_reschedule(request: Request, token: str, start: str = Form(...), tz
             exclude_id=b["id"],
         )
     except scheduling.SlotTaken:
-        ctx = _picker_ctx(et, request, is_reschedule=True, token=token)
+        ctx = _picker_ctx(
+            et,
+            request,
+            is_reschedule=True,
+            token=token,
+            submitted_start=start,
+            submitted_tz=tz,
+        )
         ctx["form_action"] = f"/booking/{token}/reschedule"
         ctx["old_when"] = b["start_utc"]
         ctx["error"] = "Sorry — that time was just taken. Please pick another."
         return templates.TemplateResponse(request, "public/book_event.html", ctx, status_code=409)
-    # New slot held; release the old one and email the fresh invite.
-    scheduling.cancel(token, "Rescheduled")
+    # New slot held; release the old one and email the fresh invite. If the old
+    # booking cannot be released, undo the replacement before any notification
+    # or external-calendar side effect fires.
+    if not scheduling.cancel(token, "Rescheduled"):
+        compensated = scheduling.cancel(new_token, "Reschedule failed — replacement rolled back")
+        if not compensated:
+            log.critical(
+                "reschedule compensation failed: old booking %s, replacement %s",
+                b["id"],
+                new_id,
+            )
+        return HTMLResponse(
+            "We couldn't complete the reschedule. The replacement booking was cancelled; "
+            "please review your original booking before trying again.",
+            status_code=409,
+        )
     booking_notify.confirm(new_id)
     log.info("booking %s rescheduled -> %s", b["id"], new_id)
     return RedirectResponse(f"/booking/{new_token}", status_code=303)
