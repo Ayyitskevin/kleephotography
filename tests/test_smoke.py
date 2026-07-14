@@ -4763,6 +4763,78 @@ def test_case_studies(admin):
         assert pub.get(f"/g/{g['slug']}").status_code == 200
 
 
+def test_gallery_public_site_readiness(admin):
+    ready_id = db.run(
+        """INSERT INTO galleries
+           (slug, title, pin, published, cs_published, cs_tagline, cs_location,
+            cs_brief, cs_credits)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (
+            "readiness-ready",
+            "Readiness Ready",
+            "1234",
+            1,
+            1,
+            "A mountain listing",
+            "Asheville, NC",
+            "Architecture and detail coverage.",
+            "Agent: Alex",
+        ),
+    )
+    db.run(
+        """INSERT INTO assets
+           (gallery_id, kind, filename, stored, status, portfolio, portfolio_tag)
+           VALUES (?,?,?,?,?,?,?)""",
+        (ready_id, "photo", "hero.jpg", "readinesshero.jpg", "ready", 1, "re/exteriors"),
+    )
+    db.run(
+        """INSERT INTO assets
+           (gallery_id, kind, filename, stored, status, portfolio, portfolio_tag)
+           VALUES (?,?,?,?,?,?,?)""",
+        (ready_id, "video", "tour.mp4", "readinesstour.mp4", "ready", 1, "re/walkthrough"),
+    )
+
+    r = admin.get(f"/admin/galleries/{ready_id}")
+    assert r.status_code == 200
+    assert "Public site readiness" in r.text
+    assert "1 starred ready photo" in r.text
+    assert "1 starred ready video" in r.text
+    assert "Inferred specialty: Real Estate" in r.text
+    assert "Ready:</b> Case-study fields are complete." in r.text
+    assert f'href="{config.BASE_URL}/g/readiness-ready"' in r.text
+    assert f'href="{config.BASE_URL}/work/readiness-ready"' in r.text
+    assert 'href="/admin/share"' in r.text
+    assert "Published case study has no eligible hero" not in r.text
+    assert "shoot your listing" in admin.get("/work/readiness-ready").text
+    assert f"{config.BASE_URL}/work/readiness-ready" in admin.get("/admin/share").text
+
+    warning_id = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("readiness-warning", "Readiness Warning", "5678"),
+    )
+    r = admin.get(f"/admin/galleries/{warning_id}")
+    assert r.status_code == 200
+    assert "0 starred ready photos" in r.text
+    assert "0 starred ready videos" in r.text
+    assert (
+        "Inferred specialty: Food &amp; Beverage (public default; no eligible starred assets)"
+        in r.text
+    )
+    assert "Missing case-study fields: tagline, location, brief, credits." in r.text
+    assert "Public gallery is unpublished; preview unavailable." in r.text
+    assert "Case study is unpublished; preview unavailable." in r.text
+    assert "Preview public gallery" not in r.text
+    assert "Preview public case study" not in r.text
+
+    db.run("UPDATE galleries SET cs_published=1 WHERE id=?", (warning_id,))
+    r = admin.get(f"/admin/galleries/{warning_id}")
+    assert "Published case study has no eligible hero/starred ready photo." in r.text
+    assert "Preview public case study" in r.text
+    assert "Open share debugger for this route" in r.text
+    assert "Preview public gallery" not in r.text
+    db.run("DELETE FROM galleries WHERE id IN (?,?)", (ready_id, warning_id))
+
+
 def test_share_debugger(admin):
     from app import config
 

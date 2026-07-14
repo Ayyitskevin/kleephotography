@@ -11,6 +11,9 @@ Single source of truth: the marketing routes (app/public/site.py), image
 alt text (app/render.py), and the admin tag suggestions all read from here.
 """
 
+from collections import Counter
+from collections.abc import Iterable
+
 SPECIALTIES: dict[str, dict] = {
     # key → public page slug, display name, craft phrase for <img alt> text,
     # plus the Screening Room vocabulary: feature billing, film-stock code, and
@@ -74,6 +77,16 @@ def split_tag(tag: str | None) -> tuple[str, str]:
 def specialty_key(tag: str | None) -> str:
     """Specialty key ('re'/'pl'/'fb') for a portfolio tag."""
     return split_tag(tag)[0]
+
+
+def infer_specialty(tags: Iterable[str | None]) -> str | None:
+    """Infer a gallery specialty from its eligible portfolio tags.
+
+    The majority wins. On a tie, the first tag wins, so callers should supply
+    tags in stable asset order. ``None`` means there were no eligible assets.
+    """
+    votes = Counter(specialty_key(tag) for tag in tags)
+    return votes.most_common(1)[0][0] if votes else None
 
 
 def tag_label(tag: str | None) -> str:

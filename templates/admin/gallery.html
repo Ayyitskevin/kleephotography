@@ -243,6 +243,46 @@
         <span class="{{ 'is-ok' if (g.client_id or client) else 'is-miss' }}">{{ '&#10003;'|safe if (g.client_id or client) else '&#10007;'|safe }} client {{ 'linked' if (g.client_id or client) else 'not linked' }}</span>
         <span class="{{ 'is-ok' if g.published else 'is-miss' }}">{{ '&#10003;'|safe if g.published else '&#9675;'|safe }} {{ 'curtain up' if g.published else 'curtain down (draft)' }}</span>
       </section>
+
+      <section class="sr-premcheck" aria-labelledby="public-readiness-heading">
+        <h3 id="public-readiness-heading" class="sr-mono sr-mono--signal">Public site readiness</h3>
+        {% set n_public = public_readiness.photos + public_readiness.videos %}
+        <span class="{{ 'is-ok' if n_public else 'is-miss' }}">
+          <b>{{ 'Ready' if n_public else 'Warning' }}:</b>
+          {{ public_readiness.photos }} starred ready photo{{ '' if public_readiness.photos == 1 else 's' }}
+          · {{ public_readiness.videos }} starred ready video{{ '' if public_readiness.videos == 1 else 's' }}.
+        </span>
+        <span class="{{ 'is-ok' if n_public else 'is-miss' }}">
+          <b>{{ 'Ready' if n_public else 'Warning' }}:</b>
+          Inferred specialty: {{ public_readiness.specialty }}{% if public_readiness.specialty_defaulted %} (public default; no eligible starred assets){% endif %}.
+        </span>
+        {% if public_readiness.missing_fields %}
+        <span class="is-miss"><b>Warning:</b> Missing case-study fields: {{ public_readiness.missing_fields | join(', ') }}.</span>
+        {% else %}
+        <span class="is-ok"><b>Ready:</b> Case-study fields are complete.</span>
+        {% endif %}
+        <span class="{{ 'is-ok' if g.published else 'is-miss' }}">
+          <b>{{ 'Ready' if g.published else 'Warning' }}:</b>
+          Public gallery is {{ 'published' if g.published else 'unpublished; preview unavailable' }}.
+        </span>
+        <span class="{{ 'is-ok' if g.cs_published else 'is-miss' }}">
+          <b>{{ 'Ready' if g.cs_published else 'Warning' }}:</b>
+          Case study is {{ 'published' if g.cs_published else 'unpublished; preview unavailable' }}.
+        </span>
+        {% if g.cs_published and not public_readiness.photos %}
+        <span class="is-miss"><b>Warning:</b> Published case study has no eligible hero/starred ready photo.</span>
+        {% elif not g.cs_published and not public_readiness.photos %}
+        <span class="is-miss"><b>Warning:</b> Add a starred ready photo before publishing the case study.</span>
+        {% endif %}
+        {% if g.published or g.cs_published %}
+        <span>
+          {% if g.published %}<a href="{{ base_url }}/g/{{ g.slug }}" target="_blank" rel="noopener">Preview public gallery</a>{% endif %}
+          {% if g.published and g.cs_published %} · {% endif %}
+          {% if g.cs_published %}<a href="{{ base_url }}/work/{{ g.slug }}" target="_blank" rel="noopener">Preview public case study</a>
+          · <a href="/admin/share">Open share debugger for this route</a>{% endif %}
+        </span>
+        {% endif %}
+      </section>
       {% endif %}
 
       <section class="gd-live">

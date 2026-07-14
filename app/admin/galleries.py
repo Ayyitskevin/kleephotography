@@ -17,6 +17,7 @@ from .. import (
     platekit,
     plutus_recommend,
     security,
+    specialties,
     video,
 )
 from ..public.gallery import _cascade_status, resolve_comment_parent, video_comment_thread
@@ -326,6 +327,32 @@ async def gallery_detail(request: Request, gallery_id: int):
                         ORDER BY a.section_id, a.position, a.id""",
         (gallery_id,),
     )
+    public_assets = db.all_(
+        """SELECT kind, portfolio_tag FROM assets
+           WHERE gallery_id=? AND portfolio=1 AND status='ready'
+           ORDER BY id""",
+        (gallery_id,),
+    )
+    specialty_key = (
+        specialties.infer_specialty(a["portfolio_tag"] for a in public_assets)
+        or specialties.DEFAULT_KEY
+    )
+    public_readiness = {
+        "photos": sum(1 for a in public_assets if a["kind"] == "photo"),
+        "videos": sum(1 for a in public_assets if a["kind"] == "video"),
+        "specialty": specialties.SPECIALTIES[specialty_key]["name"],
+        "specialty_defaulted": not public_assets,
+        "missing_fields": [
+            label
+            for column, label in (
+                ("cs_tagline", "tagline"),
+                ("cs_location", "location"),
+                ("cs_brief", "brief"),
+                ("cs_credits", "credits"),
+            )
+            if not (g[column] or "").strip()
+        ],
+    }
     clients = db.clients_for_select()
     projects = db.all_("""SELECT p.id, p.title, c.name AS client_name FROM projects p
                           JOIN clients c ON c.id=p.client_id ORDER BY p.created_at DESC""")
@@ -368,6 +395,7 @@ async def gallery_detail(request: Request, gallery_id: int):
             "g": g,
             "sections": sections,
             "assets": assets,
+            "public_readiness": public_readiness,
             "hero_asset_ids": hero_asset_ids,
             "section_picks": section_picks,
             "clients": clients,

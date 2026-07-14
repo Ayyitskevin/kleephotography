@@ -2,7 +2,7 @@
 Inquiry form emails Kevin's inbox so Odysseus inquiry_intake picks it up unchanged."""
 
 import logging
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -891,10 +891,13 @@ def _cs_specialty_map() -> dict[int, str]:
     rows = db.all_("""SELECT gallery_id, portfolio_tag FROM assets
                       WHERE portfolio=1 AND status='ready'
                       ORDER BY gallery_id, id""")
-    votes: dict[int, Counter] = defaultdict(Counter)
+    tags: dict[int, list[str | None]] = {}
     for r in rows:
-        votes[r["gallery_id"]][specialties.specialty_key(r["portfolio_tag"])] += 1
-    return {gid: c.most_common(1)[0][0] for gid, c in votes.items()}
+        tags.setdefault(r["gallery_id"], []).append(r["portfolio_tag"])
+    return {
+        gid: specialties.infer_specialty(values) or specialties.DEFAULT_KEY
+        for gid, values in tags.items()
+    }
 
 
 def _demo_gallery() -> dict | None:
