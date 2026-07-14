@@ -1,7 +1,8 @@
 {# LocalBusiness / ProfessionalService JSON-LD — marketing pages only.
    og_img is set locally: the base template's og block {% set %} is invisible
    here (Jinja block scoping), so relying on it silently dropped the image
-   field on every page. #}
+   field on every page. sameAs lists optional Instagram / Google Business
+   Profile URLs when configured. #}
 {% set og_img = og_image_id() %}
 <script type="application/ld+json">
 {
@@ -28,6 +29,6 @@
   "priceRange": "$$"{% if og_img %},
   "image": {{ (base_url ~ "/site/img/" ~ og_img)|tojson }}{% endif %}{% if contact_email %},
   "email": {{ contact_email|tojson }}{% endif %},
-  "sameAs": {% if instagram_url %}[{{ instagram_url|tojson }}]{% else %}[]{% endif %}
+  "sameAs": [{% if instagram_url %}{{ instagram_url|tojson }}{% if google_business_url %}, {% endif %}{% endif %}{% if google_business_url %}{{ google_business_url|tojson }}{% endif %}]
 }
 </script>

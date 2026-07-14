@@ -3209,6 +3209,7 @@ def test_marketing_site(admin):
 
         for path in ("/", "/portfolio", "/about", "/contact", "/book", "/work", "/services"):
             assert f"<loc>{cfg.BASE_URL}{path}</loc>" in r.text
+        assert "<lastmod>" in r.text
         assert "/g/" not in r.text and "/admin" not in r.text
 
         # OG card present, but no og:image while nothing is starred
@@ -4352,11 +4353,14 @@ def test_case_studies(admin):
         # the og override must not eat the base head: fonts, site JS, canonical
         assert "/static/fonts.css" in r.text and "/static/site.js" in r.text
         assert f'rel="canonical" href="{cfg.BASE_URL}/work/{g["slug"]}"' in r.text
+        assert '"@type": "Article"' in r.text
+        assert '"@type": "BreadcrumbList"' in r.text
 
         # sitemap now lists the case study; robots.txt unchanged (no exclusion needed)
         sm = pub.get("/sitemap.xml").text
         assert f"<loc>{cfg.BASE_URL}/work/{g['slug']}</loc>" in sm
         assert f"<loc>{cfg.BASE_URL}/work</loc>" in sm
+        assert "<lastmod>" in sm
 
         # noindex on a non-/work prefix stays noindex (middleware is path-prefixed)
         assert "x-robots-tag" in pub.get(f"/g/{g['slug']}").headers
@@ -5770,6 +5774,10 @@ def test_services_page():
         assert "tier=" in r.text
         assert 'href="/book"' in r.text
         assert 'href="/work"' in r.text
+        # Service + Offer JSON-LD mirrors the catalog (PRESET floors as price)
+        assert '"@type": "Service"' in r.text
+        assert '"@type": "Offer"' in r.text
+        assert '"priceCurrency": "USD"' in r.text
         # nav from any other site page links to /services
         assert 'href="/services"' in pub.get("/").text
         # SEO bits

@@ -2,16 +2,44 @@
 {# Top-level so BOTH the og block and site_content see it — a {% set %} inside
    one block is invisible to the others (Jinja block scoping). #}
 {% set hero = photos[0] if photos else None %}
-{% block title %}{{ g.cs_tagline or g.title }} — {{ site_name }}{% endblock %}
-{% block meta_description %}{{ (g.cs_brief or g.cs_tagline or g.title)[:200] }}{% endblock %}
+{% set cs_title = g.cs_tagline or g.title %}
+{% set cs_desc = (g.cs_brief or g.cs_tagline or g.title)|truncate(200, True, '') %}
+{% block title %}{{ cs_title }} — {{ site_name }}{% endblock %}
+{% block meta_description %}{{ cs_desc }}{% endblock %}
 {% block og %}
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="{{ site_name }}">
-<meta property="og:title" content="{{ g.cs_tagline or g.title }} — {{ site_name }}">
+<meta property="og:title" content="{{ cs_title }} — {{ site_name }}">
 <meta property="og:description" content="{{ (g.cs_brief or '')[:200] }}">
 <meta property="og:url" content="{{ base_url }}/work/{{ g.slug }}">
 {% if hero %}<meta property="og:image" content="{{ base_url }}/site/img/{{ hero.id }}">{% endif %}
 <meta name="twitter:card" content="{{ 'summary_large_image' if hero else 'summary' }}">
+{% endblock %}
+{% block site_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ cs_title|tojson }},
+  "description": {{ cs_desc|tojson }},
+  "datePublished": {{ (g.created_at|string)[:10]|tojson }},
+  "author": {"@type": "Person", "name": "Kevin Lee"},
+  "publisher": {"@type": "Organization", "name": {{ site_name|tojson }}, "url": {{ base_url|tojson }}},
+  "mainEntityOfPage": {{ (base_url ~ "/work/" ~ g.slug)|tojson }}{% if hero %},
+  "image": {{ (base_url ~ "/site/img/" ~ hero.id)|tojson }}{% endif %}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": {{ (base_url ~ "/")|tojson }}},
+    {"@type": "ListItem", "position": 2, "name": "Work", "item": {{ (base_url ~ "/work")|tojson }}},
+    {"@type": "ListItem", "position": 3, "name": {{ cs_title|tojson }}, "item": {{ (base_url ~ "/work/" ~ g.slug)|tojson }}}
+  ]
+}
+</script>
 {% endblock %}
 {% block site_content %}
 

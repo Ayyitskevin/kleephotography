@@ -10,7 +10,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
 from .. import config, db, features, jobs, mailer, security, specialties
-from ..render import ROOT, templates
+from ..render import ROOT, _static_rev, templates
 
 log = logging.getLogger("mise.public.site")
 router = APIRouter()
@@ -1433,8 +1433,33 @@ async def security_txt():
     )
 
 
+def _sitemap_day(value) -> str:
+    """W3C Datetime date portion (YYYY-MM-DD) for <lastmod>."""
+    if value is None or value == "":
+        return datetime.now(UTC).strftime("%Y-%m-%d")
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(float(value), UTC).strftime("%Y-%m-%d")
+    text = str(value).strip()
+    if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+        return text[:10]
+    try:
+        return (
+            datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(UTC).strftime("%Y-%m-%d")
+        )
+    except ValueError:
+        return datetime.now(UTC).strftime("%Y-%m-%d")
+
+
+def _sitemap_url(path: str, lastmod: str) -> str:
+    return f"<url><loc>{config.BASE_URL}{path}</loc><lastmod>{lastmod}</lastmod></url>"
+
+
 @router.get("/sitemap.xml")
 async def sitemap():
+    # Static marketing paths share the newest /static asset mtime — a cheap
+    # freshness signal that moves on every CSS/JS deploy without inventing
+    # per-page edit dates we don't store.
+    shell_day = _sitemap_day(_static_rev())
     paths = [
         "/",
         "/real-estate",
@@ -1449,10 +1474,12 @@ async def sitemap():
         "/reels",
         "/press",
     ]
+    urls = "".join(_sitemap_url(p, shell_day) for p in paths)
     # Case-study detail pages are also surfaced on /portfolio (Featured clients)
     # but get their own crawlable URLs here (/work index + /work/{slug} details).
-    paths += [f"/work/{g['slug']}" for g in _case_studies()]
-    urls = "".join(f"<url><loc>{config.BASE_URL}{p}</loc></url>" for p in paths)
+    # Prefer created_at so publishing a study bumps lastmod for crawlers.
+    for g in _case_studies():
+        urls += _sitemap_url(f"/work/{g['slug']}", _sitemap_day(g["created_at"]))
     return Response(
         content='<?xml version="1.0" encoding="UTF-8"?>'
         f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>',

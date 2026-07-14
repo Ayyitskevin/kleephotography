@@ -47,6 +47,7 @@ def _og_image_id() -> int | None:
 
 templates.env.globals["og_image_id"] = _og_image_id
 templates.env.globals["instagram_url"] = config.INSTAGRAM_URL
+templates.env.globals["google_business_url"] = config.GOOGLE_BUSINESS_URL
 templates.env.globals["contact_email"] = config.CONTACT_EMAIL
 templates.env.globals["plausible_domain"] = config.PLAUSIBLE_DOMAIN
 # Callables (not frozen bools) so the flags read current config per render —

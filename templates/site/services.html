@@ -72,4 +72,52 @@
     <div class="sr-stat sr-stat--cta"><a class="sr-btn sr-btn--ghost" href="/work">See past work</a></div>
   </div>
 </section>
+
+{# Service + Offer JSON-LD from the same SERVICES catalog the cards render.
+   price uses the PRESET floor (price_cents) so schema stays honest even when
+   display_price is still a pre-revamp marketing figure. #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": {{ (site_name ~ " services")|tojson }},
+  "itemListElement": [
+    {% for s in services %}
+    {
+      "@type": "ListItem",
+      "position": {{ loop.index }},
+      "item": {
+        "@type": "Service",
+        "name": {{ s.title|tojson }},
+        "description": {{ s.tagline|tojson }},
+        "provider": {
+          "@type": "ProfessionalService",
+          "name": {{ site_name|tojson }},
+          "url": {{ base_url|tojson }}
+        },
+        "areaServed": "Western North Carolina",
+        "offers": [
+          {% for t in s.tiers %}
+          {
+            "@type": "Offer",
+            "name": {{ t.name|tojson }},
+            "description": {{ (t.subtitle or t.name)|tojson }},
+            "price": {{ "%.2f"|format(t.price_cents / 100) }},
+            "priceCurrency": "USD",
+            "url": {{ (base_url ~ "/contact?service=" ~ (s.contact_service|urlencode) ~ "&tier=" ~ (t.name|urlencode))|tojson }}
+            {% if s.monthly %},"priceSpecification": {
+              "@type": "UnitPriceSpecification",
+              "price": {{ "%.2f"|format(t.price_cents / 100) }},
+              "priceCurrency": "USD",
+              "unitText": "MONTH"
+            }{% endif %}
+          }{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]
+      }
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+}
+</script>
 {% endblock %}
