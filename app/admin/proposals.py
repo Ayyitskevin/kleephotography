@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, security
+from .. import config, db, security, specialties
 from ..render import templates
 from . import common
 from .contracts import render_template
@@ -200,7 +200,30 @@ PRESETS = {
             {"label": "Up to 60 edited, MLS-ready images", "qty": 1, "unit_cents": 0},
             {"label": "Walkthrough film (1–2 min) + vertical reel", "qty": 1, "unit_cents": 0},
             {"label": "Twilight exterior set", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Aerial Pass included — drone stills + orbit clips (FAA Part 107)",
+                "qty": 1,
+                "unit_cents": 0,
+            },
             {"label": "Online gallery + full-res print files", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    # Paid add-on for Essentials/Signature (Premier includes Aerial Pass at $0).
+    # Rate is specialties.AERIAL_PASS_CENTS — the same source as /real-estate + booking.
+    "aerial_pass": {
+        "title": "Aerial Pass (add-on)",
+        "items": [
+            {
+                "label": "Aerial Pass — drone stills + orbit clips (FAA Part 107 · LAANC)",
+                "qty": 1,
+                "unit_cents": specialties.AERIAL_PASS_CENTS,
+            },
+            {
+                "label": "Not a substitute for a signed aerial services clause — "
+                "confirm LAANC + property permission before flight",
+                "qty": 1,
+                "unit_cents": 0,
+            },
         ],
     },
     # ── Portrait Sessions ───────────────────────────────────────────────────
