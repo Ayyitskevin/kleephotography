@@ -126,27 +126,32 @@
             <form method="post" action="/admin/studio/projects/{{ p.id }}/proposals" class="inline-form">
               <select name="preset">
                 <option value="blank">Blank</option>
+                <optgroup label="Real Estate">
+                  <option value="realestate_essentials">Essentials — $250 · 25 MLS stills</option>
+                  <option value="realestate_signature">Signature — $450 · stills + reel</option>
+                  <option value="realestate_premier">Premier — $850 · photo + film</option>
+                </optgroup>
                 <optgroup label="Photography">
-                  <option value="photo_starter">Starter — Half-day, ~20 images</option>
-                  <option value="photo_standard">Standard — Full-day, ~50 images</option>
-                  <option value="photo_premium">Premium — Extended day, ~75 images</option>
+                  <option value="photo_starter">Starter — $750 · half-day, 25 finals</option>
+                  <option value="photo_standard">Standard — $1,400 · full-day, 50 finals</option>
+                  <option value="photo_premium">Premium — $2,600 · up to two days</option>
                 </optgroup>
                 <optgroup label="Videography">
-                  <option value="video_starter">Starter — Half-day, 3 reels</option>
-                  <option value="video_standard">Standard — Full-day, 6 reels</option>
-                  <option value="video_premium">Premium — 2 days, 10 reels + hero</option>
+                  <option value="video_starter">Starter — $1,250 · hero reel + cutdowns</option>
+                  <option value="video_standard">Standard — $2,200 · brand film + 5 cuts</option>
+                  <option value="video_premium">Premium — $3,900 · two days + series</option>
                 </optgroup>
                 <optgroup label="Brand Partner (Monthly)">
-                  <option value="retainer_starter">Starter — photo content day</option>
-                  <option value="retainer_standard">Standard — photo + 3 reels/mo</option>
-                  <option value="retainer_premium">Premium — 2 days/mo + hero quarterly</option>
+                  <option value="retainer_starter">Photo — $1,100/mo</option>
+                  <option value="retainer_standard">Photo + Reels — $1,850/mo</option>
+                  <option value="retainer_premium">Two-day — $3,200/mo</option>
                 </optgroup>
-                <optgroup label="Portrait Sessions (pricing TBD)">
-                  <option value="portrait_starter">Tier I — ~1 hr, ~10 portraits</option>
-                  <option value="portrait_standard">Tier II — ~2 hrs, ~25 portraits</option>
-                  <option value="portrait_premium">Tier III — ~3 hrs, ~40 portraits</option>
+                <optgroup label="Portrait Sessions">
+                  <option value="portrait_starter">Tier I — $350 · ~1 hr, 10 portraits</option>
+                  <option value="portrait_standard">Tier II — $600 · ~2 hrs, 25 portraits</option>
+                  <option value="portrait_premium">Tier III — $850 · ~3 hrs, 40 portraits</option>
                 </optgroup>
-                <optgroup label="Brand Sessions (pricing TBD)">
+                <optgroup label="Brand Sessions">
                   <option value="brand_halfday">Half-Day — ~25 images</option>
                   <option value="brand_full">Full Package — ~50 images</option>
                 </optgroup>

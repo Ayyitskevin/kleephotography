@@ -15,14 +15,18 @@ from .lookups import get_project
 log = logging.getLogger("mise.admin.proposals")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])
 
-# Starting points only — Kevin edits line items per client. Three categories
-# (Photography / Videography / Brand Partner retainer) × three tiers (Starter /
-# Standard / Premium). Asheville/Western-NC-comp; retainer tiers stay ~35–40%
-# below the equivalent ad-hoc monthly bundle so the deal reads "deal."
+# Starting points only — Kevin edits line items per client. Paid unit_cents for
+# the public-mirrored collections (RE / portraits / F&B photo+video / Brand
+# Partner) match app.public.site_catalog.SERVICES price_cents so a preset draft
+# and the /services board quote the same starter dollars. Deliverable labels
+# stay proposal-shaped (editable per client).
 #
-# IMPORTANT: Odysseus Products catalog on mickey :7010 was backfilled at the
-# previous prices (half-day $1,000 floor, Brand Partner Monthly $2,200). Update
-# the catalog separately or proposal_engine will draft against stale numbers.
+# Brand Sessions (brand_halfday / brand_full) are admin-only anchors — not on
+# the public board — and keep their own figures.
+#
+# IMPORTANT: Odysseus Products catalog on mickey :7010 may still hold older
+# backfill prices. Update that catalog separately or proposal_engine will draft
+# against stale numbers outside Mise.
 
 # Default proposal cover note — the "Our Story" brand voice, seeded on every
 # preset proposal (editable per client; blank proposals start with no intro).
@@ -35,127 +39,141 @@ OUR_STORY_INTRO = (
 
 PRESETS = {
     "blank": {"title": "Proposal", "items": []},
-    # ── Photography ─────────────────────────────────────────────────────────
+    # ── Food & Beverage — Photography (mirrors SERVICES["photography"]) ─────
     "photo_starter": {
         "title": "Photography — Starter",
         "items": [
-            {"label": "Half-day photography session (up to 4 hrs)", "qty": 1, "unit_cents": 90000},
-            {"label": "Up to 20 edited, web-ready images", "qty": 1, "unit_cents": 0},
-            {"label": "Online gallery delivery + standard usage rights", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Half-day photography session (up to 3 hrs, one location)",
+                "qty": 1,
+                "unit_cents": 75000,
+            },
+            {"label": "Up to 25 edited finals", "qty": 1, "unit_cents": 0},
+            {"label": "Social crops — 1:1 · 4:5 · 9:16", "qty": 1, "unit_cents": 0},
+            {"label": "One revision round", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Same-week gallery delivery + standard usage rights",
+                "qty": 1,
+                "unit_cents": 0,
+            },
         ],
     },
     "photo_standard": {
         "title": "Photography — Standard",
         "items": [
-            {"label": "Full-day photography session (up to 8 hrs)", "qty": 1, "unit_cents": 180000},
-            {"label": "Up to 50 edited images", "qty": 1, "unit_cents": 0},
-            {"label": "Social crops (1:1, 4:5, 9:16) for hero selects", "qty": 1, "unit_cents": 0},
-            {"label": "Online gallery delivery + standard usage rights", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Full-day photography session (up to 6 hrs — menu, drinks & room)",
+                "qty": 1,
+                "unit_cents": 140000,
+            },
+            {"label": "Up to 50 edited finals", "qty": 1, "unit_cents": 0},
+            {"label": "Full social crop pack", "qty": 1, "unit_cents": 0},
+            {"label": "Two revision rounds", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Brand library starter set + standard usage rights",
+                "qty": 1,
+                "unit_cents": 0,
+            },
         ],
     },
     "photo_premium": {
         "title": "Photography — Premium",
         "items": [
             {
-                "label": "Extended-day photography session (up to 10 hrs)",
+                "label": "Extended photography — up to two shoot days",
                 "qty": 1,
-                "unit_cents": 320000,
+                "unit_cents": 260000,
             },
-            {"label": "Up to 75 edited images", "qty": 1, "unit_cents": 0},
-            {"label": "Social crops (1:1, 4:5, 9:16) for every select", "qty": 1, "unit_cents": 0},
-            {"label": "Rush turnaround (5 business days)", "qty": 1, "unit_cents": 0},
-            {"label": "Online gallery delivery + extended usage rights", "qty": 1, "unit_cents": 0},
-        ],
-    },
-    # ── Videography ─────────────────────────────────────────────────────────
-    "video_starter": {
-        "title": "Videography — Starter",
-        "items": [
-            {"label": "Half-day video shoot (up to 4 hrs)", "qty": 1, "unit_cents": 180000},
             {
-                "label": "3 short-form vertical reels (15–30s each, edited)",
+                "label": "Full menu + campaign concepts · 90+ edited finals",
                 "qty": 1,
                 "unit_cents": 0,
             },
-            {"label": "Licensed music + color grade", "qty": 1, "unit_cents": 0},
-            {"label": "Delivery via gallery + standard usage rights", "qty": 1, "unit_cents": 0},
+            {"label": "On-set art direction", "qty": 1, "unit_cents": 0},
+            {"label": "Commercial usage license", "qty": 1, "unit_cents": 0},
+            {"label": "Online gallery delivery", "qty": 1, "unit_cents": 0},
+        ],
+    },
+    # ── Food & Beverage — Videography (mirrors SERVICES["videography"]) ─────
+    "video_starter": {
+        "title": "Videography — Starter",
+        "items": [
+            {"label": "Half-day video shoot", "qty": 1, "unit_cents": 125000},
+            {"label": "One hero reel, 15–30s", "qty": 1, "unit_cents": 0},
+            {"label": "Three vertical cutdowns", "qty": 1, "unit_cents": 0},
+            {"label": "Licensed audio", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Delivered 9:16 + 1:1 via gallery + standard usage rights",
+                "qty": 1,
+                "unit_cents": 0,
+            },
         ],
     },
     "video_standard": {
         "title": "Videography — Standard",
         "items": [
-            {"label": "Full-day video shoot (up to 8 hrs)", "qty": 1, "unit_cents": 320000},
+            {"label": "Full-day video shoot", "qty": 1, "unit_cents": 220000},
+            {"label": "One brand film, 45–60s", "qty": 1, "unit_cents": 0},
+            {"label": "Five social cutdowns", "qty": 1, "unit_cents": 0},
+            {"label": "Photo stills included", "qty": 1, "unit_cents": 0},
             {
-                "label": "6 short-form vertical reels (15–60s each, edited)",
+                "label": "Color grade + captions · gallery delivery + standard usage rights",
                 "qty": 1,
                 "unit_cents": 0,
             },
-            {"label": "B-roll package + licensed music + color grade", "qty": 1, "unit_cents": 0},
-            {"label": "Delivery via gallery + standard usage rights", "qty": 1, "unit_cents": 0},
         ],
     },
     "video_premium": {
         "title": "Videography — Premium",
         "items": [
-            {"label": "Two video shoot days (up to 16 hrs total)", "qty": 1, "unit_cents": 580000},
-            {
-                "label": "10 short-form reels + 1 hero brand video (60–90s)",
-                "qty": 1,
-                "unit_cents": 0,
-            },
-            {"label": "B-roll package, color grade, licensed music", "qty": 1, "unit_cents": 0},
-            {"label": "Rush turnaround available", "qty": 1, "unit_cents": 0},
-            {"label": "Delivery via gallery + extended usage rights", "qty": 1, "unit_cents": 0},
+            {"label": "Two video shoot days", "qty": 1, "unit_cents": 390000},
+            {"label": "Hero film + reel series", "qty": 1, "unit_cents": 0},
+            {"label": "Storyboard & art direction", "qty": 1, "unit_cents": 0},
+            {"label": "Cinematic color grade", "qty": 1, "unit_cents": 0},
+            {"label": "Full usage license · gallery delivery", "qty": 1, "unit_cents": 0},
         ],
     },
-    # ── Brand Partner (Monthly Retainer) ────────────────────────────────────
+    # ── Brand Partner (Monthly Retainer) — mirrors SERVICES["brand_partner"] ─
     "retainer_starter": {
-        "title": "Brand Partner — Starter (Monthly)",
+        "title": "Brand Partner — Photo (Monthly)",
         "items": [
             {
-                "label": "Monthly photo content day (~20 edited images)",
+                "label": "One half-day shoot monthly · 25 finals",
                 "qty": 1,
-                "unit_cents": 140000,
+                "unit_cents": 110000,
             },
-            {
-                "label": "Social crop pack (1:1, 4:5, 9:16) for hero selects",
-                "qty": 1,
-                "unit_cents": 0,
-            },
-            {"label": "Standing client portal", "qty": 1, "unit_cents": 0},
-            {"label": "Priority scheduling (24-hr response)", "qty": 1, "unit_cents": 0},
+            {"label": "Social crop pack", "qty": 1, "unit_cents": 0},
+            {"label": "Rolling content calendar", "qty": 1, "unit_cents": 0},
+            {"label": "Cancel anytime", "qty": 1, "unit_cents": 0},
         ],
     },
     "retainer_standard": {
-        "title": "Brand Partner — Standard (Monthly)",
+        "title": "Brand Partner — Photo + Reels (Monthly)",
         "items": [
             {
-                "label": "Monthly photo + short-form video content day",
+                "label": "One full-day shoot monthly · 30 finals + 4 reels",
                 "qty": 1,
-                "unit_cents": 220000,
+                "unit_cents": 185000,
             },
-            {"label": "~30 edited images + 3 short-form reels", "qty": 1, "unit_cents": 0},
-            {
-                "label": "Social crop pack (1:1, 4:5, 9:16) for every select",
-                "qty": 1,
-                "unit_cents": 0,
-            },
-            {"label": "Standing portal + priority scheduling", "qty": 1, "unit_cents": 0},
+            {"label": "Caption packs", "qty": 1, "unit_cents": 0},
+            {"label": "Brand kit on file", "qty": 1, "unit_cents": 0},
+            {"label": "Priority scheduling", "qty": 1, "unit_cents": 0},
         ],
     },
     "retainer_premium": {
-        "title": "Brand Partner — Premium (Monthly)",
+        "title": "Brand Partner — Two-day (Monthly)",
         "items": [
-            {"label": "Two content days/month (photo + video)", "qty": 1, "unit_cents": 380000},
-            {"label": "~50 edited images + 6 short-form reels", "qty": 1, "unit_cents": 0},
-            {"label": "Quarterly hero brand video (60–90s)", "qty": 1, "unit_cents": 0},
-            {"label": "Full social crop pack + extended usage rights", "qty": 1, "unit_cents": 0},
-            {"label": "Standing portal + concierge scheduling", "qty": 1, "unit_cents": 0},
+            {
+                "label": "Two shoot days monthly · photo + video each visit",
+                "qty": 1,
+                "unit_cents": 320000,
+            },
+            {"label": "Quarterly hero film", "qty": 1, "unit_cents": 0},
+            {"label": "Biggest per-asset discount", "qty": 1, "unit_cents": 0},
+            {"label": "Dedicated calendar", "qty": 1, "unit_cents": 0},
         ],
     },
-    # ── Real Estate ─────────────────────────────────────────────────────────
-    # PLACEHOLDER ANCHORS — set from a market scan, not by Kevin yet. Adjust
-    # unit_cents (and the mirrored /services display prices) before first use.
+    # ── Real Estate (mirrors SERVICES["real_estate"]) ───────────────────────
     "realestate_essentials": {
         "title": "Real Estate — Essentials",
         "items": [
