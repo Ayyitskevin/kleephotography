@@ -1,6 +1,6 @@
-"""Basic unit tests extracted from smoke for fast feedback (-m unit).
+"""Application integration tests extracted from the full smoke suite.
 
-These are simple, no heavy side effects beyond the test client.
+These exercise TestClient, application lifecycle, and the test database.
 """
 
 import os
@@ -25,13 +25,13 @@ def client():
         yield c
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_healthz(client):
     r = client.get("/healthz")
     assert r.status_code == 200 and r.json()["ok"] is True
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_security_headers(client):
     # clickjacking + MIME-sniffing protection on every response (R18)
     r = client.get("/healthz")
@@ -45,7 +45,7 @@ def test_security_headers(client):
     assert home.headers["x-frame-options"] == "DENY"
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_hsts_tracks_cookie_secure(monkeypatch):
     from app import config
     from app.main import app
@@ -62,7 +62,7 @@ def test_hsts_tracks_cookie_secure(monkeypatch):
         assert "strict-transport-security" not in c.get("/healthz").headers
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_cookie_secure_default_fails_safe_for_https():
     from app import config
 
@@ -72,7 +72,7 @@ def test_cookie_secure_default_fails_safe_for_https():
     assert config._cookie_secure_default("http://localhost:8400") == "false"
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_admin_logout_revokes_session(client):
     from app import config, db, security
 
@@ -97,7 +97,7 @@ def test_admin_logout_revokes_session(client):
     client.cookies.clear()
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_admin_sign_out_everywhere_requires_auth(client):
     from app import db, security
 
@@ -114,7 +114,7 @@ def test_admin_sign_out_everywhere_requires_auth(client):
         db.run("DELETE FROM admin_sessions WHERE token=?", (other,))
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_admin_sign_out_everywhere_kills_all_sessions(client):
     from app import config, db, security
 
@@ -131,7 +131,7 @@ def test_admin_sign_out_everywhere_kills_all_sessions(client):
     client.cookies.clear()
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_portal_pin_bucket_avoids_throttle_sentinels():
     from app import security
     from app.public.portal import _pin_bucket
@@ -151,7 +151,7 @@ def test_portal_pin_bucket_avoids_throttle_sentinels():
     assert all(b < 0 for b in buckets)
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_pin_target_circuit_breaker(client, monkeypatch):
     from app import config, db, security
 
@@ -185,7 +185,7 @@ def test_pin_target_circuit_breaker(client, monkeypatch):
         db.run("DELETE FROM pin_attempts WHERE gallery_id IN (?, 0)", (gid,))
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_check_admin_password_handles_non_ascii(monkeypatch):
     from app import config, security
 
@@ -197,7 +197,7 @@ def test_check_admin_password_handles_non_ascii(monkeypatch):
     assert security.check_admin_password("naïve🔑") is False
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_csp_header(client):
     # Content-Security-Policy ships on every response as XSS defense-in-depth
     # (R18). script-src has NO 'unsafe-inline' — inline handlers moved to
@@ -224,7 +224,7 @@ def test_csp_header(client):
     assert "content-security-policy" in client.get("/").headers
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_csp_nonce_fresh_and_matches_markup(client):
     import re
 
@@ -244,7 +244,7 @@ def test_csp_nonce_fresh_and_matches_markup(client):
     assert "<script>" not in client.get("/admin/login").text
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_permissions_policy_header(client):
     # unused browser features are switched off on every response; fullscreen and
     # picture-in-picture are deliberately NOT restricted (native <video> controls
@@ -257,7 +257,7 @@ def test_permissions_policy_header(client):
     assert "permissions-policy" in client.get("/").headers
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_security_txt(client):
     # RFC 9116: Contact + a not-yet-expired Expires, served as text/plain
     r = client.get("/.well-known/security.txt")
@@ -272,7 +272,7 @@ def test_security_txt(client):
     assert exp.replace(tzinfo=UTC) > datetime.now(UTC)
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_invoice_stripe_return_banner(client, monkeypatch):
     from app import config, db
 
@@ -319,7 +319,7 @@ def test_invoice_stripe_return_banner(client, monkeypatch):
         db.run("DELETE FROM clients WHERE id=?", (cid,))
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_csrf_same_origin_enforced(client):
     from app import config, security
 
@@ -355,7 +355,7 @@ def test_csrf_same_origin_enforced(client):
     security.pin_clear("testclient", 0)  # drop the failed-login bookkeeping
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_session_cookie_helper_sets_shared_policy(monkeypatch):
     from http.cookies import SimpleCookie
 
@@ -379,7 +379,7 @@ def test_session_cookie_helper_sets_shared_policy(monkeypatch):
     assert morsel["samesite"].lower() == "lax"
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_public_showcase_bootstrap_relabels_demo_gallery(client):
     from app import bootstrap, db
 
@@ -416,7 +416,7 @@ def test_public_showcase_bootstrap_relabels_demo_gallery(client):
     assert gallery["cs_location"] == "Western North Carolina"
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_access_routes_use_shared_session_cookie_policy(client, monkeypatch):
     from http.cookies import SimpleCookie
 
@@ -492,7 +492,7 @@ def test_access_routes_use_shared_session_cookie_policy(client, monkeypatch):
     assert assert_session_cookie(oauth, "g_oauth_state", max_age=600).value
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_custom_forms_are_public_rate_limited():
     from app import ratelimit
 
@@ -507,7 +507,7 @@ def test_custom_forms_are_public_rate_limited():
     assert ratelimit._bucket_for("/work/spring-menu") is None
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_static_assets_cached_immutable(client):
     # /static URLs are content-hash-busted (?v=), so they're safe to cache
     # forever; the middleware must stamp the long-lived immutable header.
@@ -518,7 +518,7 @@ def test_static_assets_cached_immutable(client):
     assert "immutable" not in client.get("/healthz").headers.get("cache-control", "")
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_favicon(client):
     # legacy crawlers and share scrapers request /favicon.ico directly,
     # ignoring the <link rel=icon> tags — it must not 404
@@ -528,7 +528,7 @@ def test_favicon(client):
     assert 'rel="apple-touch-icon"' in home and "/static/favicon.svg" in home
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_branded_error_pages(client):
     # clients clicking bad links in a browser get a branded page, not raw JSON
     r = client.get("/g/nope12345678", headers={"accept": "text/html"})
@@ -539,14 +539,14 @@ def test_branded_error_pages(client):
     assert r.status_code == 404 and r.json()["detail"] == "Not Found"
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_admin_requires_login(client):
     client.cookies.clear()
     r = client.get("/admin", follow_redirects=False)
     assert r.status_code == 303
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_error_alert_throttle(monkeypatch):
     # error_alert collapses a crash storm to one alert per signature per window,
     # counting the rest — so one bug can't flood Telegram (R14: observable, not noisy).
@@ -581,7 +581,7 @@ def test_error_alert_throttle(monkeypatch):
     assert len(sent) == 2 and "+2 more" in sent[1]
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_unhandled_exception_alerts_and_500(monkeypatch):
     # an uncaught exception returns a clean 500 (branded HTML / plain JSON, no leak)
     # AND fires a crash alert — the whole point of in-app monitoring.

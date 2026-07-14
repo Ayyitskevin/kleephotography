@@ -7,6 +7,8 @@ import pytest
 
 from app import pricing
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 def test_suggest_asheville_standard():

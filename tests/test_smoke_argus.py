@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from app import argus_analyze, config, db, jobs
 from app.main import app
 
+pytestmark = pytest.mark.integration
+
 
 def _configure_tmp_db(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)

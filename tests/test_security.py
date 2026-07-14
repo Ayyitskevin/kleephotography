@@ -7,6 +7,8 @@ import pytest
 
 from app import security
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 def test_new_slug_length():

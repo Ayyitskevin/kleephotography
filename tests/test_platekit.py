@@ -1,4 +1,8 @@
+import pytest
+
 from app import platekit
+
+pytestmark = pytest.mark.unit
 
 
 def test_platekit_slug_prefers_explicit_mapping():

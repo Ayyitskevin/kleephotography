@@ -2,6 +2,8 @@ import pytest
 
 from app import video
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 def test_rendition_args_center_crop():

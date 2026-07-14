@@ -4,6 +4,8 @@ import pytest
 
 from app.admin import common
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 def test_today():

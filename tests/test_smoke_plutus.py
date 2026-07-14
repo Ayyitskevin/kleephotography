@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from app import config, db, jobs, plutus_recommend
+
+pytestmark = pytest.mark.integration
 
 
 def _configure_tmp_db(tmp_path, monkeypatch):

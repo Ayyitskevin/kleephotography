@@ -1,9 +1,12 @@
 import datetime as dt
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app import config, db
 from app.main import app
+
+pytestmark = pytest.mark.integration
 
 
 def configure_tmp_db(tmp_path, monkeypatch):

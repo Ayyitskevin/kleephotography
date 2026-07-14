@@ -9,6 +9,8 @@ import pytest
 
 from app import features
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 def test_stripe_enabled_true_when_secret_set():

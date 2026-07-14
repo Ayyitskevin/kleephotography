@@ -7,6 +7,8 @@ import pytest
 
 from app import db
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 def test_ident_allows_whitelisted():

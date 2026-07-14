@@ -35,20 +35,19 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/pip install --upgrade pip
-          .venv/bin/pip install -r requirements.txt pytest httpx
+          .venv/bin/pip install -r requirements.txt pytest httpx ruff
 
       - name: Run unit tests (fast feedback)
         run: |
           .venv/bin/python -m pytest tests/ --ignore=tests/test_smoke.py -q -m unit --tb=short
 
-      - name: Lint with ruff
+      - name: Run integration tests
         run: |
-          .venv/bin/pip install ruff
-          .venv/bin/ruff check . --output-format=github
+          .venv/bin/python -m pytest tests/ --ignore=tests/test_smoke.py -q -m integration --tb=short
 
-      - name: Check ruff format
+      - name: Lint and check format with ruff
         run: |
-          .venv/bin/pip install ruff
+          .venv/bin/ruff check . --output-format=github
           .venv/bin/ruff format --check .
 
       - name: Run full smoke suite

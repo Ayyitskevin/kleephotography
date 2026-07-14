@@ -12,6 +12,8 @@ from PIL import Image
 
 from app import imaging
 
+pytestmark = pytest.mark.unit
+
 
 def _make_test_image(w=400, h=300, color=(100, 150, 200)) -> bytes:
     buf = io.BytesIO()

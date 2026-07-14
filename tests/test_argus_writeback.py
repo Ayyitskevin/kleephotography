@@ -6,6 +6,8 @@ import pytest
 
 from app import argus_writeback, config, db
 
+pytestmark = pytest.mark.integration
+
 
 def _configure_tmp_db(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)

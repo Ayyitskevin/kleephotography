@@ -3,6 +3,8 @@ import pytest
 from app import specialties
 from app.render import _portfolio_alt, _tag_label
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.unit
 def test_split_tag_prefixed():

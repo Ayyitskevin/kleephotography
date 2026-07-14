@@ -18,6 +18,8 @@ from fastapi.testclient import TestClient
 from app import config, db, notion_sync
 from app.main import app
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture(scope="module")
 def client():
