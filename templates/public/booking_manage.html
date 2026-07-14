@@ -4,7 +4,8 @@
 {% block site_content %}
 <main class="site-main site-narrow book-manage">
   {% if b.status == 'confirmed' %}
-    <div class="book-manage-badge book-ok">Confirmed</div>
+    <div class="book-manage-badge book-ok"
+         data-analytics-view="Booking Completion" data-analytics-once>Confirmed</div>
     <h1>You're booked</h1>
     <p class="muted">A calendar invite is on its way to {{ b.email }}.</p>
   {% else %}

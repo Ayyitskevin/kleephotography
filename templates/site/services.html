@@ -44,7 +44,10 @@
           <ul>
             {% for line in t.includes %}<li>{{ line }}</li>{% endfor %}
           </ul>
-          <a class="svc-cta" href="/contact?service={{ s.contact_service|urlencode }}&amp;tier={{ t.name|urlencode }}">Request {{ s.title }} &rarr;</a>
+          <a class="svc-cta" href="/contact?service={{ s.contact_service|urlencode }}&amp;tier={{ t.name|urlencode }}"
+             data-analytics-event="Service Tier CTA"
+             data-analytics-service="{{ s.contact_service }}"
+             data-analytics-tier="{{ t.name }}">Request {{ s.title }} &rarr;</a>
         </article>
         {% endfor %}
       </div>

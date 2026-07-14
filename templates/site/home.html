@@ -114,7 +114,8 @@
   </div>
   {% if demo_gallery %}
   <p class="sr-kickrow" style="margin-top: 14px;">
-    <a class="sr-mono sr-mono--signal" href="{{ demo_gallery.url }}">Prospect screening &mdash; try the sample gallery &rarr;</a>
+    <a class="sr-mono sr-mono--signal" href="{{ demo_gallery.url }}"
+       data-analytics-event="Demo Gallery Click" data-analytics-page="home">Prospect screening &mdash; try the sample gallery &rarr;</a>
     {% if demo_gallery.pin %}<span class="sr-mono">PIN {{ demo_gallery.pin }}</span>
     {% else %}<a class="sr-mono" href="/contact?prefill=demo_gallery">Ask for the PIN</a>{% endif %}
   </p>

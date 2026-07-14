@@ -47,6 +47,56 @@
     });
   }
 
+  // Pause archive reels outside the viewport. Reduced-motion visitors retain
+  // the native controls established above, and older browsers keep normal
+  // autoplay behavior rather than losing playback entirely.
+  if (!reduceMotion && "IntersectionObserver" in window) {
+    var reelObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var reel = entry.target;
+        if (entry.isIntersecting) reel.play().catch(function () {});
+        else reel.pause();
+      });
+    }, { threshold: 0.2 });
+    document.querySelectorAll("video[data-reel-video]").forEach(function (video) {
+      reelObserver.observe(video);
+    });
+  }
+
+  // Plausible custom events. The external script defines window.plausible;
+  // without it every hook is deliberately a no-op. Props are curated from
+  // non-PII data attributes only.
+  function track(eventName, element) {
+    if (!eventName || typeof window.plausible !== "function") return;
+    var props = {};
+    ["service", "tier", "page"].forEach(function (key) {
+      var value = element && element.dataset ? element.dataset["analytics" +
+        key.charAt(0).toUpperCase() + key.slice(1)] : "";
+      if (value) props[key] = value;
+    });
+    try {
+      window.plausible(eventName, Object.keys(props).length ? { props: props } : undefined);
+    } catch (e) { /* analytics must never block navigation or rendering */ }
+  }
+
+  document.querySelectorAll("[data-analytics-view]").forEach(function (marker) {
+    var eventName = marker.dataset.analyticsView;
+    var onceKey = marker.hasAttribute("data-analytics-once") ?
+      "mise:analytics:" + eventName + ":" + window.location.pathname : "";
+    if (onceKey) {
+      try {
+        if (window.sessionStorage.getItem(onceKey)) return;
+        window.sessionStorage.setItem(onceKey, "1");
+      } catch (e) { /* storage may be unavailable; tracking can still proceed */ }
+    }
+    track(eventName, marker);
+  });
+
+  document.addEventListener("click", function (event) {
+    var target = event.target.closest && event.target.closest("[data-analytics-event]");
+    if (target) track(target.dataset.analyticsEvent, target);
+  });
+
   // --- Screening Room player chrome (house reel / premiere heroes) ---
   // One timeupdate listener per [data-sr-player]: live mono timecode
   // (HH:MM:SS:FF at 24fps, matching the marquee) + a progress line. Ambient

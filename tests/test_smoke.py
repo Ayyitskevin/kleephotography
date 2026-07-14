@@ -3244,17 +3244,35 @@ def test_pipeline_dashboard(admin):
     db.run("DELETE FROM invoices WHERE id=?", (iid,))
 
 
-def test_marketing_site(admin):
+def test_marketing_site(admin, monkeypatch):
     g = db.one("SELECT * FROM galleries ORDER BY id LIMIT 1")
     a = db.one("SELECT * FROM assets WHERE gallery_id=?", (g["id"],))
+    monkeypatch.setattr(config, "DEMO_GALLERY_SLUG", g["slug"])
+    monkeypatch.setattr(config, "DEMO_GALLERY_PIN", g["pin"])
 
     with TestClient(app) as pub:
         # marketing pages render and are indexable; everything else stays noindex
-        for path in ("/", "/portfolio", "/about", "/contact", "/book", "/work", "/services"):
+        marketing_paths = (
+            "/",
+            "/real-estate",
+            "/portraits",
+            "/food-beverage",
+            "/portfolio",
+            "/about",
+            "/contact",
+            "/book",
+            "/work",
+            "/services",
+            "/reels",
+            "/press",
+        )
+        for path in marketing_paths:
             r = pub.get(path)
             assert r.status_code == 200
             assert "x-robots-tag" not in r.headers, path
             assert 'content="index, follow"' in r.text
+            assert "<title>" in r.text and '<meta name="description"' in r.text
+            assert f'<link rel="canonical" href="{config.BASE_URL}{path}">' in r.text
             # marketing shell skips admin/client JS (~70KB) — HTMX stays on cream
             assert "htmx.min.js" not in r.text, path
             assert "behaviors.js" not in r.text, path
@@ -3264,6 +3282,8 @@ def test_marketing_site(admin):
         assert "select[data-autosubmit]" in js
         assert "form[data-confirm]" in js
         assert 'closest("[data-seek]")' in js
+        assert 'typeof window.plausible !== "function"' in js
+        assert "video[data-reel-video]" in js and "IntersectionObserver" in js
         home = pub.get("/").text
         assert 'href="/book">Book a shoot' in home
         assert "Ready for your close-up?" in home
@@ -3284,7 +3304,7 @@ def test_marketing_site(admin):
         assert "x-robots-tag" not in r.headers
         from app import config as cfg
 
-        for path in ("/", "/portfolio", "/about", "/contact", "/book", "/work", "/services"):
+        for path in marketing_paths:
             assert f"<loc>{cfg.BASE_URL}{path}</loc>" in r.text
         assert "<lastmod>" in r.text
         assert "/g/" not in r.text and "/admin" not in r.text
@@ -3308,6 +3328,7 @@ def test_marketing_site(admin):
         r = pub.get("/")
         assert f'data-web="/site/img/{a["id"]}"' in r.text
         assert 'id="lightbox"' in r.text
+        assert 'data-analytics-event="Demo Gallery Click"' in r.text
         # starred photo becomes the OG share image
         assert f'property="og:image" content="{cfg.BASE_URL}/site/img/{a["id"]}"' in r.text
         assert 'content="summary_large_image"' in r.text
@@ -3386,6 +3407,7 @@ def test_inquiry_form(monkeypatch):
             },
         )
         assert r.status_code == 200 and "Thanks" in r.text
+        assert 'data-analytics-view="Contact Success"' in r.text
         assert 'href="/book">Need a time now?' in r.text
         q = db.one("SELECT * FROM inquiries ORDER BY id DESC LIMIT 1")
         assert q["name"] == "Sam Owner" and q["emailed"] == 1
@@ -3614,6 +3636,9 @@ def test_booking_flow(monkeypatch, admin):
         # confirmation emails fired to both client and Kevin
         assert any(to == "booking-flow@test.cafe" for to, *_ in sent)
         assert any(to == "kevin@example.com" for to, *_ in sent)
+        manage = pub.get(f"/booking/{token}")
+        assert 'data-analytics-view="Booking Completion"' in manage.text
+        assert "data-analytics-once" in manage.text
 
         # double-book the same instant → 409 (slot taken), no second booking
         submitted = {
@@ -6258,6 +6283,8 @@ def test_services_page():
         # keeps Book a shoot → /book; secondary "See past work" → /work.
         assert "contact?service=" in r.text
         assert "tier=" in r.text
+        assert r.text.count('data-analytics-event="Service Tier CTA"') == 3 * len(SERVICES)
+        assert "data-analytics-service=" in r.text and "data-analytics-tier=" in r.text
         assert 'href="/book"' in r.text
         assert 'href="/work"' in r.text
         # Service + Offer JSON-LD mirrors the catalog (board price_cents as price)
@@ -10544,6 +10571,8 @@ def test_portfolio_video_tiles(admin):
             assert '"@type": "VideoObject"' in r.text
             assert f"/site/vid/{vid['id']}" in r.text
             assert "data-sound-toggle" in r.text
+            assert "data-reel-video" in r.text
+            assert "reel; use the sound button below for audio" in r.text
     finally:
         admin.post(
             f"/admin/galleries/{g['id']}/assets/{vid['id']}/portfolio", follow_redirects=False
