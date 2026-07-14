@@ -33,17 +33,15 @@ INDEXABLE = {
     "/sitemap.xml",
 }
 
-# Public services + tier cards for /services, grouped by specialty. Mirrors the
-# admin proposal PRESETS in deliverables. price_cents is the shoot-day anchor
-# from app/admin/proposals.py PRESETS (market-researched floor); display_price
-# is the public board figure. F&B + Brand Partner still show pre-revamp
-# marketing prices below the PRESET floors — reconcile in the red-light
-# pricing PR (see ops/SPECIALTY-LAUNCH.md). Final quotes are still tailored
-# on the booking form. The booking dropdown itself stays price-free. Order
-# matters: the public page renders these in nav order. contact_service maps
-# each group onto the /contact form's Project type options. The F&B groups
-# keep their pre-revamp keys (photography/videography) so the #svc-… anchors
-# linked from reels/footer never break.
+# Public services + tier cards for /services, grouped by specialty. Deliverable
+# lists loosely mirror admin proposal PRESETS; public board dollars are the
+# value-first starter menu (display_price == price_cents / 100). Admin proposal
+# PRESET unit_cents may still differ until a dedicated pricing PR syncs them.
+# Final quotes stay tailored on the booking form. The booking dropdown itself
+# stays price-free. Order matters: the public page renders these in nav order.
+# contact_service maps each group onto the /contact form's Project type
+# options. The F&B groups keep their pre-revamp keys (photography/videography)
+# so the #svc-… anchors linked from reels/footer never break.
 SERVICES = [
     {
         "key": "real_estate",
@@ -143,18 +141,18 @@ SERVICES = [
         "key": "photography",
         "title": "Food & Beverage — Photography",
         "contact_service": "Food & Beverage",
-        "tagline": "Menus, dishes, drinks, and the rooms they live in. "
-        "Every tier delivers a private same-week gallery with social crops baked in.",
+        "tagline": "Menu refreshes, launch weeks, and the rooms that sell the "
+        "plate — private same-week gallery with social crops baked in.",
         "monthly": False,
         "tiers": [
             {
                 "name": "Starter",
                 "subtitle": "Half day",
-                "display_price": "$650",
-                "price_cents": 90000,
+                "display_price": "$750",
+                "price_cents": 75000,
                 "includes": [
                     "Up to 3 hours on site, one location",
-                    "20 edited finals",
+                    "25 edited finals",
                     "Social crops — 1:1 · 4:5 · 9:16",
                     "One revision round",
                     "Same-week gallery delivery",
@@ -163,11 +161,11 @@ SERVICES = [
             {
                 "name": "Standard",
                 "subtitle": "Full day",
-                "display_price": "$1,200",
-                "price_cents": 180000,
+                "display_price": "$1,400",
+                "price_cents": 140000,
                 "includes": [
                     "Up to 6 hours — menu, drinks & room",
-                    "45 edited finals",
+                    "50 edited finals",
                     "Full social crop pack",
                     "Two revision rounds",
                     "Brand library starter set",
@@ -176,8 +174,8 @@ SERVICES = [
             {
                 "name": "Premium",
                 "subtitle": "Extended",
-                "display_price": "$2,400",
-                "price_cents": 320000,
+                "display_price": "$2,600",
+                "price_cents": 260000,
                 "includes": [
                     "Up to two shoot days",
                     "Full menu + campaign concepts",
@@ -192,15 +190,15 @@ SERVICES = [
         "key": "videography",
         "title": "Food & Beverage — Videography",
         "contact_service": "Food & Beverage",
-        "tagline": "Short-form social motion that earns the scroll, plus hero "
-        "brand films for launches and campaigns.",
+        "tagline": "Social cutdowns that earn the scroll, plus hero brand films "
+        "for launches, openings, and campaign weeks.",
         "monthly": False,
         "tiers": [
             {
                 "name": "Starter",
                 "subtitle": "The reel",
-                "display_price": "$850",
-                "price_cents": 180000,
+                "display_price": "$1,250",
+                "price_cents": 125000,
                 "includes": [
                     "Half-day shoot",
                     "One hero reel, 15–30s",
@@ -212,8 +210,8 @@ SERVICES = [
             {
                 "name": "Standard",
                 "subtitle": "Social set",
-                "display_price": "$1,800",
-                "price_cents": 320000,
+                "display_price": "$2,200",
+                "price_cents": 220000,
                 "includes": [
                     "Full-day shoot",
                     "One brand film, 45–60s",
@@ -226,7 +224,7 @@ SERVICES = [
                 "name": "Premium",
                 "subtitle": "Campaign",
                 "display_price": "$3,900",
-                "price_cents": 580000,
+                "price_cents": 390000,
                 "includes": [
                     "Two shoot days",
                     "Hero film + reel series",
@@ -241,19 +239,19 @@ SERVICES = [
         "key": "brand_partner",
         "title": "Brand Partner",
         "contact_service": "Brand Partner (monthly retainer)",
-        "tagline": "A monthly content rhythm with a built-in discount versus "
-        "ad-hoc. Deliverables auto-draft each month — never auto-sent or charged.",
+        "tagline": "A monthly content rhythm for kitchens that need a steady "
+        "feed — built-in discount versus ad-hoc, cancel anytime.",
         "monthly": True,
         "tiers": [
             {
                 "name": "Photo",
                 "subtitle": "per month",
-                "display_price": "$900",
+                "display_price": "$1,100",
                 "price_unit": "/mo",
-                "price_cents": 140000,
+                "price_cents": 110000,
                 "includes": [
                     "One half-day shoot monthly",
-                    "20 finals each month",
+                    "25 finals each month",
                     "Social crop pack",
                     "Rolling content calendar",
                     "Cancel anytime",
@@ -262,9 +260,9 @@ SERVICES = [
             {
                 "name": "Photo + Reels",
                 "subtitle": "per month",
-                "display_price": "$1,600",
+                "display_price": "$1,850",
                 "price_unit": "/mo",
-                "price_cents": 220000,
+                "price_cents": 185000,
                 "includes": [
                     "One full-day shoot monthly",
                     "30 finals + 4 reels",
@@ -276,9 +274,9 @@ SERVICES = [
             {
                 "name": "Two-day",
                 "subtitle": "per month",
-                "display_price": "$2,900",
+                "display_price": "$3,200",
                 "price_unit": "/mo",
-                "price_cents": 380000,
+                "price_cents": 320000,
                 "includes": [
                     "Two shoot days monthly",
                     "Photo + video each visit",

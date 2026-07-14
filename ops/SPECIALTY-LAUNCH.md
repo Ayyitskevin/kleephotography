@@ -80,10 +80,10 @@ Suggested setup (durations/buffers are starting points — adjust to taste):
 4. **Contract templates:** the videography agreement already exists; RE
    and portrait service agreements arrive via the red-light PR (Kevin
    merges; see PR list in HANDOFF).
-5. **Pricing:** the public /services page still shows the pre-revamp
-   photography/videography/brand-partner tiers; per-specialty packages are
-   in the red-light pricing PR (includes the $650-display vs $900-anchor
-   question on Photography Starter).
+5. **Pricing:** the public /services F&B board is the value-first starter
+   menu in `app/public/site.py` SERVICES (display_price == price_cents).
+   Admin proposal PRESET unit_cents may still differ until a red-light
+   pricing PR syncs them.
 6. **Post-deploy spot checks:** `/`, the three spokes, `/portfolio`
    (chips), `/work` (groups), `/about`, `/contact` (new project types),
    one live client gallery (video MP4 button + duration badge), one

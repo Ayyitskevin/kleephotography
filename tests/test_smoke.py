@@ -5770,7 +5770,7 @@ def test_services_page():
         # middle tier flagged as "Most picked" (UX nudge), once per group
         assert r.text.count("Most picked") == len(SERVICES)
         # Prototype copy: public tier cards show marketing display prices
-        # (F&B/Brand Partner may sit below PRESET floors until the pricing PR).
+        # (F&B board dollars match price_cents; admin PRESETS may still differ).
         for s in SERVICES:
             assert s["contact_service"]  # deep-link target for /contact
             for t in s["tiers"]:
@@ -5782,7 +5782,7 @@ def test_services_page():
         assert "tier=" in r.text
         assert 'href="/book"' in r.text
         assert 'href="/work"' in r.text
-        # Service + Offer JSON-LD mirrors the catalog (PRESET floors as price)
+        # Service + Offer JSON-LD mirrors the catalog (board price_cents as price)
         assert '"@type": "Service"' in r.text
         assert '"@type": "Offer"' in r.text
         assert '"priceCurrency": "USD"' in r.text
