@@ -18,7 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app import db, platekit
+from app import config, db, platekit
 from app.main import app
 
 
@@ -426,6 +426,60 @@ def test_full_gallery_flow(admin):
     assert len(rows) == 3  # single + zip + favorites zip
     v = db.one("SELECT * FROM visitors WHERE gallery_id=?", (g["id"],))
     assert v["email"] == "chef@bistro.com"
+
+
+def test_client_proofing_completion_state():
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("ProofClosure01", "Summer menu selects", "2468"),
+    )
+    sid = db.run(
+        "INSERT INTO sections (gallery_id, name, position, proof_target) VALUES (?,?,?,?)",
+        (gid, "Hero dishes", 0, 2),
+    )
+    aids = [
+        db.run(
+            "INSERT INTO assets (gallery_id, section_id, kind, filename, stored, status) "
+            "VALUES (?,?,?,?,?,?)",
+            (gid, sid, "photo", f"hero-{i}.jpg", f"proofclosure{i}.jpg", "ready"),
+        )
+        for i in range(2)
+    ]
+    originals = config.MEDIA_DIR / str(gid) / "original"
+    originals.mkdir(parents=True, exist_ok=True)
+    for i in range(2):
+        Image.new("RGB", (8, 8), (180, 90, 40)).save(originals / f"proofclosure{i}.jpg")
+
+    with TestClient(app, base_url="https://testserver") as pub:
+        assert pub.post("/g/ProofClosure01/pin", data={"pin": "2468"}).status_code == 200
+
+        # Incomplete state is explicit, semantic, and links to the existing contact flow.
+        page = pub.get("/g/ProofClosure01").text
+        assert 'id="proof-status"' in page
+        assert 'role="status" aria-live="polite" aria-atomic="true"' in page
+        assert "Selections in progress" in page and "Choose 2 more photos" in page
+        assert "prefill=gallery_question" in page and "Message Kevin with a question" in page
+
+        first = pub.post(f"/g/ProofClosure01/fav/{aids[0]}")
+        assert first.status_code == 200
+        assert 'id="proof-status"' in first.text and 'hx-swap-oob="outerHTML"' in first.text
+        assert "Selections in progress" in first.text and "Choose 1 more photo" in first.text
+
+        # The final selection flips the live status without adding approval semantics.
+        final = pub.post(f"/g/ProofClosure01/fav/{aids[1]}")
+        assert final.status_code == 200
+        assert "Selections complete" in final.text
+        assert "final approval and delivery happen separately" in final.text
+        assert "Message Kevin about next steps" in final.text
+
+        # Reload derives the same completed state from current targets and favorites.
+        reloaded = pub.get("/g/ProofClosure01").text
+        assert "Selections complete" in reloaded and "2 of 2 selected" in reloaded
+
+        # Existing unfavorite behavior reopens the derived state.
+        reopened = pub.post(f"/g/ProofClosure01/fav/{aids[0]}")
+        assert reopened.status_code == 200
+        assert "Selections in progress" in reopened.text and "Choose 1 more photo" in reopened.text
 
 
 def test_video_pipeline_full_flow(admin):

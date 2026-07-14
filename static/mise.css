@@ -441,6 +441,16 @@ tr.inquiry-converted td:nth-child(2) { text-decoration: line-through; }
   font-size: 0.95rem; line-height: 1.55; max-width: 720px; }
 
 /* Proofing progress badge + toast (gallery client view) */
+.proof-status { margin: 1.5rem 0; padding: 1.25rem;
+  border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  border-radius: 10px; background: var(--card); }
+.proof-status.is-complete { border-left-color: #4a8d2f; }
+.proof-status-label { margin: 0 0 0.35rem; color: var(--muted);
+  font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; }
+.proof-status h2 { margin: 0 0 0.35rem; font-size: 1.35rem; }
+.proof-status p:not(.proof-status-label) { margin: 0 0 0.9rem; max-width: 700px; }
+.proof-status .btn { display: inline-block; width: auto; }
 .proof-progress { display: inline-block; margin-left: 0.4rem;
   font-size: 0.62em; text-transform: none; letter-spacing: 0.04em; }
 .proof-progress.ok { color: #4a8d2f; font-weight: 600; }

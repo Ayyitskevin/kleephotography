@@ -1,0 +1,22 @@
+{% if proof_status %}
+<section id="proof-status"
+         class="proof-status {{ 'is-complete' if proof_status.complete else 'is-incomplete' }}"
+         aria-labelledby="proof-status-heading"
+         {% if proof_oob %}hx-swap-oob="outerHTML"{% endif %}>
+  <div role="status" aria-live="polite" aria-atomic="true">
+    <p class="proof-status-label">Proofing status &middot; {{ proof_status.picked }} of {{ proof_status.target }} selected</p>
+    {% if proof_status.complete %}
+      <h2 id="proof-status-heading">Selections complete</h2>
+      <p>All requested selections are marked. Kevin can use these picks for the next editing step; final approval and delivery happen separately.</p>
+    {% else %}
+      <h2 id="proof-status-heading">Selections in progress</h2>
+      <p>Choose {{ proof_status.remaining }} more photo{{ 's' if proof_status.remaining != 1 }} to meet the requested selection targets. Your picks save as you go.</p>
+    {% endif %}
+  </div>
+  {% if proof_status.complete %}
+    <a class="btn sr-btn sr-btn--ghost" href="/contact?prefill=gallery_question&gallery={{ g.title | urlencode }}">Message Kevin about next steps</a>
+  {% else %}
+    <a class="btn sr-btn sr-btn--ghost" href="/contact?prefill=gallery_question&gallery={{ g.title | urlencode }}">Message Kevin with a question</a>
+  {% endif %}
+</section>
+{% endif %}

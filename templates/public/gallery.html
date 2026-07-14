@@ -109,6 +109,7 @@
   {% for s in sections %}{% if by_section[s.id]|rejectattr("kind", "equalto", "video")|list %}{% if populated.append(s) %}{% endif %}{% endif %}{% endfor %}
   {% set stills_unsectioned = unsectioned|rejectattr("kind", "equalto", "video")|list %}
   {% set n_targets = populated|length + (1 if stills_unsectioned and sections else 0) %}
+  {% include "public/_proof_status.html" %}
   {% if n_stills %}
   <section id="frames" class="sr-section" aria-label="The frames">
     <div class="sr-kickrow">

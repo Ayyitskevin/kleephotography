@@ -22,6 +22,34 @@ def is_expired(g) -> bool:
     return bool(g["expires_at"]) and g["expires_at"] < dt.date.today().isoformat()
 
 
+def _proof_status(sections, section_picks: dict[int, int]) -> dict | None:
+    """Derive client-visible proofing closure from the configured section targets."""
+    targets = [s for s in sections if s["proof_target"]]
+    if not targets:
+        return None
+    target = sum(s["proof_target"] for s in targets)
+    picked = sum(min(section_picks.get(s["id"], 0), s["proof_target"]) for s in targets)
+    return {
+        "complete": all(section_picks.get(s["id"], 0) >= s["proof_target"] for s in targets),
+        "picked": picked,
+        "target": target,
+        "remaining": target - picked,
+    }
+
+
+def _proof_status_for_visitor(gallery_id: int, visitor_id: int) -> dict | None:
+    sections = db.all_(
+        """SELECT s.id, s.proof_target, COUNT(f.asset_id) AS picks
+           FROM sections s
+           LEFT JOIN assets a ON a.section_id=s.id
+           LEFT JOIN favorites f ON f.asset_id=a.id AND f.visitor_id=?
+           WHERE s.gallery_id=? AND s.proof_target>0
+           GROUP BY s.id, s.proof_target""",
+        (visitor_id, gallery_id),
+    )
+    return _proof_status(sections, {s["id"]: s["picks"] for s in sections})
+
+
 @router.get("/{slug}", response_class=HTMLResponse)
 async def view(request: Request, slug: str):
     g = get_live_gallery(slug)
@@ -89,6 +117,7 @@ async def view(request: Request, slug: str):
             "renditions": renditions,
             "renditions_pending": renditions_pending,
             "section_picks": section_picks,
+            "proof_status": _proof_status(sections, section_picks),
             "visitor": visitor,
             "total_bytes": sum(a["bytes"] or 0 for a in assets),
             "first_visit": seen_cookie not in request.cookies,
@@ -189,7 +218,7 @@ def _takes_oob(visitor_id: int, toggled_id: int, gallery_id: int) -> str:
     return "".join(out)
 
 
-def _progress_oob(g_id: int, section_id: int | None, visitor_id: int) -> str:
+def _progress_oob(g, section_id: int | None, visitor_id: int) -> str:
     """OOB-swap fragment for the section heading's progress label, returned
     alongside the heart so it updates inline after every fav/unfav."""
     if section_id is None:
@@ -203,10 +232,15 @@ def _progress_oob(g_id: int, section_id: int | None, visitor_id: int) -> str:
         (visitor_id, section_id),
     )["n"]
     cls = "ok" if picks >= s["proof_target"] else "muted"
-    return (
+    progress = (
         f'<span id="proof-{section_id}" class="proof-progress {cls}" '
         f'hx-swap-oob="outerHTML">{picks} of {s["proof_target"]} picked</span>'
     )
+    proof_status = _proof_status_for_visitor(g["id"], visitor_id)
+    status = templates.env.get_template("public/_proof_status.html").render(
+        g=g, proof_status=proof_status, proof_oob=True
+    )
+    return progress + status
 
 
 @router.post("/{slug}/fav/{asset_id}", response_class=HTMLResponse)
@@ -232,7 +266,7 @@ async def toggle_fav(request: Request, slug: str, asset_id: int):
     )
     if existing:
         db.run("DELETE FROM favorites WHERE visitor_id=? AND asset_id=?", (visitor["id"], asset_id))
-        oob = _progress_oob(g["id"], a["section_id"], visitor["id"])
+        oob = _progress_oob(g, a["section_id"], visitor["id"])
         return Response(
             f'<span id="take-{asset_id}" class="fav-btn sr-take">&#9675;</span>'
             + _takes_oob(visitor["id"], asset_id, g["id"])
@@ -256,7 +290,7 @@ async def toggle_fav(request: Request, slug: str, asset_id: int):
     if a["kind"] == "photo" and a["status"] == "ready":
         jobs.enqueue("social_crops", {"asset_id": asset_id})
     n = db.one("SELECT COUNT(*) AS n FROM favorites WHERE visitor_id=?", (visitor["id"],))["n"]
-    oob = _progress_oob(g["id"], a["section_id"], visitor["id"])
+    oob = _progress_oob(g, a["section_id"], visitor["id"])
     return Response(
         f'<span id="take-{asset_id}" class="fav-btn faved sr-take is-circled">{n}</span>'
         + _takes_oob(visitor["id"], asset_id, g["id"])
