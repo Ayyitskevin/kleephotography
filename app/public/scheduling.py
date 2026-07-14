@@ -128,7 +128,8 @@ def _picker_ctx(
 
 @router.get("/book", response_class=HTMLResponse)
 async def book_index(request: Request):
-    from .site import BOOK_ACTIVE_PROMISES, BOOK_FAQS, BOOK_PROMISES, _portfolio_assets
+    from .site import _portfolio_assets
+    from .site_catalog import BOOK_ACTIVE_PROMISES, BOOK_FAQS, BOOK_PROMISES
 
     events = scheduling.active_event_types()
     book_photo = _portfolio_assets()[:1]
