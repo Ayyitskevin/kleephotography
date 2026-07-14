@@ -3875,6 +3875,204 @@ def test_booking_manage_shows_client_timezone(admin):
         db.run("DELETE FROM event_types WHERE id=?", (eid,))
 
 
+@pytest.mark.parametrize(
+    ("hours_out", "kind", "flag", "subject_phrase"),
+    [
+        (36, "48h", "reminded_48h", "about two days"),
+        (12, "24h", "reminded_24h", "tomorrow"),
+    ],
+)
+def test_booking_reminder_sweeps_once(monkeypatch, hours_out, kind, flag, subject_phrase):
+    import datetime as dt
+
+    from app import booking_reminders, mailer
+
+    now = dt.datetime(2026, 8, 10, 12, 0, tzinfo=dt.UTC)
+
+    class FrozenDateTime(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now if tz else now.replace(tzinfo=None)
+
+    eid = db.run(
+        "INSERT INTO event_types (slug, name, duration_min) VALUES (?,?,?)",
+        (f"reminder-{kind}", f"Reminder {kind}", 60),
+    )
+    start = now + dt.timedelta(hours=hours_out)
+    bid = db.run(
+        """INSERT INTO bookings
+           (token, event_type_id, name, email, start_utc, end_utc, tz)
+           VALUES (?,?,?,?,?,?,?)""",
+        (
+            f"ReminderToken{kind}",
+            eid,
+            "Remy",
+            "remy@example.com",
+            start.strftime("%Y-%m-%d %H:%M:%S"),
+            (start + dt.timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S"),
+            "America/New_York",
+        ),
+    )
+    sent = []
+    monkeypatch.setattr(booking_reminders.dt, "datetime", FrozenDateTime)
+    monkeypatch.setattr(mailer, "configured", lambda: True)
+    monkeypatch.setattr(mailer, "send", lambda *args, **kwargs: sent.append((args, kwargs)))
+    try:
+        booking_reminders.sweep()
+        booking_reminders.sweep()
+
+        row = db.one(
+            "SELECT reminded_48h, reminded_24h FROM bookings WHERE id=?",
+            (bid,),
+        )
+        assert row[flag] == 1
+        assert row["reminded_24h" if flag == "reminded_48h" else "reminded_48h"] == 0
+        assert len(sent) == 1
+        assert subject_phrase in sent[0][0][1]
+    finally:
+        db.run("DELETE FROM bookings WHERE id=?", (bid,))
+        db.run("DELETE FROM event_types WHERE id=?", (eid,))
+
+
+def test_client_booking_cancel_route(monkeypatch):
+    from app import booking_notify
+
+    eid = db.run(
+        "INSERT INTO event_types (slug, name, duration_min) VALUES (?,?,?)",
+        ("client-cancel", "Client Cancel", 60),
+    )
+    bid = db.run(
+        """INSERT INTO bookings
+           (token, event_type_id, name, email, start_utc, end_utc)
+           VALUES (?,?,?,?,?,?)""",
+        (
+            "ClientCancelToken",
+            eid,
+            "Casey",
+            "casey@example.com",
+            "2026-09-10 14:00:00",
+            "2026-09-10 15:00:00",
+        ),
+    )
+    notified = []
+    monkeypatch.setattr(booking_notify, "cancelled", lambda booking_id: notified.append(booking_id))
+    try:
+        with TestClient(app) as pub:
+            response = pub.post(
+                "/booking/ClientCancelToken/cancel",
+                data={"reason": "Plans changed"},
+                follow_redirects=False,
+            )
+
+        assert response.status_code == 303
+        assert response.headers["location"] == "/booking/ClientCancelToken"
+        booking = db.one("SELECT status, cancel_reason FROM bookings WHERE id=?", (bid,))
+        assert booking["status"] == "cancelled"
+        assert booking["cancel_reason"] == "Plans changed"
+        assert notified == [bid]
+    finally:
+        db.run("DELETE FROM bookings WHERE id=?", (bid,))
+        db.run("DELETE FROM event_types WHERE id=?", (eid,))
+
+
+def test_client_booking_reschedule_leaves_one_confirmed(monkeypatch):
+    import datetime as dt
+
+    from app import booking_notify
+    from app import scheduling as S
+
+    day = dt.date(2026, 9, 14)
+    eid = db.run(
+        """INSERT INTO event_types
+           (slug, name, duration_min, slot_step_min, min_notice_hours, booking_window_days)
+           VALUES (?,?,?,?,?,?)""",
+        ("client-reschedule", "Client Reschedule", 60, 60, 0, 365),
+    )
+    db.run(
+        """INSERT INTO availability_rules
+           (event_type_id, weekday, start_min, end_min) VALUES (?,?,?,?)""",
+        (eid, day.weekday(), 540, 780),
+    )
+    old_id = db.run(
+        """INSERT INTO bookings
+           (token, event_type_id, name, email, start_utc, end_utc, tz)
+           VALUES (?,?,?,?,?,?,?)""",
+        (
+            "OldRescheduleToken",
+            eid,
+            "Riley",
+            "riley@example.com",
+            "2026-09-14 13:00:00",
+            "2026-09-14 14:00:00",
+            "America/New_York",
+        ),
+    )
+    confirmed = []
+    monkeypatch.setattr(S, "now_utc", lambda: dt.datetime(2026, 9, 1, tzinfo=dt.UTC))
+    monkeypatch.setattr(booking_notify, "confirm", lambda booking_id: confirmed.append(booking_id))
+    try:
+        with TestClient(app) as pub:
+            response = pub.post(
+                "/booking/OldRescheduleToken/reschedule",
+                data={"start": "2026-09-14 15:00:00", "tz": "America/New_York"},
+                follow_redirects=False,
+            )
+
+        assert response.status_code == 303
+        new_token = response.headers["location"].rsplit("/", 1)[-1]
+        rows = db.all_(
+            "SELECT id, token, status, reschedule_of FROM bookings WHERE event_type_id=?",
+            (eid,),
+        )
+        assert sum(row["status"] == "confirmed" for row in rows) == 1
+        assert db.one("SELECT status FROM bookings WHERE id=?", (old_id,))["status"] == "cancelled"
+        new = next(row for row in rows if row["token"] == new_token)
+        assert new["status"] == "confirmed" and new["reschedule_of"] == old_id
+        assert confirmed == [new["id"]]
+    finally:
+        db.run("DELETE FROM bookings WHERE event_type_id=?", (eid,))
+        db.run("DELETE FROM availability_rules WHERE event_type_id=?", (eid,))
+        db.run("DELETE FROM event_types WHERE id=?", (eid,))
+
+
+def test_booking_ics_download():
+    eid = db.run(
+        """INSERT INTO event_types (slug, name, duration_min, location)
+           VALUES (?,?,?,?)""",
+        ("ics-download", "ICS Portrait", 60, "Studio 4"),
+    )
+    bid = db.run(
+        """INSERT INTO bookings
+           (token, event_type_id, name, email, notes, start_utc, end_utc)
+           VALUES (?,?,?,?,?,?,?)""",
+        (
+            "IcsDownloadToken",
+            eid,
+            "Avery",
+            "avery@example.com",
+            "Bring two looks.",
+            "2026-10-05 14:00:00",
+            "2026-10-05 15:00:00",
+        ),
+    )
+    try:
+        with TestClient(app) as pub:
+            response = pub.get("/booking/IcsDownloadToken/invite.ics")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/calendar")
+        assert response.headers["content-disposition"] == 'attachment; filename="invite.ics"'
+        assert f"UID:mise-booking-{bid}@kleephotography.com" in response.text
+        assert "DTSTART:20261005T140000Z" in response.text
+        assert "DTEND:20261005T150000Z" in response.text
+        assert "SUMMARY:ICS Portrait" in response.text
+        assert "LOCATION:Studio 4" in response.text
+        assert "STATUS:CONFIRMED" in response.text
+    finally:
+        db.run("DELETE FROM bookings WHERE id=?", (bid,))
+        db.run("DELETE FROM event_types WHERE id=?", (eid,))
+
+
 def test_upload_all_rejected_reports_zero_accepted(admin):
     # Every unsupported file → route reports accepted=0 (the admin upload JS
     # reads this to avoid a false "Uploaded — processing…" message + reload) and
@@ -9910,6 +10108,51 @@ def test_specialty_pages(admin):
     finally:
         db.run("DELETE FROM assets WHERE id IN (?,?)", (re_id, fb_id))
         db.run("DELETE FROM event_types WHERE slug='re-shoot'")
+
+
+@pytest.mark.parametrize(
+    ("slug", "tag", "heading", "label", "service"),
+    [
+        (
+            "cta-real-estate",
+            "re/exteriors",
+            "Like the look? Let&#39;s shoot your listing.",
+            "Request a listing quote",
+            "Real%20Estate",
+        ),
+        (
+            "cta-portrait",
+            "pl/headshots",
+            "Like the look? Let&#39;s plan your session.",
+            "Request a portrait quote",
+            "Portraits",
+        ),
+    ],
+)
+def test_case_study_cta_variants(slug, tag, heading, label, service):
+    gid = db.run(
+        """INSERT INTO galleries
+           (slug, title, pin, cs_published, cs_tagline, cs_brief)
+           VALUES (?,?,?,?,?,?)""",
+        (slug, f"CTA study {slug}", "1234", 1, "A focused campaign.", "The brief."),
+    )
+    aid = db.run(
+        """INSERT INTO assets
+           (gallery_id, kind, filename, stored, status, portfolio, portfolio_tag)
+           VALUES (?,?,?,?,?,?,?)""",
+        (gid, "photo", f"{slug}.jpg", f"{slug}.jpg", "ready", 1, tag),
+    )
+    try:
+        with TestClient(app) as pub:
+            response = pub.get(f"/work/{slug}")
+
+        assert response.status_code == 200
+        assert heading in response.text
+        assert label in response.text
+        assert f'href="/contact?service={service}"' in response.text
+    finally:
+        db.run("DELETE FROM assets WHERE id=?", (aid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
 
 
 def test_video_renditions_flow(admin):
