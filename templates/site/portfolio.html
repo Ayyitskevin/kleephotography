@@ -2,8 +2,8 @@
 {# The Archive (Screening Room 3d): stills & films on one projector grid —
    mono frame metadata instead of captions, film-stock filter chips, films
    sort first on the ▶ toggle, and the lightbox screens everything dark. #}
-{% block title %}The Archive — {{ site_name }}{% endblock %}
-{% block meta_description %}Selected work across real estate, portraits, and food &amp; beverage — exteriors, faces, dishes, and the rooms they live in, shot for listings, brands, and menus.{% endblock %}
+{% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
+{% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
 
 <section class="sr-wrap" aria-label="The archive">

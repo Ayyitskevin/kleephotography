@@ -1,6 +1,6 @@
 {% extends "site/base_site.html" %}
-{% block title %}Work — {{ site_name }}{% endblock %}
-{% block meta_description %}Client case studies across real estate, portraits, and food &amp; beverage — what we shot, and what happened after it went live.{% endblock %}
+{% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
+{% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
 
 <section class="page-hero page-hero-work sr-wrap">

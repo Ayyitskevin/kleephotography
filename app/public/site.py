@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 
 from .. import config, db, features, jobs, mailer, security, specialties
 from ..render import ROOT, _static_rev, templates
+from .site_catalog import marketing_meta
 
 log = logging.getLogger("mise.public.site")
 router = APIRouter()
@@ -745,6 +746,42 @@ SPECIALTY_PAGES = {
         },
     },
 }
+
+
+def marketing_page_catalog() -> list[dict[str, str]]:
+    """Indexable static routes and their rendered title/description metadata."""
+    pages = []
+    for path in (
+        "/",
+        "/real-estate",
+        "/portraits",
+        "/food-beverage",
+        "/portfolio",
+        "/work",
+        "/services",
+        "/about",
+        "/contact",
+        "/book",
+        "/reels",
+        "/press",
+    ):
+        specialty = next(
+            (
+                page
+                for key, page in SPECIALTY_PAGES.items()
+                if f"/{specialties.SPECIALTIES[key]['slug']}" == path
+            ),
+            None,
+        )
+        if specialty:
+            title = f"{specialty['title']} — {config.SITE_NAME}"
+            description = specialty["meta"]
+        else:
+            meta = marketing_meta(path)
+            title = meta["title"]
+            description = meta["description"]
+        pages.append({"path": path, "title": title, "description": description})
+    return pages
 
 
 def _sr_rate_cells(key: str) -> list[dict]:

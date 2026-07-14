@@ -4803,7 +4803,7 @@ def test_gallery_public_site_readiness(admin):
     assert "Ready:</b> Case-study fields are complete." in r.text
     assert f'href="{config.BASE_URL}/g/readiness-ready"' in r.text
     assert f'href="{config.BASE_URL}/work/readiness-ready"' in r.text
-    assert 'href="/admin/share"' in r.text
+    assert 'href="/admin/share?path=/work/readiness-ready#selected-card"' in r.text
     assert "Published case study has no eligible hero" not in r.text
     assert "shoot your listing" in admin.get("/work/readiness-ready").text
     assert f"{config.BASE_URL}/work/readiness-ready" in admin.get("/admin/share").text
@@ -4836,16 +4836,53 @@ def test_gallery_public_site_readiness(admin):
 
 
 def test_share_debugger(admin):
+    import html
+    import re
+
     from app import config
+    from app.admin.share import _build_urls
 
     # baseline: marketing pages always listed; case-studies section only when
     # there's at least one published study
     r = admin.get("/admin/share")
     assert r.status_code == 200
     assert "Marketing pages" in r.text
-    # all marketing-page paths present
-    for path in ("/", "/portfolio", "/work", "/services", "/about", "/book", "/contact"):
+    indexable_paths = (
+        "/",
+        "/real-estate",
+        "/portraits",
+        "/food-beverage",
+        "/portfolio",
+        "/work",
+        "/services",
+        "/about",
+        "/contact",
+        "/book",
+        "/reels",
+        "/press",
+    )
+    for path in indexable_paths:
         assert f"{config.BASE_URL}{path}" in r.text, path
+    marketing_rows = {u["path"]: u for u in _build_urls() if u["kind"] == "marketing"}
+    assert set(marketing_rows) == set(indexable_paths)
+    with TestClient(app) as pub:
+        for path, row in marketing_rows.items():
+            page = pub.get(path)
+            assert page.status_code == 200
+            title = html.unescape(
+                re.search(r"<title>(.*?)</title>", page.text, re.S).group(1)
+            ).strip()
+            description = html.unescape(
+                re.search(r'<meta name="description" content="([^"]*)">', page.text).group(1)
+            )
+            canonical = re.search(r'<link rel="canonical" href="([^"]+)">', page.text).group(1)
+            og_image = re.search(
+                r'<meta property="og:image" content="[^"]+/site/img/(\d+)">', page.text
+            )
+            assert row["title"] == title
+            assert row["meta_description"] == description
+            assert row["full_url"] == canonical
+            assert row["og_image_id"] == (int(og_image.group(1)) if og_image else None)
     # per-row debugger links (Facebook + LinkedIn + OpenGraph.xyz)
     assert "developers.facebook.com/tools/debug" in r.text
     assert "linkedin.com/post-inspector" in r.text
@@ -4857,65 +4894,63 @@ def test_share_debugger(admin):
     # from any admin page via the ⌘K command palette (a JS-built CMDS entry).
     assert '"/admin/share"' in admin.get("/admin/galleries").text
 
-    # publish a case study and confirm it appears with its specific OG values
-    g = db.one("SELECT * FROM galleries ORDER BY id LIMIT 1")
-    a = db.one("SELECT id FROM assets WHERE gallery_id=? AND kind='photo'", (g["id"],))
-    # ensure starred (the toggle endpoint XORs, which would unstar if a prior
-    # test already starred this asset)
-    db.run("UPDATE assets SET portfolio=1 WHERE id=?", (a["id"],))
-    admin.post(
-        f"/admin/galleries/{g['id']}/settings",
-        data={
-            "title": g["title"],
-            "client_name": g["client_name"] or "",
-            "pin": g["pin"],
-            "expires_at": "",
-            "published": "true",
-            "captions": "",
-            "cs_published": "true",
-            "cs_tagline": "Spring dish series",
-            "cs_brief": "A two-day shoot covering the spring menu refresh.",
-            "cs_credits": "",
-            "cs_location": "Asheville, NC",
-        },
+    # Publish a self-contained case study and confirm its exact public metadata.
+    gid = db.run(
+        """INSERT INTO galleries
+           (slug, title, pin, published, cs_published, cs_tagline, cs_brief, cs_location)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        (
+            "share-debugger-study",
+            "Share Debugger Study",
+            "4422",
+            1,
+            1,
+            "Spring dish series",
+            "A two-day shoot covering the spring menu refresh.",
+            "Asheville, NC",
+        ),
     )
+    db.run(
+        """INSERT INTO assets
+           (gallery_id, kind, filename, stored, status, portfolio, position)
+           VALUES (?,?,?,?,?,?,?)""",
+        (gid, "photo", "share-hero.jpg", "sharehero.jpg", "ready", 1, 0),
+    )
+    g = db.one("SELECT * FROM galleries WHERE id=?", (gid,))
     saved = db.one(
         "SELECT cs_published, cs_location, cs_tagline FROM galleries WHERE id=?", (g["id"],)
     )
     assert saved["cs_published"] == 1
     assert saved["cs_location"] == "Asheville, NC"
     assert saved["cs_tagline"] == "Spring dish series"
-    r = admin.get("/admin/share")
+    r = admin.get(f"/admin/share?path=/work/{g['slug']}")
     assert "Case studies" in r.text
     assert f"/work/{g['slug']}" in r.text
+    assert 'id="selected-card"' in r.text
     assert "Spring dish series" in r.text  # cs_tagline became og:title
     assert "spring menu refresh" in r.text  # cs_brief became description
     # Jinja escapes the comma differently? No — just look for Asheville
     assert "Asheville" in r.text
-    # a hero photo thumb shows as the og:image preview (whichever portfolio-
-    # starred asset is newest for this gallery, not necessarily `a`)
-    import re
-
+    # a hero photo thumb shows as the same og:image used by the public study
     assert re.search(r"/site/img/\d+\?variant=thumb", r.text)
-
-    # unpublish → case study drops off the debugger
-    admin.post(
-        f"/admin/galleries/{g['id']}/settings",
-        data={
-            "title": g["title"],
-            "client_name": g["client_name"] or "",
-            "pin": g["pin"],
-            "expires_at": "",
-            "published": "true",
-            "captions": "",
-            "cs_tagline": "",
-            "cs_brief": "",
-            "cs_credits": "",
-            "cs_location": "",
-        },
+    with TestClient(app) as pub:
+        study = pub.get(f"/work/{g['slug']}")
+    row = next(u for u in _build_urls() if u["path"] == f"/work/{g['slug']}")
+    assert (
+        row["title"]
+        == html.unescape(re.search(r"<title>(.*?)</title>", study.text, re.S).group(1)).strip()
     )
+    assert row["meta_description"] == html.unescape(
+        re.search(r'<meta name="description" content="([^"]*)">', study.text).group(1)
+    )
+    study_og = re.search(r'<meta property="og:image" content="[^"]+/site/img/(\d+)">', study.text)
+    assert row["og_image_id"] == int(study_og.group(1))
+
+    # Unpublish → case study drops off the debugger.
+    db.run("UPDATE galleries SET cs_published=0 WHERE id=?", (g["id"],))
     r = admin.get("/admin/share")
     assert "Spring dish series" not in r.text
+    db.run("DELETE FROM galleries WHERE id=?", (g["id"],))
 
 
 def test_section_captions(admin):

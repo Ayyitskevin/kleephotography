@@ -1,6 +1,6 @@
 {% extends "site/base_site.html" %}
-{% block title %}Services — {{ site_name }}{% endblock %}
-{% block meta_description %}Photography, videography, and monthly Brand Partner retainers for real estate, portraits, and food &amp; beverage — Asheville and Western North Carolina. Three tiers per category.{% endblock %}
+{% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
+{% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
 
 {# PAGE HEADER — the features & screenings board #}

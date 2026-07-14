@@ -30,7 +30,8 @@
       {% set ns.current_kind = u.kind %}
       <h2>{% if u.kind == "marketing" %}Marketing pages{% else %}Case studies (/work/&lt;slug&gt;){% endif %}</h2>
     {% endif %}
-    <article class="share-row">
+    <article class="share-row{% if u.path == selected_path %} is-selected{% endif %}"
+             {% if u.path == selected_path %}id="selected-card"{% endif %}>
       <a class="share-thumb" href="{{ u.path }}" target="_blank" rel="noopener">
         {% if u.og_image_id %}
         <img src="/site/img/{{ u.og_image_id }}?variant=thumb"
@@ -43,7 +44,12 @@
           {% if u.client %} <span class="muted">· {{ u.client }}{% if u.location %} · {{ u.location }}{% endif %}</span>{% endif %}
         </p>
         <h3 class="share-title">{{ u.title }}</h3>
-        <p class="share-desc">{{ u.description or "(no description set)" }}</p>
+        <p class="share-desc"><span class="muted">Meta description:</span>
+          {{ u.meta_description or "(no description set)" }}</p>
+        {% if u.og_description != u.meta_description %}
+        <p class="share-desc"><span class="muted">OG description:</span>
+          {{ u.og_description or "(no description set)" }}</p>
+        {% endif %}
         <div class="share-debuggers">
           <span class="muted">Force refresh:</span>
           {% for label, link in u.debuggers %}

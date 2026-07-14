@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from fastapi.templating import Jinja2Templates
 
 from . import config, db, features, specialties
+from .public.site_catalog import marketing_meta
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -57,6 +58,7 @@ templates.env.globals["aerials_live"] = features.aerials_live
 # specialty key → film-stock code ('re' → '250D') for mono frame metadata
 templates.env.globals["sp_stock"] = {k: m["stock"] for k, m in specialties.SPECIALTIES.items()}
 templates.env.globals["aerial_pass_display"] = specialties.aerial_pass_display
+templates.env.globals["marketing_meta"] = marketing_meta
 
 
 def _portfolio_alt(asset, site_name: str | None = None) -> str:

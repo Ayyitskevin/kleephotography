@@ -1,6 +1,6 @@
 {% extends "site/base_site.html" %}
-{% block title %}About — {{ site_name }}{% endblock %}
-{% block meta_description %}Meet Kevin Lee — photographer &amp; filmmaker in Asheville, NC, shooting real estate, portraits, and food &amp; beverage across Western North Carolina.{% endblock %}
+{% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
+{% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
 
 {# INTRO — credits-page treatment: the studio as an end-titles roll #}

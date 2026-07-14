@@ -279,7 +279,7 @@
           {% if g.published %}<a href="{{ base_url }}/g/{{ g.slug }}" target="_blank" rel="noopener">Preview public gallery</a>{% endif %}
           {% if g.published and g.cs_published %} · {% endif %}
           {% if g.cs_published %}<a href="{{ base_url }}/work/{{ g.slug }}" target="_blank" rel="noopener">Preview public case study</a>
-          · <a href="/admin/share">Open share debugger for this route</a>{% endif %}
+          · <a href="/admin/share?path={{ ('/work/' ~ g.slug) | urlencode }}#selected-card">Open share debugger for this route</a>{% endif %}
         </span>
         {% endif %}
       </section>

@@ -9,7 +9,8 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
-from .. import config, db, security
+from .. import config, db, security, specialties
+from ..public.site import marketing_page_catalog
 from ..render import templates
 
 log = logging.getLogger("mise.admin.share")
@@ -23,78 +24,60 @@ def _first_starred_id() -> int | None:
     return row["id"] if row else None
 
 
+def _specialty_hero_ids() -> dict[str, int]:
+    """Match each spoke's first photo from site._portfolio_assets()."""
+    rows = db.all_(
+        """SELECT id, portfolio_tag FROM assets
+           WHERE portfolio=1 AND status='ready' AND kind='photo'
+           ORDER BY id DESC"""
+    )
+    heroes = {}
+    for row in rows:
+        heroes.setdefault(specialties.specialty_key(row["portfolio_tag"]), row["id"])
+    return heroes
+
+
 def _build_urls() -> list[dict]:
     """Compose every indexable URL with its computed OG metadata. Mirrors what
     the templates produce server-side so what shows here matches what the
     socials will scrape (no live HTTP fetch needed)."""
-    name = config.SITE_NAME
     default_img = _first_starred_id()
-    urls: list[dict] = [
-        {
-            "path": "/",
-            "title": f"{name} — Food & Beverage Photography",
-            "description": "Menus, dishes, drinks, and the rooms they live in.",
-            "og_image_id": default_img,
-            "kind": "marketing",
-        },
-        {
-            "path": "/portfolio",
-            "title": f"Portfolio — {name}",
-            "description": "F&B photography portfolio — dishes, drinks, interiors.",
-            "og_image_id": default_img,
-            "kind": "marketing",
-        },
-        {
-            "path": "/work",
-            "title": f"Work — {name}",
-            "description": "Selected shoots — menus, dishes, drinks, and the rooms they live in.",
-            "og_image_id": default_img,
-            "kind": "marketing",
-        },
-        {
-            "path": "/services",
-            "title": f"Services — {name}",
-            "description": "F&B photography, videography, and monthly retainers — Asheville-based.",
-            "og_image_id": default_img,
-            "kind": "marketing",
-        },
-        {
-            "path": "/about",
-            "title": f"About — {name}",
-            "description": f"{name} — food & beverage photography.",
-            "og_image_id": default_img,
-            "kind": "marketing",
-        },
-        {
-            "path": "/book",
-            "title": f"Book a shoot — {name}",
-            "description": "Pick a date and a starting service.",
-            "og_image_id": default_img,
-            "kind": "marketing",
-        },
-        {
-            "path": "/contact",
-            "title": f"Contact — {name}",
-            "description": "Tell me about your restaurant, café, bar, or brand.",
-            "og_image_id": default_img,
-            "kind": "marketing",
-        },
-    ]
+    specialty_heroes = _specialty_hero_ids()
+    specialty_by_path = {f"/{meta['slug']}": key for key, meta in specialties.SPECIALTIES.items()}
+    urls: list[dict] = []
+    for page in marketing_page_catalog():
+        path = page["path"]
+        specialty_key = specialty_by_path.get(path)
+        urls.append(
+            {
+                **page,
+                "meta_description": page["description"],
+                "og_description": page["description"],
+                "og_image_id": (
+                    specialty_heroes.get(specialty_key) if specialty_key else default_img
+                ),
+                "kind": "marketing",
+            }
+        )
     # case studies — only published, with the gallery's own hero photo
     studies = db.all_("""SELECT g.slug, g.title, g.client_name, g.cs_tagline,
                                 g.cs_brief, g.cs_location,
                                 (SELECT a.id FROM assets a WHERE a.gallery_id=g.id
                                  AND a.portfolio=1 AND a.status='ready'
-                                 AND a.kind='photo' ORDER BY a.id DESC LIMIT 1)
+                                 AND a.kind='photo'
+                                 ORDER BY a.position, a.id LIMIT 1)
                                 AS hero_id
                          FROM galleries g WHERE g.cs_published=1
                          ORDER BY g.created_at DESC""")
     for s in studies:
+        meta_description = (s["cs_brief"] or s["cs_tagline"] or s["title"])[:200]
         urls.append(
             {
                 "path": f"/work/{s['slug']}",
-                "title": f"{s['cs_tagline'] or s['title']} — {name}",
-                "description": (s["cs_brief"] or "")[:200],
+                "title": f"{s['cs_tagline'] or s['title']} — {config.SITE_NAME}",
+                "description": meta_description,
+                "meta_description": meta_description,
+                "og_description": (s["cs_brief"] or "")[:200],
                 "og_image_id": s["hero_id"],
                 "kind": "case_study",
                 "client": s["client_name"],
@@ -116,5 +99,11 @@ def _build_urls() -> list[dict]:
 @router.get("/share", response_class=HTMLResponse)
 async def share_debugger(request: Request):
     return templates.TemplateResponse(
-        request, "admin/share.html", {"urls": _build_urls(), "base_url": config.BASE_URL}
+        request,
+        "admin/share.html",
+        {
+            "urls": _build_urls(),
+            "base_url": config.BASE_URL,
+            "selected_path": request.query_params.get("path", ""),
+        },
     )

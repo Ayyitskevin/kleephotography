@@ -1,6 +1,6 @@
 {% extends "site/base_site.html" %}
-{% block title %}Press — {{ site_name }}{% endblock %}
-{% block meta_description %}Where the work has run — press features and publications covering {{ site_name }}, in print and online.{% endblock %}
+{% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
+{% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
 
 <section class="sr-wrap">

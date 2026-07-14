@@ -3,8 +3,8 @@
    three feature title cards on their film stocks, the ticker band, then the
    credits footer (base_site). The archive filmstrip keeps a lightbox-able set
    of real frames on the hub for browsers and crawlers alike. #}
-{% block title %}{{ site_name }} — Real Estate &middot; Portraits &middot; Food &amp; Beverage{% endblock %}
-{% block meta_description %}Photography &amp; film studio in Asheville, NC — real estate listings, portraits &amp; personal branding, and the food &amp; beverage work that made the name. Photo and video, delivered fast.{% endblock %}
+{% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
+{% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
 
 <div class="scroll-progress" aria-hidden="true"><div data-progress-bar></div></div>

@@ -1,6 +1,6 @@
 {% extends "site/base_site.html" %}
-{% block title %}Contact — {{ site_name }}{% endblock %}
-{% block meta_description %}Request a quote — tell me about your listing, portrait session, or food &amp; beverage project and get a tailored proposal within a business day.{% endblock %}
+{% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
+{% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
 
 <section class="contact-wrap sr-wrap sr-section">
