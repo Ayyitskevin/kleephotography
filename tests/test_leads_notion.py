@@ -91,9 +91,7 @@ def test_missing_inquiry_fails_loud():
 
 
 def _last_inquiry_job():
-    return db.one(
-        "SELECT * FROM jobs WHERE kind='notion_sync_inquiry' ORDER BY id DESC LIMIT 1"
-    )
+    return db.one("SELECT * FROM jobs WHERE kind='notion_sync_inquiry' ORDER BY id DESC LIMIT 1")
 
 
 def _wipe(email: str) -> None:

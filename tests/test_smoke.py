@@ -4604,7 +4604,7 @@ def test_portfolio_tag_filter(admin):
         r = pub.get("/portfolio")
         # filter chips render with per-tag counts + an "All" chip
         assert 'class="portfolio-filter"' in r.text
-        assert 'data-pf' in r.text
+        assert "data-pf" in r.text
         assert "/static/portfolio-filter.js?v=" in r.text
         assert 'data-filter=""' in r.text and ">All" in r.text  # 'All' chip
         # alphabetical: Dishes (2) before Drinks (1); tag filters are namespaced
