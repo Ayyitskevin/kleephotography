@@ -15,7 +15,7 @@ os.environ.setdefault("MISE_ENV_FILE", "/nonexistent")
 import pytest
 from fastapi.testclient import TestClient
 
-from app import config, db, notion_sync
+from app import booking_notify, config, db, notion_sync
 from app.main import app
 
 pytestmark = pytest.mark.integration
@@ -36,6 +36,37 @@ def inquiry_id():
     )
     yield iid
     db.run("DELETE FROM inquiries WHERE id=?", (iid,))
+
+
+@pytest.fixture()
+def booking_id():
+    db.run("DELETE FROM event_types WHERE slug='notion-observe-test'")
+    eid = db.run(
+        """INSERT INTO event_types
+           (slug, name, duration_min, active, creates_notion_session)
+           VALUES (?,?,?,?,?)""",
+        ("notion-observe-test", "Observed Shoot", 60, 1, 1),
+    )
+    bid = db.run(
+        """INSERT INTO bookings
+           (token, event_type_id, name, email, phone, notes, start_utc, end_utc, tz)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (
+            "NotionObserve01",
+            eid,
+            "Observe Client",
+            "notion-observe@example.com",
+            "555-0101",
+            "Keep this mocked.",
+            "2027-02-01 15:00:00",
+            "2027-02-01 16:00:00",
+            "America/New_York",
+        ),
+    )
+    yield bid
+    db.run("DELETE FROM bookings WHERE event_type_id=?", (eid,))
+    db.run("DELETE FROM event_types WHERE id=?", (eid,))
+    db.run("DELETE FROM inquiries WHERE email='notion-observe@example.com'")
 
 
 def test_dry_run_builds_create_plan_without_writing(inquiry_id, monkeypatch):
@@ -85,6 +116,99 @@ def test_create_stamps_page_id_then_patches_status(inquiry_id, monkeypatch):
     notion_sync.sync_inquiry(inquiry_id)
     assert len(created) == 1
     assert patched == [("pg-1", {"Status": {"select": {"name": "Dismissed"}}})]
+
+
+def test_booking_notion_create_update_and_session_reschedule_are_idempotent(
+    booking_id, monkeypatch
+):
+    monkeypatch.setattr(config, "NOTION_TOKEN", "tok")
+    monkeypatch.setattr(config, "NOTION_BOOKINGS_DB", "bookings-db")
+    monkeypatch.setattr(config, "NOTION_SESSIONS_DB", "sessions-db")
+    created, patched = [], []
+
+    def create_page(database_id, props):
+        page_id = f"{database_id}-page-{len(created) + 1}"
+        created.append((database_id, props, page_id))
+        return page_id
+
+    monkeypatch.setattr(notion_sync, "_create_page", create_page)
+    monkeypatch.setattr(
+        notion_sync, "_patch_page", lambda page_id, props: patched.append((page_id, props))
+    )
+
+    notion_sync.sync_booking(booking_id)
+    notion_sync.sync_booking(booking_id)
+    booking_page = db.one("SELECT notion_page_id FROM bookings WHERE id=?", (booking_id,))[
+        "notion_page_id"
+    ]
+    assert booking_page == "bookings-db-page-1"
+    assert [row[0] for row in created].count("bookings-db") == 1
+    assert patched[-1][0] == booking_page
+    assert patched[-1][1]["Status"]["select"]["name"] == "Confirmed"
+    db.run("UPDATE bookings SET status='cancelled' WHERE id=?", (booking_id,))
+    notion_sync.sync_booking(booking_id)
+    assert patched[-1][1]["Status"]["select"]["name"] == "Cancelled"
+    db.run("UPDATE bookings SET status='confirmed' WHERE id=?", (booking_id,))
+
+    notion_sync.sync_session_for_booking(booking_id)
+    notion_sync.sync_session_for_booking(booking_id)
+    session_page = db.one("SELECT notion_session_id FROM bookings WHERE id=?", (booking_id,))[
+        "notion_session_id"
+    ]
+    assert session_page == "sessions-db-page-2"
+    assert [row[0] for row in created].count("sessions-db") == 1
+
+    original = db.one("SELECT * FROM bookings WHERE id=?", (booking_id,))
+    replacement = db.run(
+        """INSERT INTO bookings
+           (token, event_type_id, name, email, phone, notes, start_utc, end_utc,
+            tz, reschedule_of)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (
+            "NotionObserve02",
+            original["event_type_id"],
+            original["name"],
+            original["email"],
+            original["phone"],
+            original["notes"],
+            "2027-02-02 15:00:00",
+            "2027-02-02 16:00:00",
+            original["tz"],
+            booking_id,
+        ),
+    )
+    notion_sync.sync_session_for_booking(replacement)
+    linked = db.one("SELECT notion_session_id FROM bookings WHERE id=?", (replacement,))
+    assert linked["notion_session_id"] == session_page
+    assert [row[0] for row in created].count("sessions-db") == 1
+
+
+def test_booking_mail_failure_generates_operator_signal(booking_id, monkeypatch):
+    sent_alerts = []
+    monkeypatch.setattr(booking_notify.mailer, "configured", lambda: True)
+    monkeypatch.setattr(
+        booking_notify.mailer,
+        "send",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("smtp unavailable")),
+    )
+    monkeypatch.setattr(
+        booking_notify.alerts,
+        "ops_alert",
+        lambda signature, text: sent_alerts.append((signature, text)),
+    )
+    monkeypatch.setattr(booking_notify, "_link_studio", lambda *args: None)
+    monkeypatch.setattr(booking_notify.notion_sync, "sync_booking", lambda *args: None)
+    monkeypatch.setattr(booking_notify.notion_sync, "sync_session_for_booking", lambda *args: None)
+    monkeypatch.setattr(booking_notify.gcal, "on_booking_confirmed", lambda *args: None)
+
+    booking_notify.confirm(booking_id)
+
+    assert len(sent_alerts) == 2
+    assert {signature.rsplit(":", 1)[-1] for signature, _ in sent_alerts} == {
+        "client confirmation",
+        "operator confirmation",
+    }
+    assert all("contact the client manually" in text for _, text in sent_alerts)
 
 
 def test_missing_inquiry_fails_loud():

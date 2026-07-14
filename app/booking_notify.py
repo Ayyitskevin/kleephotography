@@ -10,7 +10,7 @@ import datetime as dt
 import logging
 from zoneinfo import ZoneInfo
 
-from . import config, db, gcal, ics, mailer, notion_sync
+from . import alerts, config, db, gcal, ics, mailer, notion_sync
 
 log = logging.getLogger("mise.booking")
 _UTC = dt.UTC
@@ -36,6 +36,15 @@ def _when(start_utc: str, tzname: str) -> str:
 
 def _manage_url(token: str) -> str:
     return f"{config.BASE_URL}/booking/{token}"
+
+
+def _mail_failure_alert(booking_id: int, audience: str, reason: str) -> None:
+    alerts.ops_alert(
+        f"booking_email_failed:{audience}",
+        f"Booking {booking_id} {audience} email could not be sent ({reason}). "
+        f"Review the booking and contact the client manually: "
+        f"{config.BASE_URL}/admin/bookings",
+    )
 
 
 def _link_studio(booking_id: int, inquiry_id: int | None) -> None:
@@ -131,6 +140,7 @@ def confirm(booking_id: int) -> None:
 
     if not mailer.configured():
         log.error("booking %s confirmed but mailer not configured — no emails sent", booking_id)
+        _mail_failure_alert(booking_id, "confirmation", "mailer is not configured")
     else:
         invite = {
             "filename": "invite.ics",
@@ -170,6 +180,7 @@ def confirm(booking_id: int) -> None:
             )
         except Exception as e:
             log.error("booking %s client email failed: %s", booking_id, e)
+            _mail_failure_alert(booking_id, "client confirmation", type(e).__name__)
         try:
             # Kevin's copy doubles as the Odysseus inquiry_intake hook (it polls his inbox).
             mailer.send(
@@ -181,6 +192,7 @@ def confirm(booking_id: int) -> None:
             )
         except Exception as e:
             log.error("booking %s kevin email failed: %s", booking_id, e)
+            _mail_failure_alert(booking_id, "operator confirmation", type(e).__name__)
 
     # Mise-side inquiry row keeps the admin inquiry list + Odysseus consistent.
     iid = None
