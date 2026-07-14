@@ -81,12 +81,11 @@ def marketing_meta(path: str) -> dict[str, str]:
     }
 
 
-# Public services + tier cards for /services, grouped by specialty. Deliverable
-# lists loosely mirror admin proposal PRESETS; public board dollars are the
-# value-first starter menu (display_price == price_cents / 100). Admin proposal
-# PRESET unit_cents may still differ until a dedicated pricing PR syncs them.
-# Final quotes stay tailored on the booking form. The booking dropdown itself
-# stays price-free. Order matters: the public page renders these in nav order.
+# Public services + tier cards for /services, grouped by specialty. Board
+# dollars (display_price == price_cents / 100) are the value-first starter menu;
+# mirrored admin proposal PRESET paid lines use the same price_cents. Final
+# quotes stay tailored per client. The booking dropdown itself stays price-free.
+# Order matters: the public page renders these in nav order.
 # contact_service maps each group onto the /contact form's Project type
 # options. The F&B groups keep their pre-revamp keys (photography/videography)
 # so the #svc-… anchors linked from reels/footer never break.

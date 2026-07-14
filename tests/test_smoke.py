@@ -1298,7 +1298,7 @@ def test_proposal_lifecycle(admin):
     )
     assert r.status_code == 303
     d = db.one("SELECT * FROM proposals ORDER BY id DESC LIMIT 1")
-    assert d["status"] == "draft" and d["total_cents"] == 90000
+    assert d["status"] == "draft" and d["total_cents"] == 75000
     page = admin.get(f"/admin/studio/proposals/{d['id']}")
     assert page.status_code == 200
     # copy-link macro emits a "Copy link" button (no PIN) carrying the public URL
@@ -6279,7 +6279,7 @@ def test_services_page():
         # middle tier flagged as "Most picked" (UX nudge), once per group
         assert r.text.count("Most picked") == len(SERVICES)
         # Prototype copy: public tier cards show marketing display prices
-        # (F&B board dollars match price_cents; admin PRESETS may still differ).
+        # (board dollars match price_cents; admin PRESETS paid lines match too).
         for s in SERVICES:
             assert s["contact_service"]  # deep-link target for /contact
             for t in s["tiers"]:
