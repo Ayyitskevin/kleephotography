@@ -13,7 +13,8 @@
     </div>
   </div>
   {% if sp_chips %}
-  <nav class="portfolio-filter" aria-label="Filter reels by specialty">
+  <nav class="portfolio-filter" aria-label="Filter reels by specialty"
+       data-pf data-pf-mode="sp" data-pf-items="[data-sp]">
     <button class="pf-chip pf-chip-active" data-filter="" aria-pressed="true">All
       <span class="muted">({{ reels|length }})</span></button>
     {% for c in sp_chips %}
@@ -138,21 +139,6 @@
 </script>
 {% endif %}
 {% if sp_chips %}
-<script nonce="{{ csp_nonce }}">
-  (function () {
-    const items = document.querySelectorAll("[data-sp]");
-    const chips = document.querySelectorAll(".pf-chip");
-    function apply(sp) {
-      items.forEach(el => el.classList.toggle(
-        "pf-hidden", sp !== "" && (el.dataset.sp || "") !== sp));
-      chips.forEach(c => {
-        const on = (c.dataset.filter || "") === (sp || "");
-        c.classList.toggle("pf-chip-active", on);
-        c.setAttribute("aria-pressed", on ? "true" : "false");
-      });
-    }
-    chips.forEach(c => c.addEventListener("click", () => apply(c.dataset.filter || "")));
-  })();
-</script>
+<script src="/static/portfolio-filter.js?v={{ static_rev }}" defer></script>
 {% endif %}
 {% endblock %}

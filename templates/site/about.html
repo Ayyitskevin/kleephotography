@@ -12,7 +12,12 @@
         <em>in Asheville.</em></h1>
       <p class="sr-beat">a one-person production &mdash; shot{% if aerials_live() %} &middot; flown{% endif %} &middot; directed &middot; edited &middot; graded &middot; delivered</p>
     </div>
-    {% if featured %}
+    {% if portrait_static %}
+    <div class="about-photo ab-photo" data-reveal>
+      <img src="/static/{{ portrait_static }}?v={{ static_rev }}" loading="lazy" decoding="async"
+           alt="Kevin Lee — photographer and filmmaker in Asheville, NC">
+    </div>
+    {% elif featured %}
     <div class="about-photo ab-photo" data-reveal>
       <img src="/site/img/{{ featured[0].id }}?variant=web" loading="lazy" decoding="async"
            srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"

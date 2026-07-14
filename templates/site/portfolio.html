@@ -19,7 +19,11 @@
   </div>
 
   {% if tags or sp_chips %}
-  <nav class="portfolio-filter" aria-label="Filter portfolio">
+  <nav class="portfolio-filter" aria-label="Filter portfolio"
+       data-pf data-pf-mode="namespaced" data-pf-hash="1"
+       data-pf-items=".portfolio-masonry .pf-masonry-tile"
+       data-pf-masonry=".portfolio-masonry"
+       data-pf-films-first="[data-films-first]">
     <button class="pf-chip pf-chip-active" data-filter="" aria-pressed="true">All
       <span class="muted">({{ assets|length }})</span></button>
     {% for c in sp_chips %}
@@ -84,46 +88,6 @@
 
 {% include "site/_lightbox.html" %}
 {% if tags or sp_chips %}
-<script nonce="{{ csp_nonce }}">
-  (function () {
-    const masonry = document.querySelector(".portfolio-masonry");
-    const tiles = document.querySelectorAll(".portfolio-masonry .pf-masonry-tile");
-    const chips = document.querySelectorAll(".pf-chip[data-filter]");
-    // Filters are namespaced: "" all · "sp:re" specialty · "tag:dishes" subject.
-    function apply(f) {
-      tiles.forEach(t => {
-        let show = true;
-        if (f.startsWith("sp:")) show = (t.dataset.sp || "") === f.slice(3);
-        else if (f.startsWith("tag:")) show = (t.dataset.tag || "") === f.slice(4);
-        t.classList.toggle("pf-hidden", f !== "" && !show);
-      });
-      chips.forEach(c => {
-        const on = (c.dataset.filter || "") === (f || "");
-        c.classList.toggle("pf-chip-active", on);
-        c.setAttribute("aria-pressed", on ? "true" : "false");
-      });
-      if (f) history.replaceState(null, "", "#" + f);
-      else history.replaceState(null, "", location.pathname);
-    }
-    chips.forEach(c => c.addEventListener("click", () => apply(c.dataset.filter || "")));
-    // ▶ Films first: lift film tiles to the head of the grid (flex order via
-    // the sr-films-first class) — independent of the stock/subject filter.
-    const ff = document.querySelector("[data-films-first]");
-    if (ff && masonry) ff.addEventListener("click", () => {
-      const on = ff.getAttribute("aria-pressed") !== "true";
-      ff.setAttribute("aria-pressed", on ? "true" : "false");
-      masonry.classList.toggle("sr-films-first", on);
-    });
-    let initial = (location.hash || "").slice(1);
-    // Pre-revamp bookmarks/shares used bare tag hashes (#dishes) — map them
-    // onto the namespaced filter so old links keep landing on the right view.
-    if (initial && !document.querySelector(`.pf-chip[data-filter="${CSS.escape(initial)}"]`)) {
-      initial = "tag:" + initial;
-    }
-    if (initial && document.querySelector(`.pf-chip[data-filter="${CSS.escape(initial)}"]`)) {
-      apply(initial);
-    }
-  })();
-</script>
+<script src="/static/portfolio-filter.js?v={{ static_rev }}" defer></script>
 {% endif %}
 {% endblock %}

@@ -20,10 +20,15 @@
    MISE_SCREENING_ROOM); legal/e-sign surfaces (contract.html) never do. #}
 <link rel="stylesheet" href="/static/screening-room-tokens.css?v={{ static_rev }}">
 <link rel="stylesheet" href="/static/screening.css?v={{ static_rev }}">
+{# Admin + client surfaces need HTMX and the shared behavior helpers.
+   Marketing pages (site/base_site.html) override shell_scripts empty so
+   visitors don't download ~70KB of unused JS on every hit. #}
+{% block shell_scripts %}
 <script src="/static/htmx.min.js?v={{ static_rev }}" defer></script>
 <script src="/static/behaviors.js?v={{ static_rev }}" defer></script>
 <script src="/static/copy_link.js?v={{ static_rev }}" defer></script>
 <script src="/static/details_persist.js?v={{ static_rev }}" defer></script>
+{% endblock %}
 {% block head %}{% endblock %}
 </head>
 <body class="{% block bodyclass %}{% endblock %}">

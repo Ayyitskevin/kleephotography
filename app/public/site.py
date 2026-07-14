@@ -1043,10 +1043,39 @@ async def portfolio(request: Request):
     )
 
 
+def _about_portrait_static() -> str | None:
+    """Filename under /static for the About studio portrait, if present.
+
+    Prefers MISE_ABOUT_PORTRAIT when set; otherwise the first of
+    about-portrait.{jpg,jpeg,png,webp} that exists on disk. Returns None so
+    the template can fall back to a starred portfolio still.
+    """
+    static = ROOT / "static"
+    if config.ABOUT_PORTRAIT:
+        name = Path(config.ABOUT_PORTRAIT).name  # basename only — no path escape
+        if (static / name).is_file():
+            return name
+        return None
+    for name in (
+        "about-portrait.jpg",
+        "about-portrait.jpeg",
+        "about-portrait.png",
+        "about-portrait.webp",
+    ):
+        if (static / name).is_file():
+            return name
+    return None
+
+
 @router.get("/about", response_class=HTMLResponse)
 async def about(request: Request):
     return templates.TemplateResponse(
-        request, "site/about.html", {"featured": _portfolio_assets()[:1]}
+        request,
+        "site/about.html",
+        {
+            "portrait_static": _about_portrait_static(),
+            "featured": _portfolio_assets()[:1],
+        },
     )
 
 

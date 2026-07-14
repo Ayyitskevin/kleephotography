@@ -3195,7 +3195,13 @@ def test_marketing_site(admin):
             assert r.status_code == 200
             assert "x-robots-tag" not in r.headers, path
             assert 'content="index, follow"' in r.text
+            # marketing shell skips admin/client JS (~70KB) — HTMX stays on cream
+            assert "htmx.min.js" not in r.text, path
+            assert "behaviors.js" not in r.text, path
+            assert "details_persist.js" not in r.text, path
         assert "x-robots-tag" in pub.get(f"/g/{g['slug']}").headers
+        # client gallery still gets the HTMX shell via base_cream → base.html
+        assert "htmx.min.js" in pub.get(f"/g/{g['slug']}").text
         r = pub.get("/robots.txt")
         assert r.status_code == 200 and "Disallow: /g/" in r.text
         assert "x-robots-tag" not in r.headers
@@ -4598,6 +4604,8 @@ def test_portfolio_tag_filter(admin):
         r = pub.get("/portfolio")
         # filter chips render with per-tag counts + an "All" chip
         assert 'class="portfolio-filter"' in r.text
+        assert 'data-pf' in r.text
+        assert "/static/portfolio-filter.js?v=" in r.text
         assert 'data-filter=""' in r.text and ">All" in r.text  # 'All' chip
         # alphabetical: Dishes (2) before Drinks (1); tag filters are namespaced
         assert r.text.index('data-filter="tag:dishes"') < r.text.index('data-filter="tag:drinks"')

@@ -52,6 +52,10 @@ SITE_NAME = os.environ.get("MISE_SITE_NAME", "Kevin Lee Photography")
 INSTAGRAM_URL = os.environ.get("MISE_INSTAGRAM_URL") or None
 # Optional Google Business Profile URL for LocalBusiness sameAs (schema.org).
 GOOGLE_BUSINESS_URL = os.environ.get("MISE_GOOGLE_BUSINESS_URL") or None
+# Optional filename under /static for the About page studio portrait
+# (e.g. about-portrait.jpg). Empty = auto-detect about-portrait.{jpg,jpeg,png,webp}
+# if present; otherwise the page falls back to the newest starred portfolio still.
+ABOUT_PORTRAIT = (os.environ.get("MISE_ABOUT_PORTRAIT") or "").strip() or None
 CONTACT_EMAIL = os.environ.get("MISE_GMAIL_USER", "")  # public mailto when set
 PLAUSIBLE_DOMAIN = os.environ.get("MISE_PLAUSIBLE_DOMAIN", "")  # e.g. kleephotography.com
 # Sample client gallery for prospects (/g/{slug}). Slug auto-detected when unset.
