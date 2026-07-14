@@ -11,11 +11,6 @@
 {% block meta_description %}{{ page.meta }}{% endblock %}
 {% block sr_stock %} sr-{{ sp_key }}{% endblock %}
 {% block brand_chip %}{{ sp.feature }} — {{ sp.screen_name }}{% endblock %}
-{% block nav_items %}
-<a href="/portfolio#sp:{{ sp_key }}">{{ page.sr.nav_archive }}</a>
-<a href="#rates">Rates</a>
-<a href="{{ book_url }}" class="nav-cta">{{ page.sr.cta }}</a>
-{% endblock %}
 {% block sticky_cta %}
 <div class="sticky-cta">
   <span class="sticky-cta-msg">Ready when you are.</span>
@@ -128,7 +123,7 @@
 <section class="sr-wrap sr-section" aria-label="Selected stills" id="work">
   <div class="sr-kickrow">
     <p class="sr-mono">{{ page.sr.strip_label }}{% if aerials_live() %} <span class="sr-mono--stock">&middot; aerial frames marked &#9650;</span>{% endif %}</p>
-    <a class="sr-mono sr-mono--stock" href="/portfolio#sp:{{ sp_key }}">Full archive &rarr;</a>
+    <a class="sr-mono sr-mono--stock" href="/portfolio#sp:{{ sp_key }}">Full portfolio &rarr;</a>
   </div>
   <div class="sr-filmstrip">
     {% for a in photos[:6] %}
@@ -215,7 +210,7 @@
 <section class="sr-wrap sr-section" aria-label="Selected sessions" id="work">
   <div class="sr-kickrow">
     <p class="sr-mono">{{ page.sr.frames_label }}</p>
-    <a class="sr-mono sr-mono--stock" href="/portfolio#sp:{{ sp_key }}">Full archive &rarr;</a>
+    <a class="sr-mono sr-mono--stock" href="/portfolio#sp:{{ sp_key }}">Full portfolio &rarr;</a>
   </div>
   <div class="sr-sessions">
     {% for a in photos[:3] %}

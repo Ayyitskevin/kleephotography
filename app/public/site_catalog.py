@@ -509,7 +509,6 @@ SPECIALTY_PAGES = {
         # duration (no chapter schema); the aerial chapter and spec-line
         # segment ride the aerials_live flag.
         "sr": {
-            "nav_archive": "Listings screened",
             "cta": "Book a listing",
             "h2a": "Listings worth",
             "h2b": "the drive.",
@@ -631,7 +630,6 @@ SPECIALTY_PAGES = {
         # Screening Room (3k — reassurance psychology): direction promised up
         # front, the nerves named and answered in the client's own words.
         "sr": {
-            "nav_archive": "Sessions screened",
             "cta": "Book a session",
             "beat": "directed, never posed — you'll always know what to do with your hands",
             "body": "Headshots, personal branding, families, and the moments "
@@ -761,7 +759,6 @@ SPECIALTY_PAGES = {
         # Screening Room (3c + 3l): full-bleed opening title card, appetite
         # grid, the process told as courses.
         "sr": {
-            "nav_archive": "Menus screened",
             "cta": "Book a shoot",
             "presents": "Kevin Lee presents — Food & Beverage",
             "h2a": "Your menu,",

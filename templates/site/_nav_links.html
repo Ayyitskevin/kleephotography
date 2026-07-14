@@ -1,0 +1,13 @@
+{# Shared marketing nav — same links on every page, desktop and mobile.
+   Pass quiet=true for the mobile overlay's secondary Contact row. #}
+<a href="/real-estate">The Space</a>
+<a href="/portraits">The Face</a>
+<a href="/food-beverage">The Plate</a>
+<a href="/portfolio">Portfolio</a>
+<a href="/services">Rates</a>
+<a href="/work">Work</a>
+<a href="/about">About</a>
+<a href="/book" class="nav-cta">Book a shoot</a>
+{% if quiet %}
+<a class="nav-mobile-quiet" href="/contact">Request a quote</a>
+{% endif %}

@@ -48,38 +48,24 @@
 {% block bodyclass %}site-body{% if sr_enabled() %} sr{% block sr_stock %}{% endblock %}{% endif %}{% endblock %}
 {% block content %}
 <a class="skip-link" href="#main">Skip to content</a>
-{# Marquee nav (Screening Room 3a): brand caps + mono chip, three features by
-   their screen names, the archive, one amber CTA. Spokes override brand_chip
-   (their feature billing) and nav_items (their prefiltered links) — the CTA
-   picks up the spoke's film stock from body.sr-* via var(--sr-stock). #}
+{# Marquee nav (Screening Room 3a): one global link set on every page —
+   three features, Portfolio, Rates, Work, About, amber Book CTA. Spokes only
+   override brand_chip (feature billing); the CTA still picks up film stock
+   from body.sr-* via var(--sr-stock). #}
 <header class="site-nav{% block navclass %}{% endblock %}" data-nav>
   <a href="/" class="site-brand">
     <b>Kevin&nbsp;Lee</b>
     <small>{% block brand_chip %}Photo&nbsp;&times;&nbsp;Film{% endblock %}</small>
   </a>
   <nav aria-label="Site">
-    {% block nav_items %}
-    <a href="/real-estate">The Space — Real Estate</a>
-    <a href="/portraits">The Face — Portraits</a>
-    <a href="/food-beverage">The Plate — Food &amp; Bev</a>
-    <a href="/portfolio">Archive</a>
-    <a href="/book" class="nav-cta">Book a shoot</a>
-    {% endblock %}
+    {% with quiet=false %}{% include "site/_nav_links.html" %}{% endwith %}
   </nav>
   <button class="nav-menu-btn" data-menu-btn aria-label="Menu" aria-expanded="false"
           aria-controls="site-mobile-menu"><span></span><span></span></button>
 </header>
 
 <div class="nav-mobile" id="site-mobile-menu" data-mobile-menu>
-  <a href="/real-estate">The Space — Real Estate</a>
-  <a href="/portraits">The Face — Portraits</a>
-  <a href="/food-beverage">The Plate — Food &amp; Bev</a>
-  <a href="/portfolio">Archive</a>
-  <a href="/book" class="nav-cta">Book a shoot</a>
-  <a class="nav-mobile-quiet" href="/services">Rates</a>
-  <a class="nav-mobile-quiet" href="/work">In the wild</a>
-  <a class="nav-mobile-quiet" href="/about">About</a>
-  <a class="nav-mobile-quiet" href="/contact">Request a quote</a>
+  {% with quiet=true %}{% include "site/_nav_links.html" %}{% endwith %}
 </div>
 
 <div id="main" tabindex="-1">
@@ -106,7 +92,7 @@
   <div class="sr-footlinks">
     {% if instagram_url %}<a href="{{ instagram_url }}" rel="me noopener noreferrer" target="_blank">Instagram</a>{% endif %}
     <a href="/press">Press</a>
-    <a href="/portfolio">Archive</a>
+    <a href="/portfolio">Portfolio</a>
     <a class="sr-footlinks-cta" href="/contact">Client entrance &rarr;</a>
   </div>
   <div class="sr-footlinks sr-footlinks-quiet">
