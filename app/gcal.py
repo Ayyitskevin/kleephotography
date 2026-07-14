@@ -10,11 +10,13 @@ Two jobs:
   * event sync — create/move/delete the matching calendar event as a booking is
     confirmed / rescheduled / cancelled.
 
-Everything here is BEST-EFFORT and fail-open: if Google is unreachable or not
-connected, free/busy returns None (no slots hidden) and event sync is a no-op. A
-booking is committed in the DB before any of this runs, so a calendar hiccup can
-never lose or block a booking. Uses urllib (stdlib), matching notion_sync — no new
-runtime dependency. The refresh token is never logged.
+Default availability policy is fail-open: if Google is unreachable or not
+connected, free/busy returns intervals=None (no slots hidden) and event sync is
+a no-op. Set MISE_GCAL_AVAILABILITY_STRICT=true to fail-closed when connected —
+API failures then mark the query unavailable so callers hide slots / reject
+bookings. Event sync remains best-effort either way. Uses urllib (stdlib),
+matching notion_sync — no new runtime dependency. The refresh token is never
+logged.
 """
 
 import datetime as dt
@@ -23,6 +25,7 @@ import logging
 import urllib.error
 import urllib.parse
 import urllib.request
+from typing import NamedTuple
 
 from . import config, db
 
@@ -40,7 +43,20 @@ SCOPES = (
 
 
 class GcalError(Exception):
-    """Calendar API/OAuth failure — callers treat it as 'not available' (fail-open)."""
+    """Calendar API/OAuth failure — callers treat per availability policy."""
+
+
+class FreeBusyQuery(NamedTuple):
+    """Result of a free/busy lookup.
+
+    intervals=None means "do not filter on Google" (not provisioned, not
+    connected, or fail-open after an error). unavailable=True means the
+    calendar is connected, strict mode is on, and the API failed — callers
+    must not offer or accept slots until Google answers again.
+    """
+
+    intervals: list[tuple[dt.datetime, dt.datetime]] | None
+    unavailable: bool = False
 
 
 # ── small helpers ────────────────────────────────────────────────────────────
@@ -220,12 +236,15 @@ def _api(method: str, path: str, payload: dict | None = None) -> dict:
 # ── free/busy ────────────────────────────────────────────────────────────────
 
 
-def free_busy(time_min: dt.datetime, time_max: dt.datetime):
-    """Busy intervals [(start_utc, end_utc), ...] on the business calendar, or None
-    when calendar isn't available (not configured/connected, or the call failed).
-    None means 'don't hide any slots' — fail-open, never block the booking page."""
+def free_busy(time_min: dt.datetime, time_max: dt.datetime) -> FreeBusyQuery:
+    """Busy intervals on the business calendar for [time_min, time_max).
+
+    Not configured / not connected → intervals=None (no Google filtering).
+    API success → intervals=list (possibly empty).
+    API failure → fail-open (intervals=None) unless GCAL_AVAILABILITY_STRICT,
+    which returns unavailable=True so booking hides/rejects slots."""
     if not configured() or not is_connected():
-        return None
+        return FreeBusyQuery(intervals=None, unavailable=False)
     try:
         res = _api(
             "POST",
@@ -237,10 +256,14 @@ def free_busy(time_min: dt.datetime, time_max: dt.datetime):
             },
         )
         busy = res.get("calendars", {}).get(config.GOOGLE_CALENDAR_ID, {}).get("busy", [])
-        return [(_parse_rfc3339(b["start"]), _parse_rfc3339(b["end"])) for b in busy]
+        intervals = [(_parse_rfc3339(b["start"]), _parse_rfc3339(b["end"])) for b in busy]
+        return FreeBusyQuery(intervals=intervals, unavailable=False)
     except Exception as e:
+        if config.GCAL_AVAILABILITY_STRICT:
+            log.warning("freebusy failed under strict policy — blocking slots: %s", e)
+            return FreeBusyQuery(intervals=None, unavailable=True)
         log.warning("freebusy failed, treating as no conflicts: %s", e)
-        return None
+        return FreeBusyQuery(intervals=None, unavailable=False)
 
 
 # ── event sync (booking lifecycle) ───────────────────────────────────────────

@@ -32,6 +32,10 @@ class SlotTaken(Exception):
     """Raised when a slot is no longer bookable (gone, blocked, or out of policy)."""
 
 
+class CalendarUnavailable(Exception):
+    """Raised when Google Calendar is connected under strict policy but free/busy failed."""
+
+
 def _biz_tz() -> ZoneInfo:
     return ZoneInfo(config.TIMEZONE)
 
@@ -204,10 +208,12 @@ def slots_for_day(et, day: dt.date, visitor_tz: str = "") -> list[dict]:
     disp = _display_tz(visitor_tz)
     tz = _biz_tz()
     day_start = dt.datetime.combine(day, dt.time(), tz).astimezone(_UTC)
-    busy = gcal.free_busy(day_start, day_start + dt.timedelta(days=1))
+    fb = gcal.free_busy(day_start, day_start + dt.timedelta(days=1))
+    if fb.unavailable:
+        return []
     con = db.connect()
     try:
-        starts = _slots_utc(con, et, day, now_utc(), busy)
+        starts = _slots_utc(con, et, day, now_utc(), fb.intervals)
     finally:
         con.close()
     out = []
@@ -225,7 +231,9 @@ def days_with_slots(et, start_day: dt.date, n_days: int) -> set[str]:
     win_end = dt.datetime.combine(start_day + dt.timedelta(days=n_days), dt.time(), tz).astimezone(
         _UTC
     )
-    busy = gcal.free_busy(win_start, win_end)
+    fb = gcal.free_busy(win_start, win_end)
+    if fb.unavailable:
+        return set()
     con = db.connect()
     try:
         ref = now_utc()
@@ -233,7 +241,7 @@ def days_with_slots(et, start_day: dt.date, n_days: int) -> set[str]:
             d.isoformat()
             for i in range(n_days)
             for d in [start_day + dt.timedelta(days=i)]
-            if _slots_utc(con, et, d, ref, busy)
+            if _slots_utc(con, et, d, ref, fb.intervals)
         }
     finally:
         con.close()
@@ -252,9 +260,12 @@ def book(
     """Atomically claim a slot. Returns (booking_id, manage_token).
 
     Raises SlotTaken if the submitted instant is not currently an open slot
-    (gone to a race, blocked, out of notice/window, or never valid). The
-    open-set is re-derived inside a BEGIN IMMEDIATE transaction, so the decision
-    and the insert are a single serialized unit."""
+    (gone to a race, blocked, out of notice/window, or never valid). Raises
+    CalendarUnavailable when Google is connected under strict policy and
+    free/busy cannot be verified. The open-set is re-derived inside a BEGIN
+    IMMEDIATE transaction, so the decision and the insert are a single
+    serialized unit. Google free/busy is fetched before the lock so a network
+    stall never holds the write lock."""
     try:
         start_utc = _parse_utc(start_utc_str)
     except ValueError:
@@ -262,13 +273,17 @@ def book(
     end_utc = start_utc + dt.timedelta(minutes=et["duration_min"])
     day_local = start_utc.astimezone(_biz_tz()).date()
     token = security.new_slug(20)
+    day_start = dt.datetime.combine(day_local, dt.time(), _biz_tz()).astimezone(_UTC)
+    fb = gcal.free_busy(day_start, day_start + dt.timedelta(days=1))
+    if fb.unavailable:
+        raise CalendarUnavailable("google free/busy unavailable")
 
     con = db.connect()
     con.isolation_level = None  # take manual control of the transaction
     try:
         con.execute("BEGIN IMMEDIATE")
         ref = now_utc()
-        open_starts = {_fmt_utc(s) for s in _slots_utc(con, et, day_local, ref)}
+        open_starts = {_fmt_utc(s) for s in _slots_utc(con, et, day_local, ref, fb.intervals)}
         # exclude_id (reschedule) frees its own old slot for the overlap test
         if exclude_id is not None and start_utc_str not in open_starts:
             if not _overlaps(con, et, start_utc, end_utc, exclude_id):
@@ -296,7 +311,7 @@ def book(
         bid = cur.lastrowid
         con.execute("COMMIT")
         return bid, token
-    except SlotTaken:
+    except (SlotTaken, CalendarUnavailable):
         raise
     except Exception:
         try:

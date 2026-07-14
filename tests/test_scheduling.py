@@ -3,7 +3,8 @@ from contextlib import contextmanager
 
 import pytest
 
-from app import db, scheduling
+from app import db, gcal, scheduling
+from app.gcal import FreeBusyQuery
 
 _UTC = dt.UTC
 
@@ -154,7 +155,9 @@ def test_slots_hide_mocked_google_busy_intervals(monkeypatch):
     monkeypatch.setattr(
         scheduling.gcal,
         "free_busy",
-        lambda start, end: calls.append((start, end)) or busy,
+        lambda start, end: (
+            calls.append((start, end)) or FreeBusyQuery(intervals=busy, unavailable=False)
+        ),
     )
     with _event(slug="unit-google-busy", day=day) as et:
         slots = scheduling.slots_for_day(et, day)
@@ -164,3 +167,107 @@ def test_slots_hide_mocked_google_busy_intervals(monkeypatch):
         "2026-02-02 17:00:00",
     ]
     assert len(calls) == 1
+
+
+@pytest.mark.integration
+def test_slots_fail_open_when_freebusy_errors(monkeypatch):
+    day = dt.date(2026, 2, 3)
+    ref = dt.datetime(2026, 1, 1, tzinfo=_UTC)
+    monkeypatch.setattr(scheduling, "now_utc", lambda: ref)
+    monkeypatch.setattr(
+        scheduling.gcal,
+        "free_busy",
+        lambda start, end: FreeBusyQuery(intervals=None, unavailable=False),
+    )
+    with _event(slug="unit-gcal-open", day=day) as et:
+        slots = scheduling.slots_for_day(et, day)
+    assert [slot["utc"] for slot in slots] == [
+        "2026-02-03 14:00:00",
+        "2026-02-03 15:00:00",
+        "2026-02-03 16:00:00",
+        "2026-02-03 17:00:00",
+    ]
+
+
+@pytest.mark.integration
+def test_slots_fail_closed_when_freebusy_unavailable(monkeypatch):
+    day = dt.date(2026, 2, 4)
+    ref = dt.datetime(2026, 1, 1, tzinfo=_UTC)
+    monkeypatch.setattr(scheduling, "now_utc", lambda: ref)
+    monkeypatch.setattr(
+        scheduling.gcal,
+        "free_busy",
+        lambda start, end: FreeBusyQuery(intervals=None, unavailable=True),
+    )
+    with _event(slug="unit-gcal-strict", day=day) as et:
+        assert scheduling.slots_for_day(et, day) == []
+        assert scheduling.days_with_slots(et, day, 1) == set()
+
+
+@pytest.mark.integration
+def test_book_rejects_google_busy_slot(monkeypatch):
+    day = dt.date(2026, 2, 5)
+    ref = dt.datetime(2026, 1, 1, tzinfo=_UTC)
+    busy = [
+        (dt.datetime(2026, 2, 5, 14, 0, tzinfo=_UTC), dt.datetime(2026, 2, 5, 15, 0, tzinfo=_UTC))
+    ]
+    monkeypatch.setattr(scheduling, "now_utc", lambda: ref)
+    monkeypatch.setattr(
+        scheduling.gcal,
+        "free_busy",
+        lambda start, end: FreeBusyQuery(intervals=busy, unavailable=False),
+    )
+    with _event(slug="unit-book-busy", day=day) as et:
+        with pytest.raises(scheduling.SlotTaken):
+            scheduling.book(et, "2026-02-05 14:00:00", "Ada", "ada@example.com", "", "", "UTC")
+        bid, _token = scheduling.book(
+            et, "2026-02-05 15:00:00", "Ada", "ada@example.com", "", "", "UTC"
+        )
+        assert bid
+
+
+@pytest.mark.integration
+def test_book_raises_when_calendar_unavailable(monkeypatch):
+    day = dt.date(2026, 2, 6)
+    ref = dt.datetime(2026, 1, 1, tzinfo=_UTC)
+    monkeypatch.setattr(scheduling, "now_utc", lambda: ref)
+    monkeypatch.setattr(
+        scheduling.gcal,
+        "free_busy",
+        lambda start, end: FreeBusyQuery(intervals=None, unavailable=True),
+    )
+    with _event(slug="unit-book-unavail", day=day) as et:
+        with pytest.raises(scheduling.CalendarUnavailable):
+            scheduling.book(et, "2026-02-06 14:00:00", "Ada", "ada@example.com", "", "", "UTC")
+
+
+@pytest.mark.unit
+def test_free_busy_strict_marks_unavailable(monkeypatch):
+    monkeypatch.setattr(gcal, "configured", lambda: True)
+    monkeypatch.setattr(gcal, "is_connected", lambda: True)
+    monkeypatch.setattr(gcal.config, "GCAL_AVAILABILITY_STRICT", True)
+    monkeypatch.setattr(
+        gcal,
+        "_api",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    start = dt.datetime(2026, 2, 1, tzinfo=_UTC)
+    fb = gcal.free_busy(start, start + dt.timedelta(days=1))
+    assert fb.unavailable is True
+    assert fb.intervals is None
+
+
+@pytest.mark.unit
+def test_free_busy_fail_open_by_default(monkeypatch):
+    monkeypatch.setattr(gcal, "configured", lambda: True)
+    monkeypatch.setattr(gcal, "is_connected", lambda: True)
+    monkeypatch.setattr(gcal.config, "GCAL_AVAILABILITY_STRICT", False)
+    monkeypatch.setattr(
+        gcal,
+        "_api",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    start = dt.datetime(2026, 2, 1, tzinfo=_UTC)
+    fb = gcal.free_busy(start, start + dt.timedelta(days=1))
+    assert fb.unavailable is False
+    assert fb.intervals is None

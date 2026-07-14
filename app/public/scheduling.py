@@ -216,6 +216,11 @@ async def confirm_booking(
         return repicker("Please enter your name and a valid email.")
     try:
         bid, token = scheduling.book(et, start, name, email, phone, notes, tz)
+    except scheduling.CalendarUnavailable:
+        return repicker(
+            "Calendar sync is temporarily unavailable — please try again in a few minutes.",
+            503,
+        )
     except scheduling.SlotTaken:
         return repicker("Sorry — that time was just taken. Please pick another.", 409)
     # Persist the F&B intake (shoot event types only) before side-effects fire, so the
@@ -335,7 +340,7 @@ async def do_reschedule(request: Request, token: str, start: str = Form(...), tz
             tz or b["tz"],
             exclude_id=b["id"],
         )
-    except scheduling.SlotTaken:
+    except (scheduling.SlotTaken, scheduling.CalendarUnavailable) as exc:
         ctx = _picker_ctx(
             et,
             request,
@@ -346,6 +351,13 @@ async def do_reschedule(request: Request, token: str, start: str = Form(...), tz
         )
         ctx["form_action"] = f"/booking/{token}/reschedule"
         ctx["old_when"] = b["start_utc"]
+        if isinstance(exc, scheduling.CalendarUnavailable):
+            ctx["error"] = (
+                "Calendar sync is temporarily unavailable — please try again in a few minutes."
+            )
+            return templates.TemplateResponse(
+                request, "public/book_event.html", ctx, status_code=503
+            )
         ctx["error"] = "Sorry — that time was just taken. Please pick another."
         return templates.TemplateResponse(request, "public/book_event.html", ctx, status_code=409)
     # New slot held; release the old one and email the fresh invite. If the old

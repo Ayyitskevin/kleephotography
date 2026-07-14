@@ -116,6 +116,15 @@ GOOGLE_REDIRECT_URI = os.environ.get(
     "MISE_GOOGLE_REDIRECT_URI", f"{BASE_URL}/admin/scheduling/google/callback"
 )
 GOOGLE_CALENDAR_ID = os.environ.get("MISE_GOOGLE_CALENDAR_ID", "primary")
+# When true AND Google Calendar is connected: a free/busy API failure hides
+# slots and rejects new bookings instead of silently offering every open window
+# (fail-open). Default false preserves historical behavior until Kevin opts in.
+GCAL_AVAILABILITY_STRICT = os.environ.get("MISE_GCAL_AVAILABILITY_STRICT", "").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 
 # Odysseus caption-drafting endpoint (Domain G slices 6b/6c). BOTH url+token must be
 # set to arm the "Draft with AI" button (see caption_ai.is_enabled); either unset =
