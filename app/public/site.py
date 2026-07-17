@@ -194,6 +194,39 @@ def _public_photo_spec(asset) -> dict:
     }
 
 
+def _public_video_poster_spec(asset) -> dict:
+    """Actual poster metadata for an already public-gated video row.
+
+    Prefer the full poster rendition. If it is missing or corrupt, the
+    independently public-gated video thumbnail is a truthful lower-resolution
+    fallback for both ``poster`` and its matching preload. Callers must pass
+    rows already gated by ``portfolio=1 AND status='ready' AND kind='video'``.
+    """
+    asset_id = asset["id"]
+    gallery_id = asset["gallery_id"]
+    stem = Path(asset["stored"]).stem
+    candidates = (
+        (
+            config.MEDIA_DIR / str(gallery_id) / "web" / f"{stem}_poster.jpg",
+            f"/site/poster/{asset_id}",
+        ),
+        (
+            config.MEDIA_DIR / str(gallery_id) / "thumb" / f"{stem}.jpg",
+            f"/site/img/{asset_id}?variant=thumb",
+        ),
+    )
+    for path, url in candidates:
+        dimensions = imaging.image_dimensions(path)
+        if dimensions:
+            return {
+                "available": True,
+                "url": url,
+                "width": dimensions[0],
+                "height": dimensions[1],
+            }
+    return {"available": False, "url": None, "width": None, "height": None}
+
+
 def _parse_cs_credits(raw: str | None) -> list[dict]:
     """Turn case-study credit lines into label/value pairs for the grid layout."""
     out: list[dict] = []
@@ -423,13 +456,18 @@ def _specialty_doors() -> list[dict]:
 async def home(request: Request):
     featured = _portfolio_assets()[:6]
     reels = _portfolio_reels()
+    hero_reel = reels[0] if reels else None
+    hero_image = None if hero_reel or not featured else _public_photo_spec(featured[0])
+    hero_poster = _public_video_poster_spec(hero_reel) if hero_reel else None
     return templates.TemplateResponse(
         request,
         "site/home.html",
         {
             "featured": featured,
             "reels": reels,
-            "hero_reel": reels[0] if reels else None,
+            "hero_reel": hero_reel,
+            "hero_image": hero_image,
+            "hero_poster": hero_poster,
             "press": _press_features()[:12],
             "testimonials": _testimonials(limit=3),
             "demo_gallery": _demo_gallery(),
@@ -801,6 +839,10 @@ def _specialty_page(request: Request, key: str):
         a for a in _portfolio_assets() if specialties.specialty_key(a["portfolio_tag"]) == key
     ]
     vids = [r for r in _portfolio_reels() if specialties.specialty_key(r["portfolio_tag"]) == key]
+    hero_reel = vids[0] if vids else None
+    video_hero = hero_reel if key in ("re", "fb") else None
+    hero_image = None if video_hero or not photos else _public_photo_spec(photos[0])
+    hero_poster = _public_video_poster_spec(video_hero) if video_hero else None
     csmap = _cs_specialty_map()
     studies = [g for g in _case_studies() if csmap.get(g["id"], specialties.DEFAULT_KEY) == key]
     # Only quotes tied to this specialty's published studies belong here.
@@ -818,7 +860,9 @@ def _specialty_page(request: Request, key: str):
             "page": page,
             "photos": photos,
             "reels": vids,
-            "hero_reel": vids[0] if vids else None,
+            "hero_reel": hero_reel,
+            "hero_image": hero_image,
+            "hero_poster": hero_poster,
             "studies": studies[:4],
             "testimonials": quotes[:3],
             "demo_gallery": _demo_gallery(),

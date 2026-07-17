@@ -5,6 +5,15 @@
    of real frames on the hub for browsers and crawlers alike. #}
 {% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
 {% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
+{% block site_head %}
+{% if hero_poster and hero_poster.available %}
+<link rel="preload" as="image" href="{{ hero_poster.url }}" fetchpriority="high">
+{% elif hero_image and hero_image.available %}
+<link rel="preload" as="image" href="{{ hero_image.web.url }}" fetchpriority="high"
+      {% if hero_image.srcset %}imagesrcset="{{ hero_image.srcset }}"
+      imagesizes="(max-width: 700px) 100vw, 1344px"{% endif %}>
+{% endif %}
+{% endblock %}
 {% block site_content %}
 
 <div class="scroll-progress" aria-hidden="true"><div data-progress-bar></div></div>
@@ -19,13 +28,16 @@
     <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
     {% if hero_reel %}
     <video autoplay muted loop playsinline preload="metadata"
-           poster="/site/poster/{{ hero_reel.id }}" aria-label="House reel">
+           {% if hero_poster and hero_poster.available %}poster="{{ hero_poster.url }}" width="{{ hero_poster.width }}" height="{{ hero_poster.height }}"{% endif %}
+           aria-label="House reel">
       <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
     </video>
     {% elif featured %}
-    <img src="/site/img/{{ featured[0].id }}?variant=web"
-         srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
-         sizes="(max-width: 700px) 100vw, 1344px" fetchpriority="high" decoding="async"
+    <img src="{{ hero_image.web.url }}" decoding="async"
+         {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
+         {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
+         {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
+         sizes="(max-width: 700px) 100vw, 1344px"{% endif %}
          alt="{{ featured[0]|portfolio_alt }}">
     {% endif %}
     <span class="sr-screen-scrim" aria-hidden="true"></span>

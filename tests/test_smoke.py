@@ -4911,6 +4911,235 @@ def test_case_study_images_use_actual_derivative_metadata(admin):
         shutil.rmtree(media, ignore_errors=True)
 
 
+def test_marketing_heroes_use_actual_media_metadata(admin, tmp_path, monkeypatch, request):
+    import re
+
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
+    existing_video_ids = [
+        row["id"] for row in db.all_("SELECT id FROM assets WHERE kind='video' AND portfolio=1")
+    ]
+
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("marketing-hero-metadata", "Marketing Hero Metadata", "4455"),
+    )
+
+    cleanup_done = False
+
+    def cleanup():
+        nonlocal cleanup_done
+        if cleanup_done:
+            return
+        try:
+            db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
+        finally:
+            try:
+                for asset_id in existing_video_ids:
+                    db.run("UPDATE assets SET portfolio=1 WHERE id=?", (asset_id,))
+            finally:
+                cleanup_done = True
+
+    request.addfinalizer(cleanup)
+
+    def add_asset(kind, stored, tag):
+        return db.run(
+            """INSERT INTO assets
+               (gallery_id, kind, filename, stored, status, width, height, portfolio,
+                portfolio_tag)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (gallery_id, kind, stored, stored, "ready", 6000, 4000, 1, tag),
+        )
+
+    re_photo = add_asset("photo", "hero-re.jpg", "re/exteriors")
+    pl_photo = add_asset("photo", "hero-pl.jpg", "pl/headshots")
+    fb_photo = add_asset("photo", "hero-fb.jpg", "fb/dishes")
+    re_video = add_asset("video", "hero-re-video.mp4", "re/motion")
+    fb_video = add_asset("video", "hero-fb-video.mp4", "fb/motion")
+    pl_video = add_asset("video", "hero-pl-video.mp4", "pl/motion")
+    media = config.MEDIA_DIR / str(gallery_id)
+
+    photo_sizes = {
+        "hero-re.jpg": ((120, 80), (480, 320)),
+        "hero-pl.jpg": ((80, 120), (320, 480)),
+        "hero-fb.jpg": ((100, 100), (400, 400)),
+    }
+    for stored, (thumb_size, web_size) in photo_sizes.items():
+        for variant, size in (("thumb", thumb_size), ("web", web_size)):
+            directory = media / variant
+            directory.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", size, (80, 100, 120)).save(directory / stored, "JPEG")
+
+    video_sizes = {
+        "hero-re-video": ((420, 236), (105, 59)),
+        "hero-fb-video": ((300, 169), (75, 42)),
+        "hero-pl-video": ((360, 203), (90, 51)),
+    }
+    for stem, (poster_size, thumb_size) in video_sizes.items():
+        (media / "web").mkdir(parents=True, exist_ok=True)
+        (media / "thumb").mkdir(parents=True, exist_ok=True)
+        (media / "web" / f"{stem}.mp4").write_bytes(b"video fixture")
+        Image.new("RGB", poster_size, (40, 60, 80)).save(
+            media / "web" / f"{stem}_poster.jpg", "JPEG"
+        )
+        Image.new("RGB", thumb_size, (40, 60, 80)).save(media / "thumb" / f"{stem}.jpg", "JPEG")
+
+    def assert_priority_budget(response, expected_url):
+        preload_tags = [
+            tag
+            for tag in re.findall(r"<link\b[^>]*>", response.text)
+            if 'rel="preload"' in tag and 'as="image"' in tag
+        ]
+        assert len(preload_tags) == 1
+        priority_tags = re.findall(r'<(?:link|img)\b[^>]*fetchpriority="high"[^>]*>', response.text)
+        targets = []
+        for tag in priority_tags:
+            target = re.search(r'(?:href|src)="([^"]+)"', tag)
+            assert target is not None
+            targets.append(target.group(1))
+        assert set(targets) == {expected_url}
+
+    def assert_photo_hero(response, asset_id, thumb_size, web_size, sizes):
+        thumb_url = f"/site/img/{asset_id}?variant=thumb"
+        web_url = f"/site/img/{asset_id}?variant=web"
+        srcset = f"{thumb_url} {thumb_size[0]}w, {web_url} {web_size[0]}w"
+        tag = re.search(rf'<img src="{re.escape(web_url)}"[^>]*>', response.text).group(0)
+        assert f'width="{web_size[0]}" height="{web_size[1]}"' in tag
+        assert f'srcset="{srcset}"' in tag and f'sizes="{sizes}"' in tag
+        assert 'fetchpriority="high"' in tag and 'loading="lazy"' not in tag
+        preload_tag = re.search(
+            rf'<link rel="preload" as="image" href="{re.escape(web_url)}"[^>]*>', response.text
+        ).group(0)
+        assert preload_tag.startswith(f'<link rel="preload" as="image" href="{web_url}"')
+        assert 'fetchpriority="high"' in preload_tag
+        assert f'imagesrcset="{srcset}"' in preload_tag
+        assert f'imagesizes="{sizes}"' in preload_tag
+        assert_priority_budget(response, web_url)
+
+    def assert_video_hero(response, url, size):
+        tag = re.search(rf'<video[^>]*poster="{re.escape(url)}"[^>]*>', response.text).group(0)
+        assert f'width="{size[0]}" height="{size[1]}"' in tag
+        preload_tag = re.search(
+            rf'<link rel="preload" as="image" href="{re.escape(url)}"[^>]*>',
+            response.text,
+        ).group(0)
+        assert preload_tag == (f'<link rel="preload" as="image" href="{url}" fetchpriority="high">')
+        assert "imagesrcset=" not in preload_tag
+        assert_priority_budget(response, url)
+
+    def assert_plain_photo_hero(response, url, size):
+        tag = re.search(rf'<img src="{re.escape(url)}"[^>]*>', response.text).group(0)
+        assert f'width="{size[0]}" height="{size[1]}"' in tag
+        assert "srcset=" not in tag and "sizes=" not in tag
+        assert 'fetchpriority="high"' in tag and 'loading="lazy"' not in tag
+        preload_tag = re.search(
+            rf'<link rel="preload" as="image" href="{re.escape(url)}"[^>]*>', response.text
+        ).group(0)
+        assert preload_tag.startswith(
+            f'<link rel="preload" as="image" href="{url}" fetchpriority="high"'
+        )
+        assert "imagesrcset=" not in preload_tag and "imagesizes=" not in preload_tag
+        assert_priority_budget(response, url)
+
+    try:
+        for asset_id in existing_video_ids:
+            db.run("UPDATE assets SET portfolio=0 WHERE id=?", (asset_id,))
+        with TestClient(app) as public:
+            home = public.get("/")
+            real_estate = public.get("/real-estate")
+            portraits = public.get("/portraits")
+            food = public.get("/food-beverage")
+
+            assert_video_hero(home, f"/site/poster/{pl_video}", (360, 203))
+            assert_video_hero(real_estate, f"/site/poster/{re_video}", (420, 236))
+            assert_video_hero(food, f"/site/poster/{fb_video}", (300, 169))
+            assert_photo_hero(
+                portraits,
+                pl_photo,
+                (80, 120),
+                (320, 480),
+                "(max-width: 1000px) 100vw, 560px",
+            )
+            assert f'<link rel="preload" as="image" href="/site/poster/{pl_video}"' not in (
+                portraits.text
+            )
+
+            assert Image.open(io.BytesIO(public.get(f"/site/poster/{pl_video}").content)).size == (
+                360,
+                203,
+            )
+            assert Image.open(
+                io.BytesIO(public.get(f"/site/img/{re_photo}?variant=web").content)
+            ).size == (480, 320)
+            video_response = public.get(f"/site/vid/{re_video}")
+            assert video_response.status_code == 200 and video_response.content == b"video fixture"
+
+        (media / "web" / "hero-pl-video_poster.jpg").write_bytes(b"corrupt poster")
+        with TestClient(app) as public:
+            thumb_fallback = public.get("/")
+        assert_video_hero(
+            thumb_fallback,
+            f"/site/img/{pl_video}?variant=thumb",
+            (90, 51),
+        )
+
+        (media / "thumb" / "hero-pl-video.jpg").write_bytes(b"corrupt thumb")
+        with TestClient(app) as public:
+            unavailable = public.get("/")
+        video_tag = re.search(
+            rf'<video[^>]*>\s*<source src="/site/vid/{pl_video}"', unavailable.text
+        ).group(0)
+        assert "poster=" not in video_tag and "width=" not in video_tag
+        assert '<link rel="preload" as="image"' not in unavailable.text
+        assert 'fetchpriority="high"' not in unavailable.text
+
+        db.run(
+            "UPDATE assets SET portfolio=0 WHERE id IN (?,?,?)",
+            (re_video, fb_video, pl_video),
+        )
+        with TestClient(app) as public:
+            home_photo = public.get("/")
+            real_estate_photo = public.get("/real-estate")
+            food_photo = public.get("/food-beverage")
+        assert_photo_hero(
+            real_estate_photo,
+            re_photo,
+            (120, 80),
+            (480, 320),
+            "(max-width: 1000px) 100vw, 900px",
+        )
+        assert_photo_hero(
+            home_photo,
+            fb_photo,
+            (100, 100),
+            (400, 400),
+            "(max-width: 700px) 100vw, 1344px",
+        )
+        assert_photo_hero(food_photo, fb_photo, (100, 100), (400, 400), "100vw")
+        (media / "web" / "hero-fb.jpg").write_bytes(b"corrupt photo")
+        with TestClient(app) as public:
+            home_thumb = public.get("/")
+            food_thumb = public.get("/food-beverage")
+        thumb_url = f"/site/img/{fb_photo}?variant=thumb"
+        assert_plain_photo_hero(home_thumb, thumb_url, (100, 100))
+        assert_plain_photo_hero(food_thumb, thumb_url, (100, 100))
+
+        (media / "thumb" / "hero-fb.jpg").write_bytes(b"corrupt thumb")
+        with TestClient(app) as public:
+            photo_unavailable = public.get("/")
+        web_url = f"/site/img/{fb_photo}?variant=web"
+        unavailable_tag = re.search(
+            rf'<img src="{re.escape(web_url)}"[^>]*>', photo_unavailable.text
+        ).group(0)
+        assert 'loading="lazy"' in unavailable_tag
+        assert 'fetchpriority="high"' not in unavailable_tag
+        assert "width=" not in unavailable_tag
+        assert "srcset=" not in unavailable_tag
+        assert "sizes=" not in unavailable_tag
+        assert '<link rel="preload" as="image"' not in photo_unavailable.text
+    finally:
+        cleanup()
+
+
 def test_gallery_public_site_readiness(admin):
     ready_id = db.run(
         """INSERT INTO galleries

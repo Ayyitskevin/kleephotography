@@ -26,6 +26,22 @@
 {% if og_asset %}<meta property="og:image" content="{{ base_url }}/site/img/{{ og_asset.id }}">{% endif %}
 <meta name="twitter:card" content="{{ 'summary_large_image' if og_asset else 'summary' }}">
 {% endblock %}
+{% block site_head %}
+{% if sp_key == "re" %}
+{% set hero_sizes = "(max-width: 1000px) 100vw, 900px" %}
+{% elif sp_key == "pl" %}
+{% set hero_sizes = "(max-width: 1000px) 100vw, 560px" %}
+{% else %}
+{% set hero_sizes = "100vw" %}
+{% endif %}
+{% if hero_poster and hero_poster.available %}
+<link rel="preload" as="image" href="{{ hero_poster.url }}" fetchpriority="high">
+{% elif hero_image and hero_image.available %}
+<link rel="preload" as="image" href="{{ hero_image.web.url }}" fetchpriority="high"
+      {% if hero_image.srcset %}imagesrcset="{{ hero_image.srcset }}"
+      imagesizes="{{ hero_sizes }}"{% endif %}>
+{% endif %}
+{% endblock %}
 {% block site_content %}
 
 <div class="scroll-progress" aria-hidden="true"><div data-progress-bar></div></div>
@@ -41,13 +57,16 @@
     <figure class="sr-screen sr-screen--film" data-sr-player>
       {% if hero_reel %}
       <video autoplay muted loop playsinline preload="metadata"
-             poster="/site/poster/{{ hero_reel.id }}" aria-label="Walkthrough film">
+             {% if hero_poster and hero_poster.available %}poster="{{ hero_poster.url }}" width="{{ hero_poster.width }}" height="{{ hero_poster.height }}"{% endif %}
+             aria-label="Walkthrough film">
         <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
       </video>
       {% elif photos %}
-      <img src="/site/img/{{ photos[0].id }}?variant=web"
-           srcset="/site/img/{{ photos[0].id }}?variant=thumb 480w, /site/img/{{ photos[0].id }}?variant=web 2048w"
-           sizes="(max-width: 1000px) 100vw, 900px" fetchpriority="high" decoding="async"
+      <img src="{{ hero_image.web.url }}" decoding="async"
+           {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
+           {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
+           {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
+           sizes="(max-width: 1000px) 100vw, 900px"{% endif %}
            alt="{{ photos[0]|portfolio_alt }}">
       {% endif %}
       <span class="sr-screen-scrim" aria-hidden="true"></span>
@@ -183,9 +202,11 @@
     </div>
     <figure class="sr-herosplit-fig">
       {% if photos %}
-      <img src="/site/img/{{ photos[0].id }}?variant=web"
-           srcset="/site/img/{{ photos[0].id }}?variant=thumb 480w, /site/img/{{ photos[0].id }}?variant=web 2048w"
-           sizes="(max-width: 1000px) 100vw, 560px" fetchpriority="high" decoding="async"
+      <img src="{{ hero_image.web.url }}" decoding="async"
+           {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
+           {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
+           {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
+           sizes="(max-width: 1000px) 100vw, 560px"{% endif %}
            alt="{{ photos[0]|portfolio_alt }}">
       {% endif %}
       <span class="sr-frameno">{{ sp.stock }} &middot; FR&middot;{{ "%04d"|format(photos[0].id) if photos else "0000" }} &mdash; {{ page.hero_caption }}</span>
@@ -250,13 +271,16 @@
     <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
     {% if hero_reel %}
     <video autoplay muted loop playsinline preload="metadata"
-           poster="/site/poster/{{ hero_reel.id }}" aria-label="Appetite reel">
+           {% if hero_poster and hero_poster.available %}poster="{{ hero_poster.url }}" width="{{ hero_poster.width }}" height="{{ hero_poster.height }}"{% endif %}
+           aria-label="Appetite reel">
       <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
     </video>
     {% elif photos %}
-    <img src="/site/img/{{ photos[0].id }}?variant=web"
-         srcset="/site/img/{{ photos[0].id }}?variant=thumb 480w, /site/img/{{ photos[0].id }}?variant=web 2048w"
-         sizes="100vw" fetchpriority="high" decoding="async"
+    <img src="{{ hero_image.web.url }}" decoding="async"
+         {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
+         {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
+         {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
+         sizes="100vw"{% endif %}
          alt="{{ photos[0]|portfolio_alt }}">
     {% endif %}
     <span class="sr-titlecard-scrim" aria-hidden="true"></span>
