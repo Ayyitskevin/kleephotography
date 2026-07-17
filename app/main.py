@@ -236,14 +236,15 @@ async def common_headers(request: Request, call_next):
     # retention and subdomain coverage require a separate TLS inventory.
     if config.COOKIE_SECURE:
         resp.headers["Strict-Transport-Security"] = "max-age=300"
-    # Static assets are safe to cache forever: every /static URL carries a
-    # content-derived ?v={{ static_rev }} buster (see app/render.py), so a file
-    # change changes the URL. Without this the ~300KB stylesheet + fonts + JS
-    # get revalidated on every repeat navigation.
+    # App templates version top-level static URLs with a content-derived ?v=
+    # buster (see app/render.py), so those responses stay long-lived. Font URLs
+    # inside fonts.css have stable filenames and need a bounded freshness window.
     if 300 <= resp.status_code < 400 and "location" in resp.headers:
         # Redirect targets can change during rollback; never let browsers or the
         # edge pin even a permanent redirect response.
         resp.headers.setdefault("Cache-Control", "no-store")
+    elif p.startswith("/static/fonts/"):
+        resp.headers["Cache-Control"] = "public, max-age=86400"
     elif p.startswith("/static/"):
         resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     elif resp.headers.get("content-type", "").startswith("text/html"):

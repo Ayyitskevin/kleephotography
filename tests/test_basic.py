@@ -541,12 +541,50 @@ def test_custom_forms_are_public_rate_limited():
 
 
 @pytest.mark.integration
-def test_static_assets_cached_immutable(client):
-    # /static URLs are content-hash-busted (?v=), so they're safe to cache
-    # forever; the middleware must stamp the long-lived immutable header.
-    r = client.get("/static/mise.css")
+def test_static_asset_cache_and_font_preload_identity(client):
+    # Versioned top-level assets retain the long-lived immutable policy.
+    r = client.get("/static/mise.css?v=test")
     assert r.status_code == 200
     assert r.headers["cache-control"] == "public, max-age=31536000, immutable"
+
+    fonts_css_response = client.get("/static/fonts.css?v=test")
+    assert fonts_css_response.status_code == 200
+    assert fonts_css_response.headers["cache-control"] == r.headers["cache-control"]
+    fonts_css = fonts_css_response.text
+
+    # Font filenames are stable and unversioned in fonts.css. They must revalidate
+    # on a short cadence, and preload URLs must be byte-for-byte identical so the
+    # browser can reuse each preload for the later @font-face request.
+    font_urls = (
+        "/static/fonts/newsreader-latin.woff2",
+        "/static/fonts/archivo-latin.woff2",
+    )
+    for url in font_urls:
+        font = client.get(url)
+        assert font.status_code == 200
+        assert font.headers["cache-control"] == "public, max-age=86400"
+        assert "immutable" not in font.headers["cache-control"]
+        assert f"url({url})" in fonts_css
+
+    def assert_font_preloads(page):
+        assert page.count('rel="preload" href="/static/fonts/') == len(font_urls)
+        for url in font_urls:
+            tag = f'<link rel="preload" href="{url}" as="font" type="font/woff2" crossorigin>'
+            assert page.count(tag) == 1
+
+    home = client.get("/").text
+    assert_font_preloads(home)
+
+    from app import config
+
+    login = client.post(
+        "/admin/login", data={"password": config.ADMIN_PASSWORD}, follow_redirects=False
+    )
+    assert login.status_code == 303
+    admin = client.get("/admin/home")
+    assert admin.status_code == 200
+    assert_font_preloads(admin.text)
+
     # non-static responses must NOT get the immutable header
     assert "immutable" not in client.get("/healthz").headers.get("cache-control", "")
 

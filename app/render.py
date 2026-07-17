@@ -15,10 +15,11 @@ _static_rev_cache = {"expires": 0.0, "value": 0}
 
 
 def _static_rev() -> int:
-    """Newest mtime among top-level /static files — the cache-buster appended to
-    every static URL. Cached only briefly because CSS/JS deploys land via
-    `git pull` without a service restart; changed files are detected within the
-    five-second TTL while ordinary template renders avoid repeated directory scans."""
+    """Newest mtime among top-level /static files — the cache-buster templates
+    append to their versioned static asset URLs. Cached briefly because CSS/JS
+    deploys land via `git pull` without a service restart; changed files are
+    detected within the five-second TTL while ordinary template renders avoid
+    repeated directory scans."""
     now = time.monotonic()
     if now < _static_rev_cache["expires"]:
         return _static_rev_cache["value"]

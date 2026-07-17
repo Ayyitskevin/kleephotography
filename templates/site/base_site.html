@@ -29,8 +29,8 @@
 {% endblock %}
 {# Self-hosted typefaces — no Google Fonts CDN; see static/fonts.css (shared
    with the admin shell). Preload the two latin files the site paints first. #}
-<link rel="preload" href="/static/fonts/newsreader-latin.woff2?v={{ static_rev }}" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/archivo-latin.woff2?v={{ static_rev }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/newsreader-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
 {% if plausible_domain %}
 <script nonce="{{ csp_nonce }}">window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)};</script>

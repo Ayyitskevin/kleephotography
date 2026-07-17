@@ -7,8 +7,8 @@
 {# Self-hosted typefaces — no Google Fonts CDN (no third-party request, no
    layout-shift wait on a remote stylesheet). Preload the two latin files the
    admin paints with first; fonts.css declares the full set. #}
-<link rel="preload" href="/static/fonts/archivo-latin.woff2?v={{ static_rev }}" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/newsreader-latin.woff2?v={{ static_rev }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/newsreader-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
 {# Set the saved theme on <html> before first paint so dark mode never flashes
    light on load. Only the .admin-shell surface reacts to data-theme. #}
