@@ -73,10 +73,9 @@ Suggested setup (durations/buffers are starting points — adjust to taste):
    of empty states. F&B needs nothing.
 2. **Create the three event types** (§2) and set their availability
    windows.
-3. **Check the live sitemap** (`/sitemap.xml`) for a seeded demo case
-   study: `MISE_SHOWCASE_SEED` auto-publishes gallery #1 as a demo
-   (`/work/{slug}`). If one is live and unwanted, unpublish it from the
-   gallery's case-study settings.
+3. **Case-study provenance:** publish a gallery under `/work/{slug}` only after
+   its client attribution, results, and release are verified. Prototype showcase
+   auto-publishing was retired; an empty archive is preferable to invented proof.
 4. **Contract templates:** the videography agreement already exists; RE
    and portrait service agreements arrive via the red-light PR (Kevin
    merges; see PR list in HANDOFF).
