@@ -7,6 +7,32 @@ file as you work. **All prior context you need is here — do not assume chat hi
 
 ---
 
+## CURRENT STATUS 2026-07-17 — Truthful HTTPS baseline (RED, verified candidate)
+
+The current work supersedes older statements below that a fresh boot should
+auto-publish showcase proof. Branch `claude/truthful-https-baseline` is based on
+GitHub `main` at `522ef6c` and is intentionally human-gated because it contains
+migration 068 and changes canonical transport behavior.
+
+- Removes startup code that could publish invented prototype testimonials,
+  case-study copy, and portfolio flags; migration 068 unpublishes exact invented
+  content even after attribution edits or CRLF normalization while preserving
+  rows for audit. Legacy live-publish scripts now fail loud.
+- Removes unsupported Review JSON-LD and prevents general food-and-beverage
+  quotes from being reused as real-estate or portrait proof.
+- Adds an optional canonical-origin guard: GET/HEAD receive rollback-safe 308s,
+  unsafe noncanonical methods receive 421 without replay, and opaque/malformed
+  browser Origins are rejected. Private `/healthz` and bearer `/api/*` access
+  remain available.
+- Activation and rollback are in `ops/TRUTHFUL-HTTPS.md`. No Cloudflare, Flow,
+  production database, deploy, or live content mutation belongs in this branch.
+- Human gates still open: live proof/release inventory, fresh verified backup,
+  Kevin review/merge, Cloudflare rules, Flow deploy, and post-deploy smoke.
+
+Local acceptance: 61 unit, 87 integration, 185 smoke, Ruff check/format, and
+`git diff --check` pass; exact-SHA GitHub Actions remains the publication gate. Preserve payment and
+draft-contract operational holds from the 2026-07-15 Codex review.
+
 ## 0. STATUS 2026-07-11 — SCREENING ROOM full-platform redesign (this branch)
 
 Kevin approved the **Screening Room** redesign (design handoff:
@@ -180,8 +206,8 @@ FileNotFoundError on video tests ⇒ ffmpeg missing, not a code bug.
 Manual verification harness (already used, reuse it): scratchpad dir has a Playwright
 setup — `cd <scratchpad>/ && npm install playwright --no-save`, launch chromium with
 `executablePath: '/opt/pw-browsers/chromium'`; run uvicorn with
-`MISE_DATA_DIR=<tmp> MISE_SECRET_KEY=devtest MISE_ADMIN_PASSWORD=pw` (showcase
-auto-seeds demo data on first boot).
+`MISE_DATA_DIR=<tmp> MISE_SECRET_KEY=devtest MISE_ADMIN_PASSWORD=pw`. Fresh
+databases intentionally start without published proof; seed only verified content.
 
 ## 4. Codebase map
 

@@ -23,7 +23,6 @@ os.environ["MISE_DATA_DIR"] = tempfile.mkdtemp(prefix="mise-dryrun-")
 os.environ["MISE_SECRET_KEY"] = "dry-run"
 os.environ["MISE_ADMIN_PASSWORD"] = "dry-run"
 os.environ["MISE_ENV_FILE"] = "/nonexistent"
-os.environ["MISE_SHOWCASE_SEED"] = "false"
 # Notion deliberately UNCONFIGURED: the enqueued job must take the dormant
 # (skip + log) path, proving a live deploy without MISE_NOTION_LEADS_DB set
 # changes nothing about today's behavior.

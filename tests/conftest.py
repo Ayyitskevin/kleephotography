@@ -19,21 +19,14 @@ os.environ.setdefault("MISE_SECRET_KEY", "test-secret")
 os.environ.setdefault("MISE_ADMIN_PASSWORD", "test-pw")
 os.environ.setdefault("MISE_ENV_FILE", "/nonexistent")
 os.environ.setdefault("MISE_DATA_DIR", tempfile.mkdtemp(prefix="mise-test-"))
-# The demo-showcase backfill (bootstrap.ensure_public_showcase, gated by this flag,
-# + migration 058's one-time SQL seed) exists so a fresh prototype site isn't blank.
-# In tests it would pollute the empty-baseline assertions in the public-site suite,
-# so we turn the startup seed off here and wipe migration 058's rows once below —
-# letting those tests exercise the real empty→populated path on a pristine DB.
-os.environ.setdefault("MISE_SHOWCASE_SEED", "false")
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _strip_showcase_seed():
-    """Remove migration 058's one-time public-showcase seed before any test runs.
+    """Remove migration 058's retired prototype rows before any test runs.
 
-    058 runs unconditionally inside db.migrate(); with MISE_SHOWCASE_SEED off the
-    startup backfill won't re-add these rows, so a single wipe here sticks for the
-    whole session and the public-site tests start from a genuinely empty showcase.
+    Migration 068 leaves them unpublished for production reversibility; tests
+    remove them entirely so public-site assertions start from an empty showcase.
     """
     from app import db
 

@@ -6339,8 +6339,8 @@ html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) nav a.nav-c
 .site-body .ad-demo a:hover { color: #F2E9DC; }
 .site-body .ad-demo b { color: #F2E9DC; }
 .site-body .ad-demo .ad-demo-ask { border-bottom: none; color: rgba(242, 233, 220, 0.6); }
-/* The shared testimonials partial keeps its markup + Review JSON-LD; inside
-   the close scene it reads as bare editorial pull-quotes on near-black. */
+/* The shared testimonials partial keeps its visible markup; inside the close
+   scene it reads as bare editorial pull-quotes on near-black. */
 .site-body .ad-close .testimonials { padding: 0; background: transparent; }
 .site-body .ad-close .testimonials h2 { position: absolute; width: 1px; height: 1px;
   margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

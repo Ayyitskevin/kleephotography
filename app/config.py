@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 _ENV_FILE = os.environ.get("MISE_ENV_FILE", "/opt/mise/.env")
 
@@ -31,9 +32,37 @@ def _b(name: str, default: str = "false") -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
 
 
+def _normalize_base_url(value: str) -> str:
+    """Return a canonical http(s) origin or fail before the app starts."""
+    raw = value.strip()
+    parsed = urlsplit(raw)
+    scheme = parsed.scheme.lower()
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("MISE_BASE_URL has an invalid port") from exc
+
+    if scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("MISE_BASE_URL must be an absolute http(s) origin")
+    if parsed.username or parsed.password:
+        raise ValueError("MISE_BASE_URL must not contain credentials")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ValueError("MISE_BASE_URL must not contain a path, query, or fragment")
+
+    host = parsed.hostname.lower()
+    if ":" in host:
+        host = f"[{host}]"
+    default_port = 443 if scheme == "https" else 80
+    port_suffix = f":{port}" if port and port != default_port else ""
+    return f"{scheme}://{host}{port_suffix}"
+
+
 HOST = os.environ.get("MISE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("MISE_PORT", "8400"))
-BASE_URL = os.environ.get("MISE_BASE_URL", f"http://localhost:{PORT}")
+BASE_URL = _normalize_base_url(os.environ.get("MISE_BASE_URL", f"http://localhost:{PORT}"))
+# Opt in only after the proxy and edge checks in ops/TRUTHFUL-HTTPS.md. Internal
+# health and bearer service API paths remain reachable on the private origin.
+CANONICAL_REDIRECTS = _b("MISE_CANONICAL_REDIRECTS")
 
 DATA_DIR = Path(os.environ.get("MISE_DATA_DIR", "/opt/mise/data"))
 DB_PATH = DATA_DIR / "mise.db"
@@ -61,10 +90,6 @@ PLAUSIBLE_DOMAIN = os.environ.get("MISE_PLAUSIBLE_DOMAIN", "")  # e.g. kleephoto
 # Sample client gallery for prospects (/g/{slug}). Slug auto-detected when unset.
 DEMO_GALLERY_SLUG = os.environ.get("MISE_DEMO_GALLERY_SLUG", "")
 DEMO_GALLERY_PIN = os.environ.get("MISE_DEMO_GALLERY_PIN", "")  # show on site when set
-# Idempotent demo-showcase backfill so a fresh prototype site isn't blank (see
-# bootstrap.ensure_public_showcase). Off in the test suite so empty-baseline
-# assertions exercise the real empty→populated path instead of seeded rows.
-SHOWCASE_SEED = _b("MISE_SHOWCASE_SEED", "true")
 # Screening Room redesign rollout — emits the body.sr theme classes on converted
 # surfaces. Ships ON; setting MISE_SCREENING_ROOM=false is the kill switch back
 # to the pre-redesign palette (markup IA stays, tokens stop applying).
@@ -281,11 +306,8 @@ SESSION_MAX_AGE = int(os.environ.get("MISE_SESSION_MAX_AGE", str(60 * 60 * 24 * 
 
 
 def _cookie_secure_default(base_url: str) -> str:
-    """Fail safe: an https BASE_URL means the site is served over TLS, so session
-    cookies must carry Secure — don't rely on remembering to flip an env flag.
-    Falls back to insecure only for a plain-http (dev/localhost) base. Still
-    overridable via MISE_COOKIE_SECURE for edge cases."""
-    return "true" if base_url.startswith("https://") else "false"
+    """Default Secure cookies on for a normalized HTTPS public origin."""
+    return "true" if urlsplit(base_url).scheme == "https" else "false"
 
 
 # Secure cookies default ON whenever BASE_URL is https (production behind the

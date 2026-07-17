@@ -1,6 +1,8 @@
 {# Shared social-proof block. Caller passes `testimonials` (list) and an optional
    `heading` (string). Skip the block entirely if there are none — never render
-   an empty "What clients say" header. Emits Schema.org Review JSON-LD for SEO. #}
+   an empty "What clients say" header. Quotes stay visible HTML only: emitting
+   Review JSON-LD without a durable consent/provenance field turns an editorial
+   claim into an unsupported machine-readable one. #}
 {% if testimonials %}
 <section class="testimonials" aria-label="Client testimonials">
   <h2>{{ heading or "What clients say" }}</h2>
@@ -15,18 +17,4 @@
     {% endfor %}
   </div>
 </section>
-<script type="application/ld+json">
-[
-{% for t in testimonials %}
-{
-  "@context": "https://schema.org",
-  "@type": "Review",
-  "reviewBody": {{ t.quote|tojson }},
-  "author": { "@type": "Person", "name": {{ t.attribution_name|tojson }} }{% if t.business %},
-  "publisher": { "@type": "Organization", "name": {{ t.business|tojson }} }{% endif %},
-  "itemReviewed": { "@type": "ProfessionalService", "name": {{ site_name|tojson }} }
-}{% if not loop.last %},{% endif %}
-{% endfor %}
-]
-</script>
 {% endif %}

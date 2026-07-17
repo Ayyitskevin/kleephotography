@@ -11,6 +11,10 @@ this stops is a malicious page auto-submitting a form to us: the browser stamps 
 with `Origin: https://evil.example`, which mismatches and gets a 403. This can only
 tighten an existing legitimate flow, never break one (R3, R12).
 
+An explicit malformed or opaque Origin (including `Origin: null`) is present but
+cannot prove same-origin, so it is rejected. This matters after a cross-origin
+redirect, where browsers may deliberately serialize the tainted origin as `null`.
+
 Origin is compared against config.BASE_URL — the PUBLIC origin — not the request's
 host, because behind the Cloudflare tunnel the peer is localhost while the browser's
 Origin is https://kleephotography.com.
@@ -33,10 +37,15 @@ def _origin(url: str) -> str | None:
     """Normalize a URL to scheme://host[:port], or None if it has no usable origin."""
     if not url:
         return None
-    s = urlsplit(url)
-    if not s.scheme or not s.hostname:
+    try:
+        s = urlsplit(url)
+        hostname = s.hostname
+        port = s.port
+    except ValueError:
         return None
-    netloc = s.hostname + (f":{s.port}" if s.port else "")
+    if not s.scheme or not hostname:
+        return None
+    netloc = hostname + (f":{port}" if port else "")
     return f"{s.scheme}://{netloc}".lower()
 
 
@@ -45,8 +54,14 @@ def check(request: Request) -> JSONResponse | None:
     if request.method in _SAFE_METHODS:
         return None
     ours = _origin(config.BASE_URL)
-    sent = _origin(request.headers.get("origin", "")) or _origin(request.headers.get("referer", ""))
-    if sent is None or sent == ours:
+    source = request.headers.get("origin")
+    if source is None:
+        source = request.headers.get("referer")
+    if source is None:
+        # Server-to-server integrations generally send neither browser header.
+        return None
+    sent = _origin(source)
+    if sent == ours:
         return None
     log.warning(
         "cross-origin %s %s blocked: origin=%s expected=%s",

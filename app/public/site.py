@@ -722,13 +722,12 @@ def _specialty_page(request: Request, key: str):
     vids = [r for r in _portfolio_reels() if specialties.specialty_key(r["portfolio_tag"]) == key]
     csmap = _cs_specialty_map()
     studies = [g for g in _case_studies() if csmap.get(g["id"], specialties.DEFAULT_KEY) == key]
-    # Specialty-scoped quotes first (they ride on this vertical's case
-    # studies); top up with general ones so the block never renders thin.
+    # Only quotes tied to this specialty's published studies belong here.
+    # General quotes may be F&B-specific; using them as fallback on portraits or
+    # real estate silently misattributes the proof.
     quotes: list = []
     for s in studies:
         quotes += _testimonials(gallery_id=s["id"])
-    if len(quotes) < 3:
-        quotes += _testimonials(limit=3 - len(quotes))
     return templates.TemplateResponse(
         request,
         "site/specialty.html",

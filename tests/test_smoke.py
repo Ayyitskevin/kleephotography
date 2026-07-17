@@ -6178,9 +6178,13 @@ def test_testimonials(admin):
             assert "Mara Sun" in r.text and "Café Lune" in r.text
             assert "Spring shoot felt effortless" not in r.text, path
             assert "Draft only" not in r.text, path
-            # Schema.org Review JSON-LD for SEO rich results
-            assert '"@type": "Review"' in r.text
-            assert '"@type": "Person"' in r.text
+            # Testimonials stay human-readable without self-serving Review JSON-LD.
+            assert '"@type": "Review"' not in r.text
+
+        # A general F&B quote must not be used as proof for unrelated specialties.
+        for path in ("/real-estate", "/portraits"):
+            r = pub.get(path)
+            assert "captured our menu better" not in r.text, path
 
     # publish the case study + verify the gallery-scoped testimonial shows there
     admin.post(
