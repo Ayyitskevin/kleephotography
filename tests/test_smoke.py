@@ -6,6 +6,7 @@ Run:  MISE_DATA_DIR=$(mktemp -d) MISE_SECRET_KEY=test MISE_ADMIN_PASSWORD=pw \
 
 import io
 import os
+import re
 import tempfile
 import zipfile
 
@@ -3272,6 +3273,18 @@ def test_marketing_site(admin, monkeypatch):
             "/reels",
             "/press",
         )
+
+        mobile_destinations = (
+            "/real-estate",
+            "/portraits",
+            "/food-beverage",
+            "/portfolio",
+            "/services",
+            "/work",
+            "/about",
+            "/book",
+            "/contact",
+        )
         for path in marketing_paths:
             r = pub.get(path)
             assert r.status_code == 200
@@ -3283,6 +3296,20 @@ def test_marketing_site(admin, monkeypatch):
             assert "htmx.min.js" not in r.text, path
             assert "behaviors.js" not in r.text, path
             assert "details_persist.js" not in r.text, path
+            menu_start = '<details class="nav-menu" data-mobile-menu>'
+            assert menu_start in r.text, path
+            after_header = r.text.split("</header>", 1)[1]
+            assert after_header.lstrip().startswith(menu_start), path
+            menu = r.text.split(menu_start, 1)[1].split("</details>", 1)[0]
+            assert menu.lstrip().startswith(
+                '<summary class="nav-menu-btn" aria-label="Site menu">'
+            ), path
+            assert menu.count("<summary") == 1, path
+            assert '<nav class="nav-mobile" aria-label="Mobile site">' in menu, path
+            assert "aria-expanded=" not in menu and "data-menu-btn" not in menu, path
+            mobile_nav = menu.split('aria-label="Mobile site">', 1)[1].split("</nav>", 1)[0]
+            mobile_hrefs = tuple(re.findall(r'<a\b[^>]*\bhref="([^"]+)"', mobile_nav))
+            assert mobile_hrefs == mobile_destinations, path
         # Lean marketing JS retains the few booking/spoke handlers public pages need.
         js = pub.get("/static/site.js").text
         assert "select[data-autosubmit]" in js
@@ -3290,6 +3317,101 @@ def test_marketing_site(admin, monkeypatch):
         assert 'closest("[data-seek]")' in js
         assert 'typeof window.plausible !== "function"' in js
         assert "video[data-reel-video]" in js and "IntersectionObserver" in js
+        menu_js = js.split("// --- mobile menu ---", 1)[1].split("// --- scroll reveal ---", 1)[0]
+        for contract in (
+            'mobileMenu.querySelector("summary")',
+            'mobileMenu.addEventListener("focusin"',
+            'mobileMenu.addEventListener("toggle"',
+            'document.documentElement.classList.add("nav-menu-enhanced")',
+            'document.documentElement.classList.add("nav-menu-open")',
+            'document.documentElement.classList.remove("nav-menu-open")',
+            "setBackgroundInert(true)",
+            "setBackgroundInert(false)",
+            'element.setAttribute("inert", "")',
+            'element.removeAttribute("inert")',
+            "requestAnimationFrame",
+            "firstLink.focus()",
+            'e.key === "Tab"',
+            "e.shiftKey",
+            "document.activeElement",
+            'e.key === "Escape"',
+            "menuButton.focus()",
+            'closest("a[href]")',
+            'window.addEventListener("resize"',
+            'window.getComputedStyle(menuButton).display === "none"',
+            "lastMenuFocus",
+            "focusWasInMenu",
+            "matched = Array.prototype.some.call",
+            "if (!matched && focusWasInMenu && nav)",
+            "restoreDesktopFocus(active)",
+            "if (restoreFocus) restoreDesktopFocus(active)",
+            'window.addEventListener("pageshow"',
+            "syncMenuState(false)",
+        ):
+            assert contract in menu_js
+        assert "aria-expanded" not in menu_js
+        assert 'classList.toggle("open"' not in menu_js
+        assert "document.body.style.overflow" not in menu_js
+        assert "summaryHadFocus" not in menu_js
+
+        focus_capture = menu_js.index("var active = document.activeElement;")
+        style_read = menu_js.index('window.getComputedStyle(menuButton).display === "none"')
+        assert focus_capture < style_read
+        enhancement = menu_js.index('classList.add("nav-menu-enhanced")')
+        for listener in (
+            'mobileMenu.addEventListener("toggle"',
+            'document.addEventListener("keydown"',
+            'window.addEventListener("resize"',
+            'window.addEventListener("pageshow"',
+        ):
+            assert menu_js.index(listener) < enhancement
+
+        def css_block(source, marker):
+            start = source.index(marker)
+            brace = source.index("{", start)
+            depth = 0
+            for index in range(brace, len(source)):
+                if source[index] == "{":
+                    depth += 1
+                elif source[index] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        return source[start : index + 1]
+            raise AssertionError(f"Unclosed CSS block: {marker}")
+
+        legacy_css = pub.get("/static/mise.css").text
+        screening_css = pub.get("/static/screening.css").text
+        assert ".nav-menu[open] > .nav-mobile { display: flex; }" in legacy_css
+        assert ".sr .nav-menu[open] > .nav-mobile { display: flex; }" in screening_css
+        assert ".nav-menu-btn::-webkit-details-marker { display: none; }" in legacy_css
+        assert ".nav-mobile.open" not in legacy_css
+        assert ".nav-mobile.open" not in screening_css
+
+        legacy_fallback = css_block(legacy_css, ".nav-mobile {")
+        legacy_enhanced = css_block(legacy_css, "html.nav-menu-enhanced .nav-mobile {")
+        screening_fallback = css_block(screening_css, ".sr .nav-mobile {")
+        screening_enhanced = css_block(screening_css, "html.nav-menu-enhanced .sr .nav-mobile {")
+        for fallback in (legacy_fallback, screening_fallback):
+            assert "position: relative" in fallback
+            assert "min-height: 100dvh" in fallback
+            assert "overflow-y: auto" not in fallback
+        for enhanced in (legacy_enhanced, screening_enhanced):
+            assert "position: fixed" in enhanced
+            assert "height: 100dvh" in enhanced
+            assert "overflow-y: auto" in enhanced
+        assert ".nav-mobile > a:first-child { margin-top: auto; }" in legacy_css
+        assert ".nav-mobile > a:last-child { margin-bottom: auto; }" in legacy_css
+        assert "z-index: 80" in css_block(legacy_css, ".lightbox {")
+        scroll_lock = css_block(legacy_css, "html.nav-menu-open,")
+        assert "overflow: hidden" in scroll_lock
+        assert "overscroll-behavior: none" in scroll_lock
+
+        legacy_mobile_css = css_block(legacy_css, "@media (max-width: 860px)")
+        screening_mobile_css = css_block(screening_css, "@media (max-width: 1080px)")
+        assert ".site-nav::after" in legacy_mobile_css
+        assert ".sr .site-nav::after" in screening_mobile_css
+        assert ".nav-menu { display: block; }" in legacy_mobile_css
+        assert ".sr .nav-menu { display: block; }" in screening_mobile_css
         home = pub.get("/").text
         assert 'href="/book">Book a shoot' in home
         assert "Ready for your close-up?" in home

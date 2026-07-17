@@ -114,7 +114,7 @@ button.danger, .danger { color: #a33; }
 .fav-btn.faved { color: #ff5d73; }
 
 .lightbox {
-  position: fixed; inset: 0; background: rgba(10,8,6,0.96); z-index: 50;
+  position: fixed; inset: 0; background: rgba(10,8,6,0.96); z-index: 80;
   display: flex; align-items: center; justify-content: center;
 }
 .lightbox[hidden] { display: none; }
@@ -794,17 +794,52 @@ progress { width: 100%; }
   color: var(--cream); border-radius: 999px; font-weight: 600;
   white-space: nowrap; }
 .site-nav nav a.nav-cta:hover { background: var(--accent); color: var(--cream); }
-.nav-menu-btn { display: none; flex-direction: column; gap: 5px; padding: 6px;
-  background: none; border: 0; cursor: pointer; }
-.nav-menu-btn span { display: block; width: 24px; height: 2px; background: var(--ink); }
-.nav-mobile { position: fixed; inset: 0; z-index: 45; display: none;
-  flex-direction: column; align-items: center; justify-content: center; gap: 28px;
-  background: rgba(18,14,10,0.97); animation: klee-fade 0.3s ease; }
-.nav-mobile.open { display: flex; }
+.nav-menu { display: none; position: relative; z-index: 70; }
+.nav-menu-btn {
+  display: none; position: fixed; top: 22px; right: clamp(20px, 6vw, 88px);
+  z-index: 71; width: 44px; height: 44px; box-sizing: border-box;
+  flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  padding: 6px; background: none; border: 0; cursor: pointer; list-style: none;
+  transition: top 0.4s ease;
+}
+.nav-menu-btn::marker { content: ""; }
+.nav-menu-btn::-webkit-details-marker { display: none; }
+.site-nav.scrolled + .nav-menu > .nav-menu-btn { top: 14px; }
+.nav-menu-btn span {
+  display: block; width: 24px; height: 2px; background: var(--ink);
+  transform-origin: center; transition: transform 0.2s ease;
+}
+.nav-menu[open] .nav-menu-btn span:first-child {
+  transform: translateY(3.5px) rotate(45deg);
+}
+.nav-menu[open] .nav-menu-btn span:last-child {
+  transform: translateY(-3.5px) rotate(-45deg);
+}
+/* Native fallback stays in flow so keyboard focus can continue visibly into
+   the page; site.js upgrades it only after focus containment is wired. */
+.nav-mobile {
+  position: relative; width: 100%; min-height: 100vh; min-height: 100dvh;
+  display: none; box-sizing: border-box;
+  flex-direction: column; align-items: center; justify-content: flex-start; gap: 28px;
+  padding: max(90px, calc(env(safe-area-inset-top, 0px) + 70px)) 28px
+    max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+  background: rgba(18,14,10,0.97); animation: klee-fade 0.3s ease;
+}
+html.nav-menu-enhanced .nav-mobile {
+  position: fixed; top: 0; left: 0; width: 100vw;
+  height: 100vh; height: 100dvh; min-height: 0; z-index: 70;
+  overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.nav-menu[open] > .nav-mobile { display: flex; }
+.nav-mobile > a:first-child { margin-top: auto; }
+.nav-mobile > a:last-child { margin-bottom: auto; }
 .nav-mobile a { font-family: var(--serif); font-size: 2rem; color: #f2e9dc;
   text-decoration: none; }
 .nav-mobile a.nav-cta { margin-top: 10px; padding: 0.7em 1.7em;
   background: var(--accent); border-radius: 999px; font: 600 1rem var(--sans); }
+html.nav-menu-open,
+html.nav-menu-open body { overflow: hidden; overscroll-behavior: none; }
 
 /* ---- generic page wrapper (non-home marketing pages) ---- */
 .site-main { max-width: 1100px; width: 100%; margin: 0 auto;
@@ -1338,6 +1373,8 @@ progress { width: 100%; }
 /* ---- responsive ---- */
 @media (max-width: 860px) {
   .site-nav nav { display: none; }
+  .site-nav::after { content: ""; flex: 0 0 44px; width: 44px; height: 44px; }
+  .nav-menu { display: block; }
   .nav-menu-btn { display: flex; }
   .hero-inner { grid-template-columns: 1fr; }
   .hero-photo { order: -1; }
@@ -6179,7 +6216,7 @@ html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) nav a { col
 html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) nav a:hover { color: #8f6a1f; }
 html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) .site-brand b { color: #1C1814; }
 html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) .site-brand small { color: #8f6a1f; }
-html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) .nav-menu-btn span { background: #1C1814; }
+html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) + .nav-menu .nav-menu-btn span { background: #1C1814; }
 html[data-theme="dark"] .site-body .site-nav.nav-prep:not(.scrolled) nav a.nav-cta { color: #221507; }
 
 /* ── AS SEEN IN — italic serif strip on the prep→golden transition ────────── */

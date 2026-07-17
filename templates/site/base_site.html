@@ -60,13 +60,16 @@
   <nav aria-label="Site">
     {% with quiet=false %}{% include "site/_nav_links.html" %}{% endwith %}
   </nav>
-  <button class="nav-menu-btn" data-menu-btn aria-label="Menu" aria-expanded="false"
-          aria-controls="site-mobile-menu"><span></span><span></span></button>
 </header>
 
-<div class="nav-mobile" id="site-mobile-menu" data-mobile-menu>
-  {% with quiet=true %}{% include "site/_nav_links.html" %}{% endwith %}
-</div>
+<details class="nav-menu" data-mobile-menu>
+  <summary class="nav-menu-btn" aria-label="Site menu">
+    <span aria-hidden="true"></span><span aria-hidden="true"></span>
+  </summary>
+  <nav class="nav-mobile" aria-label="Mobile site">
+    {% with quiet=true %}{% include "site/_nav_links.html" %}{% endwith %}
+  </nav>
+</details>
 
 <div id="main" tabindex="-1">
 {% block site_content %}{% endblock %}

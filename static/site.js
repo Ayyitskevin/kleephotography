@@ -132,24 +132,142 @@
   });
 
   // --- mobile menu ---
-  var menuBtn = document.querySelector("[data-menu-btn]");
   var mobileMenu = document.querySelector("[data-mobile-menu]");
-  if (menuBtn && mobileMenu) {
-    var setMenu = function (open) {
-      mobileMenu.classList.toggle("open", open);
-      document.body.style.overflow = open ? "hidden" : "";
-      menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    };
-    menuBtn.addEventListener("click", function () {
-      setMenu(!mobileMenu.classList.contains("open"));
-    });
-    mobileMenu.addEventListener("click", function () { setMenu(false); });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && mobileMenu.classList.contains("open")) {
-        setMenu(false);
-        menuBtn.focus();
-      }
-    });
+  if (mobileMenu) {
+    var menuButton = mobileMenu.querySelector("summary");
+    var mobileNav = mobileMenu.querySelector(".nav-mobile");
+    if (menuButton && mobileNav) {
+      var inertTargets = document.querySelectorAll(
+        ".skip-link, [data-nav], #main, .sticky-cta, .site-footer"
+      );
+      var inertStates = [];
+      var lastMenuFocus = null;
+
+      // Preserve any pre-existing inert state instead of assuming ownership.
+      var setBackgroundInert = function (inert) {
+        if (inert) {
+          if (inertStates.length) return;
+          inertTargets.forEach(function (element) {
+            inertStates.push({
+              element: element,
+              wasInert: element.hasAttribute("inert")
+            });
+            element.setAttribute("inert", "");
+          });
+          return;
+        }
+        inertStates.forEach(function (state) {
+          if (!state.wasInert) state.element.removeAttribute("inert");
+        });
+        inertStates = [];
+      };
+
+      var getMenuFocus = function () {
+        var active = document.activeElement;
+        return mobileMenu.contains(active) ? active : lastMenuFocus;
+      };
+
+      var restoreDesktopFocus = function (active) {
+        var focusWasInMenu = active && mobileMenu.contains(active);
+        var mobileLink = focusWasInMenu && active.closest &&
+          active.closest("a[href]");
+        var href = mobileLink && mobileNav.contains(mobileLink) ?
+          mobileLink.getAttribute("href") : "";
+        var matched = false;
+        if (href && nav) {
+          matched = Array.prototype.some.call(
+            nav.querySelectorAll("nav a[href]"),
+            function (link) {
+              if (link.getAttribute("href") !== href) return false;
+              link.focus();
+              return true;
+            }
+          );
+        }
+        if (!matched && focusWasInMenu && nav) {
+          var brand = nav.querySelector(".site-brand");
+          if (brand) brand.focus();
+        }
+        lastMenuFocus = null;
+      };
+
+      var syncMenuState = function (focusOnOpen) {
+        var active = getMenuFocus();
+        var menuIsHidden =
+          window.getComputedStyle(menuButton).display === "none";
+        if (mobileMenu.open && !menuIsHidden) {
+          document.documentElement.classList.add("nav-menu-open");
+          setBackgroundInert(true);
+          var firstLink = mobileNav.querySelector("a[href]");
+          if (focusOnOpen && firstLink) {
+            requestAnimationFrame(function () {
+              if (mobileMenu.open) firstLink.focus();
+            });
+          }
+        } else {
+          var restoreFocus = mobileMenu.open && menuIsHidden;
+          // A persisted disclosure must not lock a desktop-width page.
+          if (mobileMenu.open) mobileMenu.open = false;
+          document.documentElement.classList.remove("nav-menu-open");
+          setBackgroundInert(false);
+          if (restoreFocus) restoreDesktopFocus(active);
+        }
+      };
+
+      var closeMenu = function (restoreFocus) {
+        if (!mobileMenu.open) return;
+        mobileMenu.open = false;
+        syncMenuState(false);
+        if (restoreFocus) menuButton.focus();
+      };
+
+      mobileMenu.addEventListener("focusin", function (e) {
+        lastMenuFocus = e.target;
+      });
+      mobileMenu.addEventListener("toggle", function () {
+        syncMenuState(true);
+      });
+      mobileNav.addEventListener("click", function (e) {
+        var link = e.target.closest && e.target.closest("a[href]");
+        if (link) closeMenu(false);
+      });
+      document.addEventListener("keydown", function (e) {
+        if (!mobileMenu.open) return;
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeMenu(true);
+          return;
+        }
+        if (e.key === "Tab") {
+          var links = Array.prototype.slice.call(
+            mobileNav.querySelectorAll("a[href]")
+          );
+          var focusable = [menuButton].concat(links);
+          var last = focusable[focusable.length - 1];
+          if (!mobileMenu.contains(document.activeElement)) {
+            e.preventDefault();
+            (e.shiftKey ? last : (links[0] || menuButton)).focus();
+          } else if (e.shiftKey && document.activeElement === menuButton) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            menuButton.focus();
+          }
+        }
+      });
+
+      // If the responsive breakpoint disappears while open, close and move
+      // focus to the equivalent desktop control rather than stranding it.
+      window.addEventListener("resize", function () {
+        syncMenuState(false);
+      });
+      window.addEventListener("pageshow", function () {
+        syncMenuState(true);
+      });
+      document.documentElement.classList.add("nav-menu-enhanced");
+      syncMenuState(true);
+    }
   }
 
   // --- scroll reveal ---
