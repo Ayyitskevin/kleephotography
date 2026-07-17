@@ -1,6 +1,14 @@
 {% extends "site/base_site.html" %}
 {% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
 {% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
+{% set feat = studies[0] if studies else None %}
+{% block site_head %}
+{% if feat and feat.hero_image and feat.hero_image.available %}
+<link rel="preload" as="image" href="{{ feat.hero_image.web.url }}" fetchpriority="high"
+      {% if feat.hero_image.srcset %}imagesrcset="{{ feat.hero_image.srcset }}"
+      imagesizes="(max-width: 900px) 100vw, 55vw"{% endif %}>
+{% endif %}
+{% endblock %}
 {% block site_content %}
 
 <section class="page-hero page-hero-work sr-wrap">
@@ -11,13 +19,14 @@
   </div>
 
   {% if studies %}
-  {% set feat = studies[0] %}
   <a class="work-feature" href="/work/{{ feat.slug }}" data-reveal>
     <div class="work-feature-media">
       {% if feat.hero_id %}
-      <img src="/site/img/{{ feat.hero_id }}?variant=web" loading="lazy" decoding="async"
-           srcset="/site/img/{{ feat.hero_id }}?variant=thumb 480w, /site/img/{{ feat.hero_id }}?variant=web 2048w"
-           sizes="(max-width: 900px) 100vw, 55vw"
+      <img src="{{ feat.hero_image.web.url }}" decoding="async"
+           {% if feat.hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
+           {% if feat.hero_image.web.width %}width="{{ feat.hero_image.web.width }}" height="{{ feat.hero_image.web.height }}"{% endif %}
+           {% if feat.hero_image.srcset %}srcset="{{ feat.hero_image.srcset }}"
+           sizes="(max-width: 900px) 100vw, 55vw"{% endif %}
            alt="{{ feat.cs_tagline or feat.title }}">
       <span class="work-feature-badge">Featured</span>
       {% else %}
@@ -49,9 +58,10 @@
     <a class="work-editorial-card" href="/work/{{ s.slug }}">
       <div class="work-editorial-img">
         {% if s.hero_id %}
-        <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
-             srcset="/site/img/{{ s.hero_id }}?variant=thumb 480w, /site/img/{{ s.hero_id }}?variant=web 2048w"
-             sizes="(max-width: 700px) 100vw, 50vw"
+        <img src="{{ s.hero_image.thumb.url }}" loading="lazy" decoding="async"
+             {% if s.hero_image.thumb.width %}width="{{ s.hero_image.thumb.width }}" height="{{ s.hero_image.thumb.height }}"{% endif %}
+             {% if s.hero_image.srcset %}srcset="{{ s.hero_image.srcset }}"
+             sizes="(max-width: 700px) 100vw, 50vw"{% endif %}
              alt="{{ s.cs_tagline or s.title }}">
         {% else %}
         <span class="placeholder">no hero photo starred yet</span>

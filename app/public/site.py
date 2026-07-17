@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
-from .. import config, db, features, jobs, mailer, security, specialties
+from .. import config, db, features, imaging, jobs, mailer, security, specialties
 from ..render import ROOT, _static_rev, templates
 from . import site_catalog as _site_catalog
 
@@ -133,6 +133,67 @@ def _portfolio_assets() -> list:
                       ORDER BY a.id DESC""")
 
 
+def _public_photo_spec(asset) -> dict:
+    """Actual derivative metadata for an already public-gated photo row.
+
+    The database stores source dimensions, while generated JPEG sizes depend
+    on the settings in force when the asset was processed. Probe only trusted
+    ``thumb``/``web`` derivative headers so responsive descriptors describe
+    the bytes visitors will really receive. Callers must pass rows already
+    gated by ``portfolio=1 AND status='ready' AND kind='photo'``.
+    """
+    asset_id = asset["id"]
+    gallery_id = asset["gallery_id"]
+    stem = Path(asset["stored"]).stem
+
+    def candidate(variant: str) -> dict:
+        path = config.MEDIA_DIR / str(gallery_id) / variant / f"{stem}.jpg"
+        dimensions = imaging.image_dimensions(path)
+        return {
+            "url": f"/site/img/{asset_id}?variant={variant}",
+            "width": dimensions[0] if dimensions else None,
+            "height": dimensions[1] if dimensions else None,
+        }
+
+    thumb = candidate("thumb")
+    web = candidate("web")
+
+    def preferred(primary: dict, fallback: dict) -> dict:
+        if primary["width"]:
+            return primary
+        if fallback["width"]:
+            return fallback
+        return primary
+
+    # Width descriptors are valid only when both encoded candidates exist,
+    # differ in width, and retain the same aspect ratio (allowing resize
+    # rounding). A stale/cropped derivative stays usable as a plain src but is
+    # never mixed into a misleading srcset.
+    srcset = None
+    if thumb["width"] and web["width"] and thumb["width"] != web["width"]:
+        thumb_ratio = thumb["width"] / thumb["height"]
+        web_ratio = web["width"] / web["height"]
+        if abs(thumb_ratio - web_ratio) / web_ratio <= 0.01:
+            candidates = sorted((thumb, web), key=lambda item: item["width"])
+            srcset = ", ".join(f"{item['url']} {item['width']}w" for item in candidates)
+        else:
+            log.warning(
+                "Public asset %s has mismatched derivative ratios: thumb=%sx%s web=%sx%s",
+                asset_id,
+                thumb["width"],
+                thumb["height"],
+                web["width"],
+                web["height"],
+            )
+
+    return {
+        "available": bool(thumb["width"] or web["width"]),
+        "thumb": preferred(thumb, web),
+        "web": preferred(web, thumb),
+        "srcset": srcset,
+    }
+
+
 def _parse_cs_credits(raw: str | None) -> list[dict]:
     """Turn case-study credit lines into label/value pairs for the grid layout."""
     out: list[dict] = []
@@ -204,12 +265,30 @@ def _press_features() -> list:
 
 def _case_studies() -> list:
     """Galleries Kevin has promoted as public case studies, newest first."""
-    return db.all_("""SELECT g.*,
-                      (SELECT a.id FROM assets a WHERE a.gallery_id=g.id
-                       AND a.portfolio=1 AND a.status='ready' AND a.kind='photo'
-                       ORDER BY a.id DESC LIMIT 1) AS hero_id
-                      FROM galleries g WHERE g.cs_published=1
+    return db.all_("""SELECT g.*, hero.id AS hero_id, hero.stored AS hero_stored
+                      FROM galleries g
+                      LEFT JOIN assets hero ON hero.id = (
+                        SELECT a.id FROM assets a WHERE a.gallery_id=g.id
+                        AND a.portfolio=1 AND a.status='ready' AND a.kind='photo'
+                        ORDER BY a.id DESC LIMIT 1
+                      )
+                      WHERE g.cs_published=1
                       ORDER BY g.created_at DESC""")
+
+
+def _case_study_view(study) -> dict:
+    """Template view of a study, with a probed public hero when one exists."""
+    view = dict(study)
+    view["hero_image"] = None
+    if study["hero_id"]:
+        view["hero_image"] = _public_photo_spec(
+            {
+                "id": study["hero_id"],
+                "gallery_id": study["id"],
+                "stored": study["hero_stored"],
+            }
+        )
+    return view
 
 
 def _cs_specialty_map() -> dict[int, str]:
@@ -621,7 +700,7 @@ async def submit_inquiry(
 
 @router.get("/work", response_class=HTMLResponse)
 async def work_index(request: Request):
-    studies = _case_studies()
+    studies = [_case_study_view(study) for study in _case_studies()]
     csmap = _cs_specialty_map()
     # Group by derived specialty (SPECIALTIES order). Headings only render
     # when more than one group exists — a single-vertical archive stays flat.
@@ -648,6 +727,7 @@ async def work_detail(request: Request, slug: str):
                         ORDER BY position, id""",
         (g["id"],),
     )
+    photo_images = {photo["id"]: _public_photo_spec(photo) for photo in photos}
     credit_items = _parse_cs_credits(g["cs_credits"])
     testimonials = _testimonials(gallery_id=g["id"])
     specialty_key = _cs_specialty_map().get(g["id"], specialties.DEFAULT_KEY)
@@ -674,6 +754,7 @@ async def work_detail(request: Request, slug: str):
         {
             "g": g,
             "photos": photos,
+            "photo_images": photo_images,
             "credit_items": credit_items,
             "testimonials": testimonials,
             "pull_quote": testimonials[0] if testimonials else None,

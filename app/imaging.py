@@ -7,8 +7,10 @@ re-encoding clean).
 
 import io
 import logging
+from functools import lru_cache
+from pathlib import Path
 
-from PIL import Image, ImageCms, ImageFilter, ImageOps
+from PIL import Image, ImageCms, ImageFilter, ImageOps, UnidentifiedImageError
 
 try:
     import pillow_heif
@@ -23,6 +25,42 @@ PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp", ".tif", ".tiff
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 
 _SRGB = ImageCms.createProfile("sRGB")
+
+
+@lru_cache(maxsize=2048)
+def _image_header_dimensions(
+    path: str, identity: tuple[int, int, int, int, int]
+) -> tuple[int, int] | None:
+    """Read one image header, caching success or failure by file identity."""
+    del identity  # cache-key material; the path is all Pillow needs
+    try:
+        with Image.open(path) as image:
+            return image.size
+    except (OSError, UnidentifiedImageError, ValueError) as exc:
+        log.warning("Could not read image dimensions for %s: %s", path, exc)
+        return None
+
+
+def image_dimensions(path: str | Path) -> tuple[int, int] | None:
+    """Return actual encoded dimensions without decoding the image payload.
+
+    Missing derivatives are a supported legacy state and return ``None``.
+    Corrupt files fail visibly in logs while callers can still render their
+    existing placeholder/fallback behavior.
+    """
+    candidate = Path(path)
+    try:
+        stat = candidate.stat()
+    except OSError:
+        return None
+    identity = (
+        stat.st_dev,
+        stat.st_ino,
+        stat.st_mtime_ns,
+        stat.st_ctime_ns,
+        stat.st_size,
+    )
+    return _image_header_dimensions(str(candidate), identity)
 
 
 def _to_srgb(img: Image.Image) -> Image.Image:

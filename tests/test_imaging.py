@@ -43,6 +43,29 @@ def test_make_derivatives_basic():
             assert im.size[0] <= 100
 
 
+def test_image_dimensions_reads_actual_header_and_invalidates_cache(tmp_path):
+    derivative = tmp_path / "derivative.jpg"
+    Image.new("RGB", (73, 109), (10, 20, 30)).save(derivative, "JPEG")
+
+    assert imaging.image_dimensions(derivative) == (73, 109)
+
+    # Replacing a derivative at the same path must not leave stale cached
+    # metadata; its filesystem identity is part of the cache key.
+    Image.new("RGB", (41, 29), (30, 20, 10)).save(derivative, "JPEG")
+    assert imaging.image_dimensions(derivative) == (41, 29)
+
+
+def test_image_dimensions_handles_missing_and_corrupt_files(tmp_path, caplog):
+    missing = tmp_path / "missing.jpg"
+    corrupt = tmp_path / "corrupt.jpg"
+    corrupt.write_bytes(b"not a jpeg")
+
+    assert imaging.image_dimensions(missing) is None
+    assert imaging.image_dimensions(corrupt) is None
+    assert imaging.image_dimensions(corrupt) is None
+    assert caplog.text.count("Could not read image dimensions") == 1
+
+
 def test_to_srgb_no_icc():
     # Simple test that non-icc image converts to RGB
     img = Image.new("RGB", (10, 10), (255, 0, 0))

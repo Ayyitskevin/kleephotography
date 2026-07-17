@@ -2,6 +2,7 @@
 {# Top-level so BOTH the og block and site_content see it — a {% set %} inside
    one block is invisible to the others (Jinja block scoping). #}
 {% set hero = photos[0] if photos else None %}
+{% set hero_image = photo_images[hero.id] if hero else None %}
 {% set cs_title = g.cs_tagline or g.title %}
 {% set cs_desc = (g.cs_brief or g.cs_tagline or g.title)|truncate(200, True, '') %}
 {% block title %}{{ cs_title }} — {{ site_name }}{% endblock %}
@@ -16,6 +17,11 @@
 <meta name="twitter:card" content="{{ 'summary_large_image' if hero else 'summary' }}">
 {% endblock %}
 {% block site_head %}
+{% if hero_image and hero_image.available %}
+<link rel="preload" as="image" href="{{ hero_image.web.url }}" fetchpriority="high"
+      {% if hero_image.srcset %}imagesrcset="{{ hero_image.srcset }}"
+      imagesizes="(max-width: 1100px) 100vw, 1320px"{% endif %}>
+{% endif %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -57,9 +63,11 @@
 {% if hero %}
 <section class="work-detail-hero" data-reveal>
   <figure class="work-hero-frame">
-    <img src="/site/img/{{ hero.id }}?variant=web" loading="lazy" decoding="async"
-         srcset="/site/img/{{ hero.id }}?variant=thumb 480w, /site/img/{{ hero.id }}?variant=web 2048w"
-         sizes="(max-width: 1100px) 100vw, 1320px"
+    <img src="{{ hero_image.web.url }}" decoding="async"
+         {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
+         {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
+         {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
+         sizes="(max-width: 1100px) 100vw, 1320px"{% endif %}
          alt="{{ g.cs_tagline or g.title }}">
   </figure>
 </section>
@@ -88,11 +96,13 @@
     {% set gallery_photos = photos[1:] if photos|length > 1 else photos %}
     {% for a in gallery_photos %}
     {% set p = spans[loop.index0 % spans|length] %}
+    {% set image = photo_images[a.id] %}
     <figure class="tile wg-tile" data-web="/site/img/{{ a.id }}"
             style="grid-column: span {{ p.col }}; aspect-ratio: {{ p.ar }};">
-      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-           srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
-           sizes="(max-width: 700px) 100vw, 50vw"
+      <img src="{{ image.thumb.url }}" loading="lazy" decoding="async"
+           {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
+           {% if image.srcset %}srcset="{{ image.srcset }}"
+           sizes="(max-width: 700px) 100vw, 50vw"{% endif %}
            alt="{{ g.cs_tagline or g.title }}{% if g.client_name %} — {{ g.client_name }}{% endif %}">
     </figure>
     {% endfor %}

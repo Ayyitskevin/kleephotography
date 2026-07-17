@@ -4794,6 +4794,123 @@ def test_case_studies(admin):
         assert pub.get(f"/g/{g['slug']}").status_code == 200
 
 
+def test_case_study_images_use_actual_derivative_metadata(admin):
+    import re
+    import shutil
+
+    slug = "image-delivery-metadata"
+    gallery_id = db.run(
+        """INSERT INTO galleries
+           (slug, title, client_name, pin, cs_published, cs_tagline, cs_brief,
+            cs_location, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (
+            slug,
+            "Image Delivery Metadata",
+            "Metadata Client",
+            "4455",
+            1,
+            "A portrait-oriented case study",
+            "Known derivative files should drive the public image markup.",
+            "Asheville, NC",
+            "2999-01-01 00:00:00",
+        ),
+    )
+    stored = "deliverymetadata.jpg"
+    asset_id = db.run(
+        """INSERT INTO assets
+           (gallery_id, kind, filename, stored, status, width, height, position, portfolio)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (
+            gallery_id,
+            "photo",
+            "source.jpg",
+            stored,
+            "ready",
+            6000,
+            4000,
+            0,
+            1,
+        ),
+    )
+    media = config.MEDIA_DIR / str(gallery_id)
+    try:
+        # Deliberately disagree with the landscape source metadata above. The
+        # public descriptors must follow these portrait derivative bytes.
+        for variant, size in (("thumb", (80, 120)), ("web", (320, 480))):
+            directory = media / variant
+            directory.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", size, (80, 100, 120)).save(directory / stored, "JPEG")
+
+        web_url = f"/site/img/{asset_id}?variant=web"
+        thumb_url = f"/site/img/{asset_id}?variant=thumb"
+        expected_srcset = f"{thumb_url} 80w, {web_url} 320w"
+
+        with TestClient(app) as public:
+            work = public.get("/work")
+            detail = public.get(f"/work/{slug}")
+
+        assert work.status_code == 200
+        work_hero = re.search(rf'<img src="{re.escape(web_url)}"[^>]*>', work.text).group(0)
+        assert 'width="320" height="480"' in work_hero
+        assert f'srcset="{expected_srcset}"' in work_hero
+        assert 'sizes="(max-width: 900px) 100vw, 55vw"' in work_hero
+        assert 'fetchpriority="high"' in work_hero
+        assert 'loading="lazy"' not in work_hero
+        assert f'<link rel="preload" as="image" href="{web_url}" fetchpriority="high"' in work.text
+        assert f'imagesrcset="{expected_srcset}"' in work.text
+
+        assert detail.status_code == 200
+        detail_hero = re.search(rf'<img src="{re.escape(web_url)}"[^>]*>', detail.text).group(0)
+        assert 'width="320" height="480"' in detail_hero
+        assert f'srcset="{expected_srcset}"' in detail_hero
+        assert 'sizes="(max-width: 1100px) 100vw, 1320px"' in detail_hero
+        assert 'fetchpriority="high"' in detail_hero
+        assert 'loading="lazy"' not in detail_hero
+        assert (
+            f'<link rel="preload" as="image" href="{web_url}" fetchpriority="high"' in detail.text
+        )
+        assert f'imagesrcset="{expected_srcset}"' in detail.text
+
+        gallery_tile = re.search(rf'<img src="{re.escape(thumb_url)}"[^>]*>', detail.text).group(0)
+        assert 'width="80" height="120"' in gallery_tile
+        assert f'srcset="{expected_srcset}"' in gallery_tile
+        assert 'loading="lazy"' in gallery_tile
+        assert 'fetchpriority="high"' not in gallery_tile
+        # A single valid derivative becomes the sole source; no speculative
+        # candidate or duplicate fetch is advertised.
+        (media / "web" / stored).unlink()
+        with TestClient(app) as public:
+            thumb_only = public.get(f"/work/{slug}")
+        thumb_only_hero = re.search(
+            rf'<img src="{re.escape(thumb_url)}"[^>]*>', thumb_only.text
+        ).group(0)
+        assert 'width="80" height="120"' in thumb_only_hero
+        assert "srcset=" not in thumb_only_hero and "sizes=" not in thumb_only_hero
+        assert 'fetchpriority="high"' in thumb_only_hero
+        assert f'<link rel="preload" as="image" href="{thumb_url}" fetchpriority="high"' in (
+            thumb_only.text
+        )
+        assert "imagesrcset=" not in thumb_only.text
+
+        # If both encoded derivatives are gone, preserve the old broken-image
+        # fallback without preloading or prioritizing a URL known to be absent.
+        (media / "thumb" / stored).unlink()
+        with TestClient(app) as public:
+            unavailable = public.get(f"/work/{slug}")
+        unavailable_hero = re.search(
+            rf'<img src="{re.escape(web_url)}"[^>]*>', unavailable.text
+        ).group(0)
+        assert 'loading="lazy"' in unavailable_hero
+        assert 'fetchpriority="high"' not in unavailable_hero
+        assert "width=" not in unavailable_hero
+        assert "srcset=" not in unavailable_hero and "sizes=" not in unavailable_hero
+        assert f'<link rel="preload" as="image" href="{web_url}"' not in unavailable.text
+    finally:
+        db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
+        shutil.rmtree(media, ignore_errors=True)
+
+
 def test_gallery_public_site_readiness(admin):
     ready_id = db.run(
         """INSERT INTO galleries
