@@ -349,7 +349,9 @@ def test_full_gallery_flow(admin):
         assert f'data-fav="/g/{g["slug"]}/fav/{a["id"]}"' in r.text
         assert f'data-dl="/g/{g["slug"]}/download?asset_id={a["id"]}"' in r.text
         assert 'class="lb-fav"' in r.text and 'class="lb-dl"' in r.text
-        assert 'class="lb-play"' in r.text
+        lightbox_tag = re.search(r'<div id="lightbox"[^>]*>', r.text, re.S).group(0)
+        assert 'aria-label="Media viewer"' in lightbox_tag
+        assert 'class="lb-play" aria-label="Slideshow" aria-pressed="false"' in r.text
         # lb-proof slot ships hidden (lightbox shows it when in a proofing section)
         assert 'class="lb-proof" hidden' in r.text
         # the tile carries its section id so the lightbox can read the live
@@ -3452,7 +3454,10 @@ def test_marketing_site(admin, monkeypatch):
         assert f'data-web="/site/img/{a["id"]}?variant=web"' in r.text
         assert 'id="lightbox"' in r.text and "lightbox.js" in r.text
         # slideshow ▶ ships on the marketing lightbox too (fav/dl stay gallery-only)
-        assert 'class="lb-play"' in r.text and 'class="lb-fav"' not in r.text
+        lightbox_tag = re.search(r'<div id="lightbox"[^>]*>', r.text, re.S).group(0)
+        assert 'aria-label="Media viewer"' in lightbox_tag
+        assert 'class="lb-play" aria-label="Slideshow" aria-pressed="false"' in r.text
+        assert 'class="lb-fav"' not in r.text
         r = pub.get("/")
         assert f'data-web="/site/img/{a["id"]}"' in r.text
         assert 'id="lightbox"' in r.text

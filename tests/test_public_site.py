@@ -187,3 +187,38 @@ def test_portfolio_screening_room_sizes_match_multicol_contract():
         columns = max(1, int((available + 10) / 310))
         css_slot = (available + 10) / columns - 10
         assert declared_slot(viewport) == pytest.approx(css_slot, abs=0.01)
+
+
+def test_lightbox_mixed_media_semantics_contract():
+    """Keep the shared viewer's source semantics honest for photo and video."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    marketing = (root / "templates/site/_lightbox.html").read_text()
+    gallery = (root / "templates/public/gallery.html").read_text()
+    javascript = (root / "static/lightbox.js").read_text()
+
+    for template in (marketing, gallery):
+        assert 'aria-label="Media viewer"' in template
+        assert 'aria-label="Photo viewer"' not in template
+        assert 'class="lb-play" aria-label="Slideshow" aria-pressed="false"' in template
+
+    def block(start, end):
+        return javascript.split(start, 1)[1].split(end, 1)[0]
+
+    stop_show = block("function stopShow()", "function startShow()")
+    start_show = block("function startShow()", "// the marketing-site lightbox")
+    media_name = block("function mediaName(t, fallback)", "function render(i)")
+    render = block("function render(i)", "// Return focus")
+    tile_init = block("tiles.forEach((t, i) =>", "// Shared fav trigger")
+
+    assert 'playBtn.setAttribute("aria-pressed", "false")' in stop_show
+    assert 'playBtn.setAttribute("aria-pressed", "true")' not in stop_show
+    assert 'playBtn.setAttribute("aria-pressed", "true")' in start_show
+    assert 'playBtn.setAttribute("aria-pressed", "false")' not in start_show
+    assert "return (source && source.alt) || fallback;" in media_name
+    assert 'v.setAttribute("aria-label", mediaName(t, "Video"));' in render
+    assert 'img.alt = mediaName(t, "");' in render
+    assert 't.dataset.kind === "video" ? "open video" : "view larger"' in tile_init
+    assert 'img.setAttribute("aria-label", mediaName(t, fallback) + " — " + action);' in tile_init
+    assert '(img.alt || "Photo") + " — view larger"' not in javascript

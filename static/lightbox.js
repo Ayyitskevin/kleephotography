@@ -100,12 +100,16 @@
 
   function stopShow() {
     if (timer) { clearInterval(timer); timer = null; }
-    if (playBtn) playBtn.innerHTML = "▶";
+    if (playBtn) {
+      playBtn.innerHTML = "▶";
+      playBtn.setAttribute("aria-pressed", "false");
+    }
   }
 
   function startShow() {
     timer = setInterval(() => step(1), 4000);
     playBtn.innerHTML = "❚❚";
+    playBtn.setAttribute("aria-pressed", "true");
   }
 
   // the marketing-site lightbox has no action bar — every bar element may be null
@@ -142,6 +146,11 @@
     }
   }
 
+  function mediaName(t, fallback) {
+    const source = t && t.querySelector("img");
+    return (source && source.alt) || fallback;
+  }
+
   function render(i) {
     idx = (i + tiles.length) % tiles.length;
     const t = tiles[idx];
@@ -161,6 +170,7 @@
       v.controls = true;
       v.playsInline = true;
       v.setAttribute("playsinline", "");
+      v.setAttribute("aria-label", mediaName(t, "Video"));
       stage.appendChild(v);
       activeVideo = v;
       activeAsset = t.dataset.id;
@@ -176,8 +186,7 @@
       img.src = t.dataset.web;
       // Carry the tile's alt onto the enlarged image so screen-reader users
       // get the same description in the viewer as in the grid.
-      const srcImg = t.querySelector("img");
-      img.alt = (srcImg && srcImg.alt) || "";
+      img.alt = mediaName(t, "");
       stage.appendChild(img);
       activeVideo = null;
       activeAsset = null;
@@ -214,7 +223,9 @@
     img.setAttribute("tabindex", "0");
     img.setAttribute("role", "button");
     if (!img.getAttribute("aria-label")) {
-      img.setAttribute("aria-label", (img.alt || "Photo") + " — view larger");
+      const action = t.dataset.kind === "video" ? "open video" : "view larger";
+      const fallback = t.dataset.kind === "video" ? "Video" : "Photo";
+      img.setAttribute("aria-label", mediaName(t, fallback) + " — " + action);
     }
     img.addEventListener("click", () => open(i));
     img.addEventListener("keydown", (e) => {
