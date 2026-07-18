@@ -4336,35 +4336,110 @@ def test_client_booking_reschedule_leaves_one_confirmed(monkeypatch):
         assert new["status"] == "confirmed" and new["reschedule_of"] == old_id
         assert confirmed == [new["id"]]
 
-        # If releasing the current booking fails, the newly held replacement is
-        # compensated before notifications/calendar side effects can fire.
-        real_cancel = S.cancel
+        compensated_token = "CompensatedRescheduleToken"
+        db.run(
+            """INSERT INTO bookings
+                 (token, event_type_id, name, email, start_utc, end_utc, status,
+                  reschedule_of, cancel_reason)
+               VALUES (?,?,?,?,?,?,'cancelled',?,?)""",
+            (
+                compensated_token,
+                eid,
+                "Riley",
+                "riley@example.com",
+                "2026-09-14 17:00:00",
+                "2026-09-14 18:00:00",
+                old_id,
+                "Reschedule failed — replacement rolled back",
+            ),
+        )
 
-        def fail_current_cancel(cancel_token, reason=""):
-            if cancel_token == new_token:
-                return False
-            return real_cancel(cancel_token, reason)
-
-        monkeypatch.setattr(S, "cancel", fail_current_cancel)
         with TestClient(app) as pub:
-            response = pub.post(
-                f"/booking/{new_token}/reschedule",
-                data={"start": "2026-09-14 16:00:00", "tz": "America/New_York"},
-                follow_redirects=False,
+            old_manage = pub.get("/booking/OldRescheduleToken", follow_redirects=False)
+            old_invite = pub.get("/booking/OldRescheduleToken/invite.ics", follow_redirects=False)
+            new_manage = pub.get(f"/booking/{new_token}")
+            invite = pub.get(f"/booking/{new_token}/invite.ics")
+            compensated_invite = pub.get(
+                f"/booking/{compensated_token}/invite.ics", follow_redirects=False
             )
+        assert old_manage.status_code == 200
+        assert "Booking cancelled" in old_manage.text
+        assert "Check your latest confirmation" in old_manage.text
+        assert "Book another time" not in old_manage.text
+        assert new_token not in old_manage.text
+        assert old_invite.status_code == 410
+        assert new_token not in old_invite.text
+        assert "calendar.google.com" in new_manage.text
+        assert "remove or edit that old entry" in new_manage.text
+        assert compensated_invite.status_code == 410
+        assert new_token not in compensated_invite.text
+        assert invite.status_code == 200
+        assert f"UID:mise-booking-{old_id}@kleephotography.com" in invite.text
+        assert "SEQUENCE:1" in invite.text
+        db.run("DELETE FROM bookings WHERE token=?", (compensated_token,))
 
-        assert response.status_code == 409
-        assert "replacement booking was cancelled" in response.text
+        # A malformed legacy lineage with two confirmed branches must not
+        # publish conflicting REQUEST invites under the shared calendar UID.
+        db.run("UPDATE bookings SET status='confirmed' WHERE id=?", (old_id,))
+        try:
+            with TestClient(app) as pub:
+                split_old_invite = pub.get(
+                    "/booking/OldRescheduleToken/invite.ics", follow_redirects=False
+                )
+                split_new_invite = pub.get(
+                    f"/booking/{new_token}/invite.ics", follow_redirects=False
+                )
+            assert split_old_invite.status_code == 410
+            assert split_new_invite.status_code == 410
+        finally:
+            db.run("UPDATE bookings SET status='cancelled' WHERE id=?", (old_id,))
+
+        # A database failure while releasing the current booking must roll the
+        # replacement INSERT back with it. The route may fail, but it must never
+        # leave two independently confirmed bookings or fire side effects.
+        con = db.connect()
+        try:
+            con.executescript(
+                f"""CREATE TRIGGER test_route_reschedule_release_abort
+                    BEFORE UPDATE OF status ON bookings
+                    WHEN OLD.id={new["id"]} AND NEW.status='cancelled'
+                    BEGIN
+                      SELECT RAISE(ABORT, 'forced route reschedule failure');
+                    END;"""
+            )
+            con.commit()
+        finally:
+            con.close()
+        try:
+            with TestClient(app, raise_server_exceptions=False) as pub:
+                response = pub.post(
+                    f"/booking/{new_token}/reschedule",
+                    data={"start": "2026-09-14 16:00:00", "tz": "America/New_York"},
+                    follow_redirects=False,
+                )
+        finally:
+            db.run("DROP TRIGGER test_route_reschedule_release_abort")
+
+        assert response.status_code == 500
         rows = db.all_(
             "SELECT id, token, status, reschedule_of FROM bookings WHERE event_type_id=?",
             (eid,),
         )
+        assert len(rows) == 2
         assert sum(row["status"] == "confirmed" for row in rows) == 1
         assert next(row for row in rows if row["token"] == new_token)["status"] == "confirmed"
-        replacement = max(rows, key=lambda row: row["id"])
-        assert replacement["status"] == "cancelled"
-        assert replacement["reschedule_of"] == new["id"]
+        assert max(row["id"] for row in rows) == new["id"]
         assert confirmed == [new["id"]]
+
+        assert S.cancel(new_token, "Plans changed") is True
+        with TestClient(app) as pub:
+            old_after_leaf_cancel = pub.get("/booking/OldRescheduleToken/invite.ics")
+            leaf_cancel = pub.get(f"/booking/{new_token}/invite.ics")
+        assert old_after_leaf_cancel.status_code == 410
+        assert leaf_cancel.status_code == 200
+        assert "METHOD:CANCEL" in leaf_cancel.text
+        assert "STATUS:CANCELLED" in leaf_cancel.text
+        assert "SEQUENCE:2" in leaf_cancel.text
     finally:
         db.run("DELETE FROM bookings WHERE event_type_id=?", (eid,))
         db.run("DELETE FROM availability_rules WHERE event_type_id=?", (eid,))

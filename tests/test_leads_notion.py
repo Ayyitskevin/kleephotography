@@ -183,6 +183,80 @@ def test_booking_notion_create_update_and_session_reschedule_are_idempotent(
     assert [row[0] for row in created].count("sessions-db") == 1
 
 
+def test_reschedule_confirmation_reuses_inquiry_and_calendar_identity(booking_id, monkeypatch):
+    original = db.one("SELECT * FROM bookings WHERE id=?", (booking_id,))
+    inquiry_id = db.run(
+        """INSERT INTO inquiries (name, email, message, kind, shoot_date, service)
+           VALUES (?,?,?,?,?,?)""",
+        (
+            original["name"],
+            original["email"],
+            "Original booking inquiry",
+            "booking",
+            original["start_utc"][:10],
+            "Observed Shoot",
+        ),
+    )
+    db.run("UPDATE bookings SET inquiry_id=? WHERE id=?", (inquiry_id, booking_id))
+    replacement = db.run(
+        """INSERT INTO bookings
+             (token, event_type_id, name, email, phone, notes, start_utc, end_utc,
+              tz, reschedule_of, inquiry_id)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            "NotionObserveRescheduled",
+            original["event_type_id"],
+            original["name"],
+            original["email"],
+            original["phone"],
+            original["notes"],
+            "2027-02-03 15:00:00",
+            "2027-02-03 16:00:00",
+            original["tz"],
+            booking_id,
+            inquiry_id,
+        ),
+    )
+    db.run(
+        """UPDATE bookings
+              SET status='cancelled', cancel_reason='Rescheduled',
+                  cancelled_at=datetime('now')
+            WHERE id=?""",
+        (booking_id,),
+    )
+    sent = []
+    monkeypatch.setattr(booking_notify.mailer, "configured", lambda: True)
+    monkeypatch.setattr(
+        booking_notify.mailer,
+        "send",
+        lambda *args, **kwargs: sent.append((args, kwargs)),
+    )
+    monkeypatch.setattr(booking_notify, "_link_studio", lambda *args: None)
+    monkeypatch.setattr(booking_notify.notion_sync, "sync_booking", lambda *args: None)
+    monkeypatch.setattr(booking_notify.notion_sync, "sync_session_for_booking", lambda *args: None)
+    monkeypatch.setattr(booking_notify.gcal, "on_booking_confirmed", lambda *args: None)
+
+    booking_notify.confirm(replacement)
+
+    assert (
+        db.one("SELECT COUNT(*) AS n FROM inquiries WHERE email=?", (original["email"],))["n"] == 1
+    )
+    assert len(sent) == 2
+    assert all("rescheduled" in args[1].lower() for args, _kwargs in sent)
+    client_body = sent[0][0][2]
+    assert "has been rescheduled" in client_body
+    assert "imported the original .ics" in client_body
+    assert "remove or edit the old entry" in client_body
+    assert "calendar.google.com" in client_body
+    invite = sent[0][1]["ics"]["content"]
+    assert f"UID:mise-booking-{booking_id}@kleephotography.com" in invite
+    assert "SEQUENCE:1" in invite
+
+    sent_count = len(sent)
+    booking_notify.confirm(booking_id)
+    assert len(sent) == sent_count
+
+
 def test_booking_mail_failure_generates_operator_signal(booking_id, monkeypatch):
     sent_alerts = []
     monkeypatch.setattr(booking_notify.mailer, "configured", lambda: True)

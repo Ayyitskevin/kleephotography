@@ -281,8 +281,17 @@ async def invite(token: str):
     b = scheduling.booking_by_token(token)
     if not b:
         raise HTTPException(status_code=404)
+    if (
+        b["status"] != "confirmed" and b["cancel_reason"] == "Rescheduled"
+    ) or scheduling.has_confirmed_replacement(b["id"]):
+        return Response(
+            "This booking was rescheduled. Use the latest invite from your confirmation email.",
+            status_code=410,
+            media_type="text/plain",
+        )
+    uid, sequence = booking_notify.calendar_identity(b["id"])
     content = ics.build(
-        uid=ics.uid_for(b["id"]),
+        uid=uid,
         summary=f"{b['event_name']} · {config.SITE_NAME}",
         description=b["notes"] or "",
         location=b["location"] or "",
@@ -291,7 +300,7 @@ async def invite(token: str):
         organizer_email=config.GMAIL_USER or "noreply@kleephotography.com",
         attendee_email=b["email"],
         cancelled=(b["status"] != "confirmed"),
-        sequence=0 if b["status"] == "confirmed" else 1,
+        sequence=sequence if b["status"] == "confirmed" else sequence + 1,
     )
     return Response(
         content,
@@ -368,22 +377,8 @@ async def do_reschedule(request: Request, token: str, start: str = Form(...), tz
         ctx["selected_slot_label"] = ""
         ctx["error"] = "Sorry — that time is no longer available. Please pick another."
         return templates.TemplateResponse(request, "public/book_event.html", ctx, status_code=409)
-    # New slot held; release the old one and email the fresh invite. If the old
-    # booking cannot be released, undo the replacement before any notification
-    # or external-calendar side effect fires.
-    if not scheduling.cancel(token, "Rescheduled"):
-        compensated = scheduling.cancel(new_token, "Reschedule failed — replacement rolled back")
-        if not compensated:
-            log.critical(
-                "reschedule compensation failed: old booking %s, replacement %s",
-                b["id"],
-                new_id,
-            )
-        return HTMLResponse(
-            "We couldn't complete the reschedule. The replacement booking was cancelled; "
-            "please review your original booking before trying again.",
-            status_code=409,
-        )
+    # scheduling.book commits the replacement and original cancellation as one
+    # BEGIN IMMEDIATE transaction. Outbound effects only see the coherent state.
     booking_notify.confirm(new_id)
     log.info("booking %s rescheduled -> %s", b["id"], new_id)
     return RedirectResponse(f"/booking/{new_token}", status_code=303)

@@ -267,6 +267,52 @@ def days_with_slots(et, start_day: dt.date, n_days: int, exclude_id: int | None 
         con.close()
 
 
+def _confirmed_lineage_ids(con, booking_id: int) -> set[int] | None:
+    """Confirmed members of a booking's full reschedule tree.
+
+    None means the lineage is structurally corrupt. Callers fail closed so a
+    stale or forked bearer link cannot mutate one branch while another remains
+    confirmed.
+    """
+    ancestors: set[int] = set()
+    current_id = booking_id
+    while True:
+        if current_id in ancestors:
+            log.error("cycle in reschedule ancestry for booking %s", booking_id)
+            return None
+        ancestors.add(current_id)
+        row = con.execute("SELECT reschedule_of FROM bookings WHERE id=?", (current_id,)).fetchone()
+        if row is None:
+            log.error("missing booking %s in reschedule ancestry for %s", current_id, booking_id)
+            return None
+        parent_id = row["reschedule_of"]
+        if parent_id is None:
+            root_id = current_id
+            break
+        current_id = parent_id
+
+    seen: set[int] = set()
+    confirmed: set[int] = set()
+    frontier = [root_id]
+    while frontier:
+        current_id = frontier.pop()
+        if current_id in seen:
+            log.error("cycle in reschedule descendants for booking %s", booking_id)
+            return None
+        seen.add(current_id)
+        row = con.execute("SELECT status FROM bookings WHERE id=?", (current_id,)).fetchone()
+        if row is None:
+            log.error("missing booking %s in reschedule descendants for %s", current_id, booking_id)
+            return None
+        if row["status"] == "confirmed":
+            confirmed.add(current_id)
+        children = con.execute(
+            "SELECT id FROM bookings WHERE reschedule_of=? ORDER BY id", (current_id,)
+        ).fetchall()
+        frontier.extend(child["id"] for child in children)
+    return confirmed
+
+
 def book(
     et,
     start_utc_str: str,
@@ -285,7 +331,13 @@ def book(
     free/busy cannot be verified. The open-set is re-derived inside a BEGIN
     IMMEDIATE transaction, so the decision and the insert are a single
     serialized unit. Google free/busy is fetched before the lock so a network
-    stall never holds the write lock."""
+    stall never holds the write lock.
+
+    When exclude_id is present, this is an atomic replacement: the original
+    must still be a confirmed booking for the same event, its client/intake and
+    external projection identities move to the replacement, and its cancellation
+    commits with the new hold. There is never a committed state with both rows
+    confirmed."""
     try:
         start_utc = _parse_utc(start_utc_str)
     except ValueError:
@@ -302,40 +354,114 @@ def book(
     con.isolation_level = None  # take manual control of the transaction
     try:
         con.execute("BEGIN IMMEDIATE")
+        original = None
+        if exclude_id is not None:
+            original = con.execute(
+                """SELECT * FROM bookings
+                   WHERE id=? AND event_type_id=? AND status='confirmed'""",
+                (exclude_id, et["id"]),
+            ).fetchone()
+            if original is None:
+                raise SlotTaken("original booking is no longer confirmed")
+            confirmed_lineage = _confirmed_lineage_ids(con, original["id"])
+            if confirmed_lineage != {original["id"]}:
+                log.error(
+                    "refusing reschedule for booking %s with confirmed lineage %s",
+                    original["id"],
+                    confirmed_lineage,
+                )
+                raise SlotTaken("booking lineage is inconsistent")
+
         ref = now_utc()
         open_starts = {
             _fmt_utc(s) for s in _slots_utc(con, et, day_local, ref, fb.intervals, exclude_id)
         }
         if start_utc_str not in open_starts:
-            con.execute("ROLLBACK")
             raise SlotTaken("slot no longer available")
-        cur = con.execute(
-            """INSERT INTO bookings (token, event_type_id, name, email, phone,
-                                     notes, start_utc, end_utc, tz, reschedule_of)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (
-                token,
-                et["id"],
-                name,
-                email,
-                phone,
-                notes,
-                start_utc_str,
-                _fmt_utc(end_utc),
-                visitor_tz,
-                exclude_id,
-            ),
-        )
+
+        if original is None:
+            cur = con.execute(
+                """INSERT INTO bookings (token, event_type_id, name, email, phone,
+                                         notes, start_utc, end_utc, tz, reschedule_of)
+                   VALUES (?,?,?,?,?,?,?,?,?,NULL)""",
+                (
+                    token,
+                    et["id"],
+                    name,
+                    email,
+                    phone,
+                    notes,
+                    start_utc_str,
+                    _fmt_utc(end_utc),
+                    visitor_tz,
+                ),
+            )
+        else:
+            cur = con.execute(
+                """INSERT INTO bookings
+                     (token, event_type_id, name, email, phone, notes,
+                      start_utc, end_utc, tz, reschedule_of,
+                      inquiry_id, google_event_id, notion_page_id,
+                      notion_session_id, client_id, project_id,
+                      venue_address, dish_count, parking_notes, style_refs,
+                      onsite_contact)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    token,
+                    et["id"],
+                    original["name"],
+                    original["email"],
+                    original["phone"],
+                    original["notes"],
+                    start_utc_str,
+                    _fmt_utc(end_utc),
+                    visitor_tz or original["tz"],
+                    original["id"],
+                    original["inquiry_id"],
+                    original["google_event_id"],
+                    original["notion_page_id"],
+                    original["notion_session_id"],
+                    original["client_id"],
+                    original["project_id"],
+                    original["venue_address"],
+                    original["dish_count"],
+                    original["parking_notes"],
+                    original["style_refs"],
+                    original["onsite_contact"],
+                ),
+            )
         bid = cur.lastrowid
+
+        if original is not None:
+            released = con.execute(
+                """UPDATE bookings
+                      SET status='cancelled', cancel_reason='Rescheduled',
+                          cancelled_at=datetime('now'), google_event_id=NULL,
+                          notion_page_id=NULL
+                    WHERE id=? AND event_type_id=? AND status='confirmed'""",
+                (original["id"], et["id"]),
+            )
+            if released.rowcount != 1:
+                raise SlotTaken("original booking is no longer confirmed")
+            if original["inquiry_id"]:
+                con.execute(
+                    "UPDATE inquiries SET shoot_date=? WHERE id=?",
+                    (day_local.isoformat(), original["inquiry_id"]),
+                )
+            if original["project_id"]:
+                con.execute(
+                    "UPDATE projects SET shoot_date=? WHERE id=?",
+                    (day_local.isoformat(), original["project_id"]),
+                )
+
         con.execute("COMMIT")
         return bid, token
-    except (SlotTaken, CalendarUnavailable):
-        raise
     except Exception:
-        try:
-            con.execute("ROLLBACK")
-        except Exception:
-            pass
+        if con.in_transaction:
+            try:
+                con.execute("ROLLBACK")
+            except Exception:
+                pass
         raise
     finally:
         con.close()
@@ -351,18 +477,66 @@ def booking_by_token(token: str):
     )
 
 
-def cancel(token: str, reason: str = "") -> bool:
-    """Cancel a confirmed booking. Returns True only if a row actually flipped
-    (so a double-click or stale link cannot fire two cancellations)."""
+def has_confirmed_replacement(booking_id: int) -> bool:
+    """Whether another confirmed row exists in this reschedule lineage.
+
+    Structural corruption also returns True so old invite URLs fail closed
+    instead of emitting a cancellation for an ambiguous calendar identity.
+    """
     con = db.connect()
     try:
+        confirmed = _confirmed_lineage_ids(con, booking_id)
+        if confirmed is None:
+            return True
+        return any(member_id != booking_id for member_id in confirmed)
+    finally:
+        con.close()
+
+
+def cancel(token: str, reason: str = "") -> bool:
+    """Cancel the sole confirmed member of a booking lineage.
+
+    Returns True only if one row flipped. Ambiguous legacy split lineages fail
+    closed for operator repair instead of cancelling an arbitrary branch.
+    """
+    con = db.connect()
+    con.isolation_level = None
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        booking = con.execute(
+            "SELECT id FROM bookings WHERE token=? AND status='confirmed'", (token,)
+        ).fetchone()
+        if booking is None:
+            con.execute("ROLLBACK")
+            return False
+
+        confirmed_lineage = _confirmed_lineage_ids(con, booking["id"])
+        if confirmed_lineage != {booking["id"]}:
+            log.error(
+                "refusing cancellation for booking %s with confirmed lineage %s",
+                booking["id"],
+                confirmed_lineage,
+            )
+            con.execute("ROLLBACK")
+            return False
+
         cur = con.execute(
             """UPDATE bookings SET status='cancelled', cancel_reason=?,
                       cancelled_at=datetime('now')
-               WHERE token=? AND status='confirmed'""",
-            (reason, token),
+               WHERE id=? AND status='confirmed'""",
+            (reason, booking["id"]),
         )
-        con.commit()
-        return cur.rowcount > 0
+        if cur.rowcount != 1:
+            con.execute("ROLLBACK")
+            return False
+        con.execute("COMMIT")
+        return True
+    except Exception:
+        if con.in_transaction:
+            try:
+                con.execute("ROLLBACK")
+            except Exception:
+                pass
+        raise
     finally:
         con.close()

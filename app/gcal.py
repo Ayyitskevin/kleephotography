@@ -305,7 +305,7 @@ def on_booking_confirmed(booking_id: int) -> None:
     b = db.one(
         """SELECT b.*, e.name AS event_name, e.location AS event_location
            FROM bookings b JOIN event_types e ON e.id=b.event_type_id
-           WHERE b.id=?""",
+           WHERE b.id=? AND b.status='confirmed'""",
         (booking_id,),
     )
     if not b:
@@ -314,9 +314,17 @@ def on_booking_confirmed(booking_id: int) -> None:
         if b["reschedule_of"]:
             _delete_event(b["reschedule_of"])
         body = _event_body(b)
-        if b["google_event_id"]:
-            _api("PATCH", f"/calendars/{_cal()}/events/{b['google_event_id']}", body)
-        else:
+        event_id = b["google_event_id"]
+        if event_id:
+            try:
+                _api("PATCH", f"/calendars/{_cal()}/events/{event_id}", body)
+            except urllib.error.HTTPError as exc:
+                if exc.code not in (404, 410):
+                    raise
+                log.info("gcal event %s vanished; recreating for booking %s", event_id, booking_id)
+                db.run("UPDATE bookings SET google_event_id=NULL WHERE id=?", (booking_id,))
+                event_id = None
+        if not event_id:
             ev = _api("POST", f"/calendars/{_cal()}/events", body)
             if ev.get("id"):
                 db.run("UPDATE bookings SET google_event_id=? WHERE id=?", (ev["id"], booking_id))

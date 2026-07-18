@@ -11,8 +11,14 @@
   {% else %}
     <div class="book-manage-badge book-off">Cancelled</div>
     <h1>Booking cancelled</h1>
-    <p class="muted">This time has been released.{% if b.cancel_reason %}
-      Reason: {{ b.cancel_reason }}{% endif %}</p>
+    {% if b.cancel_reason == 'Rescheduled' %}
+      <p class="muted">This booking was rescheduled. Check your latest confirmation
+        email for the new time and manage link. If it has not arrived,
+        <a href="/contact">get in touch</a>.</p>
+    {% else %}
+      <p class="muted">This time has been released.{% if b.cancel_reason %}
+        Reason: {{ b.cancel_reason }}{% endif %}</p>
+    {% endif %}
   {% endif %}
 
   <dl class="book-manage-detail">
@@ -31,6 +37,11 @@
                       rel="noopener">Add to Google Calendar</a>{% endif %}
       <a class="btn btn-ghost" href="/booking/{{ b.token }}/invite.ics">Download invite (.ics)</a>
     </div>
+    {% if b.reschedule_of %}
+      <p class="muted">If you used the Google Calendar button for the original time,
+        remove or edit that old entry before adding this one. Calendar apps that
+        imported the original .ics can use the updated invite instead.</p>
+    {% endif %}
 
     <div class="book-manage-change">
       <a href="/booking/{{ b.token }}/reschedule">Need a different time? Reschedule</a>
@@ -42,7 +53,9 @@
       </form>
     </div>
   {% else %}
-    <p><a class="btn" href="/book">Book another time</a></p>
+    {% if b.cancel_reason != 'Rescheduled' %}
+      <p><a class="btn" href="/book">Book another time</a></p>
+    {% endif %}
   {% endif %}
 </main>
 {% endblock %}

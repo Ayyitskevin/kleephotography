@@ -38,6 +38,44 @@ def _manage_url(token: str) -> str:
     return f"{config.BASE_URL}/booking/{token}"
 
 
+def calendar_identity(booking_id: int) -> tuple[str, int]:
+    """Return the stable iCalendar UID and revision for a booking lineage."""
+    con = db.connect()
+    try:
+        current = con.execute(
+            "SELECT id, reschedule_of FROM bookings WHERE id=?", (booking_id,)
+        ).fetchone()
+        if not current:
+            log.warning("calendar identity: booking %s vanished", booking_id)
+            return ics.uid_for(booking_id), 0
+
+        root_id = current["id"]
+        sequence = 0
+        seen = {root_id}
+        parent_id = current["reschedule_of"]
+        while parent_id is not None:
+            if parent_id in seen:
+                log.error("calendar identity: cycle in booking %s lineage", booking_id)
+                break
+            parent = con.execute(
+                "SELECT id, reschedule_of FROM bookings WHERE id=?", (parent_id,)
+            ).fetchone()
+            if not parent:
+                log.warning(
+                    "calendar identity: booking %s has missing parent %s",
+                    booking_id,
+                    parent_id,
+                )
+                break
+            root_id = parent["id"]
+            sequence += 1
+            seen.add(root_id)
+            parent_id = parent["reschedule_of"]
+        return ics.uid_for(root_id), sequence
+    finally:
+        con.close()
+
+
 def _mail_failure_alert(booking_id: int, audience: str, reason: str) -> None:
     alerts.ops_alert(
         f"booking_email_failed:{audience}",
@@ -122,9 +160,13 @@ def confirm(booking_id: int) -> None:
     if not b:
         log.error("confirm: booking %s vanished", booking_id)
         return
+    if b["status"] != "confirmed":
+        log.warning("confirm: booking %s is no longer confirmed", booking_id)
+        return
     biz_when = _when(b["start_utc"], config.TIMEZONE)
     cli_when = _when(b["start_utc"], b["tz"])
-    uid = ics.uid_for(booking_id)
+    uid, sequence = calendar_identity(booking_id)
+    rescheduled = b["reschedule_of"] is not None
     loc = b["location"] or "Details to follow"
     summary = f"{b['event_name']} · {config.SITE_NAME}"
     details = (
@@ -137,6 +179,16 @@ def confirm(booking_id: int) -> None:
         start_utc=b["start_utc"],
         end_utc=b["end_utc"],
     )
+    if rescheduled:
+        calendar_copy = (
+            "The attached invite updates calendars that imported the original .ics file.\n"
+            "If you used the Google Calendar link instead, remove or edit the old entry, "
+            f"then add the new time here:\n{gcal_link}\n\n"
+        )
+    else:
+        calendar_copy = (
+            f"Add it to your calendar with the attached invite, or here:\n{gcal_link}\n\n"
+        )
 
     if not mailer.configured():
         log.error("booking %s confirmed but mailer not configured — no emails sent", booking_id)
@@ -154,18 +206,19 @@ def confirm(booking_id: int) -> None:
                 end_utc=b["end_utc"],
                 organizer_email=config.GMAIL_USER,
                 attendee_email=b["email"],
+                sequence=sequence,
             ),
         }
         client_body = (
             f"Hi {b['name']},\n\n"
-            f"Your booking is confirmed:\n\n"
+            f"Your booking {'has been rescheduled' if rescheduled else 'is confirmed'}:\n\n"
             f"  {b['event_name']}\n  {cli_when}\n  {loc}\n\n"
-            f"Add it to your calendar with the attached invite, or here:\n{gcal_link}\n\n"
+            f"{calendar_copy}"
             f"Need to change or cancel? {_manage_url(b['token'])}\n\n"
             f"— {config.SITE_NAME}\n"
         )
         kevin_body = (
-            f"New booking via {config.BASE_URL}\n\n"
+            f"{'Rescheduled' if rescheduled else 'New'} booking via {config.BASE_URL}\n\n"
             f"Event: {b['event_name']}\nWhen: {biz_when}\n"
             f"Name: {b['name']}\nEmail: {b['email']}\nPhone: {b['phone'] or '—'}\n\n"
             f"{b['notes'] or '(no note)'}\n\nManage: {_manage_url(b['token'])}\n"
@@ -173,7 +226,7 @@ def confirm(booking_id: int) -> None:
         try:
             mailer.send(
                 b["email"],
-                f"Booking confirmed — {b['event_name']}",
+                f"Booking {'rescheduled' if rescheduled else 'confirmed'} — {b['event_name']}",
                 client_body,
                 reply_to=config.GMAIL_USER,
                 ics=invite,
@@ -185,7 +238,8 @@ def confirm(booking_id: int) -> None:
             # Kevin's copy doubles as the Odysseus inquiry_intake hook (it polls his inbox).
             mailer.send(
                 config.GMAIL_USER,
-                f"Booking — {b['name']} · {b['event_name']} · {biz_when}",
+                f"Booking{' RESCHEDULED' if rescheduled else ''} — "
+                f"{b['name']} · {b['event_name']} · {biz_when}",
                 kevin_body,
                 reply_to=b["email"],
                 ics=invite,
@@ -195,26 +249,27 @@ def confirm(booking_id: int) -> None:
             _mail_failure_alert(booking_id, "operator confirmation", type(e).__name__)
 
     # Mise-side inquiry row keeps the admin inquiry list + Odysseus consistent.
-    iid = None
-    try:
-        iid = db.run(
-            """INSERT INTO inquiries (name, email, business, message, kind,
-                                      shoot_date, service, emailed)
-               VALUES (?,?,?,?,?,?,?,?)""",
-            (
-                b["name"],
-                b["email"],
-                None,
-                f"Booked {b['event_name']} for {biz_when}.\n\n{b['notes']}",
-                "booking",
-                b["start_utc"][:10],
-                b["event_name"],
-                1 if mailer.configured() else 0,
-            ),
-        )
-        db.run("UPDATE bookings SET inquiry_id=? WHERE id=?", (iid, booking_id))
-    except Exception as e:
-        log.error("booking %s inquiry-row mirror failed: %s", booking_id, e)
+    iid = b["inquiry_id"]
+    if iid is None:
+        try:
+            iid = db.run(
+                """INSERT INTO inquiries (name, email, business, message, kind,
+                                          shoot_date, service, emailed)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (
+                    b["name"],
+                    b["email"],
+                    None,
+                    f"Booked {b['event_name']} for {biz_when}.\n\n{b['notes']}",
+                    "booking",
+                    b["start_utc"][:10],
+                    b["event_name"],
+                    1 if mailer.configured() else 0,
+                ),
+            )
+            db.run("UPDATE bookings SET inquiry_id=? WHERE id=?", (iid, booking_id))
+        except Exception as e:
+            log.error("booking %s inquiry-row mirror failed: %s", booking_id, e)
 
     # Link the booking into the Studio CRM (client always; project for real shoots).
     try:
@@ -246,12 +301,13 @@ def cancelled(booking_id: int, by_admin: bool = False) -> None:
         return
     cli_when = _when(b["start_utc"], b["tz"])
     summary = f"{b['event_name']} · {config.SITE_NAME}"
+    uid, sequence = calendar_identity(booking_id)
     if mailer.configured():
         cancel_ics = {
             "filename": "cancel.ics",
             "method": "CANCEL",
             "content": ics.build(
-                uid=ics.uid_for(booking_id),
+                uid=uid,
                 summary=summary,
                 description="This booking was cancelled.",
                 location=b["location"] or "",
@@ -259,7 +315,7 @@ def cancelled(booking_id: int, by_admin: bool = False) -> None:
                 end_utc=b["end_utc"],
                 organizer_email=config.GMAIL_USER,
                 attendee_email=b["email"],
-                sequence=1,
+                sequence=sequence + 1,
                 cancelled=True,
             ),
         }
