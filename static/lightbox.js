@@ -27,6 +27,9 @@
   let activeAsset = null;
   let lastComments = [];
   let commentRequestVersion = 0;
+  const commentDrafts = new Map();
+  let commentDraftRevision = 0;
+  const pendingCommentAssets = new Set();
 
   function ownsCommentResponse(assetId, requestVersion) {
     return activeAsset === assetId && commentRequestVersion === requestVersion;
@@ -35,6 +38,41 @@
   function fmtTC(s) {
     s = Math.max(0, Math.floor(Number(s) || 0));
     return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  function saveCommentDraft(assetId, changed = false) {
+    if (!cForm || !assetId) return null;
+    const previous = commentDrafts.get(assetId);
+    const draft = {
+      body: cBody.value,
+      parent: cParent.value,
+      timecode: cTc.value || "0",
+      revision: changed ? ++commentDraftRevision : (previous ? previous.revision : 0),
+    };
+    commentDrafts.set(assetId, draft);
+    return draft;
+  }
+
+  function restoreCommentDraft(assetId) {
+    if (!cForm) return;
+    const draft = (assetId && commentDrafts.get(assetId)) || {
+      body: "",
+      parent: "",
+      timecode: "0",
+      revision: 0,
+    };
+    cBody.value = draft.body;
+    cParent.value = draft.parent;
+    cCancel.hidden = !draft.parent;
+    cTc.value = draft.timecode;
+    cAt.textContent = "Comment at " + fmtTC(draft.timecode);
+  }
+
+  function clearSubmittedDraft(assetId, revision) {
+    const draft = commentDrafts.get(assetId);
+    if (!draft || draft.revision !== revision) return false;
+    commentDrafts.delete(assetId);
+    return true;
   }
 
   function clearReply() {
@@ -84,8 +122,10 @@
         reply.className = "vc-reply";
         reply.textContent = "reply";
         reply.addEventListener("click", () => {
+          stopShow();
           cParent.value = c.id;
           cCancel.hidden = false;
+          saveCommentDraft(activeAsset, true);
           cBody.focus();
         });
         li.append(tc, " ", role, " ", text, " ", reply);
@@ -162,6 +202,7 @@
   }
 
   function render(i) {
+    saveCommentDraft(activeAsset);
     idx = (i + tiles.length) % tiles.length;
     const t = tiles[idx];
     syncFav(t);
@@ -193,9 +234,7 @@
           cCount.classList.remove("ok");
         }
         vcError("");
-        clearReply();
-        if (cTc) cTc.value = "0";
-        if (cAt) cAt.textContent = "Comment at 0:00";
+        restoreCommentDraft(activeAsset);
         loadComments(activeAsset);
       }
     } else {
@@ -208,7 +247,10 @@
       activeVideo = null;
       activeAsset = null;
       commentRequestVersion += 1;
-      if (cWrap) cWrap.hidden = true;
+      if (cWrap) {
+        cWrap.hidden = true;
+        restoreCommentDraft(null);
+      }
     }
   }
 
@@ -224,11 +266,16 @@
     if (closeBtn) closeBtn.focus();
   }
   function close() {
+    saveCommentDraft(activeAsset);
     stopShow();
     lb.hidden = true; stage.innerHTML = ""; document.body.style.overflow = "";
     activeVideo = null; activeAsset = null;
     commentRequestVersion += 1;
-    if (cWrap) { cWrap.hidden = true; if (cList) cList.innerHTML = ""; clearReply(); }
+    if (cWrap) {
+      cWrap.hidden = true;
+      if (cList) cList.innerHTML = "";
+      restoreCommentDraft(null);
+    }
     if (lastFocused && lastFocused.focus) lastFocused.focus();
     lastFocused = null;
   }
@@ -272,55 +319,74 @@
   // Freeze the note to the current playhead, then show it on the button.
   if (cAt) cAt.addEventListener("click", () => {
     if (!activeVideo) return;
+    stopShow();
     cTc.value = activeVideo.currentTime;
     cAt.textContent = "Comment at " + fmtTC(activeVideo.currentTime);
+    saveCommentDraft(activeAsset, true);
   });
-  if (cCancel) cCancel.addEventListener("click", clearReply);
+  if (cCancel) cCancel.addEventListener("click", () => {
+    stopShow();
+    clearReply();
+    saveCommentDraft(activeAsset, true);
+  });
+  if (cForm) cForm.addEventListener("focusin", stopShow);
+  if (cBody) cBody.addEventListener("input", () => {
+    stopShow();
+    saveCommentDraft(activeAsset, true);
+  });
   // Client-side filter — re-render the already-loaded thread, no fetch.
   if (cFilter) cFilter.addEventListener("change", () => renderComments(lastComments));
   if (cForm) cForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const body = cBody.value.trim();
-    if (!body || !activeAsset) return;
     const assetId = activeAsset;
+    if (!assetId || pendingCommentAssets.has(assetId)) return;
+    const draft = saveCommentDraft(assetId);
+    const submittedRevision = draft.revision;
+    const body = draft.body.trim();
+    if (!body) return;
     const requestVersion = ++commentRequestVersion;
     const fd = new FormData();
     fd.append("body", body);
     // A reply inherits its parent's timecode server-side; a top-level note uses
     // the frozen "Comment at" value, falling back to the live playhead.
-    if (cParent.value) {
-      fd.append("parent_id", cParent.value);
+    if (draft.parent) {
+      fd.append("parent_id", draft.parent);
     } else {
-      fd.append("timecode", cTc.value || (activeVideo ? activeVideo.currentTime : 0));
+      fd.append("timecode", draft.timecode || (activeVideo ? activeVideo.currentTime : 0));
     }
-    let res;
+    pendingCommentAssets.add(assetId);
     try {
-      res = await fetch("/g/" + slug + "/comments/" + assetId, { method: "POST", body: fd });
-    } catch (err) {
-      res = null;
-    }
-    if (!ownsCommentResponse(assetId, requestVersion)) return;
-    if (res && res.ok) {
-      const comments = await res.json().catch(() => null);
-      if (!ownsCommentResponse(assetId, requestVersion)) return;
-      if (!comments) {
-        vcError("Couldn't post your note — refresh the page and try again.");
+      let res;
+      try {
+        res = await fetch("/g/" + slug + "/comments/" + assetId, { method: "POST", body: fd });
+      } catch (err) {
+        res = null;
+      }
+      if (res && res.ok) {
+        const comments = await res.json().catch(() => null);
+        const draftCleared = clearSubmittedDraft(assetId, submittedRevision);
+        if (draftCleared && activeAsset === assetId) restoreCommentDraft(assetId);
+        if (!ownsCommentResponse(assetId, requestVersion)) return;
+        if (!comments) {
+          vcError("Your note was posted, but comments couldn't refresh — reload to see it.");
+          return;
+        }
+        renderComments(comments);
+        vcError("");
         return;
       }
-      renderComments(comments);
-      cBody.value = "";
-      clearReply();
-      cTc.value = "0";
-      cAt.textContent = "Comment at 0:00";
-      vcError("");
-    } else if (res && (res.status === 403 || res.status === 410)) {
-      // session aged out or gallery expired mid-session — reload to the gate so
-      // the client re-unlocks rather than losing the typed note to a dead button
-      window.location.reload();
-    } else {
-      // keep the typed text; tell the client it didn't post instead of silently
-      // swallowing the failure
-      vcError("Couldn't post your note — refresh the page and try again.");
+      if (!ownsCommentResponse(assetId, requestVersion)) return;
+      if (res && (res.status === 403 || res.status === 410)) {
+        // session aged out or gallery expired mid-session — reload to the gate so
+        // the client re-unlocks rather than losing the typed note to a dead button
+        window.location.reload();
+      } else {
+        // keep the typed text; tell the client it didn't post instead of silently
+        // swallowing the failure
+        vcError("Couldn't post your note — refresh the page and try again.");
+      }
+    } finally {
+      pendingCommentAssets.delete(assetId);
     }
   });
 

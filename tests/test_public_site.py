@@ -306,7 +306,10 @@ def test_lightbox_comment_response_ownership_source_contract():
 
     load_guard = "if (!ownsCommentResponse(assetId, requestVersion)) return;"
     submit_guard = load_guard
-    error_message = 'vcError("Couldn\'t post your note — refresh the page and try again.");'
+    post_error = 'vcError("Couldn\'t post your note — refresh the page and try again.");'
+    refresh_error = (
+        'vcError("Your note was posted, but comments couldn\'t refresh — reload to see it.");'
+    )
 
     assert "let commentRequestVersion = 0;" in state
     assert "function ownsCommentResponse(assetId, requestVersion)" in state
@@ -355,30 +358,156 @@ def test_lightbox_comment_response_ownership_source_contract():
     assert submit.count(submit_guard) == 2
     assert "const comments = await res.json().catch(() => null);" in submit
     assert "renderComments(comments);" in submit
-    parse_failure = submit.split("if (!comments) {", 1)[1].split("\n      }", 1)[0]
-    assert parse_failure.strip() == f"{error_message}\n        return;"
+    parse_failure = submit.split("if (!comments) {", 1)[1].split("\n        }", 1)[0]
+    assert parse_failure.strip() == f"{refresh_error}\n          return;"
     first_submit_guard = submit.index(submit_guard)
     second_submit_guard = submit.index(submit_guard, first_submit_guard + 1)
-    assert submit.count(error_message) == 2
-    first_error = submit.index(error_message)
-    second_error = submit.index(error_message, first_error + 1)
+    assert submit.count(refresh_error) == 1
+    assert submit.count(post_error) == 1
     assert (
-        submit.index("if (!body || !activeAsset) return;")
-        < submit.index("const assetId")
+        submit.index("const assetId")
+        < submit.index("if (!assetId || pendingCommentAssets.has(assetId)) return;")
         < submit.index("const requestVersion")
         < submit.index("await fetch(")
-        < first_submit_guard
         < submit.index("if (res && res.ok)")
         < submit.index("await res.json()")
-        < second_submit_guard
-        < first_error
+        < submit.index("clearSubmittedDraft(assetId, submittedRevision)")
+        < submit.index("draftCleared && activeAsset === assetId")
+        < first_submit_guard
+        < submit.index("if (!comments)")
+        < submit.index(refresh_error)
         < submit.index("renderComments(comments);")
-        < submit.index('cBody.value = "";')
+        < second_submit_guard
     )
     assert (
-        first_submit_guard
+        second_submit_guard
         < submit.index("res.status === 403")
         < submit.index("window.location.reload();")
+        < submit.index(post_error)
     )
-    assert first_submit_guard < second_error
-    assert second_submit_guard < first_error
+
+
+def test_lightbox_comment_drafts_are_asset_owned_source_contract():
+    """Bind the complete comment composer state to one video asset."""
+    from pathlib import Path
+
+    javascript = (Path(__file__).resolve().parents[1] / "static/lightbox.js").read_text()
+
+    def block(start, end):
+        return javascript.split(start, 1)[1].split(end, 1)[0]
+
+    state = block("let activeVideo = null;", "function ownsCommentResponse")
+    save = block(
+        "function saveCommentDraft(assetId, changed = false)", "function restoreCommentDraft"
+    )
+    restore = block("function restoreCommentDraft(assetId)", "function clearSubmittedDraft")
+    clear = block("function clearSubmittedDraft(assetId, revision)", "function clearReply()")
+
+    assert "const commentDrafts = new Map();" in state
+    assert "let commentDraftRevision = 0;" in state
+    assert "const pendingCommentAssets = new Set();" in state
+
+    assert "activeAsset" not in save
+    assert "const previous = commentDrafts.get(assetId);" in save
+    assert "body: cBody.value" in save
+    assert "parent: cParent.value" in save
+    assert 'timecode: cTc.value || "0"' in save
+    assert "revision: changed ? ++commentDraftRevision" in save
+    assert "previous ? previous.revision : 0" in save
+    assert "commentDrafts.set(assetId, draft);" in save
+    assert "return draft;" in save
+
+    assert "activeAsset" not in restore
+    assert "assetId && commentDrafts.get(assetId)" in restore
+    assert 'body: ""' in restore
+    assert 'parent: ""' in restore
+    assert 'timecode: "0"' in restore
+    assert "revision: 0" in restore
+    assert "cBody.value = draft.body;" in restore
+    assert "cParent.value = draft.parent;" in restore
+    assert "cCancel.hidden = !draft.parent;" in restore
+    assert "cTc.value = draft.timecode;" in restore
+    assert 'cAt.textContent = "Comment at " + fmtTC(draft.timecode);' in restore
+
+    assert "activeAsset" not in clear
+    assert "const draft = commentDrafts.get(assetId);" in clear
+    assert "draft.revision !== revision" in clear
+    assert clear.index("draft.revision !== revision") < clear.index(
+        "commentDrafts.delete(assetId);"
+    )
+    assert "return true;" in clear
+
+
+def test_lightbox_comment_draft_lifecycle_source_contract():
+    """Preserve owned drafts and never clear edits made during a pending post."""
+    from pathlib import Path
+
+    javascript = (Path(__file__).resolve().parents[1] / "static/lightbox.js").read_text()
+
+    def block(start, end):
+        return javascript.split(start, 1)[1].split(end, 1)[0]
+
+    render = block("function render(i)", "// Return focus")
+    video = render.split('if (t.dataset.kind === "video") {', 1)[1].split("\n    } else {", 1)[0]
+    photo = render.split("\n    } else {", 1)[1]
+    close = block("function close()", "// Each tile image")
+    reply = block('reply.addEventListener("click", () => {', "\n        });")
+    handlers = block("// Freeze the note", "// Client-side filter")
+    submit = block(
+        'if (cForm) cForm.addEventListener("submit", async (e) => {',
+        "function vcError(msg)",
+    )
+
+    assert render.index("saveCommentDraft(activeAsset);") < render.index("idx =")
+    assert (
+        video.index("activeAsset = t.dataset.id;")
+        < video.index("restoreCommentDraft(activeAsset);")
+        < video.index("loadComments(activeAsset);")
+    )
+    assert "clearReply();" not in video
+    assert 'cTc.value = "0";' not in video
+    assert "activeAsset = null;" in photo
+    assert photo.index("activeAsset = null;") < photo.index("restoreCommentDraft(null);")
+
+    assert close.index("saveCommentDraft(activeAsset);") < close.index("activeAsset = null;")
+    assert close.index("activeAsset = null;") < close.index("restoreCommentDraft(null);")
+
+    assert "stopShow();" in reply
+    assert "saveCommentDraft(activeAsset, true);" in reply
+    assert reply.index("cParent.value = c.id;") < reply.index(
+        "saveCommentDraft(activeAsset, true);"
+    )
+    assert 'cForm.addEventListener("focusin", stopShow);' in handlers
+    assert 'cBody.addEventListener("input"' in handlers
+    assert handlers.count("saveCommentDraft(activeAsset, true);") >= 3
+
+    assert "const assetId = activeAsset;" in submit
+    assert "if (!assetId || pendingCommentAssets.has(assetId)) return;" in submit
+    assert "const draft = saveCommentDraft(assetId);" in submit
+    assert "const submittedRevision = draft.revision;" in submit
+    assert "const body = draft.body.trim();" in submit
+    assert "pendingCommentAssets.add(assetId);" in submit
+    assert submit.count("pendingCommentAssets.has(assetId)") == 1
+    assert submit.count("pendingCommentAssets.add(assetId)") == 1
+    assert submit.count("pendingCommentAssets.delete(assetId)") == 1
+    assert "pendingCommentAssets.clear()" not in submit
+    assert "draft.parent" in submit
+    assert "draft.timecode" in submit
+    assert "cParent.value" not in submit
+    assert "cTc.value" not in submit
+    assert "clearSubmittedDraft(assetId, submittedRevision)" in submit
+    assert "if (draftCleared && activeAsset === assetId) restoreCommentDraft(assetId);" in submit
+    assert submit.count("restoreCommentDraft(") == 1
+    assert "restoreCommentDraft(null)" not in submit
+    assert "pendingCommentAssets.delete(assetId);" in submit
+    assert "finally" in submit
+    assert "cBody.value" not in submit
+    assert "clearReply();" not in submit
+    assert (
+        submit.index("pendingCommentAssets.add(assetId);")
+        < submit.index("await fetch(")
+        < submit.index("await res.json()")
+        < submit.index("clearSubmittedDraft(assetId, submittedRevision)")
+        < submit.index("if (!ownsCommentResponse(assetId, requestVersion)) return;")
+        < submit.index("pendingCommentAssets.delete(assetId);")
+    )
