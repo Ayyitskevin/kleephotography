@@ -115,3 +115,75 @@ def test_public_specs_reject_corrupt_derivatives(tmp_path, monkeypatch):
         "width": None,
         "height": None,
     }
+
+
+def test_portfolio_screening_room_sizes_match_multicol_contract():
+    """Keep responsive selection aligned with the default SR masonry geometry."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    template = (root / "templates/site/portfolio.html").read_text()
+    legacy_css = (root / "static/mise.css").read_text()
+    screening_css = (root / "static/screening.css").read_text()
+    exact_sizes = (
+        "(max-width: 641px) calc(100vw - 32px), "
+        "(max-width: 700px) calc(50vw - 21px), "
+        "(max-width: 705px) calc(100vw - 96px), "
+        "(max-width: 1015px) calc(50vw - 53px), "
+        "(max-width: 1325px) calc(33.333333vw - 38.666667px), "
+        "(max-width: 1415px) calc(25vw - 31.5px), 322.5px"
+    )
+
+    def css_block(source, marker):
+        start = source.index(marker)
+        brace = source.index("{", start)
+        depth = 0
+        for index in range(brace, len(source)):
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    return source[start : index + 1]
+        raise AssertionError(f"Unclosed CSS block: {marker}")
+
+    assert '{% set tile_sizes = "' + exact_sizes + '" %}' in template
+    assert "{% if sr_enabled() %}" in template
+    assert '{% else %}\n{% set tile_sizes = "(max-width: 700px) 100vw, 300px" %}' in template
+    assert "box-sizing: border-box" in css_block(legacy_css, "* {")
+
+    masonry = css_block(legacy_css, ".portfolio-masonry {")
+    for rule in ("column-width: 300px", "column-gap: 16px", "max-width: 1320px"):
+        assert rule in masonry
+    assert "column-gap: 10px" in css_block(screening_css, ".sr .portfolio-masonry {")
+
+    wrap = css_block(screening_css, ".sr .sr-wrap {")
+    for rule in ("width: 100%", "max-width: 1440px", "padding: 0 48px"):
+        assert rule in wrap
+    mobile_rule = ".sr .sr-wrap { padding: 0 16px; }"
+    mobile_rule_at = screening_css.index(mobile_rule)
+    mobile_at = screening_css.rfind("@media (max-width: 700px)", 0, mobile_rule_at)
+    assert mobile_rule in css_block(screening_css[mobile_at:], "@media (max-width: 700px)")
+
+    def declared_slot(viewport):
+        if viewport <= 641:
+            return viewport - 32
+        if viewport <= 700:
+            return viewport / 2 - 21
+        if viewport <= 705:
+            return viewport - 96
+        if viewport <= 1015:
+            return viewport / 2 - 53
+        if viewport <= 1325:
+            return (viewport - 116) / 3
+        if viewport <= 1415:
+            return viewport / 4 - 31.5
+        return 322.5
+
+    for viewport in (390, 641, 642, 700, 701, 705, 706, 1015, 1016, 1325, 1326, 1415, 1416, 1920):
+        outer = min(viewport, 1440)
+        padding = 32 if viewport <= 700 else 96
+        available = min(outer - padding, 1320)
+        columns = max(1, int((available + 10) / 310))
+        css_slot = (available + 10) / columns - 10
+        assert declared_slot(viewport) == pytest.approx(css_slot, abs=0.01)

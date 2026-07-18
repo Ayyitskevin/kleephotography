@@ -227,6 +227,34 @@ def _public_video_poster_spec(asset) -> dict:
     return {"available": False, "url": None, "width": None, "height": None}
 
 
+def _public_portfolio_tile_spec(asset) -> dict:
+    """Actual preview metadata for one already public-gated masonry asset.
+
+    Photos reuse the responsive derivative contract. Video tiles deliberately
+    keep their lightweight thumbnail rather than pulling the larger lightbox
+    poster into the initial grid. Missing or corrupt thumbnails remain the
+    existing lazy fallback and are never promoted as known-good media.
+    """
+    if asset["kind"] == "photo":
+        return _public_photo_spec(asset)
+    if asset["kind"] != "video":
+        raise ValueError(f"Unsupported portfolio asset kind: {asset['kind']}")
+
+    asset_id = asset["id"]
+    stem = Path(asset["stored"]).stem
+    path = config.MEDIA_DIR / str(asset["gallery_id"]) / "thumb" / f"{stem}.jpg"
+    dimensions = imaging.image_dimensions(path)
+    return {
+        "available": bool(dimensions),
+        "thumb": {
+            "url": f"/site/img/{asset_id}?variant=thumb",
+            "width": dimensions[0] if dimensions else None,
+            "height": dimensions[1] if dimensions else None,
+        },
+        "srcset": None,
+    }
+
+
 def _parse_cs_credits(raw: str | None) -> list[dict]:
     """Turn case-study credit lines into label/value pairs for the grid layout."""
     out: list[dict] = []
@@ -483,6 +511,7 @@ async def portfolio(request: Request):
     assets = sorted(
         [*_portfolio_assets(), *_portfolio_reels()], key=lambda r: r["id"], reverse=True
     )
+    asset_images = {asset["id"]: _public_portfolio_tile_spec(asset) for asset in assets}
     # distinct tags actually in use, alphabetical — the subject filter chips
     tags = sorted({a["portfolio_tag"] for a in assets if a["portfolio_tag"]}, key=str.lower)
     # specialty chips render only for verticals that actually have starred work
@@ -505,6 +534,7 @@ async def portfolio(request: Request):
         "site/portfolio.html",
         {
             "assets": assets,
+            "asset_images": asset_images,
             "tags": tags,
             "sp_chips": sp_chips if len(sp_chips) > 1 else [],
             "studies": _case_studies(),

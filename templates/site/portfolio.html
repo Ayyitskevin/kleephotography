@@ -4,6 +4,22 @@
    sort first on the ▶ toggle, and the lightbox screens everything dark. #}
 {% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
 {% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
+{% set lead_asset = assets[0] if assets else None %}
+{% set lead_image = asset_images[lead_asset.id] if lead_asset else None %}
+{# Exact default Screening Room multicol slots. The emergency kill-switch keeps
+   its legacy coarse hint because that layout has different wrapper geometry. #}
+{% if sr_enabled() %}
+{% set tile_sizes = "(max-width: 641px) calc(100vw - 32px), (max-width: 700px) calc(50vw - 21px), (max-width: 705px) calc(100vw - 96px), (max-width: 1015px) calc(50vw - 53px), (max-width: 1325px) calc(33.333333vw - 38.666667px), (max-width: 1415px) calc(25vw - 31.5px), 322.5px" %}
+{% else %}
+{% set tile_sizes = "(max-width: 700px) 100vw, 300px" %}
+{% endif %}
+{% block site_head %}
+{% if lead_image and lead_image.available %}
+<link rel="preload" as="image" href="{{ lead_image.thumb.url }}" fetchpriority="high"
+      {% if lead_image.srcset %}imagesrcset="{{ lead_image.srcset }}"
+      imagesizes="{{ tile_sizes }}"{% endif %}>
+{% endif %}
+{% endblock %}
 {% block site_content %}
 
 <section class="sr-wrap" aria-label="The archive">
@@ -46,25 +62,22 @@
   {% if assets %}
   <div class="portfolio-masonry">
     {% for a in assets %}
+    {% set image = asset_images[a.id] %}
     <figure class="tile pf-masonry-tile{% if a.portfolio_tag %} pf-tile{% endif %}"
             {% if a.portfolio_tag %}data-tag="{{ a.portfolio_tag|lower }}"{% endif %}
             data-sp="{{ a.portfolio_tag|tag_specialty }}" data-kind="{{ a.kind }}"
             {% if a.kind == 'video' %}data-web="/site/vid/{{ a.id }}" data-poster="/site/poster/{{ a.id }}"
-            {% else %}data-web="/site/img/{{ a.id }}"{% endif %}>
-      {% if a.kind == 'video' %}
-      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-           sizes="(max-width: 700px) 100vw, 300px"
-           {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
+            {% else %}data-web="{{ image.web.url }}"{% endif %}>
+      <img src="{{ image.thumb.url }}" decoding="async"
+           {% if loop.first and image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
+           {% if image.srcset %}srcset="{{ image.srcset }}"
+           sizes="{{ tile_sizes }}"{% endif %}
+           {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
            alt="{{ a|portfolio_alt }}">
+      {% if a.kind == 'video' %}
       <span class="play-badge{% if a.portfolio_tag and 'aerial' in a.portfolio_tag %} sr-aerial{% endif %}">&#9654;{% if a.portfolio_tag and 'aerial' in a.portfolio_tag %} Aerial{% else %} Film{% endif %}</span>
       {% if a.duration and a.duration|hms %}<span class="dur-badge">{{ a.duration|hms }}</span>{% endif %}
-      {% else %}
-      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-           srcset="/site/img/{{ a.id }}?variant=thumb 480w, /site/img/{{ a.id }}?variant=web 2048w"
-           sizes="(max-width: 700px) 100vw, 300px"
-           {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
-           alt="{{ a|portfolio_alt }}">
-      {% if a.portfolio_tag and 'aerial' in a.portfolio_tag %}<span class="sr-filmchip sr-aerial" aria-hidden="true">&#9650; Aerial</span>{% endif %}
+      {% elif a.portfolio_tag and 'aerial' in a.portfolio_tag %}<span class="sr-filmchip sr-aerial" aria-hidden="true">&#9650; Aerial</span>
       {% endif %}
       <figcaption class="portfolio-cap">{{ sp_stock[a.portfolio_tag|tag_specialty] }} &middot; FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %}
         <small>{{ a.portfolio_tag|tag_label }}{% if a.client_name %} &middot; {{ a.client_name }}{% endif %}</small>{% elif a.client_name %}

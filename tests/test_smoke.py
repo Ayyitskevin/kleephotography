@@ -3449,7 +3449,7 @@ def test_marketing_site(admin, monkeypatch):
         assert pub.get(f"/site/img/{a['id']}").status_code == 200
         # tiles carry data-web for the lightbox, and the overlay ships with the page
         r = pub.get("/portfolio")
-        assert f'data-web="/site/img/{a["id"]}"' in r.text
+        assert f'data-web="/site/img/{a["id"]}?variant=web"' in r.text
         assert 'id="lightbox"' in r.text and "lightbox.js" in r.text
         # slideshow ▶ ships on the marketing lightbox too (fav/dl stay gallery-only)
         assert 'class="lb-play"' in r.text and 'class="lb-fav"' not in r.text
@@ -5033,6 +5033,200 @@ def test_case_study_images_use_actual_derivative_metadata(admin):
         shutil.rmtree(media, ignore_errors=True)
 
 
+def test_portfolio_tiles_use_actual_derivative_metadata(admin, tmp_path, monkeypatch, request):
+    from collections import Counter
+
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("portfolio-delivery-metadata", "Portfolio Delivery Metadata", "4455"),
+    )
+    cleanup_done = False
+
+    def cleanup():
+        nonlocal cleanup_done
+        if cleanup_done:
+            return
+        try:
+            db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
+        finally:
+            cleanup_done = True
+
+    request.addfinalizer(cleanup)
+
+    def add_asset(kind, stored):
+        return db.run(
+            """INSERT INTO assets
+               (gallery_id, kind, filename, stored, status, width, height, portfolio,
+                portfolio_tag)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (gallery_id, kind, stored, stored, "ready", 6000, 4000, 1, "fb/dishes"),
+        )
+
+    # Insert the photo first, then the video: the mixed ID ordering makes the
+    # video—not merely the first photo—the initial masonry/LCP candidate.
+    photo_id = add_asset("photo", "portfolio-photo.jpg")
+    video_id = add_asset("video", "portfolio-video.mp4")
+    media = config.MEDIA_DIR / str(gallery_id)
+    for variant, size in (("thumb", (80, 120)), ("web", (320, 480))):
+        directory = media / variant
+        directory.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", size, (80, 100, 120)).save(directory / "portfolio-photo.jpg", "JPEG")
+    (media / "thumb").mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (90, 51), (40, 60, 80)).save(media / "thumb" / "portfolio-video.jpg", "JPEG")
+    (media / "web").mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (360, 203), (40, 60, 80)).save(
+        media / "web" / "portfolio-video_poster.jpg", "JPEG"
+    )
+
+    tile_sizes = "(max-width: 641px) calc(100vw - 32px), (max-width: 700px) calc(50vw - 21px), (max-width: 705px) calc(100vw - 96px), (max-width: 1015px) calc(50vw - 53px), (max-width: 1325px) calc(33.333333vw - 38.666667px), (max-width: 1415px) calc(25vw - 31.5px), 322.5px"
+    video_url = f"/site/img/{video_id}?variant=thumb"
+    photo_thumb = f"/site/img/{photo_id}?variant=thumb"
+    photo_web = f"/site/img/{photo_id}?variant=web"
+    photo_srcset = f"{photo_thumb} 80w, {photo_web} 320w"
+
+    def masonry_figures(response):
+        masonry = re.search(
+            r'<div class="portfolio-masonry">(.*?)</div>\s*<p class="pf-empty"',
+            response.text,
+            re.S,
+        )
+        assert masonry is not None
+        figures = re.findall(
+            r'<figure class="tile pf-masonry-tile[^>]*>.*?</figure>',
+            masonry.group(1),
+            re.S,
+        )
+        assert figures
+        return figures
+
+    def image_tag(figure):
+        tag = re.search(r"<img\b[^>]*>", figure)
+        assert tag is not None
+        return tag.group(0)
+
+    def assert_priority_budget(response, expected_url):
+        image_preloads = [
+            tag
+            for tag in re.findall(r"<link\b[^>]*>", response.text)
+            if 'rel="preload"' in tag and 'as="image"' in tag
+        ]
+        assert len(image_preloads) == 1
+        priority_tags = re.findall(r'<(?:link|img)\b[^>]*fetchpriority="high"[^>]*>', response.text)
+        targets = []
+        for tag in priority_tags:
+            target = re.search(r'(?:href|src)="([^"]+)"', tag)
+            assert target is not None
+            targets.append(target.group(1))
+        assert len(targets) == 2
+        assert Counter(targets) == Counter({expected_url: 2})
+        return image_preloads[0]
+
+    with TestClient(app) as public:
+        mixed = public.get("/portfolio")
+    figures = masonry_figures(mixed)
+    assert len(figures) >= 2
+    assert f'data-web="/site/vid/{video_id}"' in figures[0]
+    video_tag = image_tag(figures[0])
+    assert f'src="{video_url}"' in video_tag
+    assert 'width="90" height="51"' in video_tag
+    assert 'fetchpriority="high"' in video_tag and 'loading="lazy"' not in video_tag
+    assert "srcset=" not in video_tag
+    video_preload = assert_priority_budget(mixed, video_url)
+    assert "imagesrcset=" not in video_preload
+    assert "imagesizes=" not in video_preload
+
+    # Even while lazy, the next photo must describe its encoded derivatives,
+    # not the 6000x4000 source row or configured 480/2048 maxima.
+    assert f'data-web="{photo_web}"' in figures[1]
+    photo_tag = image_tag(figures[1])
+    assert f'src="{photo_thumb}"' in photo_tag
+    assert 'width="80" height="120"' in photo_tag
+    assert f'srcset="{photo_srcset}"' in photo_tag
+    assert f'sizes="{tile_sizes}"' in photo_tag
+    assert 'loading="lazy"' in photo_tag and 'fetchpriority="high"' not in photo_tag
+
+    # A known-bad lead thumbnail is not speculatively prioritized and does not
+    # promote a different DOM tile behind the visitor's first visible tile.
+    (media / "thumb" / "portfolio-video.jpg").write_bytes(b"corrupt thumb")
+    with TestClient(app) as public:
+        unavailable_video = public.get("/portfolio")
+    unavailable_video_tag = image_tag(masonry_figures(unavailable_video)[0])
+    assert 'loading="lazy"' in unavailable_video_tag
+    assert 'fetchpriority="high"' not in unavailable_video_tag
+    assert "width=" not in unavailable_video_tag and "height=" not in unavailable_video_tag
+    assert "srcset=" not in unavailable_video_tag and "sizes=" not in unavailable_video_tag
+    assert '<link rel="preload" as="image"' not in unavailable_video.text
+    assert 'fetchpriority="high"' not in unavailable_video.text
+
+    db.run("UPDATE assets SET portfolio=0 WHERE id=?", (video_id,))
+    with TestClient(app) as public:
+        photo_first = public.get("/portfolio")
+    photo_first_figure = masonry_figures(photo_first)[0]
+    photo_first_tag = image_tag(photo_first_figure)
+    assert f'src="{photo_thumb}"' in photo_first_tag
+    assert 'width="80" height="120"' in photo_first_tag
+    assert f'srcset="{photo_srcset}"' in photo_first_tag
+    assert f'sizes="{tile_sizes}"' in photo_first_tag
+    assert 'fetchpriority="high"' in photo_first_tag
+    assert 'loading="lazy"' not in photo_first_tag
+    preload = re.search(
+        rf'<link rel="preload" as="image" href="{re.escape(photo_thumb)}"[^>]*>',
+        photo_first.text,
+    )
+    assert preload is not None
+    assert f'imagesrcset="{photo_srcset}"' in preload.group(0)
+    assert f'imagesizes="{tile_sizes}"' in preload.group(0)
+    assert_priority_budget(photo_first, photo_thumb)
+
+    # The opposite single-derivative direction is equally exact: a valid web
+    # image becomes the grid, preload, and lightbox identity when thumb is gone.
+    (media / "thumb" / "portfolio-photo.jpg").unlink()
+    with TestClient(app) as public:
+        web_only = public.get("/portfolio")
+    web_only_figure = masonry_figures(web_only)[0]
+    web_only_tag = image_tag(web_only_figure)
+    assert f'data-web="{photo_web}"' in web_only_figure
+    assert f'src="{photo_web}"' in web_only_tag
+    assert 'width="320" height="480"' in web_only_tag
+    assert "srcset=" not in web_only_tag and "sizes=" not in web_only_tag
+    assert 'fetchpriority="high"' in web_only_tag and 'loading="lazy"' not in web_only_tag
+    web_only_preload = assert_priority_budget(web_only, photo_web)
+    assert "imagesrcset=" not in web_only_preload
+    assert "imagesizes=" not in web_only_preload
+    Image.new("RGB", (80, 120), (80, 100, 120)).save(
+        media / "thumb" / "portfolio-photo.jpg", "JPEG"
+    )
+
+    # A single valid derivative is the sole image identity; a fully unavailable
+    # lead preserves the lazy fallback without false dimensions or priority.
+    (media / "web" / "portfolio-photo.jpg").unlink()
+    with TestClient(app) as public:
+        thumb_only = public.get("/portfolio")
+    thumb_only_figure = masonry_figures(thumb_only)[0]
+    thumb_only_tag = image_tag(thumb_only_figure)
+    assert f'data-web="{photo_thumb}"' in thumb_only_figure
+    assert 'width="80" height="120"' in thumb_only_tag
+    assert "srcset=" not in thumb_only_tag and "sizes=" not in thumb_only_tag
+    assert 'fetchpriority="high"' in thumb_only_tag and 'loading="lazy"' not in thumb_only_tag
+    thumb_only_preload = assert_priority_budget(thumb_only, photo_thumb)
+    assert "imagesrcset=" not in thumb_only_preload
+    assert "imagesizes=" not in thumb_only_preload
+
+    (media / "thumb" / "portfolio-photo.jpg").write_bytes(b"corrupt thumb")
+    with TestClient(app) as public:
+        unavailable_photo = public.get("/portfolio")
+    unavailable_photo_tag = image_tag(masonry_figures(unavailable_photo)[0])
+    assert 'loading="lazy"' in unavailable_photo_tag
+    assert 'fetchpriority="high"' not in unavailable_photo_tag
+    assert "width=" not in unavailable_photo_tag and "height=" not in unavailable_photo_tag
+    assert "srcset=" not in unavailable_photo_tag and "sizes=" not in unavailable_photo_tag
+    assert '<link rel="preload" as="image"' not in unavailable_photo.text
+    assert 'fetchpriority="high"' not in unavailable_photo.text
+
+    cleanup()
+
+
 def test_marketing_heroes_use_actual_media_metadata(admin, tmp_path, monkeypatch, request):
     import re
 
@@ -5542,9 +5736,10 @@ def test_portfolio_tag_filter(admin):
         assert "pf-chip" not in r.text
         # untagged tiles don't carry data-tag
         for aid in ids:
-            assert f'data-web="/site/img/{aid}"' in r.text
+            assert f'data-web="/site/img/{aid}?variant=web"' in r.text
             assert (
-                "data-tag=" not in r.text or f'data-tag="" data-web="/site/img/{aid}"' not in r.text
+                "data-tag=" not in r.text
+                or f'data-tag="" data-web="/site/img/{aid}?variant=web"' not in r.text
             )
 
     # admin sets tags via the tag endpoint
