@@ -24,6 +24,7 @@ log = logging.getLogger("mise.jobs")
 
 _pool: ThreadPoolExecutor | None = None
 MAX_ATTEMPTS = 3
+PRIMARY_ASSET_JOB_KINDS = frozenset({"image_derivatives", "video_transcode"})
 
 
 # ── handlers ───────────────────────────────────────────────────────────────
@@ -240,7 +241,10 @@ def _execute(job_id: int) -> None:
             (status, str(e)[:500], job_id),
         )
         log.exception("job %s %s attempt %s -> %s", job_id, job["kind"], job["attempts"], status)
-        if status == "failed" and "asset_id" in payload:
+        # Only primary ingest owns the canonical asset's readiness. Optional
+        # derivatives (social crops/renditions) report their own job failure
+        # without removing an already delivered asset from every reader.
+        if status == "failed" and job["kind"] in PRIMARY_ASSET_JOB_KINDS and "asset_id" in payload:
             db.run("UPDATE assets SET status='failed' WHERE id=?", (payload["asset_id"],))
         if status == "queued" and _pool:
             _pool.submit(_execute, job_id)
