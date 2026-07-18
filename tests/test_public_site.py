@@ -224,3 +224,58 @@ def test_lightbox_mixed_media_semantics_contract():
     assert 'img.setAttribute("aria-label", mediaName(t, fallback) + " — " + action);' in tile_init
     assert '(img.alt || "Photo") + " — view larger"' not in javascript
     assert 'v.poster = t.dataset.poster || "";' not in javascript
+
+
+def test_lightbox_arrow_navigation_respects_interactive_owners():
+    """Keep global lightbox arrows away from native/editable controls."""
+    from pathlib import Path
+
+    javascript = (Path(__file__).resolve().parents[1] / "static/lightbox.js").read_text()
+    keydown = javascript.split('document.addEventListener("keydown", (e) => {', 1)[1].split(
+        "// Touch gestures", 1
+    )[0]
+
+    hidden_guard = "if (lb.hidden || e.defaultPrevented || e.isComposing) return;"
+    escape = 'if (e.key === "Escape") {'
+    arrow_owner = "const arrowOwner = target && ("
+    arrow_branch = 'if (e.key === "ArrowLeft" || e.key === "ArrowRight") {'
+    modifier_guard = "if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || arrowOwner) return;"
+    tab_branch = 'if (e.key === "Tab") {'
+    escape_block = keydown.split(escape, 1)[1].split("const target", 1)[0]
+    ownership_setup = keydown.split("const target", 1)[1].split(arrow_branch, 1)[0]
+    arrow_block = keydown.split(arrow_branch, 1)[1].split("// Keep Tab", 1)[0]
+    tab_block = keydown.split(tab_branch, 1)[1]
+
+    assert hidden_guard in keydown
+    assert escape in keydown
+    assert "close();" in escape_block
+    assert "return;" in escape_block
+    assert escape_block.index("close();") < escape_block.index("return;")
+    assert arrow_owner in keydown
+    assert "target.isContentEditable" in keydown
+    assert 'target.closest("input, textarea, select, video")' in keydown
+    assert arrow_branch in keydown
+    assert "return;" not in ownership_setup
+    assert modifier_guard in arrow_block
+    assert "e.preventDefault();" in arrow_block
+    assert "stopShow();" in arrow_block
+    assert 'step(e.key === "ArrowLeft" ? -1 : 1);' in arrow_block
+    assert (
+        arrow_block.index(modifier_guard)
+        < arrow_block.index("e.preventDefault();")
+        < arrow_block.index("stopShow();")
+        < arrow_block.index('step(e.key === "ArrowLeft" ? -1 : 1);')
+        < arrow_block.rindex("return;")
+    )
+    assert tab_branch in keydown
+    assert "lb.querySelectorAll" in tab_block
+    assert 'button, a[href], input, textarea, [tabindex]:not([tabindex="-1"])' in tab_block
+    assert "e.shiftKey && document.activeElement === first" in tab_block
+    assert "!e.shiftKey && document.activeElement === last" in tab_block
+    assert tab_block.count("e.preventDefault();") == 2
+    assert "last.focus();" in tab_block
+    assert "first.focus();" in tab_block
+    assert "if (arrowOwner) return;" not in keydown
+    assert keydown.index(hidden_guard) < keydown.index(escape) < keydown.index(arrow_owner)
+    assert keydown.index(arrow_owner) < keydown.index(arrow_branch)
+    assert keydown.index(arrow_branch) < keydown.index(tab_branch)

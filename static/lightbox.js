@@ -313,10 +313,25 @@
   lb.addEventListener("click", (e) => { if (e.target === lb) close(); });
 
   document.addEventListener("keydown", (e) => {
-    if (lb.hidden) return;
-    if (e.key === "Escape") close();
-    if (e.key === "ArrowLeft") { stopShow(); step(-1); }
-    if (e.key === "ArrowRight") { stopShow(); step(1); }
+    if (lb.hidden || e.defaultPrevented || e.isComposing) return;
+    if (e.key === "Escape") {
+      close();
+      return;
+    }
+
+    const target = e.target;
+    const arrowOwner = target && (
+      target.isContentEditable ||
+      (target.closest && target.closest("input, textarea, select, video"))
+    );
+
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || arrowOwner) return;
+      e.preventDefault();
+      stopShow();
+      step(e.key === "ArrowLeft" ? -1 : 1);
+      return;
+    }
     // Keep Tab inside the modal so focus can't wander back to the muted grid.
     if (e.key === "Tab") {
       const focusable = Array.from(
