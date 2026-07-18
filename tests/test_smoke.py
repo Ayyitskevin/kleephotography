@@ -4260,13 +4260,15 @@ def test_client_booking_reschedule_leaves_one_confirmed(monkeypatch):
 
     from app import booking_notify
     from app import scheduling as S
+    from app.public import scheduling as public_scheduling
 
     day = dt.date(2026, 9, 14)
     eid = db.run(
         """INSERT INTO event_types
-           (slug, name, duration_min, slot_step_min, min_notice_hours, booking_window_days)
-           VALUES (?,?,?,?,?,?)""",
-        ("client-reschedule", "Client Reschedule", 60, 60, 0, 365),
+           (slug, name, duration_min, slot_step_min, min_notice_hours,
+            booking_window_days, max_per_day)
+           VALUES (?,?,?,?,?,?,?)""",
+        ("client-reschedule", "Client Reschedule", 60, 60, 0, 365, 1),
     )
     db.run(
         """INSERT INTO availability_rules
@@ -4289,9 +4291,33 @@ def test_client_booking_reschedule_leaves_one_confirmed(monkeypatch):
     )
     confirmed = []
     monkeypatch.setattr(S, "now_utc", lambda: dt.datetime(2026, 9, 1, tzinfo=dt.UTC))
+    monkeypatch.setattr(public_scheduling, "_today_local", lambda: dt.date(2026, 9, 1))
+    monkeypatch.setattr(
+        S.gcal,
+        "free_busy",
+        lambda start, end: S.gcal.FreeBusyQuery(intervals=[], unavailable=False),
+    )
     monkeypatch.setattr(booking_notify, "confirm", lambda booking_id: confirmed.append(booking_id))
     try:
         with TestClient(app) as pub:
+            picker = pub.get(
+                "/booking/OldRescheduleToken/reschedule?day=2026-09-14",
+            )
+            assert picker.status_code == 200
+            assert "start=2026-09-14%2015%3A00%3A00" in picker.text
+
+            rejected = pub.post(
+                "/booking/OldRescheduleToken/reschedule",
+                data={"start": "2026-09-14 14:30:00", "tz": "America/New_York"},
+                follow_redirects=False,
+            )
+            assert rejected.status_code == 409
+            assert "start=2026-09-14%2015%3A00%3A00" in rejected.text
+            assert (
+                db.one("SELECT status FROM bookings WHERE id=?", (old_id,))["status"] == "confirmed"
+            )
+            assert confirmed == []
+
             response = pub.post(
                 "/booking/OldRescheduleToken/reschedule",
                 data={"start": "2026-09-14 15:00:00", "tz": "America/New_York"},

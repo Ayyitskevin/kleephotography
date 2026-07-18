@@ -30,12 +30,14 @@ def _valid_email(e: str) -> bool:
     return "@" in e and "." in e.rsplit("@", 1)[-1]
 
 
-def _month_ctx(et, year: int, month: int, today: dt.date, visitor_tz: str) -> dict:
+def _month_ctx(
+    et, year: int, month: int, today: dt.date, visitor_tz: str, exclude_id: int | None = None
+) -> dict:
     """Month grid + the set of days (ISO) that actually have open slots."""
     cal = calendar.Calendar(firstweekday=6)  # Sunday-first, matches admin calendar
     weeks = cal.monthdayscalendar(year, month)
     ndays = calendar.monthrange(year, month)[1]
-    avail = scheduling.days_with_slots(et, dt.date(year, month, 1), ndays)
+    avail = scheduling.days_with_slots(et, dt.date(year, month, 1), ndays, exclude_id)
     max_day = today + dt.timedelta(days=et["booking_window_days"])
     prev_m = dt.date(year, month, 1) - dt.timedelta(days=1)
     next_m = dt.date(year, month, 1) + dt.timedelta(days=32)
@@ -65,6 +67,7 @@ def _picker_ctx(
     token="",
     submitted_start="",
     submitted_tz="",
+    exclude_id=None,
 ):
     """Shared context for the day/slot picker (new booking and reschedule)."""
     q = request.query_params
@@ -101,12 +104,12 @@ def _picker_ctx(
         "selected_slot_label": "",
         "submitted": {},
     }
-    ctx.update(_month_ctx(et, year, month, today, visitor_tz))
+    ctx.update(_month_ctx(et, year, month, today, visitor_tz, exclude_id))
 
     sel_day = submitted_day.isoformat() if submitted_day else (q.get("day") or "").strip()
     if sel_day and (submitted_start or sel_day in ctx["avail"]):
         day = dt.date.fromisoformat(sel_day)
-        slots = scheduling.slots_for_day(et, day, visitor_tz)
+        slots = scheduling.slots_for_day(et, day, visitor_tz, exclude_id)
         ctx["sel_day"] = sel_day
         ctx["slots"] = slots
         sel_start = submitted_start or (q.get("start") or "").strip()
@@ -315,7 +318,7 @@ async def reschedule_form(request: Request, token: str):
     et = scheduling.event_by_slug(b["event_slug"])
     if not et:
         raise HTTPException(status_code=404)
-    ctx = _picker_ctx(et, request, is_reschedule=True, token=token)
+    ctx = _picker_ctx(et, request, is_reschedule=True, token=token, exclude_id=b["id"])
     ctx["form_action"] = f"/booking/{token}/reschedule"
     ctx["old_when"] = b["start_utc"]
     return templates.TemplateResponse(request, "public/book_event.html", ctx)
@@ -346,6 +349,7 @@ async def do_reschedule(request: Request, token: str, start: str = Form(...), tz
             request,
             is_reschedule=True,
             token=token,
+            exclude_id=b["id"],
             submitted_start=start,
             submitted_tz=tz,
         )
@@ -358,7 +362,11 @@ async def do_reschedule(request: Request, token: str, start: str = Form(...), tz
             return templates.TemplateResponse(
                 request, "public/book_event.html", ctx, status_code=503
             )
-        ctx["error"] = "Sorry — that time was just taken. Please pick another."
+        # Return to the canonical choices instead of re-confirming the stale or
+        # out-of-policy value that was just rejected.
+        ctx["sel_start"] = None
+        ctx["selected_slot_label"] = ""
+        ctx["error"] = "Sorry — that time is no longer available. Please pick another."
         return templates.TemplateResponse(request, "public/book_event.html", ctx, status_code=409)
     # New slot held; release the old one and email the fresh invite. If the old
     # booking cannot be released, undo the replacement before any notification
