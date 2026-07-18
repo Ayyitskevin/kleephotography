@@ -26,6 +26,11 @@
   let activeVideo = null;
   let activeAsset = null;
   let lastComments = [];
+  let commentRequestVersion = 0;
+
+  function ownsCommentResponse(assetId, requestVersion) {
+    return activeAsset === assetId && commentRequestVersion === requestVersion;
+  }
 
   function fmtTC(s) {
     s = Math.max(0, Math.floor(Number(s) || 0));
@@ -92,9 +97,14 @@
 
   async function loadComments(assetId) {
     if (!cWrap) return;
+    const requestVersion = ++commentRequestVersion;
     try {
       const res = await fetch("/g/" + slug + "/comments/" + assetId);
-      if (res.ok) renderComments(await res.json());
+      if (!ownsCommentResponse(assetId, requestVersion)) return;
+      if (!res.ok) return;
+      const comments = await res.json();
+      if (!ownsCommentResponse(assetId, requestVersion)) return;
+      renderComments(comments);
     } catch (e) { /* leave the thread empty on a transient error */ }
   }
 
@@ -176,6 +186,13 @@
       activeAsset = t.dataset.id;
       if (cWrap) {
         cWrap.hidden = false;
+        lastComments = [];
+        if (cList) cList.innerHTML = "";
+        if (cCount) {
+          cCount.textContent = "";
+          cCount.classList.remove("ok");
+        }
+        vcError("");
         clearReply();
         if (cTc) cTc.value = "0";
         if (cAt) cAt.textContent = "Comment at 0:00";
@@ -190,6 +207,7 @@
       stage.appendChild(img);
       activeVideo = null;
       activeAsset = null;
+      commentRequestVersion += 1;
       if (cWrap) cWrap.hidden = true;
     }
   }
@@ -209,6 +227,7 @@
     stopShow();
     lb.hidden = true; stage.innerHTML = ""; document.body.style.overflow = "";
     activeVideo = null; activeAsset = null;
+    commentRequestVersion += 1;
     if (cWrap) { cWrap.hidden = true; if (cList) cList.innerHTML = ""; clearReply(); }
     if (lastFocused && lastFocused.focus) lastFocused.focus();
     lastFocused = null;
@@ -263,6 +282,8 @@
     e.preventDefault();
     const body = cBody.value.trim();
     if (!body || !activeAsset) return;
+    const assetId = activeAsset;
+    const requestVersion = ++commentRequestVersion;
     const fd = new FormData();
     fd.append("body", body);
     // A reply inherits its parent's timecode server-side; a top-level note uses
@@ -274,12 +295,19 @@
     }
     let res;
     try {
-      res = await fetch("/g/" + slug + "/comments/" + activeAsset, { method: "POST", body: fd });
+      res = await fetch("/g/" + slug + "/comments/" + assetId, { method: "POST", body: fd });
     } catch (err) {
       res = null;
     }
+    if (!ownsCommentResponse(assetId, requestVersion)) return;
     if (res && res.ok) {
-      renderComments(await res.json());
+      const comments = await res.json().catch(() => null);
+      if (!ownsCommentResponse(assetId, requestVersion)) return;
+      if (!comments) {
+        vcError("Couldn't post your note — refresh the page and try again.");
+        return;
+      }
+      renderComments(comments);
       cBody.value = "";
       clearReply();
       cTc.value = "0";

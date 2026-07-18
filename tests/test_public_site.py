@@ -279,3 +279,106 @@ def test_lightbox_arrow_navigation_respects_interactive_owners():
     assert keydown.index(hidden_guard) < keydown.index(escape) < keydown.index(arrow_owner)
     assert keydown.index(arrow_owner) < keydown.index(arrow_branch)
     assert keydown.index(arrow_branch) < keydown.index(tab_branch)
+
+
+def test_lightbox_comment_response_ownership_source_contract():
+    """Keep late comment responses from mutating a different video."""
+    from pathlib import Path
+
+    javascript = (Path(__file__).resolve().parents[1] / "static/lightbox.js").read_text()
+
+    def block(start, end):
+        return javascript.split(start, 1)[1].split(end, 1)[0]
+
+    state = block("let activeVideo = null;", "function fmtTC(s)")
+    owner = block(
+        "function ownsCommentResponse(assetId, requestVersion) {",
+        "\n  }\n\n  function fmtTC(s)",
+    )
+    load = block("async function loadComments(assetId)", "function stopShow()")
+    render = block("function render(i)", "// Return focus")
+    video = render.split('if (t.dataset.kind === "video") {', 1)[1].split("\n    } else {", 1)[0]
+    close = block("function close()", "// Each tile image")
+    submit = block(
+        'if (cForm) cForm.addEventListener("submit", async (e) => {',
+        "function vcError(msg)",
+    )
+
+    load_guard = "if (!ownsCommentResponse(assetId, requestVersion)) return;"
+    submit_guard = load_guard
+    error_message = 'vcError("Couldn\'t post your note — refresh the page and try again.");'
+
+    assert "let commentRequestVersion = 0;" in state
+    assert "function ownsCommentResponse(assetId, requestVersion)" in state
+    assert owner.strip() == (
+        "return activeAsset === assetId && commentRequestVersion === requestVersion;"
+    )
+
+    assert load.count("const requestVersion = ++commentRequestVersion;") == 1
+    assert 'await fetch("/g/" + slug + "/comments/" + assetId)' in load
+    assert load.count(load_guard) == 2
+    assert "if (!res.ok) return;" in load
+    assert "const comments = await res.json();" in load
+    assert "renderComments(await res.json())" not in load
+    first_load_guard = load.index(load_guard)
+    second_load_guard = load.index(load_guard, first_load_guard + 1)
+    assert (
+        load.index("const requestVersion")
+        < load.index("await fetch(")
+        < first_load_guard
+        < load.index("if (!res.ok) return;")
+        < load.index("await res.json()")
+        < second_load_guard
+        < load.index("renderComments(comments);")
+    )
+
+    assert "activeAsset = t.dataset.id;" in render
+    video_resets = (
+        "lastComments = [];",
+        'if (cList) cList.innerHTML = "";',
+        'cCount.textContent = "";',
+        'cCount.classList.remove("ok");',
+        'vcError("");',
+    )
+    assert all(reset in video for reset in video_resets)
+    assert video.index("activeAsset = t.dataset.id;") < video.index(video_resets[0])
+    assert all(
+        video.index(reset) < video.index("loadComments(activeAsset);") for reset in video_resets
+    )
+    assert render.index("activeAsset = null;") < render.index("commentRequestVersion += 1;")
+    assert close.index("activeAsset = null;") < close.index("commentRequestVersion += 1;")
+
+    assert "const assetId = activeAsset;" in submit
+    assert submit.count("const requestVersion = ++commentRequestVersion;") == 1
+    assert 'await fetch("/g/" + slug + "/comments/" + assetId' in submit
+    assert '"/comments/" + activeAsset' not in submit
+    assert submit.count(submit_guard) == 2
+    assert "const comments = await res.json().catch(() => null);" in submit
+    assert "renderComments(comments);" in submit
+    parse_failure = submit.split("if (!comments) {", 1)[1].split("\n      }", 1)[0]
+    assert parse_failure.strip() == f"{error_message}\n        return;"
+    first_submit_guard = submit.index(submit_guard)
+    second_submit_guard = submit.index(submit_guard, first_submit_guard + 1)
+    assert submit.count(error_message) == 2
+    first_error = submit.index(error_message)
+    second_error = submit.index(error_message, first_error + 1)
+    assert (
+        submit.index("if (!body || !activeAsset) return;")
+        < submit.index("const assetId")
+        < submit.index("const requestVersion")
+        < submit.index("await fetch(")
+        < first_submit_guard
+        < submit.index("if (res && res.ok)")
+        < submit.index("await res.json()")
+        < second_submit_guard
+        < first_error
+        < submit.index("renderComments(comments);")
+        < submit.index('cBody.value = "";')
+    )
+    assert (
+        first_submit_guard
+        < submit.index("res.status === 403")
+        < submit.index("window.location.reload();")
+    )
+    assert first_submit_guard < second_error
+    assert second_submit_guard < first_error
