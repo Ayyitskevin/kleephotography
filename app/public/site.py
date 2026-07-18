@@ -232,8 +232,9 @@ def _public_portfolio_tile_spec(asset) -> dict:
 
     Photos reuse the responsive derivative contract. Video tiles deliberately
     keep their lightweight thumbnail rather than pulling the larger lightbox
-    poster into the initial grid. Missing or corrupt thumbnails remain the
-    existing lazy fallback and are never promoted as known-good media.
+    poster into the initial grid; a separately validated poster spec is only
+    carried into the on-demand lightbox. Missing or corrupt thumbnails remain
+    the existing lazy fallback and are never promoted as known-good media.
     """
     if asset["kind"] == "photo":
         return _public_photo_spec(asset)
@@ -251,6 +252,7 @@ def _public_portfolio_tile_spec(asset) -> dict:
             "width": dimensions[0] if dimensions else None,
             "height": dimensions[1] if dimensions else None,
         },
+        "poster": _public_video_poster_spec(asset),
         "srcset": None,
     }
 

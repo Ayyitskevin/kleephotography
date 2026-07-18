@@ -166,7 +166,7 @@
     if (t.dataset.kind === "video") {
       const v = document.createElement("video");
       v.src = t.dataset.web;
-      v.poster = t.dataset.poster || "";
+      if (t.dataset.poster) v.poster = t.dataset.poster;
       v.controls = true;
       v.playsInline = true;
       v.setAttribute("playsinline", "");

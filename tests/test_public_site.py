@@ -218,7 +218,9 @@ def test_lightbox_mixed_media_semantics_contract():
     assert 'playBtn.setAttribute("aria-pressed", "false")' not in start_show
     assert "return (source && source.alt) || fallback;" in media_name
     assert 'v.setAttribute("aria-label", mediaName(t, "Video"));' in render
+    assert "if (t.dataset.poster) v.poster = t.dataset.poster;" in render
     assert 'img.alt = mediaName(t, "");' in render
     assert 't.dataset.kind === "video" ? "open video" : "view larger"' in tile_init
     assert 'img.setAttribute("aria-label", mediaName(t, fallback) + " — " + action);' in tile_init
     assert '(img.alt || "Photo") + " — view larger"' not in javascript
+    assert 'v.poster = t.dataset.poster || "";' not in javascript

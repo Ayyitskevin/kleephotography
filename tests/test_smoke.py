@@ -5086,6 +5086,7 @@ def test_portfolio_tiles_use_actual_derivative_metadata(admin, tmp_path, monkeyp
 
     tile_sizes = "(max-width: 641px) calc(100vw - 32px), (max-width: 700px) calc(50vw - 21px), (max-width: 705px) calc(100vw - 96px), (max-width: 1015px) calc(50vw - 53px), (max-width: 1325px) calc(33.333333vw - 38.666667px), (max-width: 1415px) calc(25vw - 31.5px), 322.5px"
     video_url = f"/site/img/{video_id}?variant=thumb"
+    video_poster = f"/site/poster/{video_id}"
     photo_thumb = f"/site/img/{photo_id}?variant=thumb"
     photo_web = f"/site/img/{photo_id}?variant=web"
     photo_srcset = f"{photo_thumb} 80w, {photo_web} 320w"
@@ -5140,6 +5141,17 @@ def test_portfolio_tiles_use_actual_derivative_metadata(admin, tmp_path, monkeyp
     video_preload = assert_priority_budget(mixed, video_url)
     assert "imagesrcset=" not in video_preload
     assert "imagesizes=" not in video_preload
+    assert f'data-poster="{video_poster}"' in figures[0]
+
+    # The lightbox poster follows the same validated full-poster -> tile-thumb
+    # -> omitted contract as the marketing heroes. A corrupt JPEG must not stay
+    # wired merely because the filesystem entry still exists.
+    (media / "web" / "portfolio-video_poster.jpg").write_bytes(b"corrupt poster")
+    with TestClient(app) as public:
+        fallback_poster = public.get("/portfolio")
+    fallback_video_figure = masonry_figures(fallback_poster)[0]
+    assert f'data-poster="{video_url}"' in fallback_video_figure
+    assert f'data-poster="{video_poster}"' not in fallback_video_figure
 
     # Even while lazy, the next photo must describe its encoded derivatives,
     # not the 6000x4000 source row or configured 480/2048 maxima.
@@ -5156,7 +5168,9 @@ def test_portfolio_tiles_use_actual_derivative_metadata(admin, tmp_path, monkeyp
     (media / "thumb" / "portfolio-video.jpg").write_bytes(b"corrupt thumb")
     with TestClient(app) as public:
         unavailable_video = public.get("/portfolio")
-    unavailable_video_tag = image_tag(masonry_figures(unavailable_video)[0])
+    unavailable_video_figure = masonry_figures(unavailable_video)[0]
+    unavailable_video_tag = image_tag(unavailable_video_figure)
+    assert "data-poster=" not in unavailable_video_figure
     assert 'loading="lazy"' in unavailable_video_tag
     assert 'fetchpriority="high"' not in unavailable_video_tag
     assert "width=" not in unavailable_video_tag and "height=" not in unavailable_video_tag
@@ -11243,6 +11257,7 @@ def test_portfolio_video_tiles(admin):
             assert pub.get(f"/site/img/{vid['id']}?variant=thumb").status_code == 200
             assert pub.get(f"/site/img/{vid['id']}?variant=web").status_code == 404
             assert pub.get(f"/site/vid/{vid['id']}").status_code == 200
+            assert pub.get(f"/site/poster/{vid['id']}").status_code == 200
 
             # /reels ships VideoObject JSON-LD + the sound toggle for the reel
             r = pub.get("/reels")
@@ -11258,6 +11273,11 @@ def test_portfolio_video_tiles(admin):
         admin.post(
             f"/admin/galleries/{g['id']}/assets/{photo['id']}/portfolio", follow_redirects=False
         )
+
+    with TestClient(app) as pub:
+        assert pub.get(f"/site/img/{vid['id']}?variant=thumb").status_code == 404
+        assert pub.get(f"/site/vid/{vid['id']}").status_code == 404
+        assert pub.get(f"/site/poster/{vid['id']}").status_code == 404
 
 
 def test_portal_motion_band(admin):
