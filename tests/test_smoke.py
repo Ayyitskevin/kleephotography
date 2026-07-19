@@ -3652,6 +3652,52 @@ def test_inquiries_admin_view(admin):
     assert admin.post("/admin/studio/inquiries/99999/unconvert").status_code == 404
 
 
+def test_inbox_deep_link_selects_matching_thread_outside_list_window(admin):
+    """An explicit thread link must never substitute the first visible inquiry.
+
+    Dashboard/activity links carry an inquiry id, but the sidebar is bounded to
+    100 rows. Seed 100 newer rows so the requested active inquiry falls outside
+    that window; its conversation and action ownership must still be selected.
+    """
+    marker = "deep-link-window-test"
+    with db.tx() as con:
+        target_id = con.execute(
+            """INSERT INTO inquiries (name, email, message, kind, created_at)
+               VALUES (?, ?, ?, 'contact', '2000-01-01 00:00:00')""",
+            ("Requested Old Lead", f"target@{marker}.test", "Requested thread body"),
+        ).lastrowid
+        con.executemany(
+            """INSERT INTO inquiries (name, email, message, kind, created_at)
+               VALUES (?, ?, 'decoy body', 'contact', '2099-01-01 00:00:00')""",
+            [(f"Newer Decoy {i}", f"decoy-{i}@{marker}.test") for i in range(100)],
+        )
+
+    try:
+        page = admin.get(f"/admin/inbox?tab=all&sel={target_id}")
+        assert page.status_code == 200
+        assert "Requested Old Lead" in page.text
+        assert "Requested thread body" in page.text
+        assert f'action="/admin/studio/inquiries/{target_id}/quote"' in page.text
+        assert f'href="/admin/inbox?tab=all&sel={target_id}" class="ib-row is-active"' in page.text
+        assert page.text.count('class="ib-row ') == 100
+
+        # Selection is still tab-scoped: after archive, the stale all-tab URL
+        # advances to a visible row instead of pinning an out-of-filter record.
+        db.run("UPDATE inquiries SET dismissed_at=datetime('now') WHERE id=?", (target_id,))
+        filtered = admin.get(f"/admin/inbox?tab=all&sel={target_id}")
+        assert "Requested thread body" not in filtered.text
+        assert f'action="/admin/studio/inquiries/{target_id}/quote"' not in filtered.text
+
+        archived = admin.get(f"/admin/inbox?tab=archived&sel={target_id}")
+        assert "Requested thread body" in archived.text
+        assert (
+            f'href="/admin/inbox?tab=archived&sel={target_id}" '
+            'class="ib-row is-active"' in archived.text
+        )
+    finally:
+        db.run("DELETE FROM inquiries WHERE email LIKE ?", (f"%@{marker}.test",))
+
+
 def test_booking_flow(monkeypatch, admin):
     # The public booking surface is the scheduler: GET /book lists event types,
     # GET /book/{slug} renders a slot picker, POST /book/{slug} claims a slot.

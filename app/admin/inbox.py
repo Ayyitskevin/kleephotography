@@ -228,7 +228,13 @@ async def inbox(request: Request, tab: str = "all", sel: int | None = None):
 
     active = None
     if rows:
-        chosen = next((r for r in rows if r["id"] == sel), rows[0])
+        chosen = next((r for r in rows if r["id"] == sel), None)
+        if chosen is None and sel is not None:
+            chosen = db.one(f"SELECT * FROM inquiries WHERE id=? AND ({where})", (sel,))
+            if chosen is not None:
+                rows = [chosen, *rows[:99]]
+        if chosen is None:
+            chosen = rows[0]
         active = _active_ctx(chosen)
 
     return templates.TemplateResponse(
