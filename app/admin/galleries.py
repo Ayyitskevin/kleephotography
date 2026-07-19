@@ -693,10 +693,19 @@ async def delete_section(gallery_id: int, section_id: int):
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/section")
 async def move_asset(gallery_id: int, asset_id: int, section_id: int | None = Form(None)):
-    db.run(
-        "UPDATE assets SET section_id=? WHERE id=? AND gallery_id=?",
-        (section_id, asset_id, gallery_id),
-    )
+    with db.tx() as con:
+        con.execute("BEGIN IMMEDIATE")
+        if (
+            section_id is not None
+            and not con.execute(
+                "SELECT id FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id)
+            ).fetchone()
+        ):
+            raise HTTPException(status_code=400, detail="unknown section")
+        con.execute(
+            "UPDATE assets SET section_id=? WHERE id=? AND gallery_id=?",
+            (section_id, asset_id, gallery_id),
+        )
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
@@ -706,11 +715,15 @@ async def bulk_move_assets(request: Request, gallery_id: int):
     form = await request.form()
     raw = form.get("section_id") or ""
     section_id = int(raw) if raw else None
-    if section_id and not db.one(
-        "SELECT id FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id)
-    ):
-        raise HTTPException(status_code=400, detail="unknown section")
     with db.tx() as con:
+        con.execute("BEGIN IMMEDIATE")
+        if (
+            section_id is not None
+            and not con.execute(
+                "SELECT id FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id)
+            ).fetchone()
+        ):
+            raise HTTPException(status_code=400, detail="unknown section")
         for v in form.getlist("asset_ids"):
             con.execute(
                 "UPDATE assets SET section_id=? WHERE id=? AND gallery_id=?",

@@ -199,10 +199,30 @@ HANDLERS = {
 # ── queue machinery ────────────────────────────────────────────────────────
 
 
+def stage(con, kind: str, payload: dict) -> int:
+    """Insert a queued job in the caller's transaction without dispatching it."""
+    return con.execute(
+        "INSERT INTO jobs (kind, payload) VALUES (?,?)", (kind, json.dumps(payload))
+    ).lastrowid
+
+
+def dispatch(job_ids: list[int]) -> None:
+    """Offer committed jobs to the live pool; durable rows survive no pool/restart."""
+    pool = _pool
+    if not pool:
+        return
+    for offset, job_id in enumerate(job_ids):
+        try:
+            pool.submit(_execute, job_id)
+        except RuntimeError:
+            log.warning("job pool unavailable; %d queued jobs remain", len(job_ids) - offset)
+            break
+
+
 def enqueue(kind: str, payload: dict) -> int:
-    job_id = db.run("INSERT INTO jobs (kind, payload) VALUES (?,?)", (kind, json.dumps(payload)))
-    if _pool:
-        _pool.submit(_execute, job_id)
+    with db.tx() as con:
+        job_id = stage(con, kind, payload)
+    dispatch([job_id])
     return job_id
 
 

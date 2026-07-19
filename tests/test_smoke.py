@@ -4611,9 +4611,13 @@ def test_asset_reorder(admin):
         "/admin/galleries", data={"title": "Ordered", "client_name": ""}, follow_redirects=False
     )
     g = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
-    admin.post(
+    r = admin.post(
         f"/admin/galleries/{g['id']}/upload",
         files=[("files", (f"{n}.jpg", _jpeg_bytes(), "image/jpeg")) for n in "abc"],
+    )
+    assert r.status_code == 200 and r.json()["accepted"] == 3
+    assert db.one("SELECT content_rev FROM galleries WHERE id=?", (g["id"],))["content_rev"] == (
+        g["content_rev"] + 1
     )
 
     def order():  # same ORDER BY the public gallery uses — this IS the client-facing order
@@ -4688,6 +4692,92 @@ def test_asset_reorder(admin):
         ).status_code
         == 400
     )
+
+
+def test_asset_section_assignment_rejects_unowned_sections(admin):
+    """A real section id is not sufficient: it must belong to this gallery."""
+    admin.post(
+        "/admin/galleries",
+        data={"title": "Section Owner Target", "client_name": ""},
+        follow_redirects=False,
+    )
+    target = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
+    admin.post(
+        "/admin/galleries",
+        data={"title": "Section Owner Foreign", "client_name": ""},
+        follow_redirects=False,
+    )
+    foreign = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
+    target_section = db.one(
+        "SELECT id FROM sections WHERE gallery_id=? ORDER BY position, id LIMIT 1",
+        (target["id"],),
+    )
+    foreign_section = db.one(
+        "SELECT id FROM sections WHERE gallery_id=? ORDER BY position, id LIMIT 1",
+        (foreign["id"],),
+    )
+    missing_section_id = db.one("SELECT COALESCE(MAX(id), 0) + 1 AS id FROM sections")["id"]
+    asset_id = db.run(
+        "INSERT INTO assets (gallery_id, section_id, kind, filename, stored) VALUES (?,?,?,?,?)",
+        (target["id"], target_section["id"], "photo", "owned.jpg", "owned.jpg"),
+    )
+    foreign_asset_id = db.run(
+        "INSERT INTO assets (gallery_id, section_id, kind, filename, stored) VALUES (?,?,?,?,?)",
+        (foreign["id"], foreign_section["id"], "photo", "foreign.jpg", "foreign.jpg"),
+    )
+
+    for invalid_section_id in (foreign_section["id"], missing_section_id, 0):
+        r = admin.post(
+            f"/admin/galleries/{target['id']}/assets/{asset_id}/section",
+            data={"section_id": str(invalid_section_id)},
+            follow_redirects=False,
+        )
+        assert r.status_code == 400
+        assert r.json()["detail"] == "unknown section"
+        assert (
+            db.one("SELECT section_id FROM assets WHERE id=?", (asset_id,))["section_id"]
+            == (target_section["id"])
+        )
+
+        r = admin.post(
+            f"/admin/galleries/{target['id']}/assets/bulk-section",
+            data={"section_id": str(invalid_section_id), "asset_ids": [str(asset_id)]},
+            follow_redirects=False,
+        )
+        assert r.status_code == 400
+        assert r.json()["detail"] == "unknown section"
+        assert (
+            db.one("SELECT section_id FROM assets WHERE id=?", (asset_id,))["section_id"]
+            == (target_section["id"])
+        )
+
+    # Asset ownership is the other half of the relation: a forged target-gallery
+    # path must not move an asset owned by another gallery.
+    r = admin.post(
+        f"/admin/galleries/{target['id']}/assets/{foreign_asset_id}/section",
+        data={"section_id": str(target_section["id"])},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    r = admin.post(
+        f"/admin/galleries/{target['id']}/assets/bulk-section",
+        data={"section_id": str(target_section["id"]), "asset_ids": [str(foreign_asset_id)]},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert (
+        db.one("SELECT section_id FROM assets WHERE id=?", (foreign_asset_id,))["section_id"]
+        == foreign_section["id"]
+    )
+
+    # The unsectioned bucket remains an intentional, valid choice.
+    r = admin.post(
+        f"/admin/galleries/{target['id']}/assets/{asset_id}/section",
+        data={"section_id": ""},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert db.one("SELECT section_id FROM assets WHERE id=?", (asset_id,))["section_id"] is None
 
 
 def test_section_rename_reorder(admin):
@@ -4796,6 +4886,144 @@ def test_upload_defaults_to_first_section(admin):
         "SELECT section_id FROM assets WHERE gallery_id=? ORDER BY id DESC LIMIT 1", (g["id"],)
     )
     assert a["section_id"] is None
+
+
+def test_upload_rejects_unowned_section_before_side_effects(admin, monkeypatch):
+    from app.admin import uploads as admin_uploads
+
+    async def unexpected_save(*_args, **_kwargs):
+        pytest.fail("invalid section reached the upload stream")
+
+    monkeypatch.setattr(admin_uploads.common, "save_upload", unexpected_save)
+    admin.post(
+        "/admin/galleries",
+        data={"title": "Upload Section Target", "client_name": ""},
+        follow_redirects=False,
+    )
+    target = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
+    admin.post(
+        "/admin/galleries",
+        data={"title": "Upload Section Foreign", "client_name": ""},
+        follow_redirects=False,
+    )
+    foreign = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
+    foreign_section = db.one(
+        "SELECT id FROM sections WHERE gallery_id=? ORDER BY position, id LIMIT 1",
+        (foreign["id"],),
+    )
+    missing_section_id = db.one("SELECT COALESCE(MAX(id), 0) + 1 AS id FROM sections")["id"]
+    media_dir = config.MEDIA_DIR / str(target["id"])
+    jobs_before = db.one("SELECT COUNT(*) AS n FROM jobs")["n"]
+    rev_before = target["content_rev"]
+
+    for invalid_section_id in (foreign_section["id"], missing_section_id, 0):
+        r = admin.post(
+            f"/admin/galleries/{target['id']}/upload?section_id={invalid_section_id}",
+            files=[("files", ("foreign.jpg", _jpeg_bytes(), "image/jpeg"))],
+        )
+        assert r.status_code == 400
+        assert r.json()["detail"] == "unknown section"
+        assert not db.one("SELECT id FROM assets WHERE gallery_id=?", (target["id"],))
+        assert (
+            db.one("SELECT content_rev FROM galleries WHERE id=?", (target["id"],))["content_rev"]
+            == rev_before
+        )
+        assert db.one("SELECT COUNT(*) AS n FROM jobs")["n"] == jobs_before
+        assert not media_dir.exists()
+
+
+def test_upload_batch_revalidates_section_ownership_at_insert(admin, monkeypatch):
+    """A failing batch cannot corrupt or erase a concurrent successful upload."""
+    from pathlib import Path
+
+    from app.admin import uploads as admin_uploads
+
+    admin.post(
+        "/admin/galleries",
+        data={"title": "Upload Race Target", "client_name": ""},
+        follow_redirects=False,
+    )
+    target = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
+    admin.post(
+        "/admin/galleries",
+        data={"title": "Upload Race Foreign", "client_name": ""},
+        follow_redirects=False,
+    )
+    foreign = db.one("SELECT * FROM galleries ORDER BY id DESC LIMIT 1")
+    target_section = db.one(
+        "SELECT id FROM sections WHERE gallery_id=? ORDER BY position, id LIMIT 1",
+        (target["id"],),
+    )
+    original_save = admin_uploads.common.save_upload
+    save_count = 0
+    inside_inner = False
+    inner_result = None
+
+    async def save_then_reuse_section_id(file, dest):
+        nonlocal inside_inner, inner_result, save_count
+        if inside_inner:
+            return await original_save(file, dest)
+        size = await original_save(file, dest)
+        save_count += 1
+        if save_count == 2:
+            inside_inner = True
+            try:
+                inner_file = admin_uploads.UploadFile(
+                    io.BytesIO(_jpeg_bytes()), filename="inner.jpg"
+                )
+                try:
+                    inner_result = await admin_uploads.upload(
+                        target["id"], [inner_file], section_id=target_section["id"]
+                    )
+                finally:
+                    await inner_file.close()
+            finally:
+                inside_inner = False
+            db.run("DELETE FROM sections WHERE id=?", (target_section["id"],))
+            db.run(
+                "INSERT INTO sections (id, gallery_id, name, position) VALUES (?,?,?,?)",
+                (target_section["id"], foreign["id"], "Reused foreign id", 99),
+            )
+        return size
+
+    monkeypatch.setattr(admin_uploads.common, "save_upload", save_then_reuse_section_id)
+    monkeypatch.setattr(admin_uploads.jobs, "_pool", None)
+    media_dir = config.MEDIA_DIR / str(target["id"])
+    last_job_id = db.one("SELECT COALESCE(MAX(id), 0) AS id FROM jobs")["id"]
+    rev_before = target["content_rev"]
+
+    r = admin.post(
+        f"/admin/galleries/{target['id']}/upload?section_id={target_section['id']}",
+        files=[
+            ("files", ("first.jpg", _jpeg_bytes(), "image/jpeg")),
+            ("files", ("raced.jpg", _jpeg_bytes(), "image/jpeg")),
+        ],
+    )
+    assert save_count == 2
+    assert inner_result == {"accepted": 1, "rejected": []}
+    assert r.status_code == 400
+    assert r.json()["detail"] == "unknown section"
+    assets = db.all_("SELECT * FROM assets WHERE gallery_id=?", (target["id"],))
+    assert len(assets) == 1 and assets[0]["section_id"] is None
+    assert not db.one(
+        """SELECT a.id FROM assets AS a JOIN sections AS s ON s.id=a.section_id
+           WHERE a.gallery_id<>s.gallery_id"""
+    )
+    assert (
+        db.one("SELECT content_rev FROM galleries WHERE id=?", (target["id"],))["content_rev"]
+        == rev_before + 1
+    )
+    new_jobs = db.all_("SELECT * FROM jobs WHERE id>? ORDER BY id", (last_job_id,))
+    assert len(new_jobs) == 1 and new_jobs[0]["status"] == "queued"
+    assert {path.name for path in (media_dir / "original").iterdir()} == {assets[0]["stored"]}
+    assert (media_dir / "web").is_dir() and (media_dir / "thumb").is_dir()
+
+    admin_uploads.jobs._execute(new_jobs[0]["id"])
+    asset = db.one("SELECT * FROM assets WHERE id=?", (assets[0]["id"],))
+    assert asset["status"] == "ready"
+    stem = Path(asset["stored"]).stem
+    assert (media_dir / "web" / f"{stem}.jpg").is_file()
+    assert (media_dir / "thumb" / f"{stem}.jpg").is_file()
 
 
 def test_section_jump_nav(admin):
