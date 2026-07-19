@@ -281,8 +281,8 @@ def test_lightbox_arrow_navigation_respects_interactive_owners():
     assert keydown.index(arrow_branch) < keydown.index(tab_branch)
 
 
-def test_lightbox_comment_response_ownership_source_contract():
-    """Keep late comment responses from mutating a different video."""
+def test_lightbox_comment_get_outcomes_are_latest_load_owned_source_contract():
+    """Keep GET freshness separate from durable comment-write outcomes."""
     from pathlib import Path
 
     javascript = (Path(__file__).resolve().parents[1] / "static/lightbox.js").read_text()
@@ -292,10 +292,77 @@ def test_lightbox_comment_response_ownership_source_contract():
 
     state = block("let activeVideo = null;", "function fmtTC(s)")
     owner = block(
-        "function ownsCommentResponse(assetId, requestVersion) {",
-        "\n  }\n\n  function fmtTC(s)",
+        "function ownsCommentLoad(assetId, loadVersion) {",
+        "\n  }\n\n  function advanceCommentServerActivity(assetId)",
     )
     load = block("async function loadComments(assetId)", "function stopShow()")
+    render = block("function render(i)", "// Return focus")
+    comments_render = block("function renderComments(list)", "function renderServerComments")
+    server_render = block("function renderServerComments", "async function loadComments")
+    close = block("function close()", "// Each tile image")
+    submit = block(
+        'if (cForm) cForm.addEventListener("submit", async (e) => {',
+        "function vcError(msg)",
+    )
+
+    load_guard = "if (!ownsCommentLoad(assetId, loadVersion)) return;"
+    status_load_error = "showCommentLoadError(commentLoadErrorMessage(res.status));"
+    generic_load_error = "showCommentLoadError(commentLoadErrorMessage());"
+
+    assert "let commentLoadVersion = 0;" in state
+    assert "commentRequestVersion" not in state
+    assert "function ownsCommentLoad(assetId, loadVersion)" in state
+    assert owner.strip() == "return activeAsset === assetId && commentLoadVersion === loadVersion;"
+    assert 'if (status === 410) return "This gallery has expired' in state
+    assert 'if (status === 429) return "Comments are temporarily rate-limited' in state
+    assert "if (status === 403) return \"We couldn't confirm gallery access" in state
+    assert 'return "Comments couldn\'t load — reopen this video or refresh."' in state
+
+    assert load.count("const loadVersion = ++commentLoadVersion;") == 1
+    assert 'await fetch("/g/" + slug + "/comments/" + assetId)' in load
+    assert load.count(load_guard) == 3
+    assert "if (!res.ok)" in load
+    assert "const comments = await res.json().catch(() => null);" in load
+    assert "if (!Array.isArray(comments))" in load
+    assert load.count(status_load_error) == 1
+    assert load.count(generic_load_error) == 2
+    assert "renderComments(await res.json())" not in load
+    assert "advanceCommentServerActivity" not in comments_render
+    assert "advanceCommentServerActivity(assetId);" in server_render
+    assert load.count("advanceCommentServerActivity(assetId);") == 1
+    assert "renderComments(list);" in server_render
+    first_load_guard = load.index(load_guard)
+    second_load_guard = load.index(load_guard, first_load_guard + 1)
+    assert (
+        load.index("advanceCommentServerActivity(assetId);")
+        < load.index("const loadVersion")
+        < load.index("await fetch(")
+        < first_load_guard
+        < load.index("if (!res.ok)")
+        < load.index("await res.json()")
+        < second_load_guard
+        < load.index("if (!Array.isArray(comments))")
+        < load.index("clearRecoveredCommentFeedback(assetId);")
+        < load.index("renderServerComments(assetId, comments);")
+    )
+
+    assert render.index("activeAsset = null;") < render.index("commentLoadVersion += 1;")
+    assert close.index("activeAsset = null;") < close.index("commentLoadVersion += 1;")
+    assert "const loadVersion" not in submit
+    assert "ownsCommentLoad" not in submit
+
+
+def test_lightbox_comment_post_outcomes_survive_asset_round_trip_source_contract():
+    """A POST outcome belongs to its asset, not an intervening GET generation."""
+    from pathlib import Path
+
+    javascript = (Path(__file__).resolve().parents[1] / "static/lightbox.js").read_text()
+
+    def block(start, end):
+        return javascript.split(start, 1)[1].split(end, 1)[0]
+
+    state = block("let activeVideo = null;", "function fmtTC(s)")
+    feedback = block("function setCommentFeedback(assetId, message,", "function fmtTC(s)")
     render = block("function render(i)", "// Return focus")
     video = render.split('if (t.dataset.kind === "video") {', 1)[1].split("\n    } else {", 1)[0]
     close = block("function close()", "// Each tile image")
@@ -303,88 +370,84 @@ def test_lightbox_comment_response_ownership_source_contract():
         'if (cForm) cForm.addEventListener("submit", async (e) => {',
         "function vcError(msg)",
     )
+    accepted = submit.split("if (res && res.ok) {", 1)[1].split(
+        "\n      if (res && res.status === 403)", 1
+    )[0]
+    failure = submit.split("if (res && res.status === 403)", 1)[1].split("\n    } finally {", 1)[0]
+    finally_block = submit.split("} finally {", 1)[1]
 
-    load_guard = "if (!ownsCommentResponse(assetId, requestVersion)) return;"
-    submit_guard = load_guard
-    post_error = 'vcError("Couldn\'t post your note — refresh the page and try again.");'
     refresh_error = (
-        'vcError("Your note was posted, but comments couldn\'t refresh — reload to see it.");'
+        "Your note was posted, but comments couldn't refresh — reopen this video or refresh."
     )
+    definite_error = "Your note wasn't posted — check the gallery before trying again."
+    ambiguous_error = (
+        "We couldn't confirm whether your note posted — refresh and check the thread before "
+        "resubmitting."
+    )
+    access_error = (
+        "We couldn't confirm your gallery access — copy your note, then refresh before "
+        "trying again."
+    )
+    expired_error = "This gallery has expired — copy your note before leaving this page."
+    rate_error = "Too many requests — wait a moment before trying again."
 
-    assert "let commentRequestVersion = 0;" in state
-    assert "function ownsCommentResponse(assetId, requestVersion)" in state
-    assert owner.strip() == (
-        "return activeAsset === assetId && commentRequestVersion === requestVersion;"
-    )
-
-    assert load.count("const requestVersion = ++commentRequestVersion;") == 1
-    assert 'await fetch("/g/" + slug + "/comments/" + assetId)' in load
-    assert load.count(load_guard) == 2
-    assert "if (!res.ok) return;" in load
-    assert "const comments = await res.json();" in load
-    assert "renderComments(await res.json())" not in load
-    first_load_guard = load.index(load_guard)
-    second_load_guard = load.index(load_guard, first_load_guard + 1)
-    assert (
-        load.index("const requestVersion")
-        < load.index("await fetch(")
-        < first_load_guard
-        < load.index("if (!res.ok) return;")
-        < load.index("await res.json()")
-        < second_load_guard
-        < load.index("renderComments(comments);")
-    )
-
-    assert "activeAsset = t.dataset.id;" in render
-    video_resets = (
-        "lastComments = [];",
-        'if (cList) cList.innerHTML = "";',
-        'cCount.textContent = "";',
-        'cCount.classList.remove("ok");',
-        'vcError("");',
-    )
-    assert all(reset in video for reset in video_resets)
-    assert video.index("activeAsset = t.dataset.id;") < video.index(video_resets[0])
-    assert all(
-        video.index(reset) < video.index("loadComments(activeAsset);") for reset in video_resets
-    )
-    assert render.index("activeAsset = null;") < render.index("commentRequestVersion += 1;")
-    assert close.index("activeAsset = null;") < close.index("commentRequestVersion += 1;")
+    assert "const commentFeedback = new Map();" in state
+    assert "const commentServerActivityVersions = new Map();" in state
+    assert "if (message) commentFeedback.set(assetId, { message, clearOnLoad });" in feedback
+    assert "else commentFeedback.delete(assetId);" in feedback
+    assert "if (activeAsset === assetId) vcError(message);" in feedback
+    assert "const feedback = assetId && commentFeedback.get(assetId);" in feedback
+    assert 'vcError(feedback ? feedback.message : "");' in feedback
+    assert 'if (feedback && feedback.clearOnLoad) setCommentFeedback(assetId, "");' in feedback
+    assert "restoreCommentFeedback(activeAsset);" in video
+    assert "restoreCommentFeedback(null);" in render
+    assert "restoreCommentFeedback(null);" in close
 
     assert "const assetId = activeAsset;" in submit
-    assert submit.count("const requestVersion = ++commentRequestVersion;") == 1
+    assert (
+        "const submittedActivityVersion = commentServerActivityVersions.get(assetId) || 0;"
+        in submit
+    )
     assert 'await fetch("/g/" + slug + "/comments/" + assetId' in submit
-    assert '"/comments/" + activeAsset' not in submit
-    assert submit.count(submit_guard) == 2
-    assert "const comments = await res.json().catch(() => null);" in submit
-    assert "renderComments(comments);" in submit
-    parse_failure = submit.split("if (!comments) {", 1)[1].split("\n        }", 1)[0]
-    assert parse_failure.strip() == f"{refresh_error}\n          return;"
-    first_submit_guard = submit.index(submit_guard)
-    second_submit_guard = submit.index(submit_guard, first_submit_guard + 1)
-    assert submit.count(refresh_error) == 1
-    assert submit.count(post_error) == 1
+    assert "ownsCommentLoad" not in submit
+    assert "const comments = await res.json().catch(() => null);" in accepted
+    assert "const commentsValid = Array.isArray(comments);" in accepted
+    assert "clearSubmittedDraft(assetId, submittedRevision)" in accepted
+    assert "if (draftCleared && activeAsset === assetId) restoreCommentDraft(assetId);" in accepted
+    assert f'commentsValid ? "" : "{refresh_error}", !commentsValid' in accepted
+    assert "if (activeAsset !== assetId) return;" in accepted
+    assert accepted.count("commentLoadVersion += 1;") == 1
+    assert "if (!commentsValid) return;" in accepted
     assert (
-        submit.index("const assetId")
-        < submit.index("if (!assetId || pendingCommentAssets.has(assetId)) return;")
-        < submit.index("const requestVersion")
-        < submit.index("await fetch(")
-        < submit.index("if (res && res.ok)")
-        < submit.index("await res.json()")
-        < submit.index("clearSubmittedDraft(assetId, submittedRevision)")
-        < submit.index("draftCleared && activeAsset === assetId")
-        < first_submit_guard
-        < submit.index("if (!comments)")
-        < submit.index(refresh_error)
-        < submit.index("renderComments(comments);")
-        < second_submit_guard
+        "if ((commentServerActivityVersions.get(assetId) || 0) !== submittedActivityVersion)"
+        in accepted
     )
+    assert "loadComments(assetId);" in accepted
+    assert "renderServerComments(assetId, comments);" in accepted
     assert (
-        second_submit_guard
-        < submit.index("res.status === 403")
-        < submit.index("window.location.reload();")
-        < submit.index(post_error)
+        accepted.index("await res.json()")
+        < accepted.index("const commentsValid")
+        < accepted.index("clearSubmittedDraft(assetId, submittedRevision)")
+        < accepted.index("setCommentFeedback(")
+        < accepted.index("if (activeAsset !== assetId) return;")
+        < accepted.index("commentLoadVersion += 1;")
+        < accepted.index("if ((commentServerActivityVersions.get(assetId)")
+        < accepted.index("loadComments(assetId);")
+        < accepted.index("if (!commentsValid) return;")
+        < accepted.index("renderServerComments(assetId, comments);")
+        < accepted.rindex("return;")
     )
+
+    assert "clearSubmittedDraft" not in failure
+    assert "commentLoadVersion" not in failure
+    assert f'setCommentFeedback(assetId, "{access_error}");' in failure
+    assert f'setCommentFeedback(assetId, "{expired_error}");' in failure
+    assert f'setCommentFeedback(assetId, "{rate_error}");' in failure
+    assert f'setCommentFeedback(assetId, "{ambiguous_error}");' in failure
+    assert f'setCommentFeedback(assetId, "{definite_error}");' in failure
+    assert "!res || res.status >= 500" in failure
+    assert "window.location.reload()" not in failure
+    assert finally_block.strip() == "pendingCommentAssets.delete(assetId);\n    }\n  });"
 
 
 def test_lightbox_comment_drafts_are_asset_owned_source_contract():
@@ -396,7 +459,7 @@ def test_lightbox_comment_drafts_are_asset_owned_source_contract():
     def block(start, end):
         return javascript.split(start, 1)[1].split(end, 1)[0]
 
-    state = block("let activeVideo = null;", "function ownsCommentResponse")
+    state = block("let activeVideo = null;", "function ownsCommentLoad")
     save = block(
         "function saveCommentDraft(assetId, changed = false)", "function restoreCommentDraft"
     )
@@ -508,6 +571,6 @@ def test_lightbox_comment_draft_lifecycle_source_contract():
         < submit.index("await fetch(")
         < submit.index("await res.json()")
         < submit.index("clearSubmittedDraft(assetId, submittedRevision)")
-        < submit.index("if (!ownsCommentResponse(assetId, requestVersion)) return;")
+        < submit.index("if (activeAsset !== assetId) return;")
         < submit.index("pendingCommentAssets.delete(assetId);")
     )

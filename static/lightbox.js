@@ -26,13 +26,45 @@
   let activeVideo = null;
   let activeAsset = null;
   let lastComments = [];
-  let commentRequestVersion = 0;
+  let commentLoadVersion = 0;
   const commentDrafts = new Map();
   let commentDraftRevision = 0;
   const pendingCommentAssets = new Set();
+  const commentFeedback = new Map();
+  const commentServerActivityVersions = new Map();
 
-  function ownsCommentResponse(assetId, requestVersion) {
-    return activeAsset === assetId && commentRequestVersion === requestVersion;
+  function ownsCommentLoad(assetId, loadVersion) {
+    return activeAsset === assetId && commentLoadVersion === loadVersion;
+  }
+
+  function advanceCommentServerActivity(assetId) {
+    const version = (commentServerActivityVersions.get(assetId) || 0) + 1;
+    commentServerActivityVersions.set(assetId, version);
+    return version;
+  }
+
+  function setCommentFeedback(assetId, message, clearOnLoad = false) {
+    if (!assetId) return;
+    if (message) commentFeedback.set(assetId, { message, clearOnLoad });
+    else commentFeedback.delete(assetId);
+    if (activeAsset === assetId) vcError(message);
+  }
+
+  function restoreCommentFeedback(assetId) {
+    const feedback = assetId && commentFeedback.get(assetId);
+    vcError(feedback ? feedback.message : "");
+  }
+
+  function clearRecoveredCommentFeedback(assetId) {
+    const feedback = commentFeedback.get(assetId);
+    if (feedback && feedback.clearOnLoad) setCommentFeedback(assetId, "");
+  }
+
+  function commentLoadErrorMessage(status) {
+    if (status === 410) return "This gallery has expired — comments are no longer available.";
+    if (status === 429) return "Comments are temporarily rate-limited — wait a moment, then reopen this video.";
+    if (status === 403) return "We couldn't confirm gallery access — refresh before reopening this video.";
+    return "Comments couldn't load — reopen this video or refresh.";
   }
 
   function fmtTC(s) {
@@ -81,13 +113,17 @@
     cCancel.hidden = true;
   }
 
+  function showCommentLoadError(message) {
+    if (activeAsset && !commentFeedback.has(activeAsset)) vcError(message);
+  }
+
   function renderComments(list) {
     if (!cList) return;
     lastComments = list;
     // Open-count = root threads still open (cascade keeps a thread's status coherent).
     if (cCount) {
       const open = list.filter((c) => !c.parent_id && (c.status || "open") === "open").length;
-      cCount.textContent = open ? open + " open" : "all resolved";
+      cCount.textContent = list.length ? (open ? open + " open" : "all resolved") : "no notes yet";
       cCount.classList.toggle("ok", open === 0 && list.length > 0);
     }
     const hideResolved = cFilter && cFilter.checked;
@@ -135,17 +171,34 @@
     })(0, 0);
   }
 
+  function renderServerComments(assetId, list) {
+    advanceCommentServerActivity(assetId);
+    renderComments(list);
+  }
+
   async function loadComments(assetId) {
     if (!cWrap) return;
-    const requestVersion = ++commentRequestVersion;
+    advanceCommentServerActivity(assetId);
+    const loadVersion = ++commentLoadVersion;
     try {
       const res = await fetch("/g/" + slug + "/comments/" + assetId);
-      if (!ownsCommentResponse(assetId, requestVersion)) return;
-      if (!res.ok) return;
-      const comments = await res.json();
-      if (!ownsCommentResponse(assetId, requestVersion)) return;
-      renderComments(comments);
-    } catch (e) { /* leave the thread empty on a transient error */ }
+      if (!ownsCommentLoad(assetId, loadVersion)) return;
+      if (!res.ok) {
+        showCommentLoadError(commentLoadErrorMessage(res.status));
+        return;
+      }
+      const comments = await res.json().catch(() => null);
+      if (!ownsCommentLoad(assetId, loadVersion)) return;
+      if (!Array.isArray(comments)) {
+        showCommentLoadError(commentLoadErrorMessage());
+        return;
+      }
+      clearRecoveredCommentFeedback(assetId);
+      renderServerComments(assetId, comments);
+    } catch (e) {
+      if (!ownsCommentLoad(assetId, loadVersion)) return;
+      showCommentLoadError(commentLoadErrorMessage());
+    }
   }
 
   function stopShow() {
@@ -233,7 +286,7 @@
           cCount.textContent = "";
           cCount.classList.remove("ok");
         }
-        vcError("");
+        restoreCommentFeedback(activeAsset);
         restoreCommentDraft(activeAsset);
         loadComments(activeAsset);
       }
@@ -246,9 +299,10 @@
       stage.appendChild(img);
       activeVideo = null;
       activeAsset = null;
-      commentRequestVersion += 1;
+      commentLoadVersion += 1;
       if (cWrap) {
         cWrap.hidden = true;
+        restoreCommentFeedback(null);
         restoreCommentDraft(null);
       }
     }
@@ -270,10 +324,11 @@
     stopShow();
     lb.hidden = true; stage.innerHTML = ""; document.body.style.overflow = "";
     activeVideo = null; activeAsset = null;
-    commentRequestVersion += 1;
+    commentLoadVersion += 1;
     if (cWrap) {
       cWrap.hidden = true;
       if (cList) cList.innerHTML = "";
+      restoreCommentFeedback(null);
       restoreCommentDraft(null);
     }
     if (lastFocused && lastFocused.focus) lastFocused.focus();
@@ -344,7 +399,7 @@
     const submittedRevision = draft.revision;
     const body = draft.body.trim();
     if (!body) return;
-    const requestVersion = ++commentRequestVersion;
+    const submittedActivityVersion = commentServerActivityVersions.get(assetId) || 0;
     const fd = new FormData();
     fd.append("body", body);
     // A reply inherits its parent's timecode server-side; a top-level note uses
@@ -364,26 +419,30 @@
       }
       if (res && res.ok) {
         const comments = await res.json().catch(() => null);
+        const commentsValid = Array.isArray(comments);
         const draftCleared = clearSubmittedDraft(assetId, submittedRevision);
         if (draftCleared && activeAsset === assetId) restoreCommentDraft(assetId);
-        if (!ownsCommentResponse(assetId, requestVersion)) return;
-        if (!comments) {
-          vcError("Your note was posted, but comments couldn't refresh — reload to see it.");
+        setCommentFeedback(assetId, commentsValid ? "" : "Your note was posted, but comments couldn't refresh — reopen this video or refresh.", !commentsValid);
+        if (activeAsset !== assetId) return;
+        commentLoadVersion += 1;
+        if ((commentServerActivityVersions.get(assetId) || 0) !== submittedActivityVersion) {
+          loadComments(assetId);
           return;
         }
-        renderComments(comments);
-        vcError("");
+        if (!commentsValid) return;
+        renderServerComments(assetId, comments);
         return;
       }
-      if (!ownsCommentResponse(assetId, requestVersion)) return;
-      if (res && (res.status === 403 || res.status === 410)) {
-        // session aged out or gallery expired mid-session — reload to the gate so
-        // the client re-unlocks rather than losing the typed note to a dead button
-        window.location.reload();
+      if (res && res.status === 403) {
+        setCommentFeedback(assetId, "We couldn't confirm your gallery access — copy your note, then refresh before trying again.");
+      } else if (res && res.status === 410) {
+        setCommentFeedback(assetId, "This gallery has expired — copy your note before leaving this page.");
+      } else if (res && res.status === 429) {
+        setCommentFeedback(assetId, "Too many requests — wait a moment before trying again.");
+      } else if (!res || res.status >= 500) {
+        setCommentFeedback(assetId, "We couldn't confirm whether your note posted — refresh and check the thread before resubmitting.");
       } else {
-        // keep the typed text; tell the client it didn't post instead of silently
-        // swallowing the failure
-        vcError("Couldn't post your note — refresh the page and try again.");
+        setCommentFeedback(assetId, "Your note wasn't posted — check the gallery before trying again.");
       }
     } finally {
       pendingCommentAssets.delete(assetId);
