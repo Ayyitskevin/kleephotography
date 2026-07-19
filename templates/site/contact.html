@@ -27,9 +27,10 @@
 
     {% if featured %}
     <div class="contact-photo" data-reveal>
-      <img src="/site/img/{{ featured[0].id }}?variant=web" loading="lazy" decoding="async"
-           srcset="/site/img/{{ featured[0].id }}?variant=thumb 480w, /site/img/{{ featured[0].id }}?variant=web 2048w"
-           sizes="(max-width: 900px) 100vw, 38vw"
+      <img src="{{ featured_image.web.url }}" loading="lazy" decoding="async"
+           {% if featured_image.web.width %}width="{{ featured_image.web.width }}" height="{{ featured_image.web.height }}"{% endif %}
+           {% if featured_image.srcset %}srcset="{{ featured_image.srcset }}"
+           sizes="(max-width: 900px) 100vw, 38vw"{% endif %}
            alt="{{ featured[0]|portfolio_alt }}">
     </div>
     {% endif %}

@@ -5413,6 +5413,171 @@ def test_case_study_images_use_actual_derivative_metadata(admin):
         shutil.rmtree(media, ignore_errors=True)
 
 
+def test_secondary_marketing_images_use_actual_derivative_metadata(
+    admin, tmp_path, monkeypatch, request
+):
+    from app import security
+
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
+    monkeypatch.setattr(config, "ABOUT_PORTRAIT", "missing-test-portrait.jpg")
+    monkeypatch.setattr(security, "inquiry_throttled", lambda _ip, _bucket: False)
+    gallery_id = db.run(
+        """INSERT INTO galleries
+           (slug, title, client_name, pin, cs_published, cs_tagline, created_at)
+           VALUES (?,?,?,?,?,?,?)""",
+        (
+            "secondary-image-metadata",
+            "Secondary Image Metadata",
+            "Metadata Client",
+            "4455",
+            1,
+            "Encoded dimensions, everywhere",
+            "2999-01-02 00:00:00",
+        ),
+    )
+    request.addfinalizer(lambda: db.run("DELETE FROM galleries WHERE id=?", (gallery_id,)))
+    stored = "secondary-image.jpg"
+    asset_id = db.run(
+        """INSERT INTO assets
+           (gallery_id, kind, filename, stored, status, width, height, portfolio,
+            portfolio_tag)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (
+            gallery_id,
+            "photo",
+            stored,
+            stored,
+            "ready",
+            6000,
+            4000,
+            1,
+            "fb/dishes",
+        ),
+    )
+    media = config.MEDIA_DIR / str(gallery_id)
+    for variant, size in (("thumb", (80, 120)), ("web", (320, 480))):
+        directory = media / variant
+        directory.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", size, (80, 100, 120)).save(directory / stored, "JPEG")
+
+    thumb_url = f"/site/img/{asset_id}?variant=thumb"
+    web_url = f"/site/img/{asset_id}?variant=web"
+    srcset = f"{thumb_url} 80w, {web_url} 320w"
+    scopes = {
+        "home": (
+            r'<a class="sr-card sp-door sr-stock-fb".*?</a>',
+            thumb_url,
+            "(max-width: 700px) 92vw, 440px",
+        ),
+        "portfolio": (
+            r'<a class="work-editorial-card" href="/work/secondary-image-metadata">.*?</a>',
+            thumb_url,
+            "(max-width: 700px) 100vw, 33vw",
+        ),
+        "about": (
+            r'<div class="about-photo ab-photo".*?</div>',
+            web_url,
+            "(max-width: 900px) 100vw, 40vw",
+        ),
+        "contact": (
+            r'<div class="contact-photo".*?</div>',
+            web_url,
+            "(max-width: 900px) 100vw, 38vw",
+        ),
+        "contact_error": (
+            r'<div class="contact-photo".*?</div>',
+            web_url,
+            "(max-width: 900px) 100vw, 38vw",
+        ),
+        "book": (
+            r'<div class="book-aside-photo".*?</div>',
+            web_url,
+            "(max-width: 900px) 100vw, 40vw",
+        ),
+    }
+
+    def responses():
+        with TestClient(app) as public:
+            return {
+                "home": public.get("/"),
+                "portfolio": public.get("/portfolio"),
+                "about": public.get("/about"),
+                "contact": public.get("/contact"),
+                "contact_error": public.post(
+                    "/contact",
+                    data={"name": "Metadata", "email": "invalid", "message": "Test"},
+                ),
+                "book": public.get("/book"),
+            }
+
+    def scoped_image(response, pattern):
+        scope = re.search(pattern, response.text, re.S)
+        assert scope is not None
+        tag = re.search(r"<img\b[^>]*>", scope.group(0))
+        assert tag is not None
+        return tag.group(0)
+
+    def attribute(tag, name):
+        match = re.search(rf'\s{re.escape(name)}="([^"]*)"', tag)
+        return match.group(1) if match else None
+
+    rendered = responses()
+    for name, (pattern, source, sizes) in scopes.items():
+        expected_status = 400 if name == "contact_error" else 200
+        assert rendered[name].status_code == expected_status
+        tag = scoped_image(rendered[name], pattern)
+        expected_size = (80, 120) if source == thumb_url else (320, 480)
+        assert attribute(tag, "src") == source
+        assert attribute(tag, "width") == str(expected_size[0])
+        assert attribute(tag, "height") == str(expected_size[1])
+        assert attribute(tag, "srcset") == srcset
+        assert attribute(tag, "sizes") == sizes
+        assert "480w" not in tag and "2048w" not in tag
+
+    # Remove the preferred thumbnail to force the two thumb-primary card
+    # surfaces through the same validated web fallback as every other surface.
+    (media / "thumb" / stored).unlink()
+    web_only = responses()
+    for name, (pattern, _source, _sizes) in scopes.items():
+        expected_status = 400 if name == "contact_error" else 200
+        assert web_only[name].status_code == expected_status
+        tag = scoped_image(web_only[name], pattern)
+        assert attribute(tag, "src") == web_url
+        assert attribute(tag, "width") == "320"
+        assert attribute(tag, "height") == "480"
+        assert attribute(tag, "srcset") is None
+        assert attribute(tag, "sizes") is None
+    Image.new("RGB", (80, 120), (80, 100, 120)).save(media / "thumb" / stored, "JPEG")
+
+    # A lone valid derivative becomes the sole identity everywhere; candidate
+    # selection hints must disappear instead of describing a missing web file.
+    (media / "web" / stored).unlink()
+    fallback = responses()
+    for name, (pattern, _source, _sizes) in scopes.items():
+        expected_status = 400 if name == "contact_error" else 200
+        assert fallback[name].status_code == expected_status
+        tag = scoped_image(fallback[name], pattern)
+        assert attribute(tag, "src") == thumb_url
+        assert attribute(tag, "width") == "80"
+        assert attribute(tag, "height") == "120"
+        assert attribute(tag, "srcset") is None
+        assert attribute(tag, "sizes") is None
+
+    # With neither derivative available, preserve each surface's previous
+    # plain URL fallback but never claim dimensions for bytes that were not read.
+    (media / "thumb" / stored).unlink()
+    unavailable = responses()
+    for name, (pattern, original_source, _sizes) in scopes.items():
+        expected_status = 400 if name == "contact_error" else 200
+        assert unavailable[name].status_code == expected_status
+        tag = scoped_image(unavailable[name], pattern)
+        assert attribute(tag, "src") == original_source
+        assert attribute(tag, "width") is None
+        assert attribute(tag, "height") is None
+        assert attribute(tag, "srcset") is None
+        assert attribute(tag, "sizes") is None
+
+
 def test_portfolio_tiles_use_actual_derivative_metadata(admin, tmp_path, monkeypatch, request):
     from collections import Counter
 

@@ -105,9 +105,10 @@
     <a class="work-editorial-card" href="/work/{{ s.slug }}">
       <div class="work-editorial-img">
         {% if s.hero_id %}
-        <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
-             srcset="/site/img/{{ s.hero_id }}?variant=thumb 480w, /site/img/{{ s.hero_id }}?variant=web 2048w"
-             sizes="(max-width: 700px) 100vw, 33vw"
+        <img src="{{ s.hero_image.thumb.url }}" loading="lazy" decoding="async"
+             {% if s.hero_image.thumb.width %}width="{{ s.hero_image.thumb.width }}" height="{{ s.hero_image.thumb.height }}"{% endif %}
+             {% if s.hero_image.srcset %}srcset="{{ s.hero_image.srcset }}"
+             sizes="(max-width: 700px) 100vw, 33vw"{% endif %}
              alt="{{ s.cs_tagline or s.title }}">
         {% else %}
         <span class="placeholder">Case study</span>

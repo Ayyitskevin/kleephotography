@@ -72,9 +72,11 @@
       </div>
       <figure class="sr-card-media">
         {% if d.lead %}
-        <img src="/site/img/{{ d.lead.id }}?variant=thumb" loading="lazy" decoding="async"
-             srcset="/site/img/{{ d.lead.id }}?variant=thumb 480w, /site/img/{{ d.lead.id }}?variant=web 2048w"
-             sizes="(max-width: 700px) 92vw, 440px" alt="{{ d.lead|portfolio_alt }}">
+        <img src="{{ d.lead_image.thumb.url }}" loading="lazy" decoding="async"
+             {% if d.lead_image.thumb.width %}width="{{ d.lead_image.thumb.width }}" height="{{ d.lead_image.thumb.height }}"{% endif %}
+             {% if d.lead_image.srcset %}srcset="{{ d.lead_image.srcset }}"
+             sizes="(max-width: 700px) 92vw, 440px"{% endif %}
+             alt="{{ d.lead|portfolio_alt }}">
         {% endif %}
         <span class="sr-card-scrim" aria-hidden="true"></span>
         <span class="sr-card-title">

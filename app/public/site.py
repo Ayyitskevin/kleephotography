@@ -462,6 +462,7 @@ def _specialty_doors() -> list[dict]:
     doors = []
     for key, meta in specialties.SPECIALTIES.items():
         mine = [a for a in assets if specialties.specialty_key(a["portfolio_tag"]) == key]
+        lead = mine[0] if mine else None
         line_key = "re_aerial" if key == "re" and features.aerials_live() else key
         doors.append(
             {
@@ -472,7 +473,8 @@ def _specialty_doors() -> list[dict]:
                 "stock": meta["stock"],
                 "screen_name": meta["screen_name"],
                 "line": DOOR_LINES[line_key],
-                "lead": mine[0] if mine else None,
+                "lead": lead,
+                "lead_image": _public_photo_spec(lead) if lead else None,
                 "n_photos": len(mine),
                 "n_reels": sum(
                     1 for r in reels if specialties.specialty_key(r["portfolio_tag"]) == key
@@ -531,6 +533,7 @@ async def portfolio(request: Request):
     ]
     # Case studies also surface here as a "Featured clients" band; the dedicated
     # /work index + /work/{slug} detail pages are public + crawlable too.
+    studies = [_case_study_view(study) for study in _case_studies()[:3]]
     return templates.TemplateResponse(
         request,
         "site/portfolio.html",
@@ -539,7 +542,7 @@ async def portfolio(request: Request):
             "asset_images": asset_images,
             "tags": tags,
             "sp_chips": sp_chips if len(sp_chips) > 1 else [],
-            "studies": _case_studies(),
+            "studies": studies,
             "demo_gallery": _demo_gallery(),
         },
     )
@@ -571,12 +574,16 @@ def _about_portrait_static() -> str | None:
 
 @router.get("/about", response_class=HTMLResponse)
 async def about(request: Request):
+    portrait_static = _about_portrait_static()
+    featured = _portfolio_assets()[:1]
+    featured_image = _public_photo_spec(featured[0]) if featured and not portrait_static else None
     return templates.TemplateResponse(
         request,
         "site/about.html",
         {
-            "portrait_static": _about_portrait_static(),
-            "featured": _portfolio_assets()[:1],
+            "portrait_static": portrait_static,
+            "featured": featured,
+            "featured_image": featured_image,
         },
     )
 
@@ -601,6 +608,7 @@ async def contact(request: Request):
     (parsed in _contact_prefill straight off the query string)."""
     pf = _contact_prefill(request)
     scope_label, scope_placeholder = _contact_scope(pf["service"])
+    featured = _portfolio_assets()[:1]
     return templates.TemplateResponse(
         request,
         "site/contact.html",
@@ -610,7 +618,8 @@ async def contact(request: Request):
             "prefill": pf,
             "scope_label": scope_label,
             "scope_placeholder": scope_placeholder,
-            "featured": _portfolio_assets()[:1],
+            "featured": featured,
+            "featured_image": _public_photo_spec(featured[0]) if featured else None,
             "faqs": CONTACT_FAQS,
             "faq_heading": "Good to know",
         },
@@ -650,6 +659,7 @@ async def submit_inquiry(
         # typo or throttle never wipes a visitor's typed quote request (the
         # template reads these off `prefill`).
         scope_label, scope_placeholder = _contact_scope(service.strip())
+        featured = _portfolio_assets()[:1]
         return templates.TemplateResponse(
             request,
             "site/contact.html",
@@ -670,7 +680,8 @@ async def submit_inquiry(
                 },
                 "scope_label": scope_label,
                 "scope_placeholder": scope_placeholder,
-                "featured": _portfolio_assets()[:1],
+                "featured": featured,
+                "featured_image": _public_photo_spec(featured[0]) if featured else None,
                 "faqs": CONTACT_FAQS,
                 "faq_heading": "Good to know",
             },

@@ -21,9 +21,10 @@
          business day.{% endif %}</p>
     {% if book_photo %}
     <div class="book-aside-photo">
-      <img src="/site/img/{{ book_photo.id }}?variant=web" loading="lazy" decoding="async"
-           srcset="/site/img/{{ book_photo.id }}?variant=thumb 480w, /site/img/{{ book_photo.id }}?variant=web 2048w"
-           sizes="(max-width: 900px) 100vw, 40vw"
+      <img src="{{ book_image.web.url }}" loading="lazy" decoding="async"
+           {% if book_image.web.width %}width="{{ book_image.web.width }}" height="{{ book_image.web.height }}"{% endif %}
+           {% if book_image.srcset %}srcset="{{ book_image.srcset }}"
+           sizes="(max-width: 900px) 100vw, 40vw"{% endif %}
            alt="{{ book_photo|portfolio_alt }}">
     </div>
     {% endif %}

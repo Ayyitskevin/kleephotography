@@ -131,11 +131,12 @@ def _picker_ctx(
 
 @router.get("/book", response_class=HTMLResponse)
 async def book_index(request: Request):
-    from .site import _portfolio_assets
+    from .site import _portfolio_assets, _public_photo_spec
     from .site_catalog import BOOK_ACTIVE_PROMISES, BOOK_FAQS, BOOK_PROMISES
 
     events = scheduling.active_event_types()
-    book_photo = _portfolio_assets()[:1]
+    book_rows = _portfolio_assets()[:1]
+    book_photo = book_rows[0] if book_rows else None
     return templates.TemplateResponse(
         request,
         "public/book_index.html",
@@ -144,7 +145,8 @@ async def book_index(request: Request):
             "faqs": BOOK_FAQS,
             "faq_heading": "Common questions",
             "book_promises": BOOK_ACTIVE_PROMISES if events else BOOK_PROMISES,
-            "book_photo": book_photo[0] if book_photo else None,
+            "book_photo": book_photo,
+            "book_image": _public_photo_spec(book_photo) if book_photo else None,
         },
     )
 
