@@ -51,14 +51,15 @@ def _hhmm_to_min(s: str) -> int | None:
     s = (s or "").strip()
     if not s:
         return None
-    try:
-        h, m = s.split(":")
-        v = int(h) * 60 + int(m)
-    except (ValueError, AttributeError):
+    match = re.fullmatch(r"(\d{1,2}):(\d{2})", s)
+    if not match:
         raise HTTPException(status_code=400, detail="bad time")
-    if not (0 <= v <= 1440):
+    h, m = (int(part) for part in match.groups())
+    if h == 24 and m == 0:
+        return 1440
+    if not (0 <= h <= 23 and 0 <= m <= 59):
         raise HTTPException(status_code=400, detail="time out of range")
-    return v
+    return h * 60 + m
 
 
 def _posint(form, key: str, lo: int, hi: int, default: int = 0) -> int:
@@ -308,12 +309,12 @@ async def add_override(
     start: str = Form(""),
     end: str = Form(""),
 ):
-    import datetime as dt
-
     try:
-        dt.date.fromisoformat(day)
+        override_day = dt.date.fromisoformat(day).isoformat()
     except ValueError:
         raise HTTPException(status_code=400, detail="bad date")
+    if mode not in {"block", "hours"}:
+        raise HTTPException(status_code=400, detail="bad override mode")
     if mode == "hours":
         s, e = _hhmm_to_min(start), _hhmm_to_min(end)
         if s is None or e is None or e <= s:
@@ -322,12 +323,43 @@ async def add_override(
     else:
         avail, smin, emin = 0, None, None
     with db.tx() as con:
+        previous = [
+            {
+                "day": row["day"],
+                "available": row["available"],
+                "start_min": row["start_min"],
+                "end_min": row["end_min"],
+            }
+            for row in con.execute(
+                """SELECT day, available, start_min, end_min FROM date_overrides
+                   WHERE event_type_id IS NULL AND day IN (?,?) ORDER BY id""",
+                (day, override_day),
+            ).fetchall()
+        ]
         con.execute(
+            "DELETE FROM date_overrides WHERE event_type_id IS NULL AND day IN (?,?)",
+            (day, override_day),
+        )
+        cur = con.execute(
             """INSERT INTO date_overrides (event_type_id,day,available,start_min,end_min)
                        VALUES (NULL,?,?,?,?)""",
-            (day, avail, smin, emin),
+            (override_day, avail, smin, emin),
         )
-        audit.log(con, "date_override", 0, "add", diff={"day": day, "blocked": avail == 0})
+        audit.log(
+            con,
+            "date_override",
+            cur.lastrowid,
+            "set",
+            diff={
+                "previous": previous,
+                "new": {
+                    "day": override_day,
+                    "available": avail,
+                    "start_min": smin,
+                    "end_min": emin,
+                },
+            },
+        )
     return RedirectResponse("/admin/scheduling", status_code=303)
 
 

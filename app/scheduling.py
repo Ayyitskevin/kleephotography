@@ -86,7 +86,7 @@ def _windows_for_day(con, et, day: dt.date) -> list[tuple[int, int]]:
     ov = con.execute(
         """SELECT available, start_min, end_min FROM date_overrides
            WHERE day=? AND (event_type_id=? OR event_type_id IS NULL)
-           ORDER BY event_type_id IS NULL LIMIT 1""",
+           ORDER BY event_type_id IS NULL, id DESC LIMIT 1""",
         (iso, et["id"]),
     ).fetchone()
     if ov is not None:
