@@ -1050,6 +1050,28 @@ html.nav-menu-open body { overflow: hidden; overscroll-behavior: none; }
 /* ---- forms (contact / book) ---- */
 .contact-form { max-width: 100%; }
 .contact-form label { flex-direction: column; align-items: stretch; }
+.contact-more { margin: 0.35rem 0 0.6rem; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--card); }
+.contact-more > summary {
+  cursor: pointer; list-style: none; padding: 0.85rem 1rem; font-weight: 600;
+  color: var(--ink); display: flex; flex-wrap: wrap; gap: 0.35rem 0.5rem;
+  align-items: baseline;
+}
+.contact-more > summary::-webkit-details-marker { display: none; }
+.contact-more > summary::before {
+  content: "+"; display: inline-block; width: 1.1em; color: var(--accent);
+  font-weight: 700;
+}
+.contact-more[open] > summary::before { content: "–"; }
+.contact-more-body { padding: 0 1rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.contact-specialty-nav { margin: 1.1rem 0 0.4rem; }
+.contact-specialty-list {
+  list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.45rem 0.85rem;
+}
+.contact-specialty-list a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.contact-specialty-list a:hover,
+.contact-specialty-list a:focus-visible { text-decoration: underline; outline: none; }
+.contact-form .error { margin: 0.4rem 0 0; }
 .hp-field { position: absolute; left: -9999px; height: 0; width: 0; border: 0; padding: 0; }
 .sent-note { background: var(--card); border: 1px solid var(--accent);
   border-radius: 10px; padding: 1rem 1.2rem; }
@@ -5040,6 +5062,29 @@ tr.inquiry-dismissed td:nth-child(2) { text-decoration: line-through; }
 .admin-shell .ib-ctx-row { display: flex; justify-content: space-between; gap: 12px; }
 .admin-shell .ib-ctx-rk { font-size: .76rem; font-weight: 600; color: var(--ink-faint); }
 .admin-shell .ib-ctx-rv { font-size: .8rem; font-weight: 600; color: var(--ink); text-align: right; }
+.admin-shell .ib-svc {
+  flex: 0 0 auto; font-size: .62rem; font-weight: 700; letter-spacing: .02em;
+  padding: 2px 7px; border-radius: 999px; color: var(--ink-soft);
+  background: var(--surface); border: 1px solid var(--line); max-width: 7.5rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.admin-shell .ib-ctx-health {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 13px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.admin-shell .ib-health-rows { display: flex; flex-direction: column; gap: 8px; }
+.admin-shell .ib-health-row { display: flex; flex-direction: column; gap: 3px; }
+.admin-shell .ib-health-ok .ib-ctx-rv { color: #2f7d57; }
+.admin-shell .ib-health-warn .ib-ctx-rv { color: #9a7a2c; }
+.admin-shell .ib-health-bad .ib-ctx-rv { color: #a33b32; }
+.admin-shell .ib-health-muted .ib-ctx-rv { color: var(--ink-faint); }
+.admin-shell .ib-health-link, .admin-shell .ib-health-retry { display: inline-block; margin-top: 4px; }
+.admin-shell .ib-health-retry { margin: 4px 0 0; }
+.admin-shell .ib-next-action {
+  margin: 4px 0 0; font-size: .78rem; font-weight: 500; color: var(--ink-soft);
+  line-height: 1.45;
+}
+.admin-shell .ib-next-action .ib-ctx-rk { display: block; margin-bottom: 2px; }
 
 @media (max-width: 1180px) {
   .admin-shell .ib { grid-template-columns: 310px minmax(0, 1fr); }

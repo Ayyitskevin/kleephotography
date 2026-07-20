@@ -25,6 +25,17 @@
       </div>
     </div>
 
+    {% if specialty_paths %}
+    <nav class="contact-specialty-nav" aria-label="Browse specialties">
+      <span class="cd-label">Browse work first</span>
+      <ul class="contact-specialty-list">
+        {% for sp in specialty_paths %}
+        <li><a href="/{{ sp.slug }}">{{ sp.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+    {% endif %}
+
     {% if featured %}
     <div class="contact-photo" data-reveal>
       <img src="{{ featured_image.web.url }}" loading="lazy" decoding="async"
@@ -36,7 +47,7 @@
     {% endif %}
   </aside>
 
-  {# RIGHT — the real quote-request form, unchanged in scope #}
+  {# RIGHT — quote-request form: essentials first, optional details progressive #}
   <div class="contact-card" data-reveal>
     {% if sent %}
     <div class="sent-note" data-analytics-view="Contact Success" data-analytics-once>
@@ -45,51 +56,73 @@
       <p><a class="sr-btn" href="/book">Need a time now? Book a shoot &rarr;</a></p>
     </div>
     {% else %}
+    {% set pf = prefill or {} %}
+    {% set open_more = pf.shoot_date or pf.dish_count or pf.usage or pf.budget or pf.service %}
     <form method="post" action="/contact" class="stack-form contact-form">
-      <label>Name <input type="text" name="name" required
-             value="{{ prefill.name if prefill else '' }}"></label>
-      <label>Email <input type="email" name="email" required
-             value="{{ prefill.email if prefill else '' }}"></label>
-      <label>Phone <span class="muted">(optional)</span>
-        <input type="tel" name="phone"
-               value="{{ prefill.phone if prefill else '' }}"></label>
-      <label>Business <input type="text" name="business"
-             value="{{ prefill.business if prefill else '' }}"
-             placeholder="Listing / brokerage, restaurant, or brand name"></label>
-      <label>Project type
-        <select name="service">
-          <option value="" data-scope-label="Project scope" data-scope-placeholder="e.g. property size, team size, or number of setups">Not sure yet — help me choose</option>
-          <option value="Real Estate" data-scope-label="Listing / property scope" data-scope-placeholder="e.g. 3,200 sq ft · 4 bed 3 bath"{% if prefill and prefill.service == 'Real Estate' %} selected{% endif %}>Real Estate — photo / video</option>
-          <option value="Portraits" data-scope-label="Subject / team scope" data-scope-placeholder="e.g. just me · team of 8 · family of 5"{% if prefill and prefill.service == 'Portraits' %} selected{% endif %}>Portraits &amp; Lifestyle</option>
-          <option value="Food &amp; Beverage" data-scope-label="Dishes / setups" data-scope-placeholder="e.g. 8–10 dishes · 3 drink setups"{% if prefill and prefill.service == 'Food & Beverage' %} selected{% endif %}>Food &amp; Beverage — photo / video</option>
-          <option value="Brand Partner (monthly retainer)" data-scope-label="Dishes / setups" data-scope-placeholder="e.g. 8–10 dishes · 3 drink setups"{% if prefill and prefill.service == 'Brand Partner (monthly retainer)' %} selected{% endif %}>Brand Partner (monthly retainer)</option>
+      <label for="contact-name">Name
+        <input id="contact-name" type="text" name="name" required autocomplete="name"
+               value="{{ pf.name if pf.name is defined else '' }}"></label>
+      <label for="contact-email">Email
+        <input id="contact-email" type="email" name="email" required autocomplete="email"
+               value="{{ pf.email if pf.email is defined else '' }}"></label>
+      <label for="contact-phone">Phone <span class="muted">(optional)</span>
+        <input id="contact-phone" type="tel" name="phone" autocomplete="tel"
+               value="{{ pf.phone if pf.phone is defined else '' }}"></label>
+      <label for="contact-business">Business
+        <input id="contact-business" type="text" name="business" autocomplete="organization"
+               value="{{ pf.business if pf.business is defined else '' }}"
+               placeholder="Listing / brokerage, restaurant, or brand name"></label>
+      <label for="contact-service">Project type
+        <select id="contact-service" name="service">
+          <option value=""
+                  data-scope-label="Project scope"
+                  data-scope-placeholder="e.g. property size, team size, or number of setups">
+            Not sure yet — help me choose
+          </option>
+          {% for opt in service_options %}
+          <option value="{{ opt.value }}"
+                  data-scope-label="{{ opt.scope_label }}"
+                  data-scope-placeholder="{{ opt.scope_placeholder }}"
+                  {% if pf.service == opt.value %} selected{% endif %}>{{ opt.label }}</option>
+          {% endfor %}
         </select></label>
-      <label>Target date <input type="date" name="shoot_date"
-             value="{{ prefill.shoot_date if prefill else '' }}"></label>
-      <label><span data-scope-label>{{ scope_label }}</span>
-        <input type="text" name="dish_count" data-scope-input
-             value="{{ prefill.dish_count if prefill else '' }}"
-             placeholder="{{ scope_placeholder }}"></label>
-      <label>Usage / licensing
-        <select name="usage">
-          <option value="">Standard — web &amp; social</option>
-          <option value="Extended — advertising / paid media"{% if prefill and prefill.usage == 'Extended — advertising / paid media' %} selected{% endif %}>Extended — advertising / paid media</option>
-          <option value="Exclusive / talent release"{% if prefill and prefill.usage == 'Exclusive / talent release' %} selected{% endif %}>Exclusive / talent release</option>
-          <option value="Not sure"{% if prefill and prefill.usage == 'Not sure' %} selected{% endif %}>Not sure</option>
-        </select></label>
-      <label>Budget range
-        <select name="budget">
-          <option value="">Prefer to discuss</option>
-          <option value="Under $1,000"{% if prefill and prefill.budget == 'Under $1,000' %} selected{% endif %}>Under $1,000</option>
-          <option value="$1,000–$2,500"{% if prefill and prefill.budget == '$1,000–$2,500' %} selected{% endif %}>$1,000–$2,500</option>
-          <option value="$2,500–$5,000"{% if prefill and prefill.budget == '$2,500–$5,000' %} selected{% endif %}>$2,500–$5,000</option>
-          <option value="$5,000+"{% if prefill and prefill.budget == '$5,000+' %} selected{% endif %}>$5,000+</option>
-        </select></label>
-      <label>Message <textarea name="message" rows="6" required
-             placeholder="What are we shooting?">{{ prefill.message if prefill else '' }}</textarea></label>
+      <label for="contact-message">Message
+        <textarea id="contact-message" name="message" rows="5" required
+                  placeholder="What are we shooting?">{{ pf.message if pf.message is defined else '' }}</textarea></label>
+
+      <details class="contact-more"{% if open_more %} open{% endif %}>
+        <summary>Project details <span class="muted">(optional — helps me quote faster)</span></summary>
+        <div class="contact-more-body">
+          <label for="contact-shoot-date">Target date
+            <input id="contact-shoot-date" type="date" name="shoot_date"
+                   value="{{ pf.shoot_date if pf.shoot_date is defined else '' }}"></label>
+          <label for="contact-scope"><span data-scope-label>{{ scope_label }}</span>
+            <input id="contact-scope" type="text" name="dish_count" data-scope-input
+                   value="{{ pf.dish_count if pf.dish_count is defined else '' }}"
+                   placeholder="{{ scope_placeholder }}"></label>
+          <label for="contact-usage">Usage / licensing
+            <select id="contact-usage" name="usage">
+              <option value="">Standard — web &amp; social</option>
+              <option value="Extended — advertising / paid media"{% if pf.usage == 'Extended — advertising / paid media' %} selected{% endif %}>Extended — advertising / paid media</option>
+              <option value="Exclusive / talent release"{% if pf.usage == 'Exclusive / talent release' %} selected{% endif %}>Exclusive / talent release</option>
+              <option value="Not sure"{% if pf.usage == 'Not sure' %} selected{% endif %}>Not sure</option>
+            </select></label>
+          <label for="contact-budget">Budget range
+            <select id="contact-budget" name="budget">
+              <option value="">Prefer to discuss</option>
+              <option value="Under $1,000"{% if pf.budget == 'Under $1,000' %} selected{% endif %}>Under $1,000</option>
+              <option value="$1,000–$2,500"{% if pf.budget == '$1,000–$2,500' %} selected{% endif %}>$1,000–$2,500</option>
+              <option value="$2,500–$5,000"{% if pf.budget == '$2,500–$5,000' %} selected{% endif %}>$2,500–$5,000</option>
+              <option value="$5,000+"{% if pf.budget == '$5,000+' %} selected{% endif %}>$5,000+</option>
+            </select></label>
+        </div>
+      </details>
+
       <input type="text" name="website" class="hp-field" tabindex="-1"
              autocomplete="off" aria-hidden="true">
-      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      {% if error %}
+      <p class="error" role="alert" aria-live="polite" id="contact-error">{{ error }}</p>
+      {% endif %}
       <button type="submit">Send inquiry &rarr;</button>
     </form>
     {% endif %}

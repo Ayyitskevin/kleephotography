@@ -336,6 +336,76 @@ SERVICES = [
     },
 ]
 
+# Project-type options on /contact — single source for labels, progressive-
+# disclosure scope copy, and specialty deep links. Values match SERVICES
+# contact_service strings so spokes, pricing board, and the inquiry form stay
+# aligned without hardcoding a fourth option list in the template.
+_CONTACT_SCOPE = {
+    "Real Estate": (
+        "Listing / property scope",
+        "e.g. 3,200 sq ft · 4 bed 3 bath",
+        "Real Estate — photo / video",
+        "real-estate",
+    ),
+    "Portraits": (
+        "Subject / team scope",
+        "e.g. just me · team of 8 · family of 5",
+        "Portraits & Lifestyle",
+        "portraits",
+    ),
+    "Food & Beverage": (
+        "Dishes / setups",
+        "e.g. 8–10 dishes · 3 drink setups",
+        "Food & Beverage — photo / video",
+        "food-beverage",
+    ),
+    "Brand Partner (monthly retainer)": (
+        "Dishes / setups",
+        "e.g. 8–10 dishes · 3 drink setups",
+        "Brand Partner (monthly retainer)",
+        "food-beverage",
+    ),
+}
+
+
+def contact_service_options() -> list[dict]:
+    """Ordered unique Project type options for the public inquiry form."""
+    seen: set[str] = set()
+    options: list[dict] = []
+    for group in SERVICES:
+        value = group["contact_service"]
+        if value in seen:
+            continue
+        seen.add(value)
+        scope_label, scope_placeholder, label, specialty_slug = _CONTACT_SCOPE.get(
+            value,
+            (
+                "Project scope",
+                "e.g. property size, team size, or number of setups",
+                value,
+                "",
+            ),
+        )
+        options.append(
+            {
+                "value": value,
+                "label": label,
+                "scope_label": scope_label,
+                "scope_placeholder": scope_placeholder,
+                "specialty_slug": specialty_slug,
+            }
+        )
+    return options
+
+
+def contact_scope_for(service: str) -> tuple[str, str]:
+    """Label + placeholder for the progressive scope field on a Project type."""
+    meta = _CONTACT_SCOPE.get(service.strip())
+    if meta:
+        return meta[0], meta[1]
+    return "Project scope", "e.g. property size, team size, or number of setups"
+
+
 # Page-specific FAQs — prototype copy from Contact.dc.html and Book.dc.html.
 CONTACT_FAQS = [
     (

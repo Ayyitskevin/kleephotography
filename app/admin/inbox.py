@@ -10,6 +10,7 @@ composer that sends by email OR text · contact details + the real convert actio
 inbound bubble from the inquiry's first message. No fabricated data.
 """
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -86,6 +87,7 @@ def _stage(inq) -> dict:
 def _thread_row(inq, active_id):
     av = _AVATARS[inq["id"] % len(_AVATARS)]
     msg = (inq["message"] or "").strip().replace("\n", " ")
+    service = (inq["service"] or "").strip()
     return {
         "id": inq["id"],
         "name": inq["business"] or inq["name"] or "Unknown",
@@ -94,6 +96,7 @@ def _thread_row(inq, active_id):
         "av_color": av[1],
         "time": inq["created_at"],
         "preview": msg or "(no message)",
+        "service": service or None,
         "active": inq["id"] == active_id,
         "unread": not inq["emailed"] and not inq["converted_at"] and not inq["dismissed_at"],
         **_channel(inq),
@@ -122,10 +125,129 @@ def _detail_rows(inq) -> list[dict]:
         }
     )
     if inq["service"]:
-        rows.append({"k": "Interested in", "v": inq["service"]})
+        rows.append({"k": "Specialty", "v": inq["service"]})
     if inq["shoot_date"]:
         rows.append({"k": "Shoot date", "v": inq["shoot_date"]})
     return rows
+
+
+def _notion_job_for(inquiry_id: int) -> dict | None:
+    """Latest notion_sync_inquiry job for this lead, if any (failed first)."""
+    rows = db.all_(
+        """SELECT id, status, error, payload, updated_at FROM jobs
+           WHERE kind='notion_sync_inquiry'
+           ORDER BY CASE status WHEN 'failed' THEN 0 WHEN 'queued' THEN 1
+                    WHEN 'running' THEN 2 ELSE 3 END, id DESC
+           LIMIT 80"""
+    )
+    for row in rows:
+        try:
+            payload = json.loads(row["payload"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if payload.get("inquiry_id") == inquiry_id:
+            return dict(row)
+    return None
+
+
+def _integration_health(inq) -> dict:
+    """Owner-facing integration signals — email notify, Notion mirror, recovery.
+
+    Computed from real columns/jobs only. Does not invent green checks: dormant
+    Notion config and failed mirror jobs surface as explicit guidance with a
+    link to the existing Jobs recovery page.
+    """
+    notion_job = _notion_job_for(inq["id"])
+    page_id = None
+    try:
+        page_id = inq["notion_page_id"]
+    except (KeyError, IndexError):
+        page_id = None
+
+    if inq["emailed"]:
+        email = {
+            "label": "Owner email",
+            "state": "ok",
+            "detail": "Notification sent (or you replied from Inbox).",
+        }
+    elif not mailer.configured():
+        email = {
+            "label": "Owner email",
+            "state": "warn",
+            "detail": "Mailer not configured — lead is stored; reply manually.",
+        }
+    else:
+        email = {
+            "label": "Owner email",
+            "state": "warn",
+            "detail": "Not marked emailed — check SMTP logs or reply here.",
+        }
+
+    armed = bool(config.NOTION_TOKEN and config.NOTION_LEADS_DB)
+    if page_id:
+        notion = {
+            "label": "Notion lead",
+            "state": "ok",
+            "detail": f"Mirrored (page {page_id[:12]}…)"
+            if len(page_id) > 12
+            else f"Mirrored ({page_id})",
+            "jobs_href": None,
+            "retry_job_id": None,
+        }
+    elif notion_job and notion_job["status"] == "failed":
+        err = (notion_job.get("error") or "unknown error")[:120]
+        notion = {
+            "label": "Notion lead",
+            "state": "bad",
+            "detail": f"Mirror failed — {err}",
+            "jobs_href": "/admin/jobs",
+            "retry_job_id": notion_job["id"],
+        }
+    elif notion_job and notion_job["status"] in ("queued", "running"):
+        notion = {
+            "label": "Notion lead",
+            "state": "warn",
+            "detail": f"Mirror {notion_job['status']} — will retry automatically.",
+            "jobs_href": "/admin/jobs",
+            "retry_job_id": None,
+        }
+    elif not armed:
+        notion = {
+            "label": "Notion lead",
+            "state": "muted",
+            "detail": "Not armed (MISE_NOTION_LEADS_DB unset) — lead lives in Mise only.",
+            "jobs_href": None,
+            "retry_job_id": None,
+        }
+    else:
+        notion = {
+            "label": "Notion lead",
+            "state": "warn",
+            "detail": "Not mirrored yet — check Jobs if this stays empty.",
+            "jobs_href": "/admin/jobs",
+            "retry_job_id": None,
+        }
+
+    if inq["converted_at"]:
+        next_action = "Open the converted client/project/proposal, or undo conversion."
+    elif inq["dismissed_at"]:
+        next_action = "Restore to pipeline if this lead is still live."
+    elif notion["state"] == "bad":
+        next_action = "Reply to the lead, then retry the failed Notion job on Jobs."
+    elif not inq["emailed"] and inq["email"]:
+        next_action = "Reply from this thread (or your mail client), then convert or dismiss."
+    else:
+        next_action = "Convert to quote/client, or dismiss if not a fit."
+
+    return {
+        "email": email,
+        "notion": notion,
+        "next_action": next_action,
+        "specialty": (inq["service"] or "").strip() or None,
+        "source": {"booking": "Booking form", "sms": "Text message", "call": "Phone call"}.get(
+            inq["kind"], "Inquiry form"
+        ),
+    }
 
 
 def _thread(inq) -> list[dict]:
@@ -200,6 +322,7 @@ def _active_ctx(inq) -> dict:
         "sub": (inq["email"] or inq["phone"] or "")
         + (" · booking request" if inq["kind"] == "booking" else ""),
         "details": _detail_rows(inq),
+        "health": _integration_health(inq),
         **_channel(inq),
         **_stage(inq),
     }
