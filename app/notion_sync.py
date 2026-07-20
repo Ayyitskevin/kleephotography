@@ -421,10 +421,12 @@ def sync_inquiry(inquiry_id: int, dry_run: bool = False) -> dict | None:
 
 
 def relink_notion_orphan(inquiry_id: int) -> bool:
-    """Promote a recorded orphan page id to the system-of-record stamp.
+    """Resolve an open create-race orphan for the operator (never deletes remote).
 
-    Operator-safe: only copies the stored orphan id onto notion_page_id when the
-    stamp is still NULL. Never calls Notion delete.
+    - Stamp NULL + open orphan → promote orphan id to notion_page_id (relinked).
+    - Stamp already set + open orphan → keep stamp, mark orphan dismissed (True).
+      This is the common race outcome; callers must 303 so Inbox recovery works.
+    - No open orphan → False (nothing to do).
     """
     with db.tx() as con:
         row = con.execute(
@@ -434,19 +436,23 @@ def relink_notion_orphan(inquiry_id: int) -> bool:
         ).fetchone()
         if not row or not row["notion_orphan_page_id"]:
             return False
+        status = row["notion_orphan_status"] or "open"
+        if status != "open":
+            return False
         if row["notion_page_id"]:
-            # Already stamped — mark orphan dismissed so UI clears.
-            con.execute(
+            # Winner stamp already present — clear open orphan for the operator.
+            cur = con.execute(
                 """UPDATE inquiries SET notion_orphan_status='dismissed'
                     WHERE id=? AND notion_orphan_status='open'""",
                 (inquiry_id,),
             )
-            return False
+            return cur.rowcount == 1
         cur = con.execute(
             """UPDATE inquiries
                   SET notion_page_id=notion_orphan_page_id,
                       notion_orphan_status='relinked'
-                WHERE id=? AND notion_page_id IS NULL AND notion_orphan_page_id IS NOT NULL""",
+                WHERE id=? AND notion_page_id IS NULL AND notion_orphan_page_id IS NOT NULL
+                  AND COALESCE(notion_orphan_status, 'open')='open'""",
             (inquiry_id,),
         )
         return cur.rowcount == 1

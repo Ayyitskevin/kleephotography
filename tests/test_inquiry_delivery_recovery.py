@@ -225,9 +225,15 @@ def test_notion_create_race_records_orphan_and_relink(monkeypatch):
     assert row["notion_orphan_page_id"] == "orphan-page-1"
     assert row["notion_orphan_status"] == "open"
 
-    # Relink only when stamp null — here stamp exists, so dismiss path:
+    # Common race: stamp already won — relink keeps stamp and clears open orphan.
+    assert notion_sync.relink_notion_orphan(iid) is True
+    row = db.one("SELECT * FROM inquiries WHERE id=?", (iid,))
+    assert row["notion_page_id"] == "winner-page"
+    assert row["notion_orphan_status"] == "dismissed"
+    # Second call has nothing open left.
     assert notion_sync.relink_notion_orphan(iid) is False
-    # Force open orphan with null stamp for relink path
+
+    # Null stamp + open orphan → promote orphan id to stamp.
     db.run(
         """UPDATE inquiries SET notion_page_id=NULL, notion_orphan_status='open',
              notion_orphan_page_id='orphan-page-1' WHERE id=?""",
@@ -236,6 +242,78 @@ def test_notion_create_race_records_orphan_and_relink(monkeypatch):
     assert notion_sync.relink_notion_orphan(iid) is True
     row = db.one("SELECT * FROM inquiries WHERE id=?", (iid,))
     assert row["notion_page_id"] == "orphan-page-1"
+    assert row["notion_orphan_status"] == "relinked"
+
+
+def test_inbox_stamp_plus_orphan_relink_route_303(client):
+    """HTTP regression: winner stamp + open orphan → POST relink must 303 (not 400)."""
+    iid = _insert_lead("stamp-orphan-route@example.com")
+    db.run(
+        """UPDATE inquiries
+              SET notion_page_id='winner-page',
+                  notion_orphan_page_id='orphan-page-x',
+                  notion_orphan_status='open',
+                  notion_orphan_recorded_at=datetime('now')
+            WHERE id=?""",
+        (iid,),
+    )
+    r = client.post("/admin/login", data={"password": "test-pw"}, follow_redirects=False)
+    assert r.status_code == 303
+
+    page = client.get(f"/admin/inbox?sel={iid}")
+    assert page.status_code == 200
+    # Stamp kept → Dismiss only; Relink form must not be offered.
+    assert "Dismiss orphan" in page.text
+    assert f'action="/admin/inbox/{iid}/notion-orphan/dismiss"' in page.text
+    assert "Relink orphan page" not in page.text
+    assert f'action="/admin/inbox/{iid}/notion-orphan/relink"' not in page.text
+    assert "stamp already kept" in page.text.lower() or "dismiss" in page.text.lower()
+
+    # Even if operator POSTs relink (bookmark/old UI), recovery must not 400.
+    r = client.post(
+        f"/admin/inbox/{iid}/notion-orphan/relink",
+        data={"tab": "all"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303, f"expected 303 got {r.status_code}: {r.text[:200]}"
+    assert "/admin/inbox" in r.headers.get("location", "")
+    row = db.one(
+        "SELECT notion_page_id, notion_orphan_status FROM inquiries WHERE id=?",
+        (iid,),
+    )
+    assert row["notion_page_id"] == "winner-page"
+    assert row["notion_orphan_status"] == "dismissed"
+
+
+def test_inbox_null_stamp_orphan_relink_route_303(client):
+    """HTTP: null stamp + open orphan → relink promotes page and redirects 303."""
+    iid = _insert_lead("null-stamp-relink@example.com")
+    db.run(
+        """UPDATE inquiries
+              SET notion_page_id=NULL,
+                  notion_orphan_page_id='orphan-adopt-me',
+                  notion_orphan_status='open'
+            WHERE id=?""",
+        (iid,),
+    )
+    r = client.post("/admin/login", data={"password": "test-pw"}, follow_redirects=False)
+    assert r.status_code == 303
+    page = client.get(f"/admin/inbox?sel={iid}")
+    assert page.status_code == 200
+    assert "Relink orphan page" in page.text
+    assert f'action="/admin/inbox/{iid}/notion-orphan/relink"' in page.text
+
+    r = client.post(
+        f"/admin/inbox/{iid}/notion-orphan/relink",
+        data={"tab": "all"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    row = db.one(
+        "SELECT notion_page_id, notion_orphan_status FROM inquiries WHERE id=?",
+        (iid,),
+    )
+    assert row["notion_page_id"] == "orphan-adopt-me"
     assert row["notion_orphan_status"] == "relinked"
 
 
