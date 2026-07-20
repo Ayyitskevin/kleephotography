@@ -170,6 +170,15 @@ def sync_booking(booking_id: int) -> None:
             bool(config.NOTION_BOOKINGS_DB),
         )
         return
+    # Re-read immediately before create/patch so concurrent confirm/cancel
+    # jobs cannot both decide to create when the stamp is still null.
+    b = db.one(
+        """SELECT b.*, e.name AS event_name FROM bookings b
+                  JOIN event_types e ON e.id=b.event_type_id WHERE b.id=?""",
+        (booking_id,),
+    )
+    if not b:
+        raise ValueError(f"booking {booking_id} not found")
     status = "Cancelled" if b["status"] == "cancelled" else "Confirmed"
     start_iso = b["start_utc"].replace(" ", "T") + "Z"
     end_iso = b["end_utc"].replace(" ", "T") + "Z"
@@ -187,8 +196,22 @@ def sync_booking(booking_id: int) -> None:
         log.info("notion booking %s patched (%s)", booking_id, status)
     else:
         page_id = _create_page(config.NOTION_BOOKINGS_DB, props)
-        db.run("UPDATE bookings SET notion_page_id=? WHERE id=?", (page_id, booking_id))
-        log.info("notion booking %s mirrored as page %s", booking_id, page_id)
+        with db.tx() as con:
+            cur = con.execute(
+                "UPDATE bookings SET notion_page_id=? WHERE id=? AND notion_page_id IS NULL",
+                (page_id, booking_id),
+            )
+            stamped = cur.rowcount == 1
+        if stamped:
+            log.info("notion booking %s mirrored as page %s", booking_id, page_id)
+        else:
+            kept = db.one("SELECT notion_page_id FROM bookings WHERE id=?", (booking_id,))
+            log.warning(
+                "notion booking %s create raced; remote page %s not stamped (kept %s)",
+                booking_id,
+                page_id,
+                kept["notion_page_id"] if kept else None,
+            )
 
 
 def sync_session_for_booking(booking_id: int) -> None:
@@ -353,11 +376,35 @@ def sync_inquiry(inquiry_id: int, dry_run: bool = False) -> dict | None:
             bool(config.NOTION_LEADS_DB),
         )
         return None
+    # Re-read immediately before the create/patch branch so a concurrent job
+    # that already stamped page id wins — prevents double-create when intake
+    # and triage both enqueue notion_sync_inquiry for the same row.
+    q = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
+    if not q:
+        raise ValueError(f"inquiry {inquiry_id} not found")
+    props = _inquiry_props(q)
     if q["notion_page_id"]:
         _patch_page(q["notion_page_id"], {"Status": props["Status"]})
         log.info("notion lead %s status patched (%s)", inquiry_id, _inquiry_status(q))
     else:
         page_id = _create_page(config.NOTION_LEADS_DB, props)
-        db.run("UPDATE inquiries SET notion_page_id=? WHERE id=?", (page_id, inquiry_id))
-        log.info("notion lead %s mirrored as page %s", inquiry_id, page_id)
+        # Conditional stamp: if another worker raced and stamped first, keep
+        # their page id (system of record) and log the orphan remote page for
+        # operator cleanup rather than clobbering the stamp.
+        with db.tx() as con:
+            cur = con.execute(
+                "UPDATE inquiries SET notion_page_id=? WHERE id=? AND notion_page_id IS NULL",
+                (page_id, inquiry_id),
+            )
+            stamped = cur.rowcount == 1
+        if stamped:
+            log.info("notion lead %s mirrored as page %s", inquiry_id, page_id)
+        else:
+            kept = db.one("SELECT notion_page_id FROM inquiries WHERE id=?", (inquiry_id,))
+            log.warning(
+                "notion lead %s create raced; remote page %s not stamped (kept %s)",
+                inquiry_id,
+                page_id,
+                kept["notion_page_id"] if kept else None,
+            )
     return None
