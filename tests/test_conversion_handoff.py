@@ -187,7 +187,8 @@ def test_inbox_surfaces_specialty_source_and_integration_health(admin_client, mo
         assert 'data-testid="lead-health"' in body
         assert "Specialty" in body
         assert "Inquiry form" in body or "Source" in body
-        assert "Not marked emailed" in body or "Owner email" in body
+        assert "Owner email" in body
+        assert "not delivered" in body.lower() or "Not marked" in body or "Owner email" in body
         assert "Mirror failed" in body
         assert "notion api down" in body
         assert f'action="/admin/jobs/{job_id}/retry"' in body
@@ -217,12 +218,14 @@ def test_integration_health_dormant_notion_is_explicit(monkeypatch):
         health = inbox_mod._integration_health(row)
         assert health["specialty"] == "Portraits"
         assert health["source"] == "Inquiry form"
-        assert health["email"]["state"] == "warn"
+        assert health["email"]["state"] == "bad"
         assert "Mailer not configured" in health["email"]["detail"]
         assert health["notion"]["state"] == "muted"
         assert "Not armed" in health["notion"]["detail"]
         assert health["notion"]["retry_job_id"] is None
-        assert "Reply" in health["next_action"] or "Convert" in health["next_action"]
+        assert (
+            "reply" in health["next_action"].lower() or "convert" in health["next_action"].lower()
+        )
     finally:
         db.run("DELETE FROM inquiries WHERE id=?", (iid,))
 
