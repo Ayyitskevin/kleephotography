@@ -43,7 +43,7 @@ def admin_client(client):
 
 def _wipe_lead(email: str) -> None:
     """Session DB is shared — leave zero lead/job/throttle residue."""
-    db.run("DELETE FROM jobs WHERE kind='notion_sync_inquiry'")
+    db.run("DELETE FROM jobs WHERE kind IN ('notion_sync_inquiry','inquiry_owner_email')")
     db.run("DELETE FROM inquiries WHERE email=?", (email,))
     db.run(
         "DELETE FROM pin_attempts WHERE gallery_id=?",
@@ -61,7 +61,9 @@ def _last_inquiry_job():
 def test_contact_post_persists_lead_enqueues_job_and_thanks(client, monkeypatch):
     email = "reliability-wire@example.com"
     _wipe_lead(email)
+    monkeypatch.setattr(jobs, "_pool", None)
     monkeypatch.setattr(mailer, "configured", lambda: True)
+    monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
     sent = []
     monkeypatch.setattr(
         mailer, "send", lambda to, subject, body, reply_to="": sent.append((to, subject))
@@ -85,7 +87,15 @@ def test_contact_post_persists_lead_enqueues_job_and_thanks(client, monkeypatch)
         assert inq["name"] == "Rel Wire"
         assert inq["business"] == "Cafe Rel"
         assert "menu shoot" in inq["message"]
+        # Owner notify is a durable job; visitor ack may already be in `sent`.
+        assert inq["emailed"] == 0
+        oe = db.one("SELECT * FROM jobs WHERE kind='inquiry_owner_email' ORDER BY id DESC LIMIT 1")
+        assert oe is not None
+        assert json.loads(oe["payload"]) == {"inquiry_id": inq["id"]}
+        jobs._execute(oe["id"])
+        inq = db.one("SELECT * FROM inquiries WHERE id=?", (inq["id"],))
         assert inq["emailed"] == 1
+        assert ("kevin@example.com", "New inquiry — Rel Wire") in sent
 
         job = _last_inquiry_job()
         assert job is not None

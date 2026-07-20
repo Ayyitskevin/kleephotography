@@ -15,7 +15,7 @@ import logging
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, mailer, security, sms
+from .. import config, db, inquiry_notify, mailer, notion_sync, security, sms
 from ..render import templates
 
 log = logging.getLogger("mise.admin.inbox")
@@ -162,32 +162,7 @@ def _integration_health(inq) -> dict:
     except (KeyError, IndexError):
         page_id = None
 
-    if inq["emailed"]:
-        email = {
-            "label": "Owner email",
-            "state": "ok",
-            "detail": "Notification sent (or you replied from Inbox).",
-        }
-    elif not mailer.configured():
-        email = {
-            "label": "Owner email",
-            "state": "bad",
-            "detail": (
-                "Mailer not configured — lead is stored; owner email was not sent. "
-                "Reply from Inbox to contact the lead."
-            ),
-        }
-    else:
-        # mailed=0 with a configured mailer means the owner notify failed (or never
-        # ran) — ops_alert also fires on SMTP failure; recovery is reply here.
-        email = {
-            "label": "Owner email",
-            "state": "bad",
-            "detail": (
-                "Owner notification not delivered — lead is stored. "
-                "Reply from this thread (or open your mail client), then convert or dismiss."
-            ),
-        }
+    email = inquiry_notify.delivery_view(inq)
 
     armed = bool(config.NOTION_TOKEN and config.NOTION_LEADS_DB)
     if page_id:
@@ -234,14 +209,37 @@ def _integration_health(inq) -> dict:
             "retry_job_id": None,
         }
 
+    orphan_open = bool(
+        inq["notion_orphan_page_id"] if "notion_orphan_page_id" in inq.keys() else None
+    ) and (
+        (inq["notion_orphan_status"] if "notion_orphan_status" in inq.keys() else "open")
+        in (None, "open")
+    )
+    if orphan_open:
+        notion = {
+            **notion,
+            "orphan": True,
+            "orphan_status": "open",
+            "detail": (
+                notion.get("detail", "")
+                + " · Create-race orphan recorded — relink to adopt the remote page "
+                "or dismiss after manual Notion cleanup (never auto-deleted)."
+            ).strip(" ·"),
+            "state": "bad" if notion.get("state") == "ok" else notion.get("state", "warn"),
+        }
+    else:
+        notion = {**notion, "orphan": False, "orphan_status": None}
+
     if inq["converted_at"]:
         next_action = "Open the converted client/project/proposal, or undo conversion."
     elif inq["dismissed_at"]:
         next_action = "Restore to pipeline if this lead is still live."
-    elif email["state"] == "bad" and not inq["emailed"]:
+    elif email.get("retryable") and email.get("state") == "bad":
         next_action = (
-            "Owner email failed — reply from Inbox now (lead is durable), then convert or dismiss."
+            "Retry owner email from Inbox (idempotent) or reply manually — lead is durable."
         )
+    elif orphan_open:
+        next_action = "Relink Notion orphan on this lead or dismiss after manual cleanup."
     elif notion["state"] == "bad":
         next_action = "Reply to the lead, then retry the failed Notion job on Jobs."
     elif not inq["emailed"] and inq["email"]:
@@ -444,9 +442,59 @@ async def reply(
                   VALUES (?, 'out', 'email', ?)""",
             (inquiry_id, message),
         )
-        db.run("UPDATE inquiries SET emailed=1 WHERE id=?", (inquiry_id,))
+        db.run(
+            """UPDATE inquiries
+                  SET emailed=1,
+                      owner_email_delivered_at=COALESCE(owner_email_delivered_at, datetime('now')),
+                      owner_email_status='delivered',
+                      owner_email_failure_category=NULL
+                WHERE id=?""",
+            (inquiry_id,),
+        )
         log.info("inbox reply sent for inquiry %s", inquiry_id)
 
+    if tab not in _TABS:
+        tab = "all"
+    return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
+
+
+@router.post("/{inquiry_id}/retry-owner-email")
+async def retry_owner_email(inquiry_id: int, tab: str = Form("all")):
+    """Re-queue idempotent owner notification. Safe under concurrency."""
+    inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
+    if not inq:
+        raise HTTPException(status_code=404)
+    if inq["owner_email_delivered_at"] if "owner_email_delivered_at" in inq.keys() else None:
+        return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
+    # Clear failed/in_flight so the claim path can run again.
+    db.run(
+        """UPDATE inquiries SET owner_email_status='failed'
+            WHERE id=? AND owner_email_delivered_at IS NULL""",
+        (inquiry_id,),
+    )
+    inquiry_notify.enqueue_owner_email(inquiry_id)
+    if tab not in _TABS:
+        tab = "all"
+    return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
+
+
+@router.post("/{inquiry_id}/notion-orphan/relink")
+async def notion_orphan_relink(inquiry_id: int, tab: str = Form("all")):
+    if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
+        raise HTTPException(status_code=404)
+    if not notion_sync.relink_notion_orphan(inquiry_id):
+        raise HTTPException(status_code=400, detail="no open orphan to relink")
+    if tab not in _TABS:
+        tab = "all"
+    return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
+
+
+@router.post("/{inquiry_id}/notion-orphan/dismiss")
+async def notion_orphan_dismiss(inquiry_id: int, tab: str = Form("all")):
+    if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
+        raise HTTPException(status_code=404)
+    if not notion_sync.dismiss_notion_orphan(inquiry_id):
+        raise HTTPException(status_code=400, detail="no open orphan to dismiss")
     if tab not in _TABS:
         tab = "all"
     return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)

@@ -40,7 +40,7 @@ def admin_client(client):
 
 
 def _wipe(email: str = VISITOR_EMAIL) -> None:
-    db.run("DELETE FROM jobs WHERE kind='notion_sync_inquiry'")
+    db.run("DELETE FROM jobs WHERE kind IN ('notion_sync_inquiry','inquiry_owner_email')")
     db.run("DELETE FROM inquiries WHERE email=?", (email,))
     db.run("DELETE FROM pin_attempts WHERE gallery_id=?", (security.INQUIRY_BUCKET_CONTACT,))
 
@@ -65,7 +65,9 @@ def test_contact_smtp_failure_stores_lead_enqueues_job_and_alerts(client, monkey
     _wipe()
     sent: list[str] = []
     _enable_ops(monkeypatch, sent)
-    monkeypatch.setattr(jobs, "_pool", None)  # durable enqueue only — no live Notion
+    # Durable enqueue only — freeze workers so we control when the alert fires.
+    monkeypatch.setattr(jobs, "start", lambda: None)
+    monkeypatch.setattr(jobs, "_pool", None)
     monkeypatch.setattr(mailer, "configured", lambda: True)
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
 
@@ -91,8 +93,21 @@ def test_contact_smtp_failure_stores_lead_enqueues_job_and_alerts(client, monkey
         job = db.one("SELECT * FROM jobs WHERE kind='notion_sync_inquiry' ORDER BY id DESC LIMIT 1")
         assert job is not None
         assert f'"inquiry_id": {inq["id"]}' in job["payload"]
-
-        assert len(sent) == 1
+        oe = db.one(
+            "SELECT id, status FROM jobs WHERE kind='inquiry_owner_email' "
+            "AND payload LIKE ? ORDER BY id DESC LIMIT 1",
+            (f'%"inquiry_id": {inq["id"]}%',),
+        )
+        assert oe is not None
+        # Alert fires when the owner-email job fails (not on the request path).
+        assert sent == []
+        if oe["status"] != "queued":
+            db.run(
+                "UPDATE jobs SET status='queued', attempts=0, error=NULL WHERE id=?",
+                (oe["id"],),
+            )
+        jobs._execute(oe["id"])
+        assert len(sent) >= 1
         body = sent[0]
         assert f"Inquiry #{inq['id']}" in body
         assert "smtp_error" in body
@@ -102,6 +117,13 @@ def test_contact_smtp_failure_stores_lead_enqueues_job_and_alerts(client, monkey
         assert VISITOR_MESSAGE not in body
         assert "Cafe Private" not in body
         assert "smtp unavailable" not in body
+        assert (
+            db.one(
+                "SELECT owner_email_failure_category FROM inquiries WHERE id=?",
+                (inq["id"],),
+            )["owner_email_failure_category"]
+            == "smtp_error"
+        )
     finally:
         _wipe()
 
@@ -150,7 +172,13 @@ def test_successful_owner_email_skips_ops_alert(client, monkeypatch):
         )
         assert r.status_code == 200
         inq = db.one("SELECT * FROM inquiries WHERE email=?", ("ok-visitor@example.com",))
+        assert inq["emailed"] == 0  # stamped only after job delivery
+        oe = db.one("SELECT id FROM jobs WHERE kind='inquiry_owner_email' ORDER BY id DESC LIMIT 1")
+        assert oe
+        jobs._execute(oe["id"])
+        inq = db.one("SELECT * FROM inquiries WHERE id=?", (inq["id"],))
         assert inq["emailed"] == 1
+        assert inq["owner_email_delivered_at"]
         assert sent == []
     finally:
         _wipe("ok-visitor@example.com")
@@ -159,8 +187,9 @@ def test_successful_owner_email_skips_ops_alert(client, monkeypatch):
 def test_inbox_surfaces_email_failure_and_recovery_path(admin_client, monkeypatch):
     monkeypatch.setattr(mailer, "configured", lambda: True)
     iid = db.run(
-        """INSERT INTO inquiries (name, email, business, message, service, emailed)
-           VALUES (?,?,?,?,?,0)""",
+        """INSERT INTO inquiries (name, email, business, message, service, emailed,
+               owner_email_status, owner_email_failure_category, owner_email_attempts)
+           VALUES (?,?,?,?,?,0,'failed','smtp_error',1)""",
         ("Alex", "alex-smtp@example.com", "Alex Co", "Need stills", "Real Estate"),
     )
     try:
@@ -168,7 +197,9 @@ def test_inbox_surfaces_email_failure_and_recovery_path(admin_client, monkeypatc
         assert page.status_code == 200
         assert "Owner notification not delivered" in page.text
         assert "lead is stored" in page.text.lower() or "Lead is stored" in page.text
-        assert "Owner email failed" in page.text or "Reply from Inbox" in page.text
+        assert "Retry owner email" in page.text
+        assert "retry-owner-email" in page.text
+        assert "lead is durable" in page.text.lower() or "smtp_error" in page.text
 
         # Recovery: mark emailed (as Inbox reply does) — health flips ok.
         db.run("UPDATE inquiries SET emailed=1 WHERE id=?", (iid,))
@@ -201,9 +232,20 @@ def test_contact_mailer_off_still_stores_and_signals(client, monkeypatch):
             "SELECT payload FROM jobs WHERE kind='notion_sync_inquiry' ORDER BY id DESC LIMIT 1"
         )
         assert f'"inquiry_id": {inq["id"]}' in job["payload"]
+        oe = db.one("SELECT id FROM jobs WHERE kind='inquiry_owner_email' ORDER BY id DESC LIMIT 1")
+        assert oe
+        assert sent == []  # alert only when job attempts delivery
+        jobs._execute(oe["id"])
         assert len(sent) == 1
         assert "mailer not configured" in sent[0].lower()
         assert VISITOR_MESSAGE not in sent[0]
         assert "unconfigured@example.com" not in sent[0]
+        assert (
+            db.one(
+                "SELECT owner_email_failure_category FROM inquiries WHERE id=?",
+                (inq["id"],),
+            )["owner_email_failure_category"]
+            == "mailer_not_configured"
+        )
     finally:
         _wipe("unconfigured@example.com")

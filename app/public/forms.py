@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from .. import alerts, config, db, jobs, mailer, security
+from .. import db, inquiry_notify, jobs, security
 from ..render import templates
 
 log = logging.getLogger("mise.public.forms")
@@ -132,19 +132,7 @@ async def submit_form(request: Request, slug: str):
         inquiry_id = db.run(
             "INSERT INTO inquiries (name, email, message) VALUES (?,?,?)", (name, email, message)
         )
-        if mailer.configured():
-            body = (
-                f'New lead via form "{f["title"]}" on kleephotography.com\n\n'
-                f"Name: {name}\nEmail: {email}\n\n{answer_lines}\n"
-            )
-            try:
-                mailer.send(config.GMAIL_USER, f"New lead — {name}", body, reply_to=email)
-                db.run("UPDATE inquiries SET emailed=1 WHERE id=?", (inquiry_id,))
-            except Exception:
-                # Durable lead + Notion job; privacy-safe operator signal only.
-                alerts.inquiry_owner_email_failed(inquiry_id, "smtp_error")
-        else:
-            alerts.inquiry_owner_email_failed(inquiry_id, "mailer_not_configured")
+        inquiry_notify.enqueue_owner_email(inquiry_id)
         jobs.enqueue("notion_sync_inquiry", {"inquiry_id": inquiry_id})
 
     sid = db.run(
