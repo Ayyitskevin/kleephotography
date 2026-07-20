@@ -14,6 +14,7 @@ from . import (
     config,
     db,
     imaging,
+    inquiry_notify,
     notion_sync,
     plutus_recommend,
     presets,
@@ -186,6 +187,7 @@ HANDLERS = {
     "notion_sync_invoice": lambda p: notion_sync.sync_invoice(p["invoice_id"]),
     "notion_sync_gallery": lambda p: notion_sync.sync_gallery(p["gallery_id"]),
     "notion_sync_inquiry": lambda p: notion_sync.sync_inquiry(p["inquiry_id"]),
+    "inquiry_owner_email": lambda p: inquiry_notify.deliver_owner_email(p["inquiry_id"]),
     "argus_analyze_gallery": lambda p: argus_analyze.run_for_gallery(
         p["gallery_id"], skip_dedup=bool(p.get("skip_dedup"))
     ),

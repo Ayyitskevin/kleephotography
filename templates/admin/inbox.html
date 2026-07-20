@@ -166,7 +166,18 @@
         </div>
         <div class="ib-health-row ib-health-{{ active.health.email.state }}">
           <span class="ib-ctx-rk">{{ active.health.email.label }}</span>
-          <span class="ib-ctx-rv">{{ active.health.email.detail }}</span>
+          <span class="ib-ctx-rv">
+            {{ active.health.email.detail }}
+            {% if active.health.email.attempts %}
+            <span class="ib-health-meta">attempts {{ active.health.email.attempts }}{% if active.health.email.last_attempted %} · last {{ active.health.email.last_attempted }}{% endif %}{% if active.health.email.failure_category %} · {{ active.health.email.failure_category }}{% endif %}</span>
+            {% endif %}
+            {% if active.health.email.retryable %}
+            <form method="post" action="/admin/inbox/{{ active.id }}/retry-owner-email" class="ib-health-retry">
+              <input type="hidden" name="tab" value="{{ tab }}">
+              <button type="submit" class="link">Retry owner email</button>
+            </form>
+            {% endif %}
+          </span>
         </div>
         <div class="ib-health-row ib-health-{{ active.health.notion.state }}">
           <span class="ib-ctx-rk">{{ active.health.notion.label }}</span>
@@ -178,6 +189,16 @@
             </form>
             {% elif active.health.notion.jobs_href %}
             <a class="ib-health-link" href="{{ active.health.notion.jobs_href }}">Open Jobs</a>
+            {% endif %}
+            {% if active.health.notion.orphan %}
+            <form method="post" action="/admin/inbox/{{ active.id }}/notion-orphan/relink" class="ib-health-retry">
+              <input type="hidden" name="tab" value="{{ tab }}">
+              <button type="submit" class="link">Relink orphan page</button>
+            </form>
+            <form method="post" action="/admin/inbox/{{ active.id }}/notion-orphan/dismiss" class="ib-health-retry">
+              <input type="hidden" name="tab" value="{{ tab }}">
+              <button type="submit" class="link">Dismiss orphan</button>
+            </form>
             {% endif %}
           </span>
         </div>

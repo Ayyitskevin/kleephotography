@@ -400,11 +400,65 @@ def sync_inquiry(inquiry_id: int, dry_run: bool = False) -> dict | None:
         if stamped:
             log.info("notion lead %s mirrored as page %s", inquiry_id, page_id)
         else:
+            # Durable orphan record for operator relink/dismiss — never auto-delete
+            # the remote page (ownership is not proven here).
+            with db.tx() as con:
+                con.execute(
+                    """UPDATE inquiries
+                          SET notion_orphan_page_id=?,
+                              notion_orphan_recorded_at=datetime('now'),
+                              notion_orphan_status='open'
+                        WHERE id=? AND notion_orphan_page_id IS NULL""",
+                    (page_id, inquiry_id),
+                )
             kept = db.one("SELECT notion_page_id FROM inquiries WHERE id=?", (inquiry_id,))
             log.warning(
-                "notion lead %s create raced; remote page %s not stamped (kept %s)",
+                "notion lead %s create raced; orphan page recorded (kept stamp present=%s)",
                 inquiry_id,
-                page_id,
-                kept["notion_page_id"] if kept else None,
+                bool(kept and kept["notion_page_id"]),
             )
     return None
+
+
+def relink_notion_orphan(inquiry_id: int) -> bool:
+    """Promote a recorded orphan page id to the system-of-record stamp.
+
+    Operator-safe: only copies the stored orphan id onto notion_page_id when the
+    stamp is still NULL. Never calls Notion delete.
+    """
+    with db.tx() as con:
+        row = con.execute(
+            """SELECT notion_page_id, notion_orphan_page_id, notion_orphan_status
+                 FROM inquiries WHERE id=?""",
+            (inquiry_id,),
+        ).fetchone()
+        if not row or not row["notion_orphan_page_id"]:
+            return False
+        if row["notion_page_id"]:
+            # Already stamped — mark orphan dismissed so UI clears.
+            con.execute(
+                """UPDATE inquiries SET notion_orphan_status='dismissed'
+                    WHERE id=? AND notion_orphan_status='open'""",
+                (inquiry_id,),
+            )
+            return False
+        cur = con.execute(
+            """UPDATE inquiries
+                  SET notion_page_id=notion_orphan_page_id,
+                      notion_orphan_status='relinked'
+                WHERE id=? AND notion_page_id IS NULL AND notion_orphan_page_id IS NOT NULL""",
+            (inquiry_id,),
+        )
+        return cur.rowcount == 1
+
+
+def dismiss_notion_orphan(inquiry_id: int) -> bool:
+    """Operator acknowledges orphan was cleaned up outside Mise (no remote delete)."""
+    with db.tx() as con:
+        cur = con.execute(
+            """UPDATE inquiries SET notion_orphan_status='dismissed'
+                WHERE id=? AND notion_orphan_page_id IS NOT NULL
+                  AND COALESCE(notion_orphan_status, 'open')='open'""",
+            (inquiry_id,),
+        )
+        return cur.rowcount == 1

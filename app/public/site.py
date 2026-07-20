@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
-from .. import alerts, config, db, features, imaging, jobs, mailer, security, specialties
+from .. import config, db, features, imaging, inquiry_notify, jobs, mailer, security, specialties
 from ..render import ROOT, _static_rev, templates
 from . import site_catalog as _site_catalog
 
@@ -742,19 +742,10 @@ async def submit_inquiry(
             phone,
         ),
     )
+    # Owner notify is async + idempotent via jobs (survives SMTP outages).
+    inquiry_notify.enqueue_owner_email(iid)
+    # Visitor acknowledgement remains best-effort and never blocks intake.
     if mailer.configured():
-        body = (
-            f"New inquiry via kleephotography.com\n\n"
-            f"Name: {name}\nEmail: {email}\n"
-            f"Phone: {phone or '—'}\n"
-            f"Business: {business.strip() or '—'}\n\n{full_message}\n"
-        )
-        try:
-            mailer.send(config.GMAIL_USER, f"New inquiry — {name}", body, reply_to=email)
-            db.run("UPDATE inquiries SET emailed=1 WHERE id=?", (iid,))
-        except Exception:
-            # Lead is already durable; alert operator without logging body/PII.
-            alerts.inquiry_owner_email_failed(iid, "smtp_error")
         acknowledgement = (
             f"Hi {name},\n\n"
             "Thanks for reaching out — your inquiry made it through. I review "
@@ -767,10 +758,7 @@ async def submit_inquiry(
         try:
             mailer.send(email, "Your inquiry is in — what happens next", acknowledgement)
         except Exception as e:
-            # Visitor ack is best-effort; owner path is the ops-critical one.
             log.warning("inquiry %s acknowledgement email failed: %s", iid, type(e).__name__)
-    else:
-        alerts.inquiry_owner_email_failed(iid, "mailer_not_configured")
     jobs.enqueue("notion_sync_inquiry", {"inquiry_id": iid})
     log.info("inquiry %s received", iid)
     return templates.TemplateResponse(
