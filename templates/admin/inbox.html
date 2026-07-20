@@ -37,6 +37,7 @@
           </span>
           <span class="ib-row-bot">
             <span class="ib-chan" style="color: {{ t.ch_color }}; background: {{ t.ch_bg }};">{{ t.ch_label }}</span>
+            {% if t.service %}<span class="ib-svc" title="Specialty">{{ t.service }}</span>{% endif %}
             <span class="ib-preview {{ 'is-unread' if t.unread }}">{{ t.preview }}</span>
           </span>
         </span>
@@ -148,6 +149,42 @@
       <span class="ib-ctx-k">Stage</span>
       <span class="ib-stage" style="color: {{ active.stage_color }}; background: {{ active.stage_bg }};">{{ active.stage }}</span>
     </div>
+
+    {% if active.health %}
+    <div class="ib-ctx-health" data-testid="lead-health">
+      <span class="ib-ctx-label">Lead status</span>
+      <div class="ib-health-rows">
+        {% if active.health.specialty %}
+        <div class="ib-health-row">
+          <span class="ib-ctx-rk">Specialty</span>
+          <span class="ib-ctx-rv">{{ active.health.specialty }}</span>
+        </div>
+        {% endif %}
+        <div class="ib-health-row">
+          <span class="ib-ctx-rk">Source</span>
+          <span class="ib-ctx-rv">{{ active.health.source }}</span>
+        </div>
+        <div class="ib-health-row ib-health-{{ active.health.email.state }}">
+          <span class="ib-ctx-rk">{{ active.health.email.label }}</span>
+          <span class="ib-ctx-rv">{{ active.health.email.detail }}</span>
+        </div>
+        <div class="ib-health-row ib-health-{{ active.health.notion.state }}">
+          <span class="ib-ctx-rk">{{ active.health.notion.label }}</span>
+          <span class="ib-ctx-rv">
+            {{ active.health.notion.detail }}
+            {% if active.health.notion.retry_job_id %}
+            <form method="post" action="/admin/jobs/{{ active.health.notion.retry_job_id }}/retry" class="ib-health-retry">
+              <button type="submit" class="link">Retry mirror</button>
+            </form>
+            {% elif active.health.notion.jobs_href %}
+            <a class="ib-health-link" href="{{ active.health.notion.jobs_href }}">Open Jobs</a>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      <p class="ib-next-action"><span class="ib-ctx-rk">Next</span> {{ active.health.next_action }}</p>
+    </div>
+    {% endif %}
 
     <div class="ib-ctx-actions">
       <span class="ib-ctx-label">Move it forward</span>

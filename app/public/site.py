@@ -20,6 +20,8 @@ CONTACT_FAQS = _site_catalog.CONTACT_FAQS
 FAQS = _site_catalog.FAQS
 SERVICES = _site_catalog.SERVICES
 SPECIALTY_PAGES = _site_catalog.SPECIALTY_PAGES
+contact_scope_for = _site_catalog.contact_scope_for
+contact_service_options = _site_catalog.contact_service_options
 marketing_meta = _site_catalog.marketing_meta
 
 log = logging.getLogger("mise.public.site")
@@ -433,13 +435,7 @@ def _contact_prefill(request: Request) -> dict:
 
 def _contact_scope(service: str) -> tuple[str, str]:
     """Human-facing scope copy while the legacy dish_count field stays stable."""
-    if service == "Real Estate":
-        return "Listing / property scope", "e.g. 3,200 sq ft · 4 bed 3 bath"
-    if service == "Portraits":
-        return "Subject / team scope", "e.g. just me · team of 8 · family of 5"
-    if service in ("Food & Beverage", "Brand Partner (monthly retainer)"):
-        return "Dishes / setups", "e.g. 8–10 dishes · 3 drink setups"
-    return "Project scope", "e.g. property size, team size, or number of setups"
+    return contact_scope_for(service)
 
 
 # Subtitle under each lobby title card (Screening Room 3a). The RE line gains
@@ -618,6 +614,10 @@ async def contact(request: Request):
             "prefill": pf,
             "scope_label": scope_label,
             "scope_placeholder": scope_placeholder,
+            "service_options": contact_service_options(),
+            "specialty_paths": [
+                {"slug": m["slug"], "name": m["name"]} for m in specialties.SPECIALTIES.values()
+            ],
             "featured": featured,
             "featured_image": _public_photo_spec(featured[0]) if featured else None,
             "faqs": CONTACT_FAQS,
@@ -680,6 +680,10 @@ async def submit_inquiry(
                 },
                 "scope_label": scope_label,
                 "scope_placeholder": scope_placeholder,
+                "service_options": contact_service_options(),
+                "specialty_paths": [
+                    {"slug": m["slug"], "name": m["name"]} for m in specialties.SPECIALTIES.values()
+                ],
                 "featured": featured,
                 "featured_image": _public_photo_spec(featured[0]) if featured else None,
                 "faqs": CONTACT_FAQS,
