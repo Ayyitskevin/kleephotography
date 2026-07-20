@@ -171,14 +171,22 @@ def _integration_health(inq) -> dict:
     elif not mailer.configured():
         email = {
             "label": "Owner email",
-            "state": "warn",
-            "detail": "Mailer not configured — lead is stored; reply manually.",
+            "state": "bad",
+            "detail": (
+                "Mailer not configured — lead is stored; owner email was not sent. "
+                "Reply from Inbox to contact the lead."
+            ),
         }
     else:
+        # mailed=0 with a configured mailer means the owner notify failed (or never
+        # ran) — ops_alert also fires on SMTP failure; recovery is reply here.
         email = {
             "label": "Owner email",
-            "state": "warn",
-            "detail": "Not marked emailed — check SMTP logs or reply here.",
+            "state": "bad",
+            "detail": (
+                "Owner notification not delivered — lead is stored. "
+                "Reply from this thread (or open your mail client), then convert or dismiss."
+            ),
         }
 
     armed = bool(config.NOTION_TOKEN and config.NOTION_LEADS_DB)
@@ -230,6 +238,10 @@ def _integration_health(inq) -> dict:
         next_action = "Open the converted client/project/proposal, or undo conversion."
     elif inq["dismissed_at"]:
         next_action = "Restore to pipeline if this lead is still live."
+    elif email["state"] == "bad" and not inq["emailed"]:
+        next_action = (
+            "Owner email failed — reply from Inbox now (lead is durable), then convert or dismiss."
+        )
     elif notion["state"] == "bad":
         next_action = "Reply to the lead, then retry the failed Notion job on Jobs."
     elif not inq["emailed"] and inq["email"]:

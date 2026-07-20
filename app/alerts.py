@@ -97,6 +97,36 @@ def ops_alert(signature: str, text: str) -> None:
     threading.Thread(target=_send, args=(f"\U0001f6df Mise ops: {text}",), daemon=True).start()
 
 
+def inquiry_owner_email_failed(inquiry_id: int, reason: str) -> None:
+    """Privacy-safe, deduplicated operator signal when a durable lead stored but
+    the owner notification email did not leave the server.
+
+    ``reason`` is a short machine code only (e.g. smtp_error, mailer_not_configured)
+    — never a visitor message, email address, or SMTP payload. Signature is keyed
+    by inquiry id so a retry storm on one lead collapses to one alert per cooldown
+    while a new lead can still notify. The lead row and Notion job stay durable.
+    """
+    code = (reason or "unknown").strip() or "unknown"
+    # Never put PII or exception strings in the operator channel — id + code only.
+    log.error("inquiry %s owner email failed reason=%s", inquiry_id, code)
+    if code == "mailer_not_configured":
+        # Global config gap: one fleet-wide signal, not one per lead.
+        signature = "inquiry_owner_email_unconfigured"
+        text = (
+            f"Inquiry #{inquiry_id} stored but owner email was not sent "
+            f"(mailer not configured). Lead is durable — open Inbox to reply: "
+            f"{config.BASE_URL}/admin/inbox?sel={inquiry_id}"
+        )
+    else:
+        signature = f"inquiry_owner_email_failed:{inquiry_id}"
+        text = (
+            f"Inquiry #{inquiry_id} stored but owner notification email failed "
+            f"({code}). Lead is durable — open Inbox and reply/convert: "
+            f"{config.BASE_URL}/admin/inbox?sel={inquiry_id}"
+        )
+    ops_alert(signature, text)
+
+
 def notify(text: str) -> None:
     """Fire-and-forget outbound nudge for a business event the CALLER has already
     de-duplicated (e.g. a one-shot DB flag), so no throttle is applied here. Used
