@@ -10,7 +10,6 @@ composer that sends by email OR text · contact details + the real convert actio
 inbound bubble from the inquiry's first message. No fabricated data.
 """
 
-import json
 import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -132,22 +131,21 @@ def _detail_rows(inq) -> list[dict]:
 
 
 def _notion_job_for(inquiry_id: int) -> dict | None:
-    """Latest notion_sync_inquiry job for this lead, if any (failed first)."""
-    rows = db.all_(
+    """Latest notion_sync_inquiry job for this lead, if any (failed first).
+
+    Filters by inquiry_id in SQL so a busy queue of other leads' jobs cannot
+    push this lead's failed mirror past an in-Python LIMIT window.
+    """
+    row = db.one(
         """SELECT id, status, error, payload, updated_at FROM jobs
            WHERE kind='notion_sync_inquiry'
+             AND CAST(json_extract(payload, '$.inquiry_id') AS INTEGER)=?
            ORDER BY CASE status WHEN 'failed' THEN 0 WHEN 'queued' THEN 1
                     WHEN 'running' THEN 2 ELSE 3 END, id DESC
-           LIMIT 80"""
+           LIMIT 1""",
+        (inquiry_id,),
     )
-    for row in rows:
-        try:
-            payload = json.loads(row["payload"] or "{}")
-        except (TypeError, json.JSONDecodeError):
-            continue
-        if payload.get("inquiry_id") == inquiry_id:
-            return dict(row)
-    return None
+    return dict(row) if row else None
 
 
 def _integration_health(inq) -> dict:

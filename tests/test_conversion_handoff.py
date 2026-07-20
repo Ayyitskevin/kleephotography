@@ -227,6 +227,80 @@ def test_integration_health_dormant_notion_is_explicit(monkeypatch):
         db.run("DELETE FROM inquiries WHERE id=?", (iid,))
 
 
+def test_notion_job_lookup_finds_lead_past_eighty_decoy_failures(monkeypatch):
+    """SQL filter must not miss a lead's failed job behind 80+ newer decoys."""
+    monkeypatch.setattr(config, "NOTION_TOKEN", "tok")
+    monkeypatch.setattr(config, "NOTION_LEADS_DB", "leads-db")
+    monkeypatch.setattr(mailer, "configured", lambda: True)
+
+    target_id = db.run(
+        """INSERT INTO inquiries (name, email, message, service, emailed)
+           VALUES (?,?,?,?,0)""",
+        ("Target Lead", "target-conv@example.com", "Need photos", "Real Estate"),
+    )
+    # Older failed job for the target — would be pushed out of any LIMIT 80 window
+    # if we only scanned recent rows and filtered in Python.
+    target_job_id = db.run(
+        """INSERT INTO jobs (kind, payload, status, attempts, error)
+           VALUES (?,?,?,?,?)""",
+        (
+            "notion_sync_inquiry",
+            json.dumps({"inquiry_id": target_id}),
+            "failed",
+            3,
+            "target mirror boom",
+        ),
+    )
+    decoy_job_ids: list[int] = []
+    decoy_inquiry_ids: list[int] = []
+    try:
+        for i in range(85):
+            decoy_iid = db.run(
+                """INSERT INTO inquiries (name, email, message, emailed)
+                   VALUES (?,?,?,0)""",
+                (f"Decoy {i}", f"decoy-conv-{i}@example.com", "noise"),
+            )
+            decoy_inquiry_ids.append(decoy_iid)
+            decoy_job_ids.append(
+                db.run(
+                    """INSERT INTO jobs (kind, payload, status, attempts, error)
+                       VALUES (?,?,?,?,?)""",
+                    (
+                        "notion_sync_inquiry",
+                        json.dumps({"inquiry_id": decoy_iid}),
+                        "failed",
+                        3,
+                        f"decoy fail {i}",
+                    ),
+                )
+            )
+
+        found = inbox_mod._notion_job_for(target_id)
+        assert found is not None
+        assert found["id"] == target_job_id
+        assert found["status"] == "failed"
+        assert "target mirror boom" in found["error"]
+
+        row = db.one("SELECT * FROM inquiries WHERE id=?", (target_id,))
+        health = inbox_mod._integration_health(row)
+        assert health["notion"]["state"] == "bad"
+        assert health["notion"]["retry_job_id"] == target_job_id
+        assert "target mirror boom" in health["notion"]["detail"]
+    finally:
+        if decoy_job_ids:
+            db.run(
+                f"DELETE FROM jobs WHERE id IN ({','.join('?' * len(decoy_job_ids))})",
+                tuple(decoy_job_ids),
+            )
+        db.run("DELETE FROM jobs WHERE id=?", (target_job_id,))
+        if decoy_inquiry_ids:
+            db.run(
+                f"DELETE FROM inquiries WHERE id IN ({','.join('?' * len(decoy_inquiry_ids))})",
+                tuple(decoy_inquiry_ids),
+            )
+        db.run("DELETE FROM inquiries WHERE id=?", (target_id,))
+
+
 # ── criterion 4: specialty SEO / sitemap / titles ────────────────────────────
 
 
