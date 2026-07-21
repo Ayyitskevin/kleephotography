@@ -191,10 +191,12 @@
             <a class="ib-health-link" href="{{ active.health.notion.jobs_href }}">Open Jobs</a>
             {% endif %}
             {% if active.health.notion.orphan %}
+            {% if active.health.notion.orphan_relinkable %}
             <form method="post" action="/admin/inbox/{{ active.id }}/notion-orphan/relink" class="ib-health-retry">
               <input type="hidden" name="tab" value="{{ tab }}">
               <button type="submit" class="link">Relink orphan page</button>
             </form>
+            {% endif %}
             <form method="post" action="/admin/inbox/{{ active.id }}/notion-orphan/dismiss" class="ib-health-retry">
               <input type="hidden" name="tab" value="{{ tab }}">
               <button type="submit" class="link">Dismiss orphan</button>

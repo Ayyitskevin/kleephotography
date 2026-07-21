@@ -209,26 +209,39 @@ def _integration_health(inq) -> dict:
             "retry_job_id": None,
         }
 
-    orphan_open = bool(
-        inq["notion_orphan_page_id"] if "notion_orphan_page_id" in inq.keys() else None
-    ) and (
-        (inq["notion_orphan_status"] if "notion_orphan_status" in inq.keys() else "open")
-        in (None, "open")
-    )
+    orphan_page = inq["notion_orphan_page_id"] if "notion_orphan_page_id" in inq.keys() else None
+    orphan_status = (
+        inq["notion_orphan_status"] if "notion_orphan_status" in inq.keys() else None
+    ) or "open"
+    orphan_open = bool(orphan_page) and orphan_status == "open"
+    # Relink only when stamp is still null; if stamp won the race, Dismiss only.
+    orphan_relinkable = orphan_open and not bool(inq["notion_page_id"])
     if orphan_open:
+        if orphan_relinkable:
+            orphan_hint = (
+                "Create-race orphan recorded — relink to adopt the remote page "
+                "or dismiss after manual Notion cleanup (never auto-deleted)."
+            )
+        else:
+            orphan_hint = (
+                "Create-race orphan recorded while stamp already kept — dismiss "
+                "after manual Notion cleanup (never auto-deleted). Relink not offered."
+            )
         notion = {
             **notion,
             "orphan": True,
             "orphan_status": "open",
-            "detail": (
-                notion.get("detail", "")
-                + " · Create-race orphan recorded — relink to adopt the remote page "
-                "or dismiss after manual Notion cleanup (never auto-deleted)."
-            ).strip(" ·"),
+            "orphan_relinkable": orphan_relinkable,
+            "detail": (notion.get("detail", "") + " · " + orphan_hint).strip(" ·"),
             "state": "bad" if notion.get("state") == "ok" else notion.get("state", "warn"),
         }
     else:
-        notion = {**notion, "orphan": False, "orphan_status": None}
+        notion = {
+            **notion,
+            "orphan": False,
+            "orphan_status": None,
+            "orphan_relinkable": False,
+        }
 
     if inq["converted_at"]:
         next_action = "Open the converted client/project/proposal, or undo conversion."
@@ -238,8 +251,10 @@ def _integration_health(inq) -> dict:
         next_action = (
             "Retry owner email from Inbox (idempotent) or reply manually — lead is durable."
         )
-    elif orphan_open:
+    elif orphan_open and orphan_relinkable:
         next_action = "Relink Notion orphan on this lead or dismiss after manual cleanup."
+    elif orphan_open:
+        next_action = "Dismiss Notion orphan after manual cleanup — stamp already kept (no relink)."
     elif notion["state"] == "bad":
         next_action = "Reply to the lead, then retry the failed Notion job on Jobs."
     elif not inq["emailed"] and inq["email"]:
