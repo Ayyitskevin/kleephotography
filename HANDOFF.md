@@ -1,9 +1,16 @@
-# HANDOFF — Klee Photography / Mise refactor (retirement notes)
+# HANDOFF — Klee Photography / Mise refactor (historical notes)
 
-**For the successor agent (Opus 4.8 / Sonnet 5 / any):** the previous agent (Fable 5)
-retired mid-effort. This file is the single source of truth. Read it top-to-bottom,
-then continue from [§7 What remains](#7-what-remains-ordered-work-queue). Update this
-file as you work. **All prior context you need is here — do not assume chat history.**
+**Prefer [`AGENTS.md`](AGENTS.md) + [`README.md`](README.md) + [`ops/`](ops/) over this
+file.** HANDOFF archives the mid-2026 refactor / Screening Room / truthful-HTTPS work.
+Do not treat [§7](#7-what-remains-ordered-work-queue) as an active autonomous queue.
+
+**Standing truths:**
+
+- §6a security red-lights are **fixed** on main.
+- **Full-site deploy** = git pull on flow `/opt/mise` + restart — [`ops/DEPLOY.md`](ops/DEPLOY.md).
+  `scripts/deploy-flow.sh` is a specialty rsync slice only.
+- Screening Room / Aerials kill switches: `.env.example`. Migrations policy: [`ops/MIGRATIONS.md`](ops/MIGRATIONS.md).
+- Do not start leftover §6b / §6c items without Kevin's explicit ask.
 
 ---
 
@@ -150,11 +157,11 @@ The audit remediation and the follow-up queue finished as:
 - **Design pass:** marketing + client-facing form polish, focus-visible states,
   testimonials elevation (#14, #15). Refactor duplication collapse (#11).
 - Gates at completion: **50 unit + 166 smoke, ruff clean**, CI green on main.
-- **Standing deploy reminders for Kevin:** deploy via `scripts/deploy-flow.sh`;
-  delete/flip any `MISE_COOKIE_SECURE=false` left in flow's `.env`; expect one
-  admin re-login after the 065 session-table migration; post-deploy click through
-  admin flows (delete confirms, studio board, email picker) — a missed CSP spot
-  fails silently with a console `Refused to execute…` line.
+- **Standing deploy reminders for Kevin:** full-site deploy via git pull on flow
+  ([`ops/DEPLOY.md`](ops/DEPLOY.md)); delete/flip any `MISE_COOKIE_SECURE=false`
+  left in flow's `.env`; expect one admin re-login after the 065 session-table
+  migration; post-deploy click through admin flows — a missed CSP spot fails
+  silently with a console `Refused to execute…` line.
 - **Do not start §6b-remaining / §6c or anything new without Kevin's explicit ask.**
 
 ---
@@ -332,21 +339,20 @@ imaging/jobs hot paths, N+1s in admin lists/studio dashboard, `test_pin_lockout`
 ordering brittleness in test_smoke.py (it reads `ORDER BY id DESC LIMIT 1` galleries
 created by earlier tests), TODO/FIXME grep, mailer/gcal/notion failure modes.
 
-## 7. What remains (ordered work queue)
+## 7. What remains (STALE — archive only)
 
-1. **Green fixes from §6b, top-down** (confirmed first, then verify-and-fix the
-   unverified ones). Small commits; add/extend a test per meaningful fix; gates every time.
-2. Push after every 2-3 commits: `git push -u origin claude/klee-photography-refactor-y9tr5g`.
-3. **Keep PR #2 body current**: red-light table (§6a), change list, tests run.
-4. §6c sweeps if capacity remains.
-5. Finalize: gates → push → PR body final (summary, risk, tests, manual verification,
-   rollback, red-light list) → flip PR from draft only when Kevin asks.
-6. **Deploy is BLOCKED from this environment** (no access to flow). Kevin deploys
-   after merge via existing `scripts/deploy-flow.sh` (do not modify). Post-deploy
-   checks: `curl https://kleephotography.com/healthz` · spot / , /work , /work/{slug}
-   (fonts+menu+hero now load there — verify!), /services, /contact, /book · /admin
-   303→login · one gallery PIN page. Rollback: revert merge on main, redeploy;
-   nightly DB snapshots per ops/BACKUP.md (untouched by this work).
+> **Stale.** The PR #2 / `claude/klee-photography-refactor-y9tr5g` queue below is
+> historical. For deploy, use [`ops/DEPLOY.md`](ops/DEPLOY.md) (git pull on flow),
+> not `scripts/deploy-flow.sh`. Ask Kevin before picking up §6b / §6c leftovers.
+
+1. ~~Green fixes from §6b~~ — only with Kevin's explicit ask.
+2. ~~Push to refactor branch / PR #2~~ — completed / superseded.
+3. ~~Keep PR #2 body current~~ — superseded.
+4. §6c sweeps — optional, Kevin-gated.
+5. ~~Finalize draft PR #2~~ — superseded.
+6. **Deploy:** git pull on flow `/opt/mise` + restart mise ([`ops/DEPLOY.md`](ops/DEPLOY.md)).
+   Post-deploy: `/healthz`, home, spoke, `/admin` login, one gallery PIN page.
+   Rollback look: `MISE_SCREENING_ROOM=false`. Data: nightly backups per `ops/BACKUP.md`.
 
 ## 8. Operational notes
 

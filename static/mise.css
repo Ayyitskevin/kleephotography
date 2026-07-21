@@ -6082,13 +6082,11 @@ html[data-theme="dark"] .admin-shell .unlinked-warn-head { color: var(--ink-soft
 html[data-theme="dark"] .admin-shell .unlinked-warn-head strong { color: var(--ink); }
 
 /* ============================================================================
+   LEGACY-KILL-SWITCH — keep while MISE_SCREENING_ROOM can be false.
    PUBLIC SITE — DARK MODE · CANDLELIGHT (After Dark × Direction B).
-   Dark is now the marketing site's DEFAULT (see the dark-first pre-paint
-   script in templates/site/base_site.html); an explicit "light" choice keeps
-   the locked candlelit-editorial LIGHT design, byte-untouched below this
-   layer. Scoped to .site-body under html[data-theme="dark"] — near-black
-   forest surfaces, warm cream ink, gold accent. Shares the admin localStorage
-   key ("mise-theme"); the admin keeps its own light-first default.
+   Superseded for the default Screening Room path by the EDITORIAL DARK block
+   later in this file + screening.css. Still required when the SR kill switch
+   is off and marketing falls back to mise.css alone. See ops/CSS-DUAL-STACK.md.
    ========================================================================== */
 html[data-theme="dark"] .site-body {
   color-scheme: dark;
