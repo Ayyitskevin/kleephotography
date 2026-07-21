@@ -44,11 +44,11 @@ jobs:
 
       - name: Run unit tests (fast feedback)
         run: |
-          .venv/bin/python -m pytest tests/ --ignore=tests/test_smoke.py -q -m unit --tb=short
+          .venv/bin/python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m unit --tb=short
 
       - name: Run integration tests
         run: |
-          .venv/bin/python -m pytest tests/ --ignore=tests/test_smoke.py -q -m integration --tb=short
+          .venv/bin/python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m integration --tb=short
 
       - name: Lint and check format with ruff
         run: |
@@ -61,4 +61,4 @@ jobs:
           MISE_SECRET_KEY=test-secret \
           MISE_ADMIN_PASSWORD=test-pw \
           MISE_ENV_FILE=/nonexistent \
-            .venv/bin/python -m pytest tests/test_smoke.py -q --tb=short
+            .venv/bin/python -m pytest tests/ -q -m smoke --tb=short

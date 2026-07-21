@@ -62,10 +62,12 @@ def _enable_ops(monkeypatch, sent: list[str]) -> None:
 
 
 def test_contact_smtp_failure_stores_lead_enqueues_job_and_alerts(client, monkeypatch):
+    # Freeze workers before wipe so in-flight jobs from other module clients
+    # cannot race the alert sink after we patch alerts._send.
+    jobs.stop()
     _wipe()
     sent: list[str] = []
     _enable_ops(monkeypatch, sent)
-    # Durable enqueue only — freeze workers so we control when the alert fires.
     monkeypatch.setattr(jobs, "start", lambda: None)
     monkeypatch.setattr(jobs, "_pool", None)
     monkeypatch.setattr(mailer, "configured", lambda: True)
@@ -100,6 +102,8 @@ def test_contact_smtp_failure_stores_lead_enqueues_job_and_alerts(client, monkey
         )
         assert oe is not None
         # Alert fires when the owner-email job fails (not on the request path).
+        # Drop any late arrivals from stopped workers that still held the patched _send.
+        sent.clear()
         assert sent == []
         if oe["status"] != "queued":
             db.run(

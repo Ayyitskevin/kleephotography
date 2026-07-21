@@ -50,16 +50,21 @@ minutes; the cost of an unattended money/schema mistake is an incident.
 ```sh
 source .venv/bin/activate
 # 1. unit (fast, pure logic — no DB/network)
-python -m pytest tests/ --ignore=tests/test_smoke.py -q -m unit
-# 2. full smoke (e2e against a throwaway DB)
+python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m unit
+# 2. integration (SQLite + TestClient seams — CI runs this too)
+python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m integration
+# 3. full smoke (e2e against a throwaway DB; ffmpeg needed for video tests)
 MISE_DATA_DIR=$(mktemp -d) MISE_SECRET_KEY=test MISE_ADMIN_PASSWORD=pw \
-  python -m pytest tests/test_smoke.py -q
-# 3. lint + format (CI enforces both, strict)
+  python -m pytest tests/ -q -m smoke
+# 4. lint + format (CI enforces both, strict)
 ruff check . && ruff format --check .
 ```
 
-"Tests pass" is false if any were skipped or mocked without saying so. Run all three
+"Tests pass" is false if any were skipped or mocked without saying so. Run all four
 locally before pushing — CI runs the same on `main` and on PRs.
+
+Full-site deploy is git pull on flow + restart — see `ops/DEPLOY.md`.
+`scripts/deploy-flow.sh` is a specialty rsync slice, not the normal path.
 
 ## Conventions that bite if you miss them
 
