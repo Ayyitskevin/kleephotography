@@ -45,6 +45,13 @@ def _wipe(email: str = VISITOR_EMAIL) -> None:
     db.run("DELETE FROM pin_attempts WHERE gallery_id=?", (security.INQUIRY_BUCKET_CONTACT,))
 
 
+def _freeze_owner_email_workers(monkeypatch) -> None:
+    """Stop the shared lifespan pool so earlier module clients cannot race alerts."""
+    jobs.stop()
+    monkeypatch.setattr(jobs, "start", lambda: None)
+    monkeypatch.setattr(jobs, "_pool", None)
+
+
 def _enable_ops(monkeypatch, sent: list[str]) -> None:
     class _InlineThread:
         def __init__(self, target, args=(), **kw):
@@ -62,12 +69,10 @@ def _enable_ops(monkeypatch, sent: list[str]) -> None:
 
 
 def test_contact_smtp_failure_stores_lead_enqueues_job_and_alerts(client, monkeypatch):
+    _freeze_owner_email_workers(monkeypatch)
     _wipe()
     sent: list[str] = []
     _enable_ops(monkeypatch, sent)
-    # Durable enqueue only — freeze workers so we control when the alert fires.
-    monkeypatch.setattr(jobs, "start", lambda: None)
-    monkeypatch.setattr(jobs, "_pool", None)
     monkeypatch.setattr(mailer, "configured", lambda: True)
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
 
@@ -100,6 +105,8 @@ def test_contact_smtp_failure_stores_lead_enqueues_job_and_alerts(client, monkey
         )
         assert oe is not None
         # Alert fires when the owner-email job fails (not on the request path).
+        # Drop late arrivals from stopped workers that still held the patched _send.
+        sent.clear()
         assert sent == []
         if oe["status"] != "queued":
             db.run(
@@ -154,10 +161,10 @@ def test_mailer_unconfigured_uses_global_dedupe_signature(monkeypatch):
 
 
 def test_successful_owner_email_skips_ops_alert(client, monkeypatch):
+    _freeze_owner_email_workers(monkeypatch)
     _wipe("ok-visitor@example.com")
     sent: list[str] = []
     _enable_ops(monkeypatch, sent)
-    monkeypatch.setattr(jobs, "_pool", None)
     monkeypatch.setattr(mailer, "configured", lambda: True)
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
     monkeypatch.setattr(mailer, "send", lambda *a, **k: None)
@@ -211,10 +218,10 @@ def test_inbox_surfaces_email_failure_and_recovery_path(admin_client, monkeypatc
 
 
 def test_contact_mailer_off_still_stores_and_signals(client, monkeypatch):
+    _freeze_owner_email_workers(monkeypatch)
     _wipe("unconfigured@example.com")
     sent: list[str] = []
     _enable_ops(monkeypatch, sent)
-    monkeypatch.setattr(jobs, "_pool", None)
     monkeypatch.setattr(mailer, "configured", lambda: False)
     try:
         r = client.post(

@@ -12,6 +12,9 @@ pytestmark = pytest.mark.integration
 
 
 def _configure_tmp_db(tmp_path, monkeypatch):
+    # Stop leftover workers from earlier module-scoped TestClients before we
+    # swap DB_PATH — otherwise they race migrate() on the new file (locked DB).
+    jobs.stop()
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "mise.db")
     monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
