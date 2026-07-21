@@ -466,12 +466,7 @@ async def retry_owner_email(inquiry_id: int, tab: str = Form("all")):
         raise HTTPException(status_code=404)
     if inq["owner_email_delivered_at"] if "owner_email_delivered_at" in inq.keys() else None:
         return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
-    # Clear failed/in_flight so the claim path can run again.
-    db.run(
-        """UPDATE inquiries SET owner_email_status='failed'
-            WHERE id=? AND owner_email_delivered_at IS NULL""",
-        (inquiry_id,),
-    )
+    # Preserve fresh in_flight ownership; the claim path already reclaims failed/stale rows.
     inquiry_notify.enqueue_owner_email(inquiry_id)
     if tab not in _TABS:
         tab = "all"

@@ -308,3 +308,75 @@ def test_inbox_retry_owner_email_route(client, monkeypatch):
     assert r.status_code == 303
     job = db.one("SELECT * FROM jobs WHERE kind='inquiry_owner_email' ORDER BY id DESC LIMIT 1")
     assert job is not None
+
+
+def test_inbox_retry_preserves_fresh_owner_email_claim(client, monkeypatch):
+    """A manual retry must not release a worker's active SMTP claim."""
+    monkeypatch.setattr(jobs, "dispatch", lambda job_ids: None)
+    monkeypatch.setattr(mailer, "configured", lambda: True)
+    monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
+    iid = _insert_lead("retry-race@example.com")
+    db.run("UPDATE inquiries SET name='Retry Race' WHERE id=?", (iid,))
+
+    r = client.post("/admin/login", data={"password": "test-pw"}, follow_redirects=False)
+    assert r.status_code == 303
+
+    first_send_started = threading.Event()
+    release_first_send = threading.Event()
+    sends = []
+    sends_lock = threading.Lock()
+    first_worker_errors = []
+
+    def blocked_first_send(*args, **kwargs):
+        if len(args) < 2 or args[1] != "New inquiry — Retry Race":
+            return
+        with sends_lock:
+            sends.append(1)
+            send_number = len(sends)
+        if send_number == 1:
+            first_send_started.set()
+            if not release_first_send.wait(timeout=5):
+                raise RuntimeError("test timed out waiting to release first SMTP send")
+
+    monkeypatch.setattr(mailer, "send", blocked_first_send)
+
+    def first_worker():
+        try:
+            inquiry_notify.deliver_owner_email(iid)
+        except Exception as exc:
+            first_worker_errors.append(exc)
+
+    worker = threading.Thread(target=first_worker)
+    worker.start()
+    assert first_send_started.wait(timeout=5)
+
+    second_worker_error = None
+    try:
+        response = client.post(
+            f"/admin/inbox/{iid}/retry-owner-email",
+            data={"tab": "all"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        status_after_retry = db.one("SELECT owner_email_status FROM inquiries WHERE id=?", (iid,))[
+            "owner_email_status"
+        ]
+        try:
+            inquiry_notify.deliver_owner_email(iid)
+        except RuntimeError as exc:
+            second_worker_error = str(exc)
+    finally:
+        release_first_send.set()
+        worker.join(timeout=5)
+
+    assert not worker.is_alive()
+    assert first_worker_errors == []
+    assert status_after_retry == "in_flight"
+    assert second_worker_error == "owner_email_claim_busy"
+    assert len(sends) == 1
+    row = db.one(
+        "SELECT owner_email_status, owner_email_delivered_at FROM inquiries WHERE id=?",
+        (iid,),
+    )
+    assert row["owner_email_status"] == "delivered"
+    assert row["owner_email_delivered_at"]
