@@ -22,7 +22,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Red
 
 from .. import config, db, security
 from ..render import templates
-from . import common
+from . import common, studio
 
 router = APIRouter(prefix="/admin/financials", dependencies=[Depends(security.require_admin)])
 
@@ -57,7 +57,7 @@ def _initials(name: str) -> str:
 
 def _range_bounds(key: str) -> tuple[str, str]:
     """(start, end) ISO dates, end exclusive. Default quarter."""
-    today = dt.date.today()
+    today = studio._today()
     if key == "month":
         start = today.replace(day=1)
         end = (
@@ -196,7 +196,7 @@ async def income(request: Request, range: str = "quarter"):
 
     # Month reel (Screening Room 3i): trailing six months of collected cash,
     # heights proportional to the best month. Read-only.
-    first_of_month = dt.date.today().replace(day=1)
+    first_of_month = studio._today().replace(day=1)
     reel_months, cursor = [], first_of_month
     # NB: the route's `range` query param shadows the builtin in this scope
     for _ in (0, 1, 2, 3, 4, 5):
@@ -471,7 +471,7 @@ async def expenses(request: Request, cat: str = "all"):
             "rows": table,
             "by_cat": by_cat,
             "cats": [c for c, _ in _EXP_CATS],
-            "today": dt.date.today().isoformat(),
+            "today": studio._today().isoformat(),
             "pills": pills,
             "cat": cat,
         },
@@ -696,7 +696,7 @@ async def mileage(request: Request):
             "cards": cards,
             "rows": table,
             "count": len(rows),
-            "today": dt.date.today().isoformat(),
+            "today": studio._today().isoformat(),
             "rate_cents": config.MILEAGE_RATE_CENTS,
         },
     )

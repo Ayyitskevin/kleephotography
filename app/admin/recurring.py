@@ -20,6 +20,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, caption_ai, config, db, security
 from ..render import templates
+from . import studio
 from .lookups import get_project
 from .proposals import MAX_ITEM_ROWS, parse_items
 
@@ -39,7 +40,7 @@ def get_plan(plan_id: int) -> "db.sqlite3.Row":
 
 def _period(today: dt.date | None = None) -> str:
     """Current billing period as 'YYYY-MM' — the dedupe key for manual generate."""
-    return (today or dt.date.today()).strftime("%Y-%m")
+    return (today or studio._today()).strftime("%Y-%m")
 
 
 def parse_quota(form) -> str:
@@ -635,7 +636,7 @@ def run_due_plans(today: dt.date | None = None) -> int:
     claim in generate_for_plan means repeated sweeps can't double-bill, so this is
     safe to call as often as the thread wakes. Returns the count generated.
     """
-    today = today or dt.date.today()
+    today = today or studio._today()
     period = _period(today)
     due = db.all_(
         "SELECT * FROM recurring_plans WHERE active=1 AND total_cents>0 "
