@@ -172,6 +172,11 @@ async def stripe_webhook(request: Request):
     if not d:
         log.error("stripe webhook for unknown invoice %s", invoice_id)
         raise HTTPException(status_code=404)
+    # Stripe retries the same event_id after a 5xx / timeout. Honor idempotency
+    # BEFORE amount/kind checks — a successful deposit changes what is "owed",
+    # so a retry would otherwise look like a mismatch and 409 forever.
+    if db.one("SELECT id FROM payments WHERE stripe_event_id=?", (event["id"],)):
+        return {"ok": True, "duplicate": True}
     # Defense in depth: Checkout metadata + amount_total are not trusted blindly.
     # A stale session (client paid an old Checkout after the invoice changed) or
     # metadata drift must not mark the wrong amount/kind paid.

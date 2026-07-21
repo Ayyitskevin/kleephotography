@@ -193,6 +193,24 @@ def test_webhook_rejects_kind_mismatch(client, monkeypatch):
     _cleanup_money_chain(cid, pid, iid)
 
 
+def test_webhook_retry_same_event_is_duplicate_after_deposit(client, monkeypatch):
+    """Stripe retries must stay idempotent even after owed kind flips to balance."""
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.alerts, "security_alert", lambda *a, **k: None)
+    cid, pid, iid = _seed_money_chain(
+        project_status="proposal_sent", total=90000, deposit=30000, inv_status="sent"
+    )
+    body = _checkout_event("evt_dep_retry", iid, "deposit", 30000)
+    first = _post_signed(client, body)
+    assert first.status_code == 200 and first.json() == {"ok": True}
+    assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "deposit_paid"
+    retry = _post_signed(client, body)
+    assert retry.status_code == 200 and retry.json().get("duplicate") is True
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 1
+    _cleanup_money_chain(cid, pid, iid)
+
+
 def test_webhook_async_payment_succeeded_settles_ach(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
     monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
