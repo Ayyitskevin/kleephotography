@@ -1,16 +1,22 @@
 """Shared smoke fixtures — session-scoped so domain files share one DB.
 
-Collection order is numeric filename prefixes (test_01_… before test_02_…).
-Do not rename without preserving that order; many tests still seed state for later ones.
+Order coupling (do not "fix" without a plan):
+  - Collection order is numeric filename prefixes (test_01_… before test_07_…).
+  - Many later tests still assume rows/assets seeded by earlier files.
+  - Renaming or reordering files without migrating that seed chain will flake.
+  - Shared helpers live in tests/smoke/_helpers.py — prefer importing those
+    over redefining local copies (F811).
+
+Disk note: default MISE_DATA_DIR via mktemp often lands on a small /tmp
+tmpfs. If uploads return 507, put DATA_DIR on a large volume or set
+MISE_MIN_FREE_GB=1 for the run.
 """
 
-import io
 import os
 import tempfile
 
 import pytest
 from fastapi.testclient import TestClient
-from PIL import Image
 
 from app.main import app
 

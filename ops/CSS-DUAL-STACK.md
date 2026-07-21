@@ -35,4 +35,6 @@ stay `.cream-theme`.
 - Documented the stack (this file).
 - Bannered the superseded **Candlelight / After Dark** marketing block in
   `mise.css` as kill-switch-only (not deleted — rollback path).
-- No hero/marketing redesign in this wave.
+- Bannered the cream `.site-body` marketing system and the **Editorial Dark**
+  reskin the same way (still required for `MISE_SCREENING_ROOM=false`).
+- No hero/marketing redesign in this wave; no deletion of `.cream-theme`.
