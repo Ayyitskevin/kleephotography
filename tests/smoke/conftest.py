@@ -9,6 +9,16 @@ Order coupling (do not "fix" without a plan):
   - Job-pool races: use tests.jobtest.freeze_job_pool (stop + block lifespan
     restart). Never null jobs._pool alone — that orphans still-running workers.
 
+Worst seed chains (keep order or rewrite the consumer):
+  - test_02 test_studio_clients_projects → later studio docs grab
+    ``clients/projects ORDER BY id DESC`` (proposal/contract/invoice lifecycle).
+  - test_02 test_invoice_lifecycle → leaves a paid invoice for test_notion_sync
+    (``assert inv, "earlier test left a paid invoice"``).
+  - test_01 gallery/fav flow → test_03 portal asserts at least one favorite
+    already exists on the shared DB.
+  - Nested ``with TestClient(app)`` stops the session job pool; later upload
+    waits rely on a fresh lifespan (or freeze + ``jobs._execute``).
+
 Disk note: default MISE_DATA_DIR via mktemp often lands on a small /tmp
 tmpfs. If uploads return 507, put DATA_DIR on a large volume or set
 MISE_MIN_FREE_GB=1 for the run.
