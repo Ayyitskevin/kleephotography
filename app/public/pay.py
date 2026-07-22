@@ -7,7 +7,7 @@ import stripe
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, features, jobs, security
+from .. import alerts, config, db, features, jobs, security
 from ..render import templates
 
 log = logging.getLogger("mise.public.pay")
@@ -172,6 +172,34 @@ async def stripe_webhook(request: Request):
     if not d:
         log.error("stripe webhook for unknown invoice %s", invoice_id)
         raise HTTPException(status_code=404)
+    # Stripe retries the same event_id after a 5xx / timeout. Honor idempotency
+    # BEFORE amount/kind checks — a successful deposit changes what is "owed",
+    # so a retry would otherwise look like a mismatch and 409 forever.
+    if db.one("SELECT id FROM payments WHERE stripe_event_id=?", (event["id"],)):
+        return {"ok": True, "duplicate": True}
+    # Defense in depth: Checkout metadata + amount_total are not trusted blindly.
+    # A stale session (client paid an old Checkout after the invoice changed) or
+    # metadata drift must not mark the wrong amount/kind paid.
+    owed_cents, owed_kind = next_payment(d)
+    amount_total = int(session["amount_total"] or 0)
+    if not owed_cents:
+        log.error("stripe webhook for settled invoice %s (event %s)", invoice_id, event["id"])
+        alerts.security_alert(f"Stripe webhook for already-settled invoice {invoice_id}")
+        raise HTTPException(status_code=409, detail="invoice already settled")
+    if kind != owed_kind or amount_total != owed_cents:
+        log.error(
+            "stripe webhook mismatch invoice %s: got kind=%s amount=%s; owed kind=%s amount=%s",
+            invoice_id,
+            kind,
+            amount_total,
+            owed_kind,
+            owed_cents,
+        )
+        alerts.security_alert(
+            f"Stripe webhook amount/kind mismatch on invoice {invoice_id}: "
+            f"got {kind}/{amount_total}, owed {owed_kind}/{owed_cents}"
+        )
+        raise HTTPException(status_code=409, detail="payment does not match amount owed")
     # Record the payment and advance invoice + project state as one atomic unit:
     # a crash between these writes would otherwise leave the payment logged but the
     # invoice unpaid, and Stripe's retry would short-circuit on the duplicate event
@@ -182,7 +210,7 @@ async def stripe_webhook(request: Request):
             con.execute(
                 """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
                       amount_cents, kind) VALUES (?,?,?,?,?)""",
-                (invoice_id, event["id"], session["id"], session["amount_total"], kind),
+                (invoice_id, event["id"], session["id"], amount_total, kind),
             )
             if kind == "deposit":
                 con.execute("UPDATE invoices SET status='deposit_paid' WHERE id=?", (invoice_id,))
