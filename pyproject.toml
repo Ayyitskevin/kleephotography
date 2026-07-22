@@ -14,6 +14,7 @@ known-first-party = ["app"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/test_smoke.py" = ["E401", "UP017", "E731", "F401", "F841", "UP012"]
+"tests/smoke/*" = ["E401", "UP017", "E731", "F401", "F841", "UP012"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from .. import db, security
 from ..render import templates
-from . import common
+from . import common, studio
 from .financials import _RANGE_LABELS, _RANGES, _range_bounds, _usd0
 from .lookups import PROJECT_STATUSES
 
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/admin/reports", dependencies=[Depends(security.requi
 
 def _months_back(n=12):
     """List of (YYYY-MM, 'Mon YY') from oldest to newest, ending this month."""
-    today = dt.date.today().replace(day=1)
+    today = studio._today().replace(day=1)
     out = []
     y, m = today.year, today.month
     for _ in range(n):
@@ -31,7 +31,7 @@ def _months_back(n=12):
 def _prior_bounds(key: str) -> tuple[str, str]:
     """(start, end) of the period immediately before the current one, for
     'vs prior' trend deltas. Mirrors financials._range_bounds shape."""
-    today = dt.date.today()
+    today = studio._today()
     if key == "month":
         cur = today.replace(day=1)
         end = cur

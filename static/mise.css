@@ -699,10 +699,12 @@ progress { width: 100%; }
   border-radius: 10px; padding: 1rem 1.2rem; white-space: pre-wrap; }
 
 /* ============================================================
-   Marketing site — editorial F&B design system (Claude Design)
+   LEGACY-KILL-SWITCH — keep while MISE_SCREENING_ROOM can be false.
+   Marketing site — editorial F&B cream design system (Claude Design).
    Scoped under .site-body so the admin UI keeps the default theme.
-   Palette + fonts are overridden as CSS variables here, so existing
-   .site-* primitives re-tint automatically. Fonts: Newsreader + Archivo.
+   When Screening Room is ON, screening.css overrides this chrome;
+   when OFF, this block + candlelight/editorial-dark below are the look.
+   .cream-theme (money docs / login) still needs these palette tokens.
    ============================================================ */
 .site-body {
   --bg: #F7F1E5; --ink: #1C1814; --muted: #5B554C; --accent: #CF452C;
@@ -6082,13 +6084,11 @@ html[data-theme="dark"] .admin-shell .unlinked-warn-head { color: var(--ink-soft
 html[data-theme="dark"] .admin-shell .unlinked-warn-head strong { color: var(--ink); }
 
 /* ============================================================================
+   LEGACY-KILL-SWITCH — keep while MISE_SCREENING_ROOM can be false.
    PUBLIC SITE — DARK MODE · CANDLELIGHT (After Dark × Direction B).
-   Dark is now the marketing site's DEFAULT (see the dark-first pre-paint
-   script in templates/site/base_site.html); an explicit "light" choice keeps
-   the locked candlelit-editorial LIGHT design, byte-untouched below this
-   layer. Scoped to .site-body under html[data-theme="dark"] — near-black
-   forest surfaces, warm cream ink, gold accent. Shares the admin localStorage
-   key ("mise-theme"); the admin keeps its own light-first default.
+   Superseded for the default Screening Room path by the EDITORIAL DARK block
+   later in this file + screening.css. Still required when the SR kill switch
+   is off and marketing falls back to mise.css alone. See ops/CSS-DUAL-STACK.md.
    ========================================================================== */
 html[data-theme="dark"] .site-body {
   color-scheme: dark;
@@ -7286,6 +7286,7 @@ html[data-theme="dark"] .admin-shell .fin-card-ok .fin-card-val { color: #5fbf93
 .admin-shell .stack-form .inline-form { display: flex; gap: 12px; align-items: center; }
 
 /* ============================================================================
+   LEGACY-KILL-SWITCH — keep while MISE_SCREENING_ROOM can be false.
    EDITORIAL DARK — MARKETING RESKIN  (Claude Design handoff2, 2026-07-11)
    ----------------------------------------------------------------------------
    Cool slate-navy #0e1319 base · cool-grey #afbbca ink · dusty-rose #d37e88 +
@@ -7294,8 +7295,7 @@ html[data-theme="dark"] .admin-shell .fin-card-ok .fin-card-val { color: #5fbf93
    data-theme=dark). This layer is APPENDED last, so at equal specificity it
    overrides the earlier "After Dark · Candlelight" block by source order. It
    touches ONLY .site-body — money docs (.cream-theme) and admin (.admin-shell)
-   are untouched. PR-A covers the shared chrome + the home page; inner-page
-   bodies are recolored in the following PRs.
+   are untouched. When Screening Room is ON, screening.css is authoritative.
    ========================================================================== */
 
 /* ── 1. Tokens (override the candlelight dark block) ─────────────────────── */

@@ -38,6 +38,7 @@ from .admin import (
     financials,
     forms,
     galleries,
+    gallery_sections,
     inbox,
     invoices,
     licenses,
@@ -53,6 +54,8 @@ from .admin import (
     share,
     shotlist,
     studio,
+    studio_brand,
+    tasks,
     uploads,
 )
 from .admin import scheduling as admin_scheduling
@@ -333,9 +336,12 @@ async def healthz():
 for r in (
     auth.router,
     galleries.router,
+    gallery_sections.router,
     uploads.router,
     activity.router,
+    tasks.router,
     studio.router,
+    studio_brand.router,
     proposals.router,
     contracts.router,
     invoices.router,
