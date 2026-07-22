@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from app import booking_notify, config, db, notion_sync
 from app.main import app
+from tests.jobtest import freeze_job_pool
 
 pytestmark = pytest.mark.integration
 
@@ -302,7 +303,8 @@ def _wipe(email: str) -> None:
     db.run("DELETE FROM pin_attempts")
 
 
-def test_contact_post_enqueues_sync_job(client):
+def test_contact_post_enqueues_sync_job(client, monkeypatch):
+    freeze_job_pool(monkeypatch)
     try:
         r = client.post(
             "/contact",
@@ -316,12 +318,14 @@ def test_contact_post_enqueues_sync_job(client):
         inq = db.one("SELECT id FROM inquiries WHERE email='wire@example.com'")
         job = _last_inquiry_job()
         assert job is not None
+        assert job["status"] == "queued"
         assert f'"inquiry_id": {inq["id"]}' in job["payload"]
     finally:
         _wipe("wire@example.com")
 
 
-def test_lead_form_post_enqueues_sync_job(client):
+def test_lead_form_post_enqueues_sync_job(client, monkeypatch):
+    freeze_job_pool(monkeypatch)
     fid = db.run(
         "INSERT INTO forms (slug, title, kind, active) VALUES ('wire-test','Wire Test','lead',1)"
     )
@@ -334,6 +338,7 @@ def test_lead_form_post_enqueues_sync_job(client):
         inq = db.one("SELECT id FROM inquiries WHERE email='formwire@example.com'")
         assert inq is not None
         job = _last_inquiry_job()
+        assert job["status"] == "queued"
         assert f'"inquiry_id": {inq["id"]}' in job["payload"]
     finally:
         db.run("DELETE FROM form_submissions WHERE form_id=?", (fid,))

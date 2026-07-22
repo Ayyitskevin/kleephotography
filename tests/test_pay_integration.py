@@ -211,6 +211,40 @@ def test_webhook_retry_same_event_is_duplicate_after_deposit(client, monkeypatch
     _cleanup_money_chain(cid, pid, iid)
 
 
+def test_webhook_rejects_settled_invoice(client, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    alerts = []
+    monkeypatch.setattr(pay.alerts, "security_alert", lambda text: alerts.append(text))
+    cid, pid, iid = _seed_money_chain(
+        project_status="retainer_paid", total=90000, deposit=0, inv_status="paid"
+    )
+    r = _post_signed(client, _checkout_event("evt_settled", iid, "full", 90000))
+    assert r.status_code == 409
+    assert "already-settled" in alerts[0] or "settled" in alerts[0].lower()
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_deposit_then_balance_settles(client, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.alerts, "security_alert", lambda *a, **k: None)
+    cid, pid, iid = _seed_money_chain(
+        project_status="proposal_sent", total=90000, deposit=30000, inv_status="sent"
+    )
+    dep = _post_signed(client, _checkout_event("evt_dep_ok", iid, "deposit", 30000))
+    assert dep.status_code == 200 and dep.json() == {"ok": True}
+    assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "deposit_paid"
+    bal = _post_signed(client, _checkout_event("evt_bal_ok", iid, "balance", 60000))
+    assert bal.status_code == 200 and bal.json() == {"ok": True}
+    inv = db.one("SELECT status, paid_at FROM invoices WHERE id=?", (iid,))
+    assert inv["status"] == "paid" and inv["paid_at"]
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 2
+    assert db.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "retainer_paid"
+    _cleanup_money_chain(cid, pid, iid)
+
+
 def test_webhook_async_payment_succeeded_settles_ach(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
     monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)

@@ -536,7 +536,9 @@ def test_upload_batch_revalidates_section_ownership_at_insert(admin, monkeypatch
         return size
 
     monkeypatch.setattr(admin_uploads.common, "save_upload", save_then_reuse_section_id)
-    monkeypatch.setattr(admin_uploads.jobs, "_pool", None)
+    from tests.jobtest import freeze_job_pool
+
+    freeze_job_pool(monkeypatch)
     media_dir = config.MEDIA_DIR / str(target["id"])
     last_job_id = db.one("SELECT COALESCE(MAX(id), 0) AS id FROM jobs")["id"]
     rev_before = target["content_rev"]
