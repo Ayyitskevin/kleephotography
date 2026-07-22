@@ -1,6 +1,7 @@
 import pytest
 
 from app import config, db, jobs
+from tests.jobtest import freeze_job_pool
 
 pytestmark = pytest.mark.integration
 
@@ -31,7 +32,7 @@ def _delete_fixture(gallery_id: int, job_id: int | None) -> None:
 
 def test_social_crop_exhaustion_preserves_ready_asset_and_retry_runs(monkeypatch, tmp_path):
     """An optional crop failure must not remove the delivered source photo."""
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
     gallery_id, asset_id = _make_asset("photo", "ready")
     source = config.MEDIA_DIR / str(gallery_id) / "original" / "photo-source"
@@ -74,7 +75,7 @@ def test_social_crop_exhaustion_preserves_ready_asset_and_retry_runs(monkeypatch
 
 def test_video_rendition_exhaustion_preserves_ready_asset(monkeypatch):
     """A failed optional video rendition must not hide the delivered source."""
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     gallery_id, asset_id = _make_asset("video", "ready")
     job_id = None
 
@@ -100,7 +101,7 @@ def test_video_rendition_exhaustion_preserves_ready_asset(monkeypatch):
 )
 def test_primary_processing_exhaustion_marks_asset_failed(monkeypatch, job_kind, asset_kind):
     """Primary ingest failures still make unusable assets unavailable."""
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     gallery_id, asset_id = _make_asset(asset_kind, "pending")
     sentinel_id = db.run(
         "INSERT INTO assets (gallery_id, kind, filename, stored, status) VALUES (?,?,?,?,?)",

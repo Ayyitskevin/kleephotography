@@ -638,33 +638,19 @@ def test_marketing_site(admin, monkeypatch):
 
 
 def test_inquiry_form(monkeypatch):
-    from app import config, jobs, mailer
+    from app import config, mailer
+    from tests.jobtest import drain_owner_email, freeze_job_pool
 
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
     monkeypatch.setattr(config, "GMAIL_APP_PASSWORD", "app-pw")
-    # Owner notify is a durable job; keep pool off so we drain inline.
-    monkeypatch.setattr(jobs, "start", lambda: None)
-    monkeypatch.setattr(jobs, "_pool", None)
+    # Owner notify is a durable job; freeze the shared pool and drain inline.
+    freeze_job_pool(monkeypatch)
     sent = []
     monkeypatch.setattr(
         mailer,
         "send",
         lambda to, subject, body, reply_to="": sent.append((to, subject, body, reply_to)),
     )
-
-    def _drain_owner_email():
-        row = db.one(
-            "SELECT id, status FROM jobs WHERE kind='inquiry_owner_email' ORDER BY id DESC LIMIT 1"
-        )
-        assert row is not None
-        if row["status"] == "done":
-            return
-        if row["status"] != "queued":
-            db.run(
-                "UPDATE jobs SET status='queued', attempts=0, error=NULL WHERE id=?",
-                (row["id"],),
-            )
-        jobs._execute(row["id"])
 
     with TestClient(app) as pub:
         # honeypot filled → pretend success, store nothing, send nothing
@@ -678,7 +664,10 @@ def test_inquiry_form(monkeypatch):
             },
         )
         assert r.status_code == 200 and "Thanks" in r.text
-        assert db.one("SELECT COUNT(*) AS n FROM inquiries")["n"] == 0 and not sent
+        assert (
+            db.one("SELECT COUNT(*) AS n FROM inquiries WHERE email=?", ("b@spam.com",))["n"] == 0
+            and not sent
+        )
 
         # bad email rejected — and every typed value is echoed back so the
         # visitor never loses their quote request to a typo (dotless domain
@@ -708,7 +697,10 @@ def test_inquiry_form(monkeypatch):
         assert '<option value="Not sure" selected' in r.text
         assert '<option value="Under $1,000" selected' in r.text
         # nothing was stored for the rejected submission
-        assert db.one("SELECT COUNT(*) AS n FROM inquiries")["n"] == 0
+        assert (
+            db.one("SELECT COUNT(*) AS n FROM inquiries WHERE email=?", ("sam@localhost",))["n"]
+            == 0
+        )
 
         # real inquiry: stored immediately; visitor ack is sync; owner notify is a job
         r = pub.post(
@@ -726,22 +718,24 @@ def test_inquiry_form(monkeypatch):
         assert r.status_code == 200 and "Thanks" in r.text
         assert 'data-analytics-view="Contact Success"' in r.text
         assert 'href="/book">Need a time now?' in r.text
-        q = db.one("SELECT * FROM inquiries ORDER BY id DESC LIMIT 1")
+        q = db.one("SELECT * FROM inquiries WHERE email=?", ("sam@taqueria.com",))
         assert q["name"] == "Sam Owner" and q["emailed"] == 0
         assert q["phone"] == "828-555-0102"
         assert "Listing / property scope: 3,200 sq ft · 4 bed 3 bath" in q["message"]
         assert "Dishes / setups" not in q["message"]
         # Visitor acknowledgement is best-effort on the request path.
-        ack_to, ack_subject, ack_body, ack_reply_to = sent[0]
-        assert ack_to == "sam@taqueria.com" and ack_reply_to == ""
+        ack = next(c for c in sent if c[0] == "sam@taqueria.com")
+        ack_to, ack_subject, ack_body, ack_reply_to = ack
+        assert ack_reply_to == ""
         assert "what happens next" in ack_subject.lower()
         assert f"{config.BASE_URL}/services" in ack_body
         assert f"{config.BASE_URL}/book" in ack_body
-        _drain_owner_email()
+        drain_owner_email(q["id"])
         q = db.one("SELECT * FROM inquiries WHERE id=?", (q["id"],))
         assert q["emailed"] == 1 and q["owner_email_delivered_at"]
-        to, subject, body, reply_to = sent[1]
-        assert to == "kevin@example.com" and reply_to == "sam@taqueria.com"
+        owner = next(c for c in sent if c[0] == "kevin@example.com")
+        to, subject, body, reply_to = owner
+        assert reply_to == "sam@taqueria.com"
         assert "Taqueria Luz" in body and "menu shoot" in body and "828-555-0102" in body
         assert "Listing / property scope" in body and "Dishes / setups" not in body
 
@@ -760,11 +754,11 @@ def test_inquiry_form(monkeypatch):
             data={"name": "Pat", "email": "pat@cafe.com", "message": "Brand partner info?"},
         )
         assert r.status_code == 200 and "Thanks" in r.text
-        q = db.one("SELECT * FROM inquiries ORDER BY id DESC LIMIT 1")
+        q = db.one("SELECT * FROM inquiries WHERE email=?", ("pat@cafe.com",))
         assert q["name"] == "Pat" and q["emailed"] == 0 and q["phone"] == ""
         # Request path only attempted visitor ack (failed); owner notify is the job.
         assert [call[0] for call in delivered] == ["pat@cafe.com"]
-        _drain_owner_email()
+        drain_owner_email(q["id"])
         q = db.one("SELECT * FROM inquiries WHERE id=?", (q["id"],))
         assert q["emailed"] == 1
         assert [call[0] for call in delivered] == ["pat@cafe.com", "kevin@example.com"]
@@ -779,9 +773,9 @@ def test_inquiry_form(monkeypatch):
             data={"name": "Lee", "email": "lee@cafe.com", "message": "Portrait session?"},
         )
         assert r.status_code == 200 and "Thanks" in r.text
-        q = db.one("SELECT * FROM inquiries ORDER BY id DESC LIMIT 1")
+        q = db.one("SELECT * FROM inquiries WHERE email=?", ("lee@cafe.com",))
         assert q["name"] == "Lee" and q["emailed"] == 0
-        _drain_owner_email()
+        drain_owner_email(q["id"])
         q = db.one("SELECT * FROM inquiries WHERE id=?", (q["id"],))
         assert q["emailed"] == 0
         assert q["owner_email_failure_category"] == "smtp_error"

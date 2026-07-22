@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from app import alerts, config, db, inquiry_notify, jobs, mailer, notion_sync
 from app.main import app
+from tests.jobtest import freeze_job_pool
 
 pytestmark = pytest.mark.integration
 
@@ -59,7 +60,7 @@ def _insert_lead(email="lead@example.com") -> int:
 
 
 def test_smtp_down_then_recover_idempotent(monkeypatch):
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     sent_alert = []
     _enable_ops(monkeypatch, sent_alert)
     iid = _insert_lead("smtp-rec@example.com")
@@ -114,7 +115,7 @@ def test_worker_crash_after_send_before_stamp_then_retry(monkeypatch):
     """Send succeeds but stamp fails once — reclaim allows recovery without
     requiring a second SMTP when already delivered; if stamp never landed,
     reclaim + resend is acceptable (claim lock is the concurrency fence)."""
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     iid = _insert_lead("crash@example.com")
     monkeypatch.setattr(mailer, "configured", lambda: True)
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
@@ -145,7 +146,7 @@ def test_worker_crash_after_send_before_stamp_then_retry(monkeypatch):
 
 
 def test_concurrent_claims_only_one_send(monkeypatch):
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     iid = _insert_lead("race@example.com")
     monkeypatch.setattr(mailer, "configured", lambda: True)
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
@@ -181,7 +182,7 @@ def test_concurrent_claims_only_one_send(monkeypatch):
 
 
 def test_max_attempt_job_fails_visible(monkeypatch):
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     iid = _insert_lead("max@example.com")
     monkeypatch.setattr(mailer, "configured", lambda: True)
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
@@ -318,7 +319,7 @@ def test_inbox_null_stamp_orphan_relink_route_303(client):
 
 
 def test_lead_survives_email_and_notion_failure(client, monkeypatch):
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     monkeypatch.setattr(mailer, "configured", lambda: True)
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
     monkeypatch.setattr(mailer, "send", lambda *a, **k: (_ for _ in ()).throw(OSError("smtp")))
@@ -356,7 +357,7 @@ def test_lead_survives_email_and_notion_failure(client, monkeypatch):
 
 
 def test_contact_enqueues_owner_email_and_thanks(client, monkeypatch):
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     monkeypatch.setattr(mailer, "configured", lambda: False)
     email = "enqueue-only@example.com"
     db.run("DELETE FROM inquiries WHERE email=?", (email,))
@@ -368,7 +369,7 @@ def test_contact_enqueues_owner_email_and_thanks(client, monkeypatch):
 
 
 def test_inbox_retry_owner_email_route(client, monkeypatch):
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     iid = _insert_lead("retry-ui@example.com")
     db.run(
         """UPDATE inquiries SET owner_email_status='failed',

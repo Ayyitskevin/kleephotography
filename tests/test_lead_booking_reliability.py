@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 from app import config, db, jobs, mailer, notion_sync, scheduling, security
 from app.gcal import FreeBusyQuery
 from app.main import app
+from tests.jobtest import freeze_job_pool
 
 pytestmark = pytest.mark.integration
 
@@ -61,7 +62,7 @@ def _last_inquiry_job():
 def test_contact_post_persists_lead_enqueues_job_and_thanks(client, monkeypatch):
     email = "reliability-wire@example.com"
     _wipe_lead(email)
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     monkeypatch.setattr(mailer, "configured", lambda: True)
     monkeypatch.setattr(config, "GMAIL_USER", "kevin@example.com")
     sent = []
@@ -99,7 +100,7 @@ def test_contact_post_persists_lead_enqueues_job_and_thanks(client, monkeypatch)
 
         job = _last_inquiry_job()
         assert job is not None
-        assert job["status"] in ("queued", "running", "done")
+        assert job["status"] == "queued"
         payload = json.loads(job["payload"])
         assert payload == {"inquiry_id": inq["id"]}
     finally:
@@ -186,7 +187,7 @@ def test_contact_email_failure_still_stores_lead_and_enqueues_job(client, monkey
 
 
 def test_notion_sync_inquiry_job_stamps_then_patches_idempotently(monkeypatch):
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     monkeypatch.setattr(config, "NOTION_TOKEN", "tok")
     monkeypatch.setattr(config, "NOTION_LEADS_DB", "leads-db")
     created, patched = [], []
@@ -269,7 +270,7 @@ def test_notion_sync_inquiry_race_keeps_first_stamp(monkeypatch):
 
 
 def test_failed_notion_sync_inquiry_surfaces_and_admin_retry_recovers(admin_client, monkeypatch):
-    monkeypatch.setattr(jobs, "_pool", None)
+    freeze_job_pool(monkeypatch)
     monkeypatch.setattr(config, "NOTION_TOKEN", "tok")
     monkeypatch.setattr(config, "NOTION_LEADS_DB", "leads-db")
 

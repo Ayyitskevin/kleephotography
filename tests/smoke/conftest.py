@@ -6,6 +6,8 @@ Order coupling (do not "fix" without a plan):
   - Renaming or reordering files without migrating that seed chain will flake.
   - Shared helpers live in tests/smoke/_helpers.py — prefer importing those
     over redefining local copies (F811).
+  - Job-pool races: use tests.jobtest.freeze_job_pool (stop + block lifespan
+    restart). Never null jobs._pool alone — that orphans still-running workers.
 
 Disk note: default MISE_DATA_DIR via mktemp often lands on a small /tmp
 tmpfs. If uploads return 507, put DATA_DIR on a large volume or set

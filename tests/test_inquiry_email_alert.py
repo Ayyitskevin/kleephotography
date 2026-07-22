@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from app import alerts, config, db, jobs, mailer, security
 from app.main import app
+from tests.jobtest import freeze_job_pool
 
 pytestmark = pytest.mark.integration
 
@@ -45,13 +46,6 @@ def _wipe(email: str = VISITOR_EMAIL) -> None:
     db.run("DELETE FROM pin_attempts WHERE gallery_id=?", (security.INQUIRY_BUCKET_CONTACT,))
 
 
-def _freeze_owner_email_workers(monkeypatch) -> None:
-    """Stop the shared lifespan pool so earlier module clients cannot race alerts."""
-    jobs.stop()
-    monkeypatch.setattr(jobs, "start", lambda: None)
-    monkeypatch.setattr(jobs, "_pool", None)
-
-
 def _enable_ops(monkeypatch, sent: list[str]) -> None:
     class _InlineThread:
         def __init__(self, target, args=(), **kw):
@@ -71,7 +65,7 @@ def _enable_ops(monkeypatch, sent: list[str]) -> None:
 def test_contact_smtp_failure_stores_lead_enqueues_job_and_alerts(client, monkeypatch):
     # Freeze workers before wipe so in-flight jobs from other module clients
     # cannot race the alert sink after we patch alerts._send.
-    _freeze_owner_email_workers(monkeypatch)
+    freeze_job_pool(monkeypatch)
     _wipe()
     sent: list[str] = []
     _enable_ops(monkeypatch, sent)
@@ -163,7 +157,7 @@ def test_mailer_unconfigured_uses_global_dedupe_signature(monkeypatch):
 
 
 def test_successful_owner_email_skips_ops_alert(client, monkeypatch):
-    _freeze_owner_email_workers(monkeypatch)
+    freeze_job_pool(monkeypatch)
     _wipe("ok-visitor@example.com")
     sent: list[str] = []
     _enable_ops(monkeypatch, sent)
@@ -220,7 +214,7 @@ def test_inbox_surfaces_email_failure_and_recovery_path(admin_client, monkeypatc
 
 
 def test_contact_mailer_off_still_stores_and_signals(client, monkeypatch):
-    _freeze_owner_email_workers(monkeypatch)
+    freeze_job_pool(monkeypatch)
     _wipe("unconfigured@example.com")
     sent: list[str] = []
     _enable_ops(monkeypatch, sent)
