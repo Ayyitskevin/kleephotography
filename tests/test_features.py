@@ -54,14 +54,10 @@ def test_gmail_enabled_and_telegram_and_sms():
 
 
 @pytest.mark.unit
-def test_notion_variants():
+def test_notion_enabled():
     with patch("app.features.config") as mock_cfg:
         mock_cfg.NOTION_TOKEN = "n"
-        mock_cfg.NOTION_BOOKINGS_DB = "db1"
-        mock_cfg.NOTION_SESSIONS_DB = ""
         assert features.notion_enabled() is True
-        assert features.notion_bookings_enabled() is True
-        assert features.notion_sessions_enabled() is False
 
 
 @pytest.mark.unit
@@ -76,14 +72,3 @@ def test_screening_room_and_aerials_flags():
         mock_cfg.AERIALS_LIVE = True
         assert features.screening_room() is False
         assert features.aerials_live() is True
-
-
-@pytest.mark.unit
-def test_demo_gallery_and_plausible():
-    with patch("app.features.config") as mock_cfg:
-        mock_cfg.DEMO_GALLERY_SLUG = "demo"
-        mock_cfg.DEMO_GALLERY_PIN = "1234"
-        assert features.demo_gallery_enabled() is True
-
-        mock_cfg.PLAUSIBLE_DOMAIN = "kleephotography.com"
-        assert features.plausible_enabled() is True

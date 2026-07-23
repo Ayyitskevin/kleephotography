@@ -35,14 +35,6 @@ def sms_enabled() -> bool:
     return bool(config.QUO_API_KEY and config.QUO_NUMBER)
 
 
-def google_calendar_enabled() -> bool:
-    return bool(config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET)
-
-
-def reopen_notify_enabled() -> bool:
-    return bool(config.REOPEN_NOTIFY_URL and config.REOPEN_NOTIFY_TOKEN)
-
-
 def hermes_enabled() -> bool:
     return bool(config.HERMES_ARM_URL)
 
@@ -53,22 +45,6 @@ def shots_api_enabled() -> bool:
 
 def notion_enabled() -> bool:
     return bool(config.NOTION_TOKEN)
-
-
-def notion_bookings_enabled() -> bool:
-    return bool(config.NOTION_TOKEN and config.NOTION_BOOKINGS_DB)
-
-
-def notion_sessions_enabled() -> bool:
-    return bool(config.NOTION_TOKEN and config.NOTION_SESSIONS_DB)
-
-
-def plausible_enabled() -> bool:
-    return bool(config.PLAUSIBLE_DOMAIN)
-
-
-def demo_gallery_enabled() -> bool:
-    return bool(config.DEMO_GALLERY_SLUG and config.DEMO_GALLERY_PIN)
 
 
 def screening_room() -> bool:
