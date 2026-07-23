@@ -641,7 +641,10 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .book-event-go { color: var(--sr-amber); }
 .sr .book-promises li { color: var(--sr-ink-soft); }
 .sr .book-promises li::marker, .sr .book-promises li::before { color: var(--sr-ok); }
-.sr .book-rail { border-right: 1px solid var(--sr-line); }
+.sr .book-rail { border-right: 1px solid var(--sr-line);
+  /* keep the legacy cream --bg fallback off the rail — it reads as a white
+     slab on the house (mise.css:2931 var(--paper2, var(--bg)) hits :root --bg) */
+  background: var(--sr-house-deep); }
 .sr .book-rail-host { font: 500 9.5px/1 var(--sr-mono); letter-spacing: 0.26em;
   text-transform: uppercase; color: var(--sr-ink-ghost); }
 .sr .book-rail-title { color: var(--sr-cream-strong); text-transform: uppercase;
