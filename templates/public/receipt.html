@@ -2,40 +2,64 @@
 {% block title %}Receipt · {{ d.title }} · {{ site_name }}{% endblock %}
 {% block bodyclass %}{% if sr_enabled() %}sr sr-moneydoc{% else %}cream-theme{% endif %}{% endblock %}
 {% block content %}
-<main class="doc-page">
-  <header class="doc-head">
-    <p class="muted">{{ site_name }}</p>
-    <h1>Receipt</h1>
-    <p class="muted">Invoice #{{ d.id }} · {{ d.title }}</p>
-    <p class="muted">Billed to {{ d.client_name }}{% if d.company %} · {{ d.company }}{% endif %}</p>
-  </header>
-
-  <table class="list doc-items">
-    <tr><th>Date</th><th>Payment</th><th>Amount</th></tr>
-    {% for p in payments %}
-    <tr>
-      <td>{{ p.created_at[:10] }}</td>
-      <td>{{ {"deposit": "Deposit", "balance": "Balance", "full": "Payment"}.get(p.kind, p.kind) }}</td>
-      <td>${{ p.amount_cents|usd }}</td>
-    </tr>
-    {% endfor %}
-    <tr><td colspan="2"><strong>Total paid</strong></td>
-        <td><strong>${{ paid_cents|usd }}</strong></td></tr>
-    {% if remaining_cents %}
-    <tr><td colspan="2">Remaining balance</td>
-        <td>${{ remaining_cents|usd }}</td></tr>
-    {% endif %}
-  </table>
-
-  {% if not remaining_cents %}
-  <p class="doc-accepted">✓ Paid in full — thank you!</p>
-  {% endif %}
-  <p class="muted">Invoice total ${{ d.total_cents|usd }}.
-    Payments processed securely by Stripe.</p>
-
-  <div class="doc-actions no-print">
-    <button data-print class="link">Print / save as PDF</button>
-    <a href="/i/{{ d.slug }}" class="link">Back to invoice</a>
+<main class="doc-page client-doc">
+  <div class="client-doc-brandbar">
+    <div>
+      <strong>{{ site_name }}</strong>
+      <span>Photography &amp; Film</span>
+    </div>
+    <span>Receipt · Invoice #{{ d.id }}</span>
   </div>
+
+  <section class="client-doc-paper">
+    <header class="client-doc-head">
+      <div>
+        <p class="client-doc-kicker">Receipt — billed to</p>
+        <h1>{{ d.company or d.client_name }}</h1>
+        <p>{{ d.client_name }} · {{ d.title }}</p>
+      </div>
+      <div class="client-doc-meta">
+        <p><span>Invoice</span>#{{ d.id }}</p>
+        <p><span>Status</span>{{ "Paid in full" if not remaining_cents else "Partially paid" }}</p>
+      </div>
+    </header>
+
+    <div class="client-doc-table-wrap">
+    <table class="client-doc-table">
+      <thead>
+        <tr><th>Date</th><th>Payment</th><th class="doc-r">Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for p in payments %}
+        <tr>
+          <td>{{ p.created_at[:10] }}</td>
+          <td><strong>{{ {"deposit": "Deposit", "balance": "Balance", "full": "Payment"}.get(p.kind, p.kind) }}</strong></td>
+          <td class="doc-r">${{ p.amount_cents|usd }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+
+    <div class="client-doc-totals">
+      <div><span>Invoice total</span><strong>${{ d.total_cents|usd }}</strong></div>
+      <div><span>Total paid</span><strong>${{ paid_cents|usd }}</strong></div>
+      {% if remaining_cents %}
+      <div class="client-doc-due"><span>Remaining balance</span><strong>${{ remaining_cents|usd }}</strong></div>
+      {% endif %}
+    </div>
+
+    {% if not remaining_cents %}
+    <p class="doc-accepted">Paid in full — thank you!</p>
+    {% endif %}
+
+    <div class="client-doc-actions no-print">
+      <button type="button" data-print class="link">Print / save as PDF</button>
+      <a href="/i/{{ d.slug }}" class="link">Back to invoice</a>
+    </div>
+    <p class="client-doc-security no-print">Payments processed securely by Stripe.</p>
+  </section>
+
+  <p class="client-doc-foot">Proposal → Contract → Invoice — clean documents, secure payment, no extra portal friction.</p>
 </main>
 {% endblock %}
