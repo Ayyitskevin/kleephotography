@@ -1534,3 +1534,73 @@ body.sr-admin .admin-shell, body.sr-admin {
 .admin-shell .sch-ov-add select { width: auto; }
 .admin-shell .sch-ov-hours { display: inline-flex; gap: 8px; align-items: center; }
 .admin-shell .sch-ov-hours[hidden] { display: none; }
+
+/* ── house-lights pass (2026-07) ──────────────────────────────────────────────
+   Lobby choreography + cinema atmosphere. All progressive enhancement: every
+   element renders fully without JS, all motion honors prefers-reduced-motion,
+   admin and legacy surfaces never match these selectors. */
+
+/* reveal stagger — sibling cards/frames rise in sequence, like title cards
+   coming up (site.js adds .reveal-hidden per element; delay shapes the rise) */
+.sr .sr-features [data-reveal]:nth-child(2) { transition-delay: 0.12s; }
+.sr .sr-features [data-reveal]:nth-child(3) { transition-delay: 0.24s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(2) { transition-delay: 0.06s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(3) { transition-delay: 0.12s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(4) { transition-delay: 0.18s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(5) { transition-delay: 0.24s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(6) { transition-delay: 0.3s; }
+
+/* ticker pauses under the pointer so a highlight can actually be read */
+.sr .sr-ticker:hover .sr-ticker-track,
+.sr .sr-ticker:focus-within .sr-ticker-track { animation-play-state: paused; }
+
+/* cross-page fade — browsers without view transitions just navigate as before */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: sr-vt-out 160ms ease both; }
+::view-transition-new(root) { animation: sr-vt-in 200ms ease 40ms both; }
+@keyframes sr-vt-out { to { opacity: 0; } }
+@keyframes sr-vt-in { from { opacity: 0; } }
+
+/* film grain over the marquee/premiere screens — texture only, never
+   interactive, below the title/corners/playerstrip (z2), above the scrim */
+.sr .sr-screen::after {
+  content: ""; position: absolute; inset: -60px; z-index: 1; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.055; mix-blend-mode: overlay;
+  animation: sr-grain 1.1s steps(6) infinite;
+}
+@keyframes sr-grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-18px, 12px); }
+  40% { transform: translate(14px, -20px); }
+  60% { transform: translate(-10px, -14px); }
+  80% { transform: translate(20px, 16px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Ken Burns drift on the hero still (only renders when there is no reel) */
+.sr .sr-screen--reel > img { animation: sr-kenburns 28s ease-in-out infinite alternate; }
+@keyframes sr-kenburns { from { transform: scale(1); } to { transform: scale(1.055); } }
+
+/* frame-advance hovers — stills breathe like a projector gate; frame numbers
+   warm to the house amber */
+.sr .sr-filmstrip figure img { transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sr .sr-filmstrip figure:hover img { transform: scale(1.045); }
+.sr .sr-filmstrip .sr-frameno { transition: color 0.3s ease; }
+.sr .sr-filmstrip figure:hover .sr-frameno { color: var(--sr-amber); }
+.sr a.sr-card { transition: border-color 0.25s ease; }
+.sr a.sr-card .sr-card-media img { transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sr a.sr-card:hover .sr-card-media img,
+.sr a.sr-card:focus-visible .sr-card-media img { transform: scale(1.03); }
+.sr .portfolio-masonry .tile { overflow: hidden; }
+.sr .portfolio-masonry .tile img { transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sr .portfolio-masonry .tile:hover img { transform: scale(1.03); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sr [data-reveal] { transition-delay: 0s !important; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
+  .sr .sr-screen::after { animation: none; }
+  .sr .sr-screen--reel > img { animation: none; }
+  .sr .sr-filmstrip figure img, .sr a.sr-card .sr-card-media img,
+  .sr .portfolio-masonry .tile img { transition: none; }
+}

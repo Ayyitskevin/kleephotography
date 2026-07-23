@@ -63,7 +63,7 @@
   </div>
   <div class="sr-features">
     {% for d in doors %}
-    <a class="sr-card sp-door sr-stock-{{ d.key }}" href="/{{ d.slug }}">
+    <a class="sr-card sp-door sr-stock-{{ d.key }}" href="/{{ d.slug }}" data-reveal>
       <div class="sr-card-head">
         <span class="sr-mono sr-mono--stock">{{ d.feature }} &middot; Stock {{ d.stock }}</span>
         {% if d.n_photos or d.n_reels %}
@@ -119,7 +119,7 @@
   </div>
   <div class="sr-filmstrip">
     {% for a in featured[:6] %}
-    <figure class="tile{{ ' sr-frame-wide' if loop.index is odd else ' sr-frame-tall' }}" data-web="/site/img/{{ a.id }}">
+    <figure class="tile{{ ' sr-frame-wide' if loop.index is odd else ' sr-frame-tall' }}" data-web="/site/img/{{ a.id }}" data-reveal>
       <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
            sizes="(max-width: 700px) 45vw, 260px" alt="{{ a|portfolio_alt }}">
       <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
@@ -139,13 +139,13 @@
 
 {# ═══ WHAT CLIENTS SAY — visible proof only; no unsupported Review schema ════ #}
 {% if testimonials %}
-<section class="sr-wrap sr-section" aria-label="Testimonials">
+<section class="sr-wrap sr-section" aria-label="Testimonials" data-reveal>
   {% include "site/_testimonials.html" %}
 </section>
 {% endif %}
 
 <section class="sr-wrap sr-section" aria-label="Book">
-  <div class="sr-stats">
+  <div class="sr-stats" data-reveal>
     <div class="sr-stat"><b>Ready for your close-up?</b><small>Pick a time, or request a tailored quote for a custom project.</small></div>
     <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Book a shoot &rarr;</a></div>
     <div class="sr-stat sr-stat--cta"><a class="sr-btn sr-btn--ghost" href="/contact">Request a quote</a></div>
