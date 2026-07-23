@@ -89,7 +89,7 @@
   </aside>
 
   <section class="book-main">
-    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    {% if error %}<p class="error" role="alert" aria-live="polite" id="book-error">{{ error }}</p>{% endif %}
 
     {% if sel_start %}
       {# ── Step 2: details / confirm ─────────────────────────────── #}
@@ -101,8 +101,12 @@
           <p class="muted">Your name and details carry over from the original booking.</p>
           <button type="submit">Confirm new time</button>
         {% else %}
-          <label>Name <input type="text" name="name" value="{{ submitted.name }}" required></label>
-          <label>Email <input type="email" name="email" value="{{ submitted.email }}" required></label>
+          <label>Name <span class="req" aria-hidden="true">*</span>
+            <input type="text" name="name" value="{{ submitted.name }}" required
+                   {% if 'name' in error_fields %}aria-invalid="true" aria-describedby="book-error"{% endif %}></label>
+          <label>Email <span class="req" aria-hidden="true">*</span>
+            <input type="email" name="email" value="{{ submitted.email }}" required
+                   {% if 'email' in error_fields %}aria-invalid="true" aria-describedby="book-error"{% endif %}></label>
           <label>Phone <span class="muted">(optional)</span>
             <input type="tel" name="phone" value="{{ submitted.phone }}"></label>
           <label>Anything I should know? <span class="muted">(optional)</span>

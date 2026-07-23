@@ -49,7 +49,7 @@
     {% endif %}
     {% endfor %}
     <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    {% if error %}<p class="error" role="alert" aria-live="polite">{{ error }}</p>{% endif %}
     <button type="submit">Submit</button>
   </form>
   {% endif %}

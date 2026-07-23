@@ -98,6 +98,7 @@ def _picker_ctx(
         "is_reschedule": is_reschedule,
         "token": token,
         "error": None,
+        "error_fields": (),
         "slots": None,
         "sel_day": None,
         "sel_start": None,
@@ -210,10 +211,11 @@ async def confirm_booking(
         tag = f"AERIAL PASS requested ({specialties.aerial_pass_display()} add-on) — confirm LAANC"
         notes = f"{tag}\n{notes}".strip()[:2000]
 
-    def repicker(msg: str, code: int = 400):
+    def repicker(msg: str, code: int = 400, fields: tuple = ()):
         ctx = _picker_ctx(et, request, submitted_start=start, submitted_tz=tz)
         ctx["form_action"] = f"/book/{slug}"
         ctx["error"] = msg
+        ctx["error_fields"] = fields
         ctx["submitted"] = submitted
         return templates.TemplateResponse(request, "public/book_event.html", ctx, status_code=code)
 
@@ -222,7 +224,7 @@ async def confirm_booking(
             "You've booked a few times recently — give me a moment before booking another.", 429
         )
     if not (name and _valid_email(email)):
-        return repicker("Please enter your name and a valid email.")
+        return repicker("Please enter your name and a valid email.", fields=("name", "email"))
     try:
         bid, token = scheduling.book(et, start, name, email, phone, notes, tz)
     except scheduling.CalendarUnavailable:

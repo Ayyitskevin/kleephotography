@@ -15,8 +15,9 @@
       <label class="sr-ticket-label" for="sr-pin">Enter PIN from your text</label>
       <input id="sr-pin" class="sr-pin-input" type="text" name="pin" inputmode="numeric"
              pattern="[0-9]{4}" maxlength="4" placeholder="&middot;&middot;&middot;&middot;"
-             autocomplete="one-time-code" autofocus required>
-      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+             autocomplete="one-time-code" autofocus required
+             {% if error %}aria-invalid="true" aria-describedby="ticket-error"{% endif %}>
+      {% if error %}<p class="error" role="alert" aria-live="polite" id="ticket-error">{{ error }}</p>{% endif %}
       <button type="submit" class="sr-ticket-go">{{ ticket_cta }}</button>
     </form>
   </div>

@@ -7,12 +7,13 @@
   <h1 class="sr-state-title">Almost there</h1>
   <p class="muted">Enter your email to unlock downloads for this gallery.</p>
   <form method="post" action="/g/{{ g.slug }}/email" class="pin-form">
-    <input type="email" name="email" placeholder="you@company.com" autofocus required>
+    <input type="email" name="email" placeholder="you@company.com" autofocus required
+           {% if error %}aria-invalid="true" aria-describedby="gate-error"{% endif %}>
     {% if asset_id is not none %}<input type="hidden" name="asset_id" value="{{ asset_id }}">{% endif %}
     {% if fav %}<input type="hidden" name="fav" value="1">{% endif %}
     {% if section is not none %}<input type="hidden" name="section" value="{{ section }}">{% endif %}
     {% if web %}<input type="hidden" name="web" value="1">{% endif %}
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    {% if error %}<p class="error" role="alert" aria-live="polite" id="gate-error">{{ error }}</p>{% endif %}
     <button type="submit">Unlock downloads</button>
   </form>
   <p class="muted gate-help">
