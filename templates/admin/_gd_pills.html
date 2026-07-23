@@ -1,0 +1,16 @@
+{# Bench section-filter pills — rendered inside gallery.html's toolbar, and
+   appended to the bench HX fragment with hx-swap-oob (inert on the full
+   render) so bulk moves re-true the per-section counts. Filtering itself is
+   the delegated data-filter behavior (behaviors.js): pills carry
+   data-filter-key/value, the All pill's empty value clears the section axis.
+   #gd-pills is the swap root. #}
+{% set is_drop = g.type == 'drop' %}
+<div class="gd-pills" id="gd-pills" role="group" aria-label="Filter by section"{% if request.headers.get("hx-request") %} hx-swap-oob="outerHTML"{% endif %}>
+  <button type="button" class="gd-pill is-active" data-filter-key="section" data-filter-value="" aria-pressed="true">All <span>{{ assets|length }}</span></button>
+  {% if not is_drop %}
+  {% for s in sections %}
+  {% set sn = assets | selectattr("section_id", "equalto", s.id) | list | length %}
+  <button type="button" class="gd-pill" data-filter-key="section" data-filter-value="{{ s.id }}" aria-pressed="false">{{ s.name }} <span>{{ sn }}</span></button>
+  {% endfor %}
+  {% endif %}
+</div>

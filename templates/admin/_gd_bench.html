@@ -1,0 +1,9 @@
+{# HX fragment for bench-level actions (move / bulk-section / bulk-portfolio):
+   the whole masonry (swapped outerHTML onto #gd-masonry) plus the stats and
+   section pills riding out-of-band, so one POST re-trues tile order and every
+   count. Rendered by galleries.py / gallery_sections.py on HX-Request only —
+   same _bench_context as the full gallery GET, a rendering fork never a
+   logic one (mirrors _studio_frag.html). #}
+{% include "admin/_gd_stats.html" %}
+{% include "admin/_gd_pills.html" %}
+{% include "admin/_gd_masonry.html" %}

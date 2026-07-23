@@ -1,0 +1,10 @@
+{# The bench masonry — rendered inside gallery.html, and the main swap root
+   (#gd-masonry, outerHTML) of the bench HX fragment after a move or bulk
+   action. data-cull arms the keyboard culling (behaviors.js); each tile is
+   _gd_tile.html so per-tile swaps render identically. #}
+{% set is_drop = g.type == 'drop' %}
+<div class="gd-masonry" id="gd-masonry"{% if not is_drop %} data-cull{% endif %}>
+  {% for a in assets %}
+  {% include "admin/_gd_tile.html" %}
+  {% endfor %}
+</div>

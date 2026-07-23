@@ -51,26 +51,13 @@
   <div class="gd-grid" data-gal-grid>
 
     <!-- LEFT: stats + toolbar + masonry -->
-    <div class="gd-left">
-      <div class="gd-stats">
-        <div class="gd-stat"><span class="gd-stat-n">{{ assets|length }}</span><span class="gd-stat-l">Photos</span></div>
-        <div class="gd-stat"><span class="gd-stat-n gd-stat-gold">{{ n_fav }}</span><span class="gd-stat-l">Favorited</span></div>
-        <div class="gd-stat"><span class="gd-stat-n">{{ n_views }}</span><span class="gd-stat-l">Client views</span></div>
-        <div class="gd-stat"><span class="gd-stat-n gd-stat-ok">{{ n_downloads }}</span><span class="gd-stat-l">Downloads</span></div>
-      </div>
+    <div class="gd-left" data-filter data-filter-empty="#gd-empty" data-filter-hide-class="gd-hidden">
+      {% include "admin/_gd_stats.html" %}
 
       <div class="gd-toolbar">
-        <div class="gd-pills" role="group" aria-label="Filter by section">
-          <button type="button" class="gd-pill is-active" data-section="" aria-pressed="true">All <span>{{ assets|length }}</span></button>
-          {% if not is_drop %}
-          {% for s in sections %}
-          {% set sn = assets | selectattr("section_id", "equalto", s.id) | list | length %}
-          <button type="button" class="gd-pill" data-section="{{ s.id }}" aria-pressed="false">{{ s.name }} <span>{{ sn }}</span></button>
-          {% endfor %}
-          {% endif %}
-        </div>
+        {% include "admin/_gd_pills.html" %}
         {% if n_fav %}
-        <button type="button" class="gd-favtoggle" id="gd-favtoggle" aria-pressed="false"><span class="gd-heart">&#9829;</span> Favorites only</button>
+        <button type="button" class="gd-favtoggle" id="gd-favtoggle" data-filter-key="fav" data-filter-value="1" data-filter-toggle aria-pressed="false"><span class="gd-heart">&#9829;</span> Favorites only</button>
         {% endif %}
       </div>
 
@@ -82,15 +69,21 @@
           <option value="">(no section)</option>
           {% for s in sections %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
         </select>
-        <button type="submit" class="sr-btn sr-btn--sm">Move</button>
+        <button type="submit" class="sr-btn sr-btn--sm"
+                hx-post="/admin/galleries/{{ g.id }}/assets/bulk-section"
+                hx-target="#gd-masonry" hx-swap="outerHTML">Move</button>
         <span class="muted">· portfolio:</span>
         <input type="text" name="portfolio_tag" list="tag-suggestions" placeholder="tag (optional)…"
                style="width:9rem" title="Applied to the checked assets when starring; blank keeps existing tags">
         <button type="submit" class="sr-btn sr-btn--sm"
                 formaction="/admin/galleries/{{ g.id }}/assets/bulk-portfolio"
+                hx-post="/admin/galleries/{{ g.id }}/assets/bulk-portfolio"
+                hx-target="#gd-masonry" hx-swap="outerHTML"
                 title="Star checked assets for the public portfolio, tagging them if a tag is set"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-star"/></svg> Star checked</button>
         <button type="submit" class="sr-btn sr-btn--sm" name="mode" value="unstar"
                 formaction="/admin/galleries/{{ g.id }}/assets/bulk-portfolio"
+                hx-post="/admin/galleries/{{ g.id }}/assets/bulk-portfolio"
+                hx-target="#gd-masonry" hx-swap="outerHTML"
                 title="Remove checked assets from the public portfolio">Unstar</button>
       </form>
       {% endif %}
@@ -98,132 +91,7 @@
         {% for t in tag_suggestions %}<option value="{{ t }}">{% endfor %}
       </datalist>
 
-      {% macro vc_thread(comments, parent, g, a, depth) %}
-        {% for c in comments if (c.parent_id or 0) == parent %}
-        <div class="avc{{ ' avc-resolved' if (c.status or 'open') == 'resolved' else '' }}" style="margin-left:{{ depth }}rem">
-          <span class="avc-tc">{{ '%d:%02d'|format((c.timecode // 60)|int, (c.timecode % 60)|int) }}</span>
-          <span class="avc-role">{{ 'Studio' if c.author_role == 'admin' else 'Client' }}</span>
-          <span class="avc-text">{{ c.body }}</span>
-          {% if depth == 0 %}
-            {% if (c.status or 'open') == 'resolved' %}
-            <form method="post" action="/admin/comments/{{ c.id }}/reopen" class="inline">
-              <button class="link">reopen</button></form>
-            {% else %}
-            <form method="post" action="/admin/comments/{{ c.id }}/resolve" class="inline">
-              <button class="link ok">resolve</button></form>
-            {% endif %}
-          {% endif %}
-          <form method="post" action="/admin/comments/{{ c.id }}/hide" class="inline"
-                data-confirm="Hide this comment and any replies?">
-            <button class="link danger">hide</button>
-          </form>
-          <details class="avc-reply">
-            <summary>reply</summary>
-            <form method="post" action="/admin/galleries/{{ g.id }}/comments/{{ a.id }}">
-              <input type="hidden" name="parent_id" value="{{ c.id }}">
-              <textarea name="body" rows="2" required placeholder="Reply…"></textarea>
-              <button class="link">Reply</button>
-            </form>
-          </details>
-          {{ vc_thread(comments, c.id, g, a, depth + 1) }}
-        </div>
-        {% endfor %}
-      {% endmacro %}
-
-      <div class="gd-masonry" id="gd-masonry"{% if not is_drop %} data-cull{% endif %}>
-        {% for a in assets %}
-        <figure class="gd-tile" data-section="{{ a.section_id or '' }}" data-fav="{{ 1 if a.n_fav else 0 }}" id="asset-{{ a.id }}">
-          {% if a.status == 'ready' %}
-          <img src="/admin/thumb/{{ g.id }}/{{ a.id }}" loading="lazy" alt="{{ a.filename }}">
-          {% else %}
-          <div class="gd-tile-ph">{{ a.status }}</div>
-          {% endif %}
-          {% if a.id in hero_asset_ids %}<span class="gd-tile-hero" title="Argus hero pick">&#9733;</span>{% endif %}
-          {% if a.n_fav %}<span class="gd-tile-fav" title="{{ a.n_fav }} client favorite{{ '' if a.n_fav == 1 else 's' }}">&#9829;{% if a.n_fav > 1 %} {{ a.n_fav }}{% endif %}</span>{% endif %}
-          {% if a.kind == 'video' %}<span class="gd-tile-vid" title="Video">&#9658;</span>{% endif %}
-          <figcaption class="gd-ov">
-            <span class="gd-ov-name">{{ a.filename }}</span>
-            {% if a.argus_keeper_score is not none %}
-            <span class="gd-ov-score" title="Argus keeper score">{{ '%.0f'|format(a.argus_keeper_score * 100) }}%</span>
-            {% endif %}
-            {% if a.argus_alt_text %}
-            <span class="gd-ov-alt" title="{{ a.argus_alt_text }}">{{ a.argus_alt_text[:72] }}{% if a.argus_alt_text|length > 72 %}…{% endif %}</span>
-            {% endif %}
-          </figcaption>
-          <details class="gd-manage">
-            <summary class="gd-gear" title="Manage this file">&#9881;</summary>
-            <div class="gd-manage-body">
-              <p class="gd-manage-head">#{{ a.id }} · {{ a.kind }}{% if a.n_fav %} · &#9829; {{ a.n_fav }}{% endif %}</p>
-              {% if not is_drop %}
-              <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/section" class="gd-mrow">
-                <span class="muted">Section</span>
-                <select name="section_id" data-autosubmit>
-                  <option value="">(none)</option>
-                  {% for s in sections %}
-                  <option value="{{ s.id }}" {% if a.section_id == s.id %}selected{% endif %}>{{ s.name }}</option>
-                  {% endfor %}
-                </select>
-              </form>
-              {% endif %}
-              <div class="gd-mrow">
-                <input type="checkbox" name="asset_ids" value="{{ a.id }}" form="bulkform" title="Select for bulk move"> <span class="muted">bulk-select</span>
-                <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/move" class="inline">
-                  <button class="link" name="dir" value="left" title="Move earlier">&larr;</button>
-                  <button class="link" name="dir" value="right" title="Move later">&rarr;</button>
-                </form>
-              </div>
-              {% if a.kind in ('photo', 'video') and not is_drop %}
-              <div class="gd-mrow">
-                {% if a.kind == 'photo' %}
-                <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/cover" class="inline">
-                  <button class="link" title="Toggle cover photo">{% if g.cover_asset_id == a.id %}&#10022; cover{% else %}&#10023; cover{% endif %}</button>
-                </form>
-                {% endif %}
-                <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/portfolio" class="inline">
-                  <button class="link" title="Toggle portfolio">{% if a.portfolio %}&#9733; portfolio{% else %}&#9734; portfolio{% endif %}</button>
-                </form>
-              </div>
-              {% if a.portfolio %}
-              <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/tag" class="gd-mrow"
-                    title="Portfolio filter tag (visible on /portfolio)">
-                <input type="text" name="portfolio_tag" list="tag-suggestions" value="{{ a.portfolio_tag or '' }}" placeholder="tag…" style="width:8rem">
-                <button class="link">tag</button>
-              </form>
-              {% endif %}
-              {% endif %}
-              <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/delete" class="gd-mrow"
-                    data-confirm="Delete {{ a.filename }}?">
-                <button class="link danger">Delete file</button>
-              </form>
-              {% if a.kind == 'video' and a.status == 'ready' and not is_drop %}
-              {% set rends = renditions.get(a.id, []) %}
-              <div class="gd-mrow" title="Aspect renditions for social — 9:16 and 1:1 cut from the original">
-                <span class="muted">Social cuts</span>
-                {% for r in rends %}
-                <span class="muted">{{ r.preset.replace('x', ':') }}&nbsp;{% if r.status == 'ready' %}&#10003;{% elif r.status == 'failed' %}&#10007;{% else %}…{% endif %}</span>
-                {% endfor %}
-                <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/renditions" class="inline">
-                  <button class="link">{% if rends %}rebuild{% else %}build{% endif %}</button>
-                </form>
-              </div>
-              {% endif %}
-              {% if a.kind == 'video' %}
-              {% set thread = video_comments.get(a.id, []) %}
-              <details class="avc-panel">
-                <summary>Notes ({{ thread|length }})</summary>
-                {{ vc_thread(thread, 0, g, a, 0) }}
-                <form method="post" action="/admin/galleries/{{ g.id }}/comments/{{ a.id }}" class="avc-new">
-                  <input type="text" name="timecode" value="0" size="4" title="Timecode in seconds (0 = general note)">
-                  <textarea name="body" rows="2" required placeholder="Add a studio note…"></textarea>
-                  <button class="link">Post note</button>
-                </form>
-              </details>
-              {% endif %}
-            </div>
-          </details>
-        </figure>
-        {% endfor %}
-      </div>
+      {% include "admin/_gd_masonry.html" %}
       <p class="gd-empty muted" id="gd-empty" hidden>No files match this filter.</p>
       {% else %}
       <p class="muted">No files yet — use <b>Upload</b> above to add {{ 'files' if is_drop else 'photos and videos' }}.</p>
@@ -656,43 +524,6 @@
       d.open = true;
       d.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-  });
-
-  // Section pills + favorites toggle filter the masonry together.
-  var masonry = document.getElementById('gd-masonry');
-  var empty = document.getElementById('gd-empty');
-  var favBtn = document.getElementById('gd-favtoggle');
-  var section = '', favOnly = false;
-
-  function apply() {
-    var shown = 0;
-    if (masonry) masonry.querySelectorAll('.gd-tile').forEach(function (t) {
-      var okSec = !section || t.dataset.section === section;
-      var okFav = !favOnly || t.dataset.fav === '1';
-      var ok = okSec && okFav;
-      t.classList.toggle('gd-hidden', !ok);
-      if (ok) shown++;
-    });
-    if (empty) empty.hidden = shown !== 0;
-  }
-
-  document.querySelectorAll('.gd-pill').forEach(function (pill) {
-    pill.addEventListener('click', function () {
-      document.querySelectorAll('.gd-pill').forEach(function (p) {
-        var on = p === pill;
-        p.classList.toggle('is-active', on);
-        p.setAttribute('aria-pressed', on ? 'true' : 'false');
-      });
-      section = pill.dataset.section;
-      apply();
-    });
-  });
-
-  if (favBtn) favBtn.addEventListener('click', function () {
-    favOnly = !favOnly;
-    favBtn.classList.toggle('is-active', favOnly);
-    favBtn.setAttribute('aria-pressed', favOnly ? 'true' : 'false');
-    apply();
   });
 })();
 

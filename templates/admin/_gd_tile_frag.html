@@ -1,0 +1,6 @@
+{# Per-tile HX response: the swapped tile (primary, outerHTML onto #asset-{id})
+   PLUS pills/stats out-of-band. Star/section/delete all move bench numbers, so
+   every tile action re-trues the counts in the same response — no drift. #}
+{% include "admin/_gd_tile.html" %}
+{% include "admin/_gd_pills.html" %}
+{% include "admin/_gd_stats.html" %}

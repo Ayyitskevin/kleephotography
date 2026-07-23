@@ -1,0 +1,5 @@
+{# Delete-tile HX response: no non-oob content (htmx removes the #asset-{id}
+   target on the empty swap), just pills/stats out-of-band so the bench counts
+   drop by one in the same response. #}
+{% include "admin/_gd_pills.html" %}
+{% include "admin/_gd_stats.html" %}

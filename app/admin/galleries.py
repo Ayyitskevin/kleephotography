@@ -68,6 +68,80 @@ def get_gallery(gallery_id: int) -> "db.sqlite3.Row":
     return db.get_or_404("SELECT * FROM galleries WHERE id=?", (gallery_id,))
 
 
+def _bench_context(g: "db.sqlite3.Row") -> dict:
+    """The bench region's context: assets with fav counts, sections, hero
+    picks, per-video comment threads, renditions, tag suggestions, and the
+    header delivery stats. Shared by the gallery detail GET and the HX
+    fragment forks (per-tile / bench-level) so a swapped tile or masonry
+    renders exactly like the full page — a rendering fork, never a logic one."""
+    gallery_id = g["id"]
+    sections = db.all_("SELECT * FROM sections WHERE gallery_id=? ORDER BY position", (gallery_id,))
+    assets = db.all_(
+        """SELECT a.*,
+                        (SELECT COUNT(*) FROM favorites f WHERE f.asset_id=a.id) AS n_fav
+                        FROM assets a WHERE a.gallery_id=?
+                        ORDER BY a.section_id, a.position, a.id""",
+        (gallery_id,),
+    )
+    # Visible review-comment threads per video asset (flat, nested in the template).
+    # Single source of truth for "the visible thread" — the same helper the client
+    # gallery uses, so the visibility rule can never drift between the two views.
+    video_comments = {
+        a["id"]: video_comment_thread(a["id"]) for a in assets if a["kind"] == "video"
+    }
+    renditions: dict[int, list] = {}
+    for r in db.all_(
+        """SELECT r.* FROM asset_renditions r JOIN assets a ON a.id = r.asset_id
+           WHERE a.gallery_id=? ORDER BY r.preset""",
+        (gallery_id,),
+    ):
+        renditions.setdefault(r["asset_id"], []).append(r)
+    hero_asset_ids: set[int] = set()
+    raw_heroes = g["argus_hero_asset_ids"]
+    if raw_heroes:
+        try:
+            hero_asset_ids = {int(x) for x in json.loads(raw_heroes)}
+        except (json.JSONDecodeError, TypeError, ValueError):
+            hero_asset_ids = set()
+    # Honest delivery stats for the gallery header tiles — real rows only.
+    n_views = db.one("SELECT COUNT(*) AS n FROM visitors WHERE gallery_id=?", (gallery_id,))["n"]
+    n_downloads = db.one("SELECT COUNT(*) AS n FROM downloads WHERE gallery_id=?", (gallery_id,))[
+        "n"
+    ]
+    return {
+        "g": g,
+        "sections": sections,
+        "assets": assets,
+        "hero_asset_ids": hero_asset_ids,
+        "tag_suggestions": PORTFOLIO_TAG_SUGGESTIONS,
+        "video_comments": video_comments,
+        "renditions": renditions,
+        "n_views": n_views,
+        "n_downloads": n_downloads,
+    }
+
+
+def _tile_fragment(request: Request, gallery_id: int, asset_id: int):
+    """HX fork for the per-tile actions: re-render the one tile (primary swap
+    onto #asset-{id}) plus pills/stats out-of-band (admin/_gd_tile_frag.html),
+    so star/section moves re-true the bench counts in the same response."""
+    g = get_gallery(gallery_id)
+    ctx = _bench_context(g)
+    a = next((x for x in ctx["assets"] if x["id"] == asset_id), None)
+    if a is None:
+        raise HTTPException(status_code=404)
+    ctx["a"] = a
+    return templates.TemplateResponse(request, "admin/_gd_tile_frag.html", ctx)
+
+
+def _bench_fragment(request: Request, gallery_id: int):
+    """HX fork for the bench-level actions: the whole masonry plus the stats
+    and pills out-of-band (admin/_gd_bench.html), swapped onto #gd-masonry."""
+    return templates.TemplateResponse(
+        request, "admin/_gd_bench.html", _bench_context(get_gallery(gallery_id))
+    )
+
+
 @router.get("")
 async def admin_root():
     # Home is the studio landing now; the bare /admin keeps working for old
@@ -283,7 +357,6 @@ async def create_transfer(
 @router.get("/galleries/{gallery_id}", response_class=HTMLResponse)
 async def gallery_detail(request: Request, gallery_id: int):
     g = get_gallery(gallery_id)
-    sections = db.all_("SELECT * FROM sections WHERE gallery_id=? ORDER BY position", (gallery_id,))
     # unique-asset selection counts per section (proofing progress signal for admin)
     section_picks = {
         r["section_id"]: r["n"]
@@ -294,13 +367,6 @@ async def gallery_detail(request: Request, gallery_id: int):
             (gallery_id,),
         )
     }
-    assets = db.all_(
-        """SELECT a.*,
-                        (SELECT COUNT(*) FROM favorites f WHERE f.asset_id=a.id) AS n_fav
-                        FROM assets a WHERE a.gallery_id=?
-                        ORDER BY a.section_id, a.position, a.id""",
-        (gallery_id,),
-    )
     public_assets = db.all_(
         """SELECT kind, portfolio_tag FROM assets
            WHERE gallery_id=? AND portfolio=1 AND status='ready'
@@ -336,60 +402,25 @@ async def gallery_detail(request: Request, gallery_id: int):
         else None
     )
     portal_favs = _portal_fav_count(gallery_id, g["client_id"])
-    # Honest delivery stats for the gallery header tiles — real rows only.
-    n_views = db.one("SELECT COUNT(*) AS n FROM visitors WHERE gallery_id=?", (gallery_id,))["n"]
-    n_downloads = db.one("SELECT COUNT(*) AS n FROM downloads WHERE gallery_id=?", (gallery_id,))[
-        "n"
-    ]
-    # Visible review-comment threads per video asset (flat, nested in the template).
-    # Single source of truth for "the visible thread" — the same helper the client
-    # gallery uses, so the visibility rule can never drift between the two views.
-    video_comments = {
-        a["id"]: video_comment_thread(a["id"]) for a in assets if a["kind"] == "video"
-    }
-    renditions: dict[int, list] = {}
-    for r in db.all_(
-        """SELECT r.* FROM asset_renditions r JOIN assets a ON a.id = r.asset_id
-           WHERE a.gallery_id=? ORDER BY r.preset""",
-        (gallery_id,),
-    ):
-        renditions.setdefault(r["asset_id"], []).append(r)
-    hero_asset_ids: set[int] = set()
-    raw_heroes = g["argus_hero_asset_ids"]
-    if raw_heroes:
-        try:
-            hero_asset_ids = {int(x) for x in json.loads(raw_heroes)}
-        except (json.JSONDecodeError, TypeError, ValueError):
-            hero_asset_ids = set()
-
-    return templates.TemplateResponse(
-        request,
-        "admin/gallery.html",
+    ctx = _bench_context(g)
+    ctx.update(
         {
-            "g": g,
-            "sections": sections,
-            "assets": assets,
-            "public_readiness": public_readiness,
-            "hero_asset_ids": hero_asset_ids,
             "section_picks": section_picks,
+            "public_readiness": public_readiness,
             "clients": clients,
             "projects": projects,
             "client": client,
             "base_url": config.BASE_URL,
-            "tag_suggestions": PORTFOLIO_TAG_SUGGESTIONS,
             "portal_favs": portal_favs,
-            "n_views": n_views,
-            "n_downloads": n_downloads,
-            "video_comments": video_comments,
-            "renditions": renditions,
             "argus_enabled": argus_analyze.is_enabled(),
             "argus_url": config.ARGUS_URL,
             "plutus_enabled": plutus_recommend.is_enabled(),
             "plutus_url": config.PLUTUS_URL,
             "platekit_enabled": platekit.is_enabled(),
             "platekit_url": config.PLATEKIT_API_BASE,
-        },
+        }
     )
+    return templates.TemplateResponse(request, "admin/gallery.html", ctx)
 
 
 @router.post("/galleries/{gallery_id}/link-client")
@@ -616,11 +647,13 @@ async def bulk_star_tag(request: Request, gallery_id: int):
                        WHERE id=? AND gallery_id=? AND kind IN ('photo', 'video')""",
                     (aid, gallery_id),
                 )
+    if request.headers.get("hx-request") == "true":
+        return _bench_fragment(request, gallery_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/move")
-async def reorder_asset(gallery_id: int, asset_id: int, dir: str = Form(...)):
+async def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: str = Form(...)):
     if dir not in ("left", "right"):
         raise HTTPException(status_code=400, detail="dir must be left or right")
     a = db.one("SELECT section_id FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
@@ -640,11 +673,13 @@ async def reorder_asset(gallery_id: int, asset_id: int, dir: str = Form(...)):
         with db.tx() as con:
             for pos, aid in enumerate(ids):
                 con.execute("UPDATE assets SET position=? WHERE id=?", (pos, aid))
+    if request.headers.get("hx-request") == "true":
+        return _bench_fragment(request, gallery_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/cover")
-async def set_cover(gallery_id: int, asset_id: int):
+async def set_cover(request: Request, gallery_id: int, asset_id: int):
     g = get_gallery(gallery_id)
     a = db.one(
         "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='photo'", (asset_id, gallery_id)
@@ -653,11 +688,13 @@ async def set_cover(gallery_id: int, asset_id: int):
         raise HTTPException(status_code=404)
     new = None if g["cover_asset_id"] == asset_id else asset_id
     db.run("UPDATE galleries SET cover_asset_id=? WHERE id=?", (new, gallery_id))
+    if request.headers.get("hx-request") == "true":
+        return _tile_fragment(request, gallery_id, asset_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/renditions")
-async def build_renditions(gallery_id: int, asset_id: int):
+async def build_renditions(request: Request, gallery_id: int, asset_id: int):
     """Queue the social-cut renditions (9:16 / 1:1) for a ready video. Idempotent:
     INSERT OR IGNORE per preset; failed rows re-queue as pending so the button
     doubles as a retry. Encoding happens in the job pool off-request."""
@@ -681,24 +718,32 @@ async def build_renditions(gallery_id: int, asset_id: int):
     )
     jobs.enqueue("video_renditions", {"asset_id": asset_id})
     log.info("renditions queued for asset %s (gallery %s)", asset_id, gallery_id)
+    if request.headers.get("hx-request") == "true":
+        return _tile_fragment(request, gallery_id, asset_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/portfolio")
-async def toggle_portfolio(gallery_id: int, asset_id: int):
+async def toggle_portfolio(request: Request, gallery_id: int, asset_id: int):
     db.run(
         "UPDATE assets SET portfolio = 1 - portfolio WHERE id=? AND gallery_id=? AND kind IN ('photo', 'video')",
         (asset_id, gallery_id),
     )
+    if request.headers.get("hx-request") == "true":
+        return _tile_fragment(request, gallery_id, asset_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/tag")
-async def set_portfolio_tag(gallery_id: int, asset_id: int, portfolio_tag: str = Form("")):
+async def set_portfolio_tag(
+    request: Request, gallery_id: int, asset_id: int, portfolio_tag: str = Form("")
+):
     db.run(
         "UPDATE assets SET portfolio_tag=? WHERE id=? AND gallery_id=? AND kind IN ('photo', 'video')",
         (portfolio_tag.strip() or None, asset_id, gallery_id),
     )
+    if request.headers.get("hx-request") == "true":
+        return _tile_fragment(request, gallery_id, asset_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
@@ -754,7 +799,7 @@ async def delete_gallery(gallery_id: int, force: bool = Form(False)):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/delete")
-async def delete_asset(gallery_id: int, asset_id: int):
+async def delete_asset(request: Request, gallery_id: int, asset_id: int):
     a = db.one("SELECT * FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
     if a:
         base = config.MEDIA_DIR / str(gallery_id)
@@ -770,6 +815,11 @@ async def delete_asset(gallery_id: int, asset_id: int):
                 "WHERE id=?",
                 (asset_id, gallery_id),
             )
+    if request.headers.get("hx-request") == "true":
+        # no non-oob content — htmx removes the #asset-{id} target on the empty
+        # swap; pills/stats ride out-of-band so the bench counts drop too
+        g = get_gallery(gallery_id)
+        return templates.TemplateResponse(request, "admin/_gd_delete_frag.html", _bench_context(g))
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 

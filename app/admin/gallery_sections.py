@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from .. import db, security
-from .galleries import get_gallery
+from .galleries import _bench_fragment, _tile_fragment, get_gallery
 
 log = logging.getLogger("mise.admin.gallery_sections")
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -96,7 +96,9 @@ async def delete_section(gallery_id: int, section_id: int):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/section")
-async def move_asset(gallery_id: int, asset_id: int, section_id: int | None = Form(None)):
+async def move_asset(
+    request: Request, gallery_id: int, asset_id: int, section_id: int | None = Form(None)
+):
     with db.tx() as con:
         con.execute("BEGIN IMMEDIATE")
         if (
@@ -110,6 +112,8 @@ async def move_asset(gallery_id: int, asset_id: int, section_id: int | None = Fo
             "UPDATE assets SET section_id=? WHERE id=? AND gallery_id=?",
             (section_id, asset_id, gallery_id),
         )
+    if request.headers.get("hx-request") == "true":
+        return _tile_fragment(request, gallery_id, asset_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
@@ -133,4 +137,6 @@ async def bulk_move_assets(request: Request, gallery_id: int):
                 "UPDATE assets SET section_id=? WHERE id=? AND gallery_id=?",
                 (section_id, int(v), gallery_id),
             )
+    if request.headers.get("hx-request") == "true":
+        return _bench_fragment(request, gallery_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
