@@ -70,9 +70,17 @@ async def view_invoice(request: Request, slug: str, thanks: str = ""):
             (d["id"],),
         )
         awaiting_confirmation = recent is None
+    # htmx polls the status region while awaiting_confirmation (the template
+    # carries hx-get then, instead of the old <meta refresh>). Same context —
+    # a rendering fork, never a payment-logic one.
+    template = (
+        "public/_invoice_status.html"
+        if request.headers.get("hx-request") == "true"
+        else "public/invoice.html"
+    )
     return templates.TemplateResponse(
         request,
-        "public/invoice.html",
+        template,
         {
             "d": d,
             "items": json.loads(d["line_items"]),

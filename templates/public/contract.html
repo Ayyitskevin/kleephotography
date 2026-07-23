@@ -25,28 +25,7 @@
 
     <pre class="client-doc-contract-body">{{ d.body }}</pre>
 
-    {% if d.status == 'signed' %}
-    <div class="client-doc-signatures">
-      <p class="client-doc-status is-ok">Signed by {{ d.signer_name }} on {{ d.signed_at }}</p>
-      {% if d.countersigned_at %}
-      <p class="client-doc-status is-ok">Countersigned by {{ d.countersigner_name }} on {{ d.countersigned_at }}</p>
-      {% endif %}
-    </div>
-    <p class="client-doc-hash">Document SHA-256: {{ d.body_sha256 }}</p>
-    <p class="no-print client-doc-print">
-      <button type="button" data-print class="link">Print / save as PDF</button>
-    </p>
-    {% else %}
-    <form method="post" action="/c/{{ d.slug }}/sign" class="client-doc-sign no-print"
-          data-confirm="Sign this agreement as {signer_name}?">
-      <span class="client-doc-kicker">E-signature</span>
-      <label>Type your full legal name
-        <input type="text" name="signer_name" required autocomplete="name"></label>
-      <label class="client-doc-check"><input type="checkbox" name="agree" value="yes" required>
-        <span>I have read this agreement and intend my typed name to be my legal signature.</span></label>
-      <button type="submit" class="client-pay-btn">Sign agreement</button>
-    </form>
-    {% endif %}
+    {% include "public/_contract_state.html" %}
   </section>
 
   <p class="client-doc-foot">Secure typed-name signature. The locked agreement hash is kept with the signed record.</p>

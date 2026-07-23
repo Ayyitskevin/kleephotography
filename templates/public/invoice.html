@@ -2,13 +2,12 @@
 {% block title %}{{ d.title }} · {{ site_name }}{% endblock %}
 {% block bodyclass %}{% if sr_enabled() %}sr sr-moneydoc{% else %}cream-theme{% endif %}{% endblock %}
 {% block cream_head %}
-{# While a just-made payment is awaiting the webhook, reload periodically so the
-   page flips to its real paid state on its own — no manual refresh to explain. #}
-{% if awaiting_confirmation %}<meta http-equiv="refresh" content="15">{% endif %}
+{# While a just-made payment awaits the webhook, the status region polls itself
+   (htmx). JS-off clients keep the old full-page meta refresh — it's inside
+   noscript so JS clients never double-poll. #}
+{% if awaiting_confirmation %}<noscript><meta http-equiv="refresh" content="15"></noscript>{% endif %}
 {% endblock %}
 {% block content %}
-{% set paid_total = paid_cents or 0 %}
-{% set balance_cents = [d.total_cents - paid_total, 0]|max %}
 <main class="doc-page client-doc">
   <div class="client-doc-brandbar">
     <div>
@@ -19,15 +18,6 @@
   </div>
 
   <section class="client-doc-paper">
-    {% if awaiting_confirmation %}
-    <div class="client-doc-thanks no-print" role="status">
-      <strong>Thank you — your payment is on its way.</strong>
-      <p>Stripe is confirming it now: card payments usually clear within a minute,
-         bank transfers can take a few business days. This page updates automatically
-         once it lands — your receipt will appear right here, and there's nothing
-         else you need to do.</p>
-    </div>
-    {% endif %}
     <header class="client-doc-head">
       <div>
         <p class="client-doc-kicker">Billed to</p>
@@ -57,52 +47,7 @@
     </table>
     </div>
 
-    <div class="client-doc-totals">
-      <div><span>Subtotal</span><strong>${{ d.total_cents|usd }}</strong></div>
-      {% if paid_total %}
-      <div><span>Paid</span><strong>-${{ paid_total|usd }}</strong></div>
-      {% elif d.deposit_cents %}
-      <div><span>Deposit to reserve your date</span><strong>${{ d.deposit_cents|usd }}</strong></div>
-      {% endif %}
-      <div class="client-doc-due"><span>{{ "Amount due" if amount_due else "Balance" }}</span><strong>${{ (amount_due or balance_cents)|usd }}</strong></div>
-    </div>
-
-    {% if d.terms %}
-    <section class="client-doc-terms">
-      <h2>Payment terms</h2>
-      <p>{{ d.terms }}</p>
-    </section>
-    {% endif %}
-
-    {# The Pay button hides while a just-made payment awaits its webhook — the
-       one moment a visible button invites paying twice. Purely cosmetic: any
-       plain /i/{slug} visit shows it again, and payment state never moves here. #}
-    {% set show_pay = amount_due and payments_on and not awaiting_confirmation %}
-    {% if d.status == 'paid' %}
-    <p class="doc-accepted">Paid in full {{ d.paid_at }} — thank you.</p>
-    {% elif amount_due %}
-      {% if d.status == 'deposit_paid' %}
-      <p class="doc-accepted">Deposit received — your date is reserved.</p>
-      {% endif %}
-      {% if show_pay %}
-      <div class="client-doc-actions no-print">
-        <form method="post" action="/i/{{ d.slug }}/pay">
-          <button type="submit" class="client-pay-btn">Pay {{ "deposit" if pay_kind == "deposit" else ("balance" if pay_kind == "balance" else "now") }} — ${{ amount_due|usd }}</button>
-        </form>
-        <button type="button" data-print class="client-secondary-btn">Print / save as PDF</button>
-      </div>
-      <p class="client-doc-security no-print">Secured by Stripe · card or bank transfer · questions can stay in the email thread.</p>
-      {% elif not awaiting_confirmation %}
-      <p class="muted">To pay, reply to the email thread — online payment is being set up.</p>
-      {% endif %}
-    {% endif %}
-
-    {% if not show_pay or paid_total %}
-    <p class="no-print client-doc-print">
-      {% if not show_pay %}<button type="button" data-print class="link">Print / save as PDF</button>{% endif %}
-      {% if paid_total %}{% if not show_pay %} · {% endif %}<a href="/i/{{ d.slug }}/receipt" class="link">View receipt</a>{% endif %}
-    </p>
-    {% endif %}
+    {% include "public/_invoice_status.html" %}
   </section>
 
   <p class="client-doc-foot">Proposal → Contract → Invoice — clean documents, secure payment, no extra portal friction.</p>

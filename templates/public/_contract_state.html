@@ -1,0 +1,32 @@
+{# Contract state region — signatures/hash or the sign form. Rendered inside
+   contract.html, or standalone on HX-Request (docs.py) when the client signs
+   inline. Wrong-state HX posts get this region back with a gentle error line
+   and the true state, instead of a bare 400 page. The wrapper id lives HERE
+   (not in the parent) because hx-swap="outerHTML" replaces the whole
+   target — it must regrow. #}
+<div id="doc-state">
+{% if error %}<p class="error" role="alert" aria-live="polite">{{ error }}</p>{% endif %}
+{% if d.status == 'signed' %}
+<div class="client-doc-signatures">
+  <p class="client-doc-status is-ok">Signed by {{ d.signer_name }} on {{ d.signed_at }}</p>
+  {% if d.countersigned_at %}
+  <p class="client-doc-status is-ok">Countersigned by {{ d.countersigner_name }} on {{ d.countersigned_at }}</p>
+  {% endif %}
+</div>
+<p class="client-doc-hash">Document SHA-256: {{ d.body_sha256 }}</p>
+<p class="no-print client-doc-print">
+  <button type="button" data-print class="link">Print / save as PDF</button>
+</p>
+{% else %}
+<form method="post" action="/c/{{ d.slug }}/sign" class="client-doc-sign no-print"
+      data-confirm="Sign this agreement as {signer_name}?"
+      hx-post="/c/{{ d.slug }}/sign" hx-target="#doc-state" hx-swap="outerHTML">
+  <span class="client-doc-kicker">E-signature</span>
+  <label>Type your full legal name
+    <input type="text" name="signer_name" required autocomplete="name"></label>
+  <label class="client-doc-check"><input type="checkbox" name="agree" value="yes" required>
+    <span>I have read this agreement and intend my typed name to be my legal signature.</span></label>
+  <button type="submit" class="client-pay-btn">Sign agreement</button>
+</form>
+{% endif %}
+</div>

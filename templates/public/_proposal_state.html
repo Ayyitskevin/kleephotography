@@ -1,0 +1,27 @@
+{# Proposal state region — status banner or the accept/decline actions.
+   Rendered inside proposal.html, or standalone on HX-Request (docs.py) when
+   the client accepts/declines inline. Wrong-state HX posts (e.g. a double
+   click) get this region back with a gentle error line and the true state,
+   instead of a bare 400 page. The wrapper id lives HERE (not in the parent)
+   because hx-swap="outerHTML" replaces the whole target — it must regrow. #}
+<div id="doc-state">
+{% if error %}<p class="error" role="alert" aria-live="polite">{{ error }}</p>{% endif %}
+{% if d.status == 'accepted' %}
+<p class="client-doc-status is-ok">Accepted {{ d.accepted_at }}. Thank you. Contract and invoice will follow by email.</p>
+{% elif d.status == 'declined' %}
+<p class="client-doc-status is-muted">This proposal was declined. Reply to the email thread if you would like to revisit it.</p>
+{% else %}
+<div class="client-doc-actions no-print client-doc-actions-split">
+  <form method="post" action="/p/{{ d.slug }}/accept"
+        data-confirm="Accept this proposal?"
+        hx-post="/p/{{ d.slug }}/accept" hx-target="#doc-state" hx-swap="outerHTML">
+    <button type="submit" class="client-pay-btn">Accept proposal</button>
+  </form>
+  <form method="post" action="/p/{{ d.slug }}/decline"
+        data-confirm="Decline this proposal?"
+        hx-post="/p/{{ d.slug }}/decline" hx-target="#doc-state" hx-swap="outerHTML">
+    <button type="submit" class="client-secondary-btn">Decline</button>
+  </form>
+</div>
+{% endif %}
+</div>
