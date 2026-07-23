@@ -1,0 +1,6 @@
+{# HX fragment for the kanban drag-to-move: the whole board (swapped
+   outerHTML onto #studio-board) plus the whole list-view table riding
+   out-of-band, so one POST re-trues both views. Rendered by studio.py's
+   move_project_status on HX-Request only. #}
+{% include "admin/_studio_board.html" %}
+{% include "admin/_studio_list_table.html" %}

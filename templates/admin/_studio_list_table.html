@@ -1,0 +1,37 @@
+{# The studio list view as ONE table — rendered inside studio.html, and
+   appended to the kanban HX fragment with hx-swap-oob (inert on the full
+   render) so a drag-to-move re-trues the list view too. The whole table swaps
+   (a bare <tbody> wouldn't survive HTML parsing in an htmx fragment).
+   stage_label duplicates _studio_board.html — keep in sync. #}
+{% set stage_label = {"inquiry_received": "Inquiry Received",
+    "consultation_call": "Consultation Call", "proposal_sent": "Proposal Sent",
+    "contract_signed": "Contract Signed", "retainer_paid": "Retainer Paid",
+    "session_planning": "Session Planning", "project_closed": "Project Closed",
+    "archived": "Archived"} %}
+<table class="list studio-list" id="studio-list" hidden{% if request.headers.get("hx-request") %} hx-swap-oob="outerHTML"{% endif %}>
+  <thead>
+    <tr><th>Session</th><th>Client</th><th>Stage</th><th>Shoot</th><th>In stage</th><th class="num">Value</th></tr>
+  </thead>
+  <tbody id="studio-list-tbody">
+  {% if not projects %}
+  <tr><td colspan="6" class="studio-list-empty muted">No active sessions yet. Add a client
+    with <b>+ New project</b>, or convert an inquiry from the <a href="/admin/inbox">Inbox</a>.</td></tr>
+  {% endif %}
+  {% for p in projects %}
+  {% set is_stale = p.status != 'project_closed' and p.days_in_stage >= stale_days %}
+  <tr class="studio-row{% if p.n_overdue %} studio-row-overdue{% endif %}"
+      data-pid="{{ p.id }}" data-stage="{{ p.status }}"
+      data-name="{{ p.title | lower }}" data-shoot="{{ p.shoot_date or '' }}"
+      data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
+      data-created="{{ p.created_at or '' }}">
+    <td><a href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
+      {% if p.n_overdue %}<span class="warn" title="{{ p.n_overdue }} overdue invoice(s)"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-warning"/></svg></span>{% endif %}</td>
+    <td>{{ p.client_name }}{% if p.company %}<span class="muted"> · {{ p.company }}</span>{% endif %}</td>
+    <td><span class="studio-list-stage">{{ stage_label.get(p.status, p.status) }}</span></td>
+    <td>{{ p.shoot_date or "—" }}</td>
+    <td class="{% if is_stale %}warn{% endif %}">{% if p.status != 'project_closed' %}{{ p.days_in_stage }}d{% if is_stale %} · stalled{% endif %}{% else %}—{% endif %}</td>
+    <td class="num">{% if p.value_cents %}${{ p.value_cents|usd0 }}{% else %}—{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>

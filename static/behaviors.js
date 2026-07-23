@@ -406,19 +406,31 @@
     dragEl.dataset.stage = newStage;
     var url = board.getAttribute("data-drag-board").replace("{pid}", pid);
     var target = board.getAttribute("data-drag-target");
-    var fd = new FormData(); fd.append("status", newStage);
-    fetch(url, {
-      method: "POST", body: fd, credentials: "same-origin",
-      headers: target ? { "HX-Request": "true" } : {}
-    }).then(function (r) {
-      if (!r.ok) throw new Error("status " + r.status);
-      if (target && window.htmx) {
-        return r.text().then(function (html) { htmx.swap(target, html, { swapStyle: "outerHTML" }); });
-      }
-    }).catch(function () {
+    var failed = false;
+    var fail = function () {
+      if (failed) return; failed = true;
       miseToast("Could not move the session — reloading to re-sync.", "danger");
       location.reload();
-    });
+    };
+    if (target && window.htmx) {
+      /* htmx swaps the returned board fragment (server truth); a 4xx/5xx
+         leaves the optimistic move in place, so re-sync from the server. */
+      var onErr = function (ev2) {
+        if (ev2.detail && ev2.detail.pathInfo && ev2.detail.pathInfo.requestPath === url) {
+          document.removeEventListener("htmx:responseError", onErr);
+          fail();
+        }
+      };
+      document.addEventListener("htmx:responseError", onErr);
+      htmx.ajax("POST", url, { values: { status: newStage }, target: target, swap: "outerHTML" })
+        .then(function () { document.removeEventListener("htmx:responseError", onErr); })
+        .catch(fail);
+    } else {
+      var fd = new FormData(); fd.append("status", newStage);
+      fetch(url, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (r) { if (!r.ok) throw new Error("status " + r.status); })
+        .catch(fail);
+    }
   });
 
   /* Studio board/list pill + "+ Add" openers — delegated for the same reason

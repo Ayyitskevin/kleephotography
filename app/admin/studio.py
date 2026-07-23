@@ -904,7 +904,7 @@ async def update_project(
 
 
 @router.post("/projects/{project_id}/status")
-async def move_project_status(project_id: int, status: str = Form(...)):
+async def move_project_status(request: Request, project_id: int, status: str = Form(...)):
     """Kanban quick-move: change only a project's pipeline stage. The full project
     form (update_project) still owns title/notes/gallery edits; this is the
     board's drag-to-column equivalent — one field, one write, back to the board."""
@@ -919,4 +919,11 @@ async def move_project_status(project_id: int, status: str = Form(...)):
         (status, status, project_id),
     )
     log.info("project %s moved to status %s", project_id, status)
+    if request.headers.get("hx-request") == "true":
+        # The drag behavior swaps with the server's truth: the whole board
+        # (column counts/sums) plus the list-view tbody out-of-band. Same
+        # context as the full studio GET — a rendering fork, never a logic one.
+        return templates.TemplateResponse(
+            request, "admin/_studio_frag.html", _studio_context(request)
+        )
     return RedirectResponse("/admin/studio#projects", status_code=303)
