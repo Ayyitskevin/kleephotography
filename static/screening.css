@@ -1768,3 +1768,36 @@ body.sr-admin .admin-shell, body.sr-admin {
 /* visually-hidden but announced (live regions like .lb-live) */
 .sr .sr-only { position: absolute; width: 1px; height: 1px; padding: 0;
   margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ── "More" full-index sheet + rail sign-out (command deck) ─────────────────
+   The rail's 7th stop: every admin page as plain links so nothing lives only
+   behind ⌘K. Slides in from the rail on desktop, rises over the bottom bar
+   on phones. */
+.sr-admin .sr-rail-cmd.is-active { color: var(--sr-cream); background: var(--sr-line-faint);
+  border-left: 2px solid var(--sr-amber); }
+.sr-admin .sr-rail-signout { margin: 0; }
+
+.sr-admin .sr-more { position: fixed; inset: 0; z-index: var(--sr-z-overlay);
+  background: rgba(6, 6, 7, 0.55); }
+.sr-admin .sr-more-sheet { position: absolute; left: 64px; top: 0; bottom: 0;
+  width: min(600px, calc(100vw - 64px)); overflow-y: auto;
+  background: var(--sr-panel); border-right: 1px solid var(--sr-line-strong);
+  padding: 22px 28px 44px; animation: sr-more-in var(--sr-t-fast); }
+@keyframes sr-more-in { from { transform: translateX(-10px); opacity: 0; } }
+.sr-admin .sr-more-head { display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 22px; }
+.sr-admin .sr-more-groups { display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 26px; }
+.sr-admin .sr-more-group > p { margin: 0 0 9px; color: var(--sr-amber); }
+.sr-admin .sr-more-group a { display: block; padding: 8px 0; font-size: 13.5px;
+  color: var(--sr-ink-soft); text-decoration: none;
+  border-bottom: 1px solid var(--sr-line-faint); }
+.sr-admin .sr-more-group a:hover { color: var(--sr-amber); }
+@media (max-width: 860px) {
+  .sr-admin .sr-more-sheet { left: 0; right: 0; top: auto; bottom: 62px; width: 100%;
+    max-height: 62vh; border-right: 0; border-top: 1px solid var(--sr-line-strong); }
+  .sr-admin .sr-rail-cmd.is-active { border-left: 0; border-top: 2px solid var(--sr-amber); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sr-admin .sr-more-sheet { animation: none; }
+}

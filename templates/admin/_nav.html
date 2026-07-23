@@ -1,9 +1,10 @@
 {% set _p = request.url.path %}
 {% if sr_enabled() %}
-{# Screening Room command deck rail (3h): 64px, five destinations — Deck /
-   Projects / Money / Library / Day — plus ⌘K and the sync pulse. Every other
-   admin surface is a verb in the palette, not a rail stop. On phones the rail
-   becomes the 5-tab bottom bar (CSS). #}
+{# Screening Room command deck rail (3h): 64px, six destinations — Deck /
+   Projects / Money / Library / Day / More — plus ⌘K, sign-out, and the sync
+   pulse. More opens the full index sheet: every admin page as plain links, so
+   nothing lives only behind ⌘K. On phones the rail becomes a bottom bar. #}
+{% set more_prefixes = ['/admin/templates', '/admin/content', '/admin/portals', '/admin/tasks', '/admin/forms', '/admin/share', '/admin/audit', '/admin/reference', '/admin/settings', '/admin/sent', '/admin/jobs', '/admin/emails', '/admin/search'] %}
 <aside class="admin-nav sr-rail" aria-label="Primary">
   <a class="sr-rail-brand" href="/admin/home" aria-label="Kevin Lee — the deck">K</a>
   <a href="/admin/home" title="Deck"{% if _p.startswith('/admin/home') or _p.startswith('/admin/today') or _p.startswith('/admin/inbox') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-deck"/></svg></span><span class="sr-rail-lbl">Deck</span></a>
@@ -13,8 +14,63 @@
   <a href="/admin/financials" title="Money"{% if _p.startswith('/admin/financials') or _p.startswith('/admin/reports') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-dollar"/></svg></span><span class="sr-rail-lbl">Ledger</span></a>
   <a href="/admin/galleries" title="Library"{% if _p.startswith('/admin/galleries') or _p.startswith('/admin/transfers') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-film"/></svg></span><span class="sr-rail-lbl">Lib</span></a>
   <a href="/admin/scheduling" title="Day" class="sr-rail-day{% if _p.startswith('/admin/scheduling') or _p.startswith('/admin/calendar') %} is-active{% endif %}"><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-clock"/></svg></span><span class="sr-rail-lbl">Day</span></a>
+  <button type="button" class="sr-rail-cmd{% for mp in more_prefixes %}{% if _p.startswith(mp) %} is-active{% endif %}{% endfor %}" id="sr-more-open"
+          aria-haspopup="menu" aria-expanded="false" aria-controls="sr-more"
+          title="More — every admin page"><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-menu"/></svg></span><span class="sr-rail-lbl">More</span></button>
+  <form method="post" action="/admin/logout" class="sr-rail-signout">
+    <button type="submit" class="sr-rail-cmd" aria-label="Sign out" title="Sign out"><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-external"/></svg></span><span class="sr-rail-lbl">Out</span></button>
+  </form>
   <span class="ns-pulse sr-rail-pulse" title="self-hosted, synced" aria-hidden="true"></span>
 </aside>
+
+{# The full index — server-rendered plain links (no fuzzy search; that's ⌘K's
+   job). Groups mirror the palette's. Toggle script lives at the foot of this
+   partial, next to the palette script. #}
+<div class="sr-more" id="sr-more" hidden>
+  <div class="sr-more-sheet" role="menu" aria-label="Every admin page">
+    <div class="sr-more-head">
+      <span class="sr-mono sr-mono--signal">The full index</span>
+      <button type="button" class="sr-icon-btn" id="sr-more-close" aria-label="Close the index"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-x"/></svg></button>
+    </div>
+    <div class="sr-more-groups">
+      <nav class="sr-more-group" aria-label="Desk">
+        <p class="sr-mono">Desk</p>
+        <a href="/admin/today">Today</a>
+        <a href="/admin/search">Search everything</a>
+        <a href="/admin/scheduling/bookings">Bookings</a>
+        <a href="/admin/emails">Captured emails</a>
+        <a href="/admin/sent">Sent emails</a>
+        <a href="/admin/jobs">Jobs</a>
+        <a href="/admin/settings">Settings</a>
+      </nav>
+      <nav class="sr-more-group" aria-label="Studio">
+        <p class="sr-mono">Studio</p>
+        <a href="/admin/templates">Templates</a>
+        <a href="/admin/studio/email-templates">Email templates</a>
+        <a href="/admin/studio/licenses">Licenses</a>
+        <a href="/admin/studio/press">Press</a>
+        <a href="/admin/studio/presets">Crop presets</a>
+        <a href="/admin/studio/testimonials">Testimonials</a>
+        <a href="/admin/studio/playbook">Booking playbook</a>
+        <a href="/admin/content">Content portal</a>
+        <a href="/admin/portals">Client portals</a>
+      </nav>
+      <nav class="sr-more-group" aria-label="Money and ops">
+        <p class="sr-mono">Money &amp; ops</p>
+        <a href="/admin/reports">Reports</a>
+        <a href="/admin/tasks">Tasks</a>
+        <a href="/admin/forms">Forms</a>
+        <a href="/admin/financials/clients">Client P&amp;L</a>
+        <a href="/admin/financials/expenses">Expenses</a>
+        <a href="/admin/financials/mileage">Mileage</a>
+        <a href="/admin/financials/receipts">Receipts</a>
+        <a href="/admin/share">Share debugger</a>
+        <a href="/admin/audit">Audit log</a>
+        <a href="/admin/reference">Reference</a>
+      </nav>
+    </div>
+  </div>
+</div>
 {% else %}
 {# Legacy sidebar — recreated 1:1 from the Claude Design "Admin Sidebar"
    prototype: honey-badger crest, gold "CRM" lockup, ⌘K command palette, an
@@ -97,6 +153,9 @@
     { label: "Booking playbook", group: "Manage",   href: "/admin/studio/playbook",       glyph: "W", kw: "booking playbook reference internal process studio" },
     { label: "Reference",       group: "Manage",    href: "/admin/reference",             glyph: "B", kw: "reference playbook docs notes" },
     { label: "Today",           group: "Manage",    href: "/admin/today",                 glyph: "Y", kw: "today agenda activity day" },
+    { label: "Studio activity", group: "Manage",    href: "/admin/studio/activity",       glyph: "Λ", kw: "studio activity feed actions events log" },
+    { label: "Studio clients",  group: "Manage",    href: "/admin/studio/clients",        glyph: "C", kw: "studio clients list companies contacts directory" },
+    { label: "Receipts",        group: "Manage",    href: "/admin/financials/receipts",   glyph: "R", kw: "receipts expenses bookkeeping proof financials" },
     { label: "Sent emails",     group: "Manage",    href: "/admin/sent",                  glyph: "U", kw: "sent emails log outbox delivered proposal contract invoice" },
     { label: "Jobs",            group: "Manage",    href: "/admin/jobs",                  glyph: "J", kw: "jobs queue derivatives transcode background processing" },
     { label: "Captured emails", group: "Manage",    href: "/admin/emails",                glyph: "A", kw: "captured emails visitors leads download gate gallery" },
@@ -249,6 +308,26 @@
       if (t) { remember(t.href); window.location.href = t.href; }
     }
   });
+
+  /* More sheet — the full index: plain links, no fuzzy search (that's ⌘K).
+     Same open/close etiquette as the palette (backdrop, link, Escape). */
+  var moreBtn = document.getElementById("sr-more-open");
+  var more = document.getElementById("sr-more");
+  if (moreBtn && more) {
+    var moreClose = document.getElementById("sr-more-close");
+    var setMore = function (on) {
+      more.hidden = !on;
+      moreBtn.setAttribute("aria-expanded", on ? "true" : "false");
+    };
+    moreBtn.addEventListener("click", function () { setMore(more.hidden); });
+    if (moreClose) moreClose.addEventListener("click", function () { setMore(false); });
+    more.addEventListener("click", function (e) {
+      if (e.target === more || e.target.closest("a")) setMore(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !more.hidden) { e.preventDefault(); setMore(false); }
+    });
+  }
 
   /* Animated active-indicator: slides to the active item, follows hover. */
   var nav = document.getElementById("ns-list");
