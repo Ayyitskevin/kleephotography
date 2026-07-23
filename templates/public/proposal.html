@@ -52,22 +52,7 @@
       <div class="client-doc-due"><span>Total proposal</span><strong>${{ d.total_cents|usd }}</strong></div>
     </div>
 
-    {% if d.status == 'accepted' %}
-    <p class="client-doc-status is-ok">Accepted {{ d.accepted_at }}. Thank you. Contract and invoice will follow by email.</p>
-    {% elif d.status == 'declined' %}
-    <p class="client-doc-status is-muted">This proposal was declined. Reply to the email thread if you would like to revisit it.</p>
-    {% else %}
-    <div class="client-doc-actions no-print client-doc-actions-split">
-      <form method="post" action="/p/{{ d.slug }}/accept"
-            data-confirm="Accept this proposal?">
-        <button type="submit" class="client-pay-btn">Accept proposal</button>
-      </form>
-      <form method="post" action="/p/{{ d.slug }}/decline"
-            data-confirm="Decline this proposal?">
-        <button type="submit" class="client-secondary-btn">Decline</button>
-      </form>
-    </div>
-    {% endif %}
+    {% include "public/_proposal_state.html" %}
 
     <p class="no-print client-doc-print">
       <button type="button" data-print class="link">Print / save as PDF</button>

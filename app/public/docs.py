@@ -45,11 +45,21 @@ async def view_proposal(request: Request, slug: str):
 async def accept_proposal(request: Request, slug: str):
     d = _proposal_or_404(slug)
     if d["status"] not in ("sent", "viewed"):
+        if request.headers.get("hx-request") == "true":
+            return templates.TemplateResponse(
+                request,
+                "public/_proposal_state.html",
+                {"d": d, "error": "This proposal is no longer open — its current state is shown."},
+            )
         raise HTTPException(status_code=400, detail="proposal is not open for acceptance")
     db.run(
         "UPDATE proposals SET status='accepted', accepted_at=datetime('now') WHERE id=?", (d["id"],)
     )
     log.info("proposal %s ACCEPTED from %s", d["id"], security.client_ip(request))
+    if request.headers.get("hx-request") == "true":
+        return templates.TemplateResponse(
+            request, "public/_proposal_state.html", {"d": _proposal_or_404(slug)}
+        )
     return RedirectResponse(f"/p/{slug}", status_code=303)
 
 
@@ -57,9 +67,19 @@ async def accept_proposal(request: Request, slug: str):
 async def decline_proposal(request: Request, slug: str):
     d = _proposal_or_404(slug)
     if d["status"] not in ("sent", "viewed"):
+        if request.headers.get("hx-request") == "true":
+            return templates.TemplateResponse(
+                request,
+                "public/_proposal_state.html",
+                {"d": d, "error": "This proposal is no longer open — its current state is shown."},
+            )
         raise HTTPException(status_code=400, detail="proposal is not open")
     db.run("UPDATE proposals SET status='declined' WHERE id=?", (d["id"],))
     log.info("proposal %s declined from %s", d["id"], security.client_ip(request))
+    if request.headers.get("hx-request") == "true":
+        return templates.TemplateResponse(
+            request, "public/_proposal_state.html", {"d": _proposal_or_404(slug)}
+        )
     return RedirectResponse(f"/p/{slug}", status_code=303)
 
 
@@ -94,8 +114,23 @@ async def sign_contract(
 ):
     d = _contract_or_404(slug)
     if d["status"] not in ("sent", "viewed"):
+        if request.headers.get("hx-request") == "true":
+            return templates.TemplateResponse(
+                request,
+                "public/_contract_state.html",
+                {
+                    "d": d,
+                    "error": "This contract is no longer open for signing — its current state is shown.",
+                },
+            )
         raise HTTPException(status_code=400, detail="contract is not open for signing")
     if not signer_name.strip():
+        if request.headers.get("hx-request") == "true":
+            return templates.TemplateResponse(
+                request,
+                "public/_contract_state.html",
+                {"d": d, "error": "Type your full legal name to sign."},
+            )
         raise HTTPException(status_code=400, detail="typed name required")
     # ESIGN integrity: refuse if the body no longer matches the hash locked at send
     if hashlib.sha256(d["body"].encode()).hexdigest() != d["body_sha256"]:
@@ -113,6 +148,10 @@ async def sign_contract(
         (d["project_id"],),
     )
     log.info("contract %s SIGNED from %s", d["id"], security.client_ip(request))
+    if request.headers.get("hx-request") == "true":
+        return templates.TemplateResponse(
+            request, "public/_contract_state.html", {"d": _contract_or_404(slug)}
+        )
     return RedirectResponse(f"/c/{slug}", status_code=303)
 
 
