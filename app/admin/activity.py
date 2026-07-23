@@ -617,15 +617,32 @@ async def job_retry(job_id: int):
 
 
 @router.get("/emails", response_class=HTMLResponse)
-async def emails_view(request: Request):
-    rows = db.all_("""SELECT v.email, v.first_seen, g.id AS gallery_id, g.title
+async def emails_view(request: Request, offset: int = 0):
+    """Download-gate captures, newest first. Paginated like /admin/sent — the
+    .txt export remains the full-list path."""
+    offset = max(0, offset)
+    page_size = 100
+    rows = db.all_(
+        """SELECT v.email, v.first_seen, g.id AS gallery_id, g.title
                       FROM visitors v JOIN galleries g ON g.id=v.gallery_id
                       WHERE v.email IS NOT NULL
-                      ORDER BY v.first_seen DESC""")
+                      ORDER BY v.first_seen DESC
+                      LIMIT ? OFFSET ?""",
+        (page_size, offset),
+    )
+    total = db.one("SELECT COUNT(*) AS n FROM visitors WHERE email IS NOT NULL")["n"]
     distinct = db.one("""SELECT COUNT(DISTINCT email) AS n FROM visitors
                          WHERE email IS NOT NULL""")["n"]
     return templates.TemplateResponse(
-        request, "admin/emails.html", {"rows": rows, "distinct": distinct}
+        request,
+        "admin/emails.html",
+        {
+            "rows": rows,
+            "total": total,
+            "distinct": distinct,
+            "offset": offset,
+            "page_size": page_size,
+        },
     )
 
 

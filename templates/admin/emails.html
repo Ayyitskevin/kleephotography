@@ -5,7 +5,7 @@
   <div class="pgtop-lead">
     <h1>Captured emails</h1>
     <p class="pgtop-sub">
-      {% if rows %}<b>{{ rows|length }}</b> capture{{ "s" if rows|length != 1 }} · <b>{{ distinct }}</b> unique
+      {% if rows %}<b>{{ total }}</b> capture{{ "s" if total != 1 }} · <b>{{ distinct }}</b> unique
       {% else %}Collected by the gallery download gate{% endif %}
     </p>
   </div>
@@ -28,6 +28,12 @@
     </tr>
     {% endfor %}
   </table>
+
+  <p class="muted">
+    {% if offset > 0 %}<a href="/admin/emails?offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+    {% if rows|length == page_size %} ·
+    <a href="/admin/emails?offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
+  </p>
   {% else %}
   <p class="muted">No emails captured yet — the download gate collects them.</p>
   {% endif %}
