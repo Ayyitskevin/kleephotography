@@ -91,6 +91,38 @@
           {% endfor %}
         </form>
       </section>
+
+      <section class="sch-card">
+        <h2 class="sch-h2">Date overrides</h2>
+        <p class="sch-sub">Block a date or set custom hours — wins over the weekly schedule for that day</p>
+        {% if overrides %}
+        {% for o in overrides %}
+        <div class="sch-day sch-day-ov{% if o.past %} is-off{% endif %}">
+          <span class="sch-day-label">{{ o.date_label }}</span>
+          <span class="sch-day-hours">{{ o.desc }}</span>
+          <form method="post" action="/admin/scheduling/override/{{ o.id }}/delete">
+            <button type="submit" class="sch-ov-del"
+                    data-confirm="Remove the override for {{ o.date_label }}?"
+                    aria-label="Remove override for {{ o.date_label }}">&times;</button>
+          </form>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="muted">No overrides — the weekly hours apply to every day.</p>
+        {% endif %}
+        <form method="post" action="/admin/scheduling/override" class="inline-form sch-ov-add">
+          <input type="date" name="day" min="{{ today_iso }}" required aria-label="Override date">
+          <select name="mode" aria-label="Override type" data-ov-mode>
+            <option value="block">Block day</option>
+            <option value="hours">Custom hours</option>
+          </select>
+          <span class="sch-ov-hours" data-ov-hours hidden>
+            <input type="time" name="start" value="09:00" aria-label="Start time">
+            <input type="time" name="end" value="17:00" aria-label="End time">
+          </span>
+          <button type="submit">Add</button>
+        </form>
+      </section>
     </div>
 
     <div class="sch-col sch-rail">
@@ -145,6 +177,13 @@
         e.preventDefault();
         compose.classList.remove('is-open');
       });
+    }
+    var ovMode = document.querySelector('[data-ov-mode]');
+    var ovHours = document.querySelector('[data-ov-hours]');
+    if (ovMode && ovHours) {
+      var syncOvHours = function () { ovHours.hidden = ovMode.value !== 'hours'; };
+      ovMode.addEventListener('change', syncOvHours);
+      syncOvHours();
     }
     document.querySelectorAll('[data-copy-path]').forEach(function (btn) {
       btn.addEventListener('click', function () {

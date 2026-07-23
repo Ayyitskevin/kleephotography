@@ -246,6 +246,32 @@ def _sched_overview(events, week) -> dict:
     }
 
 
+def _global_overrides() -> list[dict]:
+    """Date-level exceptions to the weekly schedule (block a day / custom hours),
+    soonest first. Past rows are inert — booking never looks back — but stay
+    listed (muted) so they can be cleaned up."""
+    today = scheduling.now_utc().astimezone(scheduling._biz_tz()).date()
+    out = []
+    for r in db.all_("""SELECT id, day, available, start_min, end_min FROM date_overrides
+                        WHERE event_type_id IS NULL ORDER BY day"""):
+        d = dt.date.fromisoformat(r["day"])
+        if r["available"]:
+            desc = "Custom hours " + _hours_label(
+                _min_to_hhmm(r["start_min"]), _min_to_hhmm(r["end_min"])
+            )
+        else:
+            desc = "Blocked"
+        out.append(
+            {
+                "id": r["id"],
+                "date_label": d.strftime("%b %-d, %Y"),
+                "past": d < today,
+                "desc": desc,
+            }
+        )
+    return out
+
+
 @router.get("", response_class=HTMLResponse)
 async def home(request: Request):
     events = db.all_("""SELECT et.*,
@@ -257,6 +283,8 @@ async def home(request: Request):
     ctx = {
         "events": events,
         "week": week,
+        "overrides": _global_overrides(),
+        "today_iso": scheduling.now_utc().astimezone(scheduling._biz_tz()).date().isoformat(),
         "tz": scheduling.config.TIMEZONE,
         "gcal": gcal.status(),
         "g_error": _GERR.get(request.query_params.get("gerr")),

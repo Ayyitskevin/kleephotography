@@ -214,6 +214,46 @@ def test_global_override_write_rolls_back_when_audit_fails(admin_client, monkeyp
 
 
 @pytest.mark.integration
+def test_console_lists_and_deletes_global_overrides(admin_client):
+    hours_day, block_day = "2035-08-04", "2035-08-05"
+    try:
+        response = admin_client.post(
+            "/admin/scheduling/override",
+            data={"day": hours_day, "mode": "hours", "start": "10:00", "end": "12:00"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        response = admin_client.post(
+            "/admin/scheduling/override",
+            data={"day": block_day, "mode": "block"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+
+        page = admin_client.get("/admin/scheduling")
+        assert page.status_code == 200
+        assert "Aug 4, 2035" in page.text
+        assert "Custom hours" in page.text
+        assert "Aug 5, 2035" in page.text
+        assert "Blocked" in page.text
+
+        row = db.one(
+            "SELECT id FROM date_overrides WHERE event_type_id IS NULL AND day=?",
+            (hours_day,),
+        )
+        response = admin_client.post(
+            f"/admin/scheduling/override/{row['id']}/delete", follow_redirects=False
+        )
+        assert response.status_code == 303
+
+        page = admin_client.get("/admin/scheduling")
+        assert "Aug 4, 2035" not in page.text
+        assert "Aug 5, 2035" in page.text
+    finally:
+        db.run("DELETE FROM date_overrides WHERE day IN (?,?)", (hours_day, block_day))
+
+
+@pytest.mark.integration
 def test_historical_same_scope_override_uses_latest_row():
     day = dt.date(2035, 7, 21)
     event_id = _event("override-latest-wins")

@@ -1520,3 +1520,17 @@ body.sr-admin .admin-shell, body.sr-admin {
   .sr .sr-filmstrip figure { min-width: 140px; }
   .sr .sr-pagehead { padding: 36px 0 24px; }
 }
+
+/* Scheduling date overrides (admin-only) — legacy var set so the sr-admin
+   re-map above converts it wholesale; works with the kill switch off too. */
+.admin-shell .sch-day-ov .sch-day-label { width: auto; flex: 1; }
+.admin-shell .sch-ov-del { background: none; border: 0; cursor: pointer;
+  color: var(--ink-faint); font: 600 1rem/1 var(--font-ui); padding: 2px 6px; }
+.admin-shell .sch-ov-del:hover { color: var(--clay); }
+.admin-shell .sch-ov-add { margin-top: 4px; padding-top: 14px;
+  border-top: 1px dashed var(--line-strong); align-items: center; }
+.admin-shell .sch-ov-add input[type="date"],
+.admin-shell .sch-ov-add input[type="time"],
+.admin-shell .sch-ov-add select { width: auto; }
+.admin-shell .sch-ov-hours { display: inline-flex; gap: 8px; align-items: center; }
+.admin-shell .sch-ov-hours[hidden] { display: none; }
