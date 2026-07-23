@@ -1,7 +1,8 @@
-{% extends "site/base_site.html" %}
+{% extends "public/base_flow.html" %}
 {% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block title %}Your booking — {{ site_name }}{% endblock %}
-{% block site_content %}
+{% block flow_kicker %}Will call{% endblock %}
+{% block flow_content %}
 <main class="site-main site-narrow book-manage">
   {% if b.status == 'confirmed' %}
     <div class="book-manage-badge book-ok"

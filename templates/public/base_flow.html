@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{# Focused client-flow chrome ("the box office"): booking and booking manage.
+   Slim header/footer instead of the full marketing shell — task pages read as
+   one continuous client journey (ticket gate → premiere → money docs), not a
+   detour back through the storefront. Unlike the marketing shell this loads
+   the standard shell_scripts (htmx + behaviors.js), so fragments, autosubmit
+   and the styled confirm dialog all work here. Pages put their extra <head>
+   (meta description, inline scripts) in flow_head. #}
+{% block head %}{% block flow_head %}{% endblock %}{% endblock %}
+{% block bodyclass %}sr{% endblock %}
+{% block content %}
+<header class="flow-chrome">
+  <a class="flow-brand" href="/" aria-label="{{ site_name }} — back to the site">
+    <b>{{ site_name }}</b>
+    <small>Photo &times; Film</small>
+  </a>
+  <span class="flow-kicker sr-mono">{% block flow_kicker %}Box office{% endblock %}</span>
+</header>
+{% block flow_content %}{% endblock %}
+<footer class="flow-foot">
+  <span>&copy; 2026 {{ site_name }}</span>
+  <a href="/contact">Questions? Get in touch &rarr;</a>
+</footer>
+{% endblock %}

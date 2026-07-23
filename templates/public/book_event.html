@@ -1,16 +1,10 @@
-{% extends "site/base_site.html" %}
+{% extends "public/base_flow.html" %}
 {# Middleware already sends X-Robots-Tag: noindex for /book/{slug}; align the
    meta so the page stops emitting conflicting index,follow. #}
 {% block robots %}<meta name="robots" content="noindex, follow">{% endblock %}
 {% block title %}{{ e.name }} — {{ site_name }}{% endblock %}
-{% block meta_description %}{{ e.description or 'Book ' ~ e.name ~ ' — pick a time and get an instant confirmation with a calendar invite.' }}{% endblock %}
-{% block sticky_cta %}
-<div class="sticky-cta">
-  <span class="sticky-cta-msg">Pick a time that works.</span>
-  <a class="btn-gold" href="#main">Book a shoot &rarr;</a>
-</div>
-{% endblock %}
-{% block site_content %}
+{% block flow_head %}
+<meta name="description" content="{{ e.description or 'Book ' ~ e.name ~ ' — pick a time and get an instant confirmation with a calendar invite.' }}">
 {# Detect the visitor's timezone once and reload with it, so slot times show in
    their local time. No tz param -> business timezone (graceful fallback). The
    timezone dropdown lets them override the detected zone by hand. #}
@@ -25,6 +19,8 @@
   }
 })();
 </script>
+{% endblock %}
+{% block flow_content %}
 {% set tzq = '&tz=' ~ visitor_tz if visitor_tz else '' %}
 {% set tz_options = [
   ['America/New_York','Eastern Time — US & Canada'],

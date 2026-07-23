@@ -1734,3 +1734,22 @@ body.sr-admin .admin-shell, body.sr-admin {
   .sr .sr-toast { animation: none; }
   .sr .sr-toast.is-out { transition: none; }
 }
+
+/* ── flow chrome ("the box office") — slim header/footer for client task ────
+   flows (templates/public/base_flow.html): booking, booking manage. Keeps the
+   page on the house with just brand + kicker + a way out — no marketing nav. */
+.sr .flow-chrome { position: sticky; top: 0; z-index: var(--sr-z-sticky);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 22px; background: var(--sr-house); border-bottom: 1px solid var(--sr-line); }
+.sr .flow-brand { text-decoration: none; }
+.sr .flow-brand b { display: block; font: 700 15px/1 var(--sr-sans);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--sr-cream-strong); }
+.sr .flow-brand small { display: block; margin-top: 3px; font: 500 9px/1 var(--sr-mono);
+  letter-spacing: 0.26em; text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .flow-kicker { color: var(--sr-amber); }
+.sr .flow-foot { display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin-top: 56px; padding: 18px 22px; border-top: 1px solid var(--sr-line);
+  font: 500 10px/1.6 var(--sr-mono); letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--sr-ink-ghost); }
+.sr .flow-foot a { color: var(--sr-ink-soft); text-decoration: none; }
+.sr .flow-foot a:hover { color: var(--sr-amber); }
