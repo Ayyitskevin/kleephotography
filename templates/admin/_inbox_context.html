@@ -1,0 +1,128 @@
+{# PANE 3 of the inbox: contact id, stage, the lead-health card, the real
+   convert actions (studio.py — plain 303 posts), and details. Rendered inside
+   inbox.html, and in admin/_inbox_frag.html with hx-swap-oob (inert on the
+   full render) so an inbox HX POST re-trues this pane out-of-band. The
+   include site owns the first line's indent — keep inner indentation in
+   lockstep with inbox.html. #}{% if active %}
+  <div class="ib-context" id="ib-context" hx-swap-oob="outerHTML">
+    <div class="ib-ctx-id">
+      <span class="ib-av ib-av-lg" style="background: {{ active.av_bg }}; color: {{ active.av_color }};">{{ active.initials }}</span>
+      <h3>{{ active.name }}</h3>
+      {% if active.contact_name and active.contact_name != active.name %}
+      <p class="ib-ctx-contact">{{ active.contact_name }}</p>
+      {% endif %}
+    </div>
+
+    <div class="ib-ctx-stage">
+      <span class="ib-ctx-k">Stage</span>
+      <span class="ib-stage" style="color: {{ active.stage_color }}; background: {{ active.stage_bg }};">{{ active.stage }}</span>
+    </div>
+
+    {% if active.health %}
+    <div class="ib-ctx-health" data-testid="lead-health">
+      <span class="ib-ctx-label">Lead status</span>
+      <div class="ib-health-rows">
+        {% if active.health.specialty %}
+        <div class="ib-health-row">
+          <span class="ib-ctx-rk">Specialty</span>
+          <span class="ib-ctx-rv">{{ active.health.specialty }}</span>
+        </div>
+        {% endif %}
+        <div class="ib-health-row">
+          <span class="ib-ctx-rk">Source</span>
+          <span class="ib-ctx-rv">{{ active.health.source }}</span>
+        </div>
+        <div class="ib-health-row ib-health-{{ active.health.email.state }}">
+          <span class="ib-ctx-rk">{{ active.health.email.label }}</span>
+          <span class="ib-ctx-rv">
+            {{ active.health.email.detail }}
+            {% if active.health.email.attempts %}
+            <span class="ib-health-meta">attempts {{ active.health.email.attempts }}{% if active.health.email.last_attempted %} · last {{ active.health.email.last_attempted }}{% endif %}{% if active.health.email.failure_category %} · {{ active.health.email.failure_category }}{% endif %}</span>
+            {% endif %}
+            {% if active.health.email.retryable %}
+            <form method="post" action="/admin/inbox/{{ active.id }}/retry-owner-email" class="ib-health-retry"
+                  hx-post="/admin/inbox/{{ active.id }}/retry-owner-email" hx-target="#ib-convo" hx-swap="outerHTML">
+              <input type="hidden" name="tab" value="{{ tab }}">
+              <button type="submit" class="link">Retry owner email</button>
+            </form>
+            {% endif %}
+          </span>
+        </div>
+        <div class="ib-health-row ib-health-{{ active.health.notion.state }}">
+          <span class="ib-ctx-rk">{{ active.health.notion.label }}</span>
+          <span class="ib-ctx-rv">
+            {{ active.health.notion.detail }}
+            {% if active.health.notion.retry_job_id %}
+            <form method="post" action="/admin/jobs/{{ active.health.notion.retry_job_id }}/retry" class="ib-health-retry">
+              <button type="submit" class="link">Retry mirror</button>
+            </form>
+            {% elif active.health.notion.jobs_href %}
+            <a class="ib-health-link" href="{{ active.health.notion.jobs_href }}">Open Jobs</a>
+            {% endif %}
+            {% if active.health.notion.orphan %}
+            {% if active.health.notion.orphan_relinkable %}
+            <form method="post" action="/admin/inbox/{{ active.id }}/notion-orphan/relink" class="ib-health-retry"
+                  hx-post="/admin/inbox/{{ active.id }}/notion-orphan/relink" hx-target="#ib-convo" hx-swap="outerHTML">
+              <input type="hidden" name="tab" value="{{ tab }}">
+              <button type="submit" class="link">Relink orphan page</button>
+            </form>
+            {% endif %}
+            <form method="post" action="/admin/inbox/{{ active.id }}/notion-orphan/dismiss" class="ib-health-retry"
+                  hx-post="/admin/inbox/{{ active.id }}/notion-orphan/dismiss" hx-target="#ib-convo" hx-swap="outerHTML">
+              <input type="hidden" name="tab" value="{{ tab }}">
+              <button type="submit" class="link">Dismiss orphan</button>
+            </form>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      <p class="ib-next-action"><span class="ib-ctx-rk">Next</span> {{ active.health.next_action }}</p>
+    </div>
+    {% endif %}
+
+    <div class="ib-ctx-actions">
+      <span class="ib-ctx-label">Move it forward</span>
+      {% if active.is_converted %}
+        <a class="ib-act ib-act-primary"
+           href="{% if active.converted_proposal_id %}/admin/studio/proposals/{{ active.converted_proposal_id }}{% elif active.converted_project_id %}/admin/studio/projects/{{ active.converted_project_id }}{% elif active.converted_client_id %}/admin/studio/clients/{{ active.converted_client_id }}{% else %}/admin/studio{% endif %}">
+          <span aria-hidden="true">✦</span><span class="ib-act-t">Open converted record</span><span>→</span></a>
+        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/unconvert">
+          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
+          <button class="ib-act" type="submit"><span aria-hidden="true">↩</span><span class="ib-act-t">Undo conversion</span></button>
+        </form>
+      {% elif active.is_dismissed %}
+        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/undismiss">
+          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
+          <button class="ib-act ib-act-primary" type="submit"><span aria-hidden="true">↩</span><span class="ib-act-t">Restore to pipeline</span><span>→</span></button>
+        </form>
+      {% else %}
+        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/quote">
+          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
+          <button class="ib-act ib-act-primary" type="submit"><span aria-hidden="true">$</span><span class="ib-act-t">Send a quick quote</span><span>→</span></button>
+        </form>
+        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/client">
+          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
+          <button class="ib-act" type="submit"><span aria-hidden="true">⊞</span><span class="ib-act-t">Create client &amp; project</span></button>
+        </form>
+        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/dismiss">
+          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
+          <button class="ib-act" type="submit"><span aria-hidden="true">✕</span><span class="ib-act-t">Dismiss</span></button>
+        </form>
+      {% endif %}
+    </div>
+
+    {% if active.details %}
+    <div class="ib-ctx-details">
+      <span class="ib-ctx-label">Details</span>
+      <div class="ib-ctx-rows">
+        {% for d in active.details %}
+        <div class="ib-ctx-row">
+          <span class="ib-ctx-rk">{{ d.k }}</span>
+          <span class="ib-ctx-rv">{{ d.v }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}

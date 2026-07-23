@@ -1,0 +1,89 @@
+{# PANE 2 of the inbox: conversation head/body + the reply composer, or the
+   blank state. Rendered inside inbox.html, and as the PRIMARY (non-oob) root
+   of admin/_inbox_frag.html — every inbox HX POST targets #ib-convo and
+   outerHTML-swaps this whole pane. The include site owns the first line's
+   indent — keep inner indentation in lockstep with inbox.html. #}<div class="ib-convo" id="ib-convo">
+    {% if active %}
+    {% set email_ok = active.can_email and mail_configured %}
+    {% set sms_ok = active.can_sms and sms_configured %}
+    <div class="ib-convo-head">
+      <span class="ib-av" style="background: {{ active.av_bg }}; color: {{ active.av_color }};">{{ active.initials }}</span>
+      <div class="ib-convo-id">
+        <div class="ib-convo-name">
+          <h2>{{ active.name }}</h2>
+          <span class="ib-chan" style="color: {{ active.ch_color }}; background: {{ active.ch_bg }};">{{ active.ch_label }}</span>
+        </div>
+        <p class="ib-convo-sub">{{ active.sub }}</p>
+      </div>
+      <span class="ib-convo-when">received<br><b>{{ active.created_at | localtime }}</b></span>
+    </div>
+
+    <div class="ib-convo-body">
+      {% for m in active.messages %}
+      <div class="ib-msg {{ 'ib-msg-out' if m.mine }}">
+        <div class="ib-bubble {{ 'ib-bubble-out' if m.mine }}{{ ' ib-bubble-empty' if not m.body }}">{{ m.body or "(no message body)" }}</div>
+        <div class="ib-bubble-meta">
+          {{ "You" if m.mine else (active.contact_name or active.name) }}
+          · {{ m.channel }} · {{ m.time | localtime }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="ib-reply">
+      {% if not email_ok and not sms_ok %}
+        {% if active.email %}
+        <a class="sr-btn sr-btn--sm" href="mailto:{{ active.email }}?subject={{ active.reply_subject|urlencode }}">
+          <span aria-hidden="true">✉</span> Reply by email
+        </a>
+        <span class="ib-reply-note">Mail isn't configured — this opens your mail client instead.</span>
+        {% else %}
+        <span class="ib-reply-note">No reachable channel on file — add an email or phone to reply.</span>
+        {% endif %}
+      {% else %}
+      <form method="post" action="/admin/inbox/{{ active.id }}/reply" class="ib-reply-form"
+            hx-post="/admin/inbox/{{ active.id }}/reply" hx-target="#ib-convo" hx-swap="outerHTML">
+        <input type="hidden" name="tab" value="{{ tab }}">
+        {% if active.is_replied %}<p class="ib-reply-sent">✓ You've replied to this inquiry — send another below.</p>{% endif %}
+        {% if email_ok and sms_ok %}
+        <div class="ib-reply-chans">
+          <label class="ib-reply-chan">
+            <input type="radio" name="channel" value="email" {{ 'checked' if active.default_channel == 'email' }}>
+            <span>✉ Email <b>{{ active.email }}</b></span>
+          </label>
+          <label class="ib-reply-chan">
+            <input type="radio" name="channel" value="sms" {{ 'checked' if active.default_channel == 'sms' }}>
+            <span>✆ Text <b>{{ active.phone }}</b></span>
+          </label>
+        </div>
+        {% elif sms_ok %}
+        <input type="hidden" name="channel" value="sms">
+        <label class="ib-reply-to">Text <b>{{ active.phone }}</b></label>
+        {% else %}
+        <input type="hidden" name="channel" value="email">
+        <label class="ib-reply-to">To <b>{{ active.email }}</b></label>
+        {% endif %}
+        {% if email_ok %}
+        <input class="ib-reply-subj" type="text" name="subject" value="{{ active.reply_subject }}"
+               placeholder="Subject (email only)">
+        {% endif %}
+        <div class="ib-snippets">
+          <button type="button" class="ib-snippet" data-snippet="Thanks for reaching out — I'd love to help!">Thanks for reaching out!</button>
+          <button type="button" class="ib-snippet" data-snippet="Sounds great! What dates work for a shoot?">When works for you?</button>
+          <button type="button" class="ib-snippet" data-snippet="Putting a proposal together now — you'll have it within the hour.">Sending a proposal</button>
+        </div>
+        <textarea class="ib-reply-msg" name="message" rows="5" required
+                  placeholder="Write your reply…"></textarea>
+        <div class="ib-reply-foot">
+          <span class="ib-reply-note">Manual send · logged to the thread</span>
+          <button class="ib-reply-send" type="submit"><span aria-hidden="true">➤</span> Send reply</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="ib-blank">
+      <p>No inquiry selected.</p>
+    </div>
+    {% endif %}
+  </div>

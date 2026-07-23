@@ -351,8 +351,12 @@ def _active_ctx(inq) -> dict:
     }
 
 
-@router.get("", response_class=HTMLResponse)
-async def inbox(request: Request, tab: str = "all", sel: int | None = None):
+def _inbox_ctx(request: Request, tab: str, sel: int | None) -> dict:
+    """Shared render context for the inbox GET and the HTMX fragment forks of
+    its POST handlers — one assembler for the tab gating, 100-row window,
+    counts, and active-thread selection, so a fragment can never drift from the
+    page it re-renders parts of. `request` rides the signature for symmetry
+    with studio_context._studio_context(request); the queries don't need it."""
     if tab not in _TABS:
         tab = "all"
     where, order = _INBOX_FILTERS[tab]
@@ -383,22 +387,35 @@ async def inbox(request: Request, tab: str = "all", sel: int | None = None):
             chosen = rows[0]
         active = _active_ctx(chosen)
 
-    return templates.TemplateResponse(
-        request,
-        "admin/inbox.html",
-        {
-            "tab": tab,
-            "counts": counts,
-            "threads": [_thread_row(r, active["id"] if active else None) for r in rows],
-            "active": active,
-            "mail_configured": mailer.configured(),
-            "sms_configured": sms.configured(),
-        },
-    )
+    return {
+        "tab": tab,
+        "counts": counts,
+        "threads": [_thread_row(r, active["id"] if active else None) for r in rows],
+        "active": active,
+        "mail_configured": mailer.configured(),
+        "sms_configured": sms.configured(),
+    }
+
+
+@router.get("", response_class=HTMLResponse)
+async def inbox(request: Request, tab: str = "all", sel: int | None = None):
+    return templates.TemplateResponse(request, "admin/inbox.html", _inbox_ctx(request, tab, sel))
+
+
+def _inbox_frag(request: Request, tab: str, inquiry_id: int):
+    """HTMX fork of an inbox POST: the SAME context as the full GET, rendered as
+    the multi-root fragment — the convo pane swaps outerHTML onto #ib-convo
+    while the context pane and the active thread row ride out-of-band, so one
+    POST re-trues all three regions. A rendering fork, never a logic one."""
+    ctx = _inbox_ctx(request, tab, inquiry_id)
+    active_id = ctx["active"]["id"] if ctx["active"] else None
+    ctx["active_thread"] = next((t for t in ctx["threads"] if t["id"] == active_id), None)
+    return templates.TemplateResponse(request, "admin/_inbox_frag.html", ctx)
 
 
 @router.post("/{inquiry_id}/reply")
 async def reply(
+    request: Request,
     inquiry_id: int,
     tab: str = Form("all"),
     channel: str = Form("email"),
@@ -468,18 +485,25 @@ async def reply(
         )
         log.info("inbox reply sent for inquiry %s", inquiry_id)
 
+    if request.headers.get("hx-request") == "true":
+        # HTMX fork: the writes above already landed; re-render the panes as
+        # the fragment instead of redirecting. The non-HX 303 below is
+        # unchanged for no-JS clients.
+        return _inbox_frag(request, tab, inquiry_id)
     if tab not in _TABS:
         tab = "all"
     return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
 
 
 @router.post("/{inquiry_id}/retry-owner-email")
-async def retry_owner_email(inquiry_id: int, tab: str = Form("all")):
+async def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("all")):
     """Re-queue idempotent owner notification. Safe under concurrency."""
     inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
     if not inq:
         raise HTTPException(status_code=404)
     if inq["owner_email_delivered_at"] if "owner_email_delivered_at" in inq.keys() else None:
+        if request.headers.get("hx-request") == "true":
+            return _inbox_frag(request, tab, inquiry_id)
         return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
     # Clear failed/in_flight so the claim path can run again.
     db.run(
@@ -488,28 +512,34 @@ async def retry_owner_email(inquiry_id: int, tab: str = Form("all")):
         (inquiry_id,),
     )
     inquiry_notify.enqueue_owner_email(inquiry_id)
+    if request.headers.get("hx-request") == "true":
+        return _inbox_frag(request, tab, inquiry_id)
     if tab not in _TABS:
         tab = "all"
     return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
 
 
 @router.post("/{inquiry_id}/notion-orphan/relink")
-async def notion_orphan_relink(inquiry_id: int, tab: str = Form("all")):
+async def notion_orphan_relink(request: Request, inquiry_id: int, tab: str = Form("all")):
     if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
         raise HTTPException(status_code=404)
     if not notion_sync.relink_notion_orphan(inquiry_id):
         raise HTTPException(status_code=400, detail="no open orphan to relink")
+    if request.headers.get("hx-request") == "true":
+        return _inbox_frag(request, tab, inquiry_id)
     if tab not in _TABS:
         tab = "all"
     return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
 
 
 @router.post("/{inquiry_id}/notion-orphan/dismiss")
-async def notion_orphan_dismiss(inquiry_id: int, tab: str = Form("all")):
+async def notion_orphan_dismiss(request: Request, inquiry_id: int, tab: str = Form("all")):
     if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
         raise HTTPException(status_code=404)
     if not notion_sync.dismiss_notion_orphan(inquiry_id):
         raise HTTPException(status_code=400, detail="no open orphan to dismiss")
+    if request.headers.get("hx-request") == "true":
+        return _inbox_frag(request, tab, inquiry_id)
     if tab not in _TABS:
         tab = "all"
     return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)

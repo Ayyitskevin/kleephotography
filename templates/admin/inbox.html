@@ -3,7 +3,10 @@
    over Mise's REAL data. 3-pane layout: thread list · conversation (inbound +
    outbound bubbles) + a composer that sends by email (Gmail SMTP) or text (Quo,
    inert until configured) · contact + the real convert actions from studio.py.
-   The thread is the messages table; channels appear only when actually sendable. #}
+   The thread is the messages table; channels appear only when actually sendable.
+   The three panes live in _inbox_row / _inbox_convo / _inbox_context partials so
+   the HX POST forks (admin/_inbox_frag.html) re-render the exact same markup;
+   snippet fill is delegated in /static/behaviors.js (data-snippet). #}
 {% block topbar %}{% endblock %}
 {% block admin_body %}
 <div class="ib">
@@ -25,23 +28,7 @@
     </div>
     <div class="ib-thread-list">
       {% for t in threads %}
-      <a href="/admin/inbox?tab={{ tab }}&sel={{ t.id }}" class="ib-row {{ 'is-active' if t.active }}">
-        <span class="ib-av-wrap">
-          <span class="ib-av" style="background: {{ t.av_bg }}; color: {{ t.av_color }};">{{ t.initials }}</span>
-          {% if t.unread %}<span class="ib-dot"></span>{% endif %}
-        </span>
-        <span class="ib-row-body">
-          <span class="ib-row-top">
-            <span class="ib-row-name">{{ t.name }}</span>
-            <span class="ib-row-time">{{ t.time | localtime }}</span>
-          </span>
-          <span class="ib-row-bot">
-            <span class="ib-chan" style="color: {{ t.ch_color }}; background: {{ t.ch_bg }};">{{ t.ch_label }}</span>
-            {% if t.service %}<span class="ib-svc" title="Specialty">{{ t.service }}</span>{% endif %}
-            <span class="ib-preview {{ 'is-unread' if t.unread }}">{{ t.preview }}</span>
-          </span>
-        </span>
-      </a>
+      {% include "admin/_inbox_row.html" %}
       {% else %}
       <div class="ib-empty-list">No messages in this view.</div>
       {% endfor %}
@@ -49,225 +36,10 @@
   </div>
 
   {# ── PANE 2: the two-way conversation thread + composer ── #}
-  <div class="ib-convo">
-    {% if active %}
-    {% set email_ok = active.can_email and mail_configured %}
-    {% set sms_ok = active.can_sms and sms_configured %}
-    <div class="ib-convo-head">
-      <span class="ib-av" style="background: {{ active.av_bg }}; color: {{ active.av_color }};">{{ active.initials }}</span>
-      <div class="ib-convo-id">
-        <div class="ib-convo-name">
-          <h2>{{ active.name }}</h2>
-          <span class="ib-chan" style="color: {{ active.ch_color }}; background: {{ active.ch_bg }};">{{ active.ch_label }}</span>
-        </div>
-        <p class="ib-convo-sub">{{ active.sub }}</p>
-      </div>
-      <span class="ib-convo-when">received<br><b>{{ active.created_at | localtime }}</b></span>
-    </div>
-
-    <div class="ib-convo-body">
-      {% for m in active.messages %}
-      <div class="ib-msg {{ 'ib-msg-out' if m.mine }}">
-        <div class="ib-bubble {{ 'ib-bubble-out' if m.mine }}{{ ' ib-bubble-empty' if not m.body }}">{{ m.body or "(no message body)" }}</div>
-        <div class="ib-bubble-meta">
-          {{ "You" if m.mine else (active.contact_name or active.name) }}
-          · {{ m.channel }} · {{ m.time | localtime }}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-
-    <div class="ib-reply">
-      {% if not email_ok and not sms_ok %}
-        {% if active.email %}
-        <a class="sr-btn sr-btn--sm" href="mailto:{{ active.email }}?subject={{ active.reply_subject|urlencode }}">
-          <span aria-hidden="true">✉</span> Reply by email
-        </a>
-        <span class="ib-reply-note">Mail isn't configured — this opens your mail client instead.</span>
-        {% else %}
-        <span class="ib-reply-note">No reachable channel on file — add an email or phone to reply.</span>
-        {% endif %}
-      {% else %}
-      <form method="post" action="/admin/inbox/{{ active.id }}/reply" class="ib-reply-form">
-        <input type="hidden" name="tab" value="{{ tab }}">
-        {% if active.is_replied %}<p class="ib-reply-sent">✓ You've replied to this inquiry — send another below.</p>{% endif %}
-        {% if email_ok and sms_ok %}
-        <div class="ib-reply-chans">
-          <label class="ib-reply-chan">
-            <input type="radio" name="channel" value="email" {{ 'checked' if active.default_channel == 'email' }}>
-            <span>✉ Email <b>{{ active.email }}</b></span>
-          </label>
-          <label class="ib-reply-chan">
-            <input type="radio" name="channel" value="sms" {{ 'checked' if active.default_channel == 'sms' }}>
-            <span>✆ Text <b>{{ active.phone }}</b></span>
-          </label>
-        </div>
-        {% elif sms_ok %}
-        <input type="hidden" name="channel" value="sms">
-        <label class="ib-reply-to">Text <b>{{ active.phone }}</b></label>
-        {% else %}
-        <input type="hidden" name="channel" value="email">
-        <label class="ib-reply-to">To <b>{{ active.email }}</b></label>
-        {% endif %}
-        {% if email_ok %}
-        <input class="ib-reply-subj" type="text" name="subject" value="{{ active.reply_subject }}"
-               placeholder="Subject (email only)">
-        {% endif %}
-        <div class="ib-snippets">
-          <button type="button" class="ib-snippet" data-snippet="Thanks for reaching out — I'd love to help!">Thanks for reaching out!</button>
-          <button type="button" class="ib-snippet" data-snippet="Sounds great! What dates work for a shoot?">When works for you?</button>
-          <button type="button" class="ib-snippet" data-snippet="Putting a proposal together now — you'll have it within the hour.">Sending a proposal</button>
-        </div>
-        <textarea class="ib-reply-msg" name="message" rows="5" required
-                  placeholder="Write your reply…"></textarea>
-        <div class="ib-reply-foot">
-          <span class="ib-reply-note">Manual send · logged to the thread</span>
-          <button class="ib-reply-send" type="submit"><span aria-hidden="true">➤</span> Send reply</button>
-        </div>
-      </form>
-      {% endif %}
-    </div>
-    {% else %}
-    <div class="ib-blank">
-      <p>No inquiry selected.</p>
-    </div>
-    {% endif %}
-  </div>
+  {% include "admin/_inbox_convo.html" %}
 
   {# ── PANE 3: contact + the real convert actions ── #}
-  {% if active %}
-  <div class="ib-context">
-    <div class="ib-ctx-id">
-      <span class="ib-av ib-av-lg" style="background: {{ active.av_bg }}; color: {{ active.av_color }};">{{ active.initials }}</span>
-      <h3>{{ active.name }}</h3>
-      {% if active.contact_name and active.contact_name != active.name %}
-      <p class="ib-ctx-contact">{{ active.contact_name }}</p>
-      {% endif %}
-    </div>
-
-    <div class="ib-ctx-stage">
-      <span class="ib-ctx-k">Stage</span>
-      <span class="ib-stage" style="color: {{ active.stage_color }}; background: {{ active.stage_bg }};">{{ active.stage }}</span>
-    </div>
-
-    {% if active.health %}
-    <div class="ib-ctx-health" data-testid="lead-health">
-      <span class="ib-ctx-label">Lead status</span>
-      <div class="ib-health-rows">
-        {% if active.health.specialty %}
-        <div class="ib-health-row">
-          <span class="ib-ctx-rk">Specialty</span>
-          <span class="ib-ctx-rv">{{ active.health.specialty }}</span>
-        </div>
-        {% endif %}
-        <div class="ib-health-row">
-          <span class="ib-ctx-rk">Source</span>
-          <span class="ib-ctx-rv">{{ active.health.source }}</span>
-        </div>
-        <div class="ib-health-row ib-health-{{ active.health.email.state }}">
-          <span class="ib-ctx-rk">{{ active.health.email.label }}</span>
-          <span class="ib-ctx-rv">
-            {{ active.health.email.detail }}
-            {% if active.health.email.attempts %}
-            <span class="ib-health-meta">attempts {{ active.health.email.attempts }}{% if active.health.email.last_attempted %} · last {{ active.health.email.last_attempted }}{% endif %}{% if active.health.email.failure_category %} · {{ active.health.email.failure_category }}{% endif %}</span>
-            {% endif %}
-            {% if active.health.email.retryable %}
-            <form method="post" action="/admin/inbox/{{ active.id }}/retry-owner-email" class="ib-health-retry">
-              <input type="hidden" name="tab" value="{{ tab }}">
-              <button type="submit" class="link">Retry owner email</button>
-            </form>
-            {% endif %}
-          </span>
-        </div>
-        <div class="ib-health-row ib-health-{{ active.health.notion.state }}">
-          <span class="ib-ctx-rk">{{ active.health.notion.label }}</span>
-          <span class="ib-ctx-rv">
-            {{ active.health.notion.detail }}
-            {% if active.health.notion.retry_job_id %}
-            <form method="post" action="/admin/jobs/{{ active.health.notion.retry_job_id }}/retry" class="ib-health-retry">
-              <button type="submit" class="link">Retry mirror</button>
-            </form>
-            {% elif active.health.notion.jobs_href %}
-            <a class="ib-health-link" href="{{ active.health.notion.jobs_href }}">Open Jobs</a>
-            {% endif %}
-            {% if active.health.notion.orphan %}
-            {% if active.health.notion.orphan_relinkable %}
-            <form method="post" action="/admin/inbox/{{ active.id }}/notion-orphan/relink" class="ib-health-retry">
-              <input type="hidden" name="tab" value="{{ tab }}">
-              <button type="submit" class="link">Relink orphan page</button>
-            </form>
-            {% endif %}
-            <form method="post" action="/admin/inbox/{{ active.id }}/notion-orphan/dismiss" class="ib-health-retry">
-              <input type="hidden" name="tab" value="{{ tab }}">
-              <button type="submit" class="link">Dismiss orphan</button>
-            </form>
-            {% endif %}
-          </span>
-        </div>
-      </div>
-      <p class="ib-next-action"><span class="ib-ctx-rk">Next</span> {{ active.health.next_action }}</p>
-    </div>
-    {% endif %}
-
-    <div class="ib-ctx-actions">
-      <span class="ib-ctx-label">Move it forward</span>
-      {% if active.is_converted %}
-        <a class="ib-act ib-act-primary"
-           href="{% if active.converted_proposal_id %}/admin/studio/proposals/{{ active.converted_proposal_id }}{% elif active.converted_project_id %}/admin/studio/projects/{{ active.converted_project_id }}{% elif active.converted_client_id %}/admin/studio/clients/{{ active.converted_client_id }}{% else %}/admin/studio{% endif %}">
-          <span aria-hidden="true">✦</span><span class="ib-act-t">Open converted record</span><span>→</span></a>
-        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/unconvert">
-          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
-          <button class="ib-act" type="submit"><span aria-hidden="true">↩</span><span class="ib-act-t">Undo conversion</span></button>
-        </form>
-      {% elif active.is_dismissed %}
-        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/undismiss">
-          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
-          <button class="ib-act ib-act-primary" type="submit"><span aria-hidden="true">↩</span><span class="ib-act-t">Restore to pipeline</span><span>→</span></button>
-        </form>
-      {% else %}
-        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/quote">
-          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
-          <button class="ib-act ib-act-primary" type="submit"><span aria-hidden="true">$</span><span class="ib-act-t">Send a quick quote</span><span>→</span></button>
-        </form>
-        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/client">
-          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
-          <button class="ib-act" type="submit"><span aria-hidden="true">⊞</span><span class="ib-act-t">Create client &amp; project</span></button>
-        </form>
-        <form method="post" action="/admin/studio/inquiries/{{ active.id }}/dismiss">
-          <input type="hidden" name="return_to" value="/admin/inbox?tab={{ tab }}&sel={{ active.id }}">
-          <button class="ib-act" type="submit"><span aria-hidden="true">✕</span><span class="ib-act-t">Dismiss</span></button>
-        </form>
-      {% endif %}
-    </div>
-
-    {% if active.details %}
-    <div class="ib-ctx-details">
-      <span class="ib-ctx-label">Details</span>
-      <div class="ib-ctx-rows">
-        {% for d in active.details %}
-        <div class="ib-ctx-row">
-          <span class="ib-ctx-rk">{{ d.k }}</span>
-          <span class="ib-ctx-rv">{{ d.v }}</span>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
+  {% include "admin/_inbox_context.html" %}
 
 </div>
-<script nonce="{{ csp_nonce }}">
-(function () {
-  var box = document.querySelector('.ib-reply-msg');
-  if (!box) return;
-  document.querySelectorAll('.ib-snippet').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var t = b.getAttribute('data-snippet');
-      box.value = box.value.trim() ? box.value.replace(/\s*$/, ' ') + t : t;
-      box.focus();
-    });
-  });
-})();
-</script>
 {% endblock %}

@@ -1,0 +1,21 @@
+{# ONE inbox thread row — rendered by inbox.html's pane-1 loop, and appended
+   to the inbox HX fragment (admin/_inbox_frag.html) with hx-swap-oob (inert
+   on the full render) so a reply/health POST re-trues the active row (unread
+   dot clears, preview). The include site owns the first line's indent — keep
+   this partial's inner indentation in lockstep with inbox.html. #}<a href="/admin/inbox?tab={{ tab }}&sel={{ t.id }}" class="ib-row {{ 'is-active' if t.active }}" id="ib-row-{{ t.id }}" hx-swap-oob="outerHTML">
+        <span class="ib-av-wrap">
+          <span class="ib-av" style="background: {{ t.av_bg }}; color: {{ t.av_color }};">{{ t.initials }}</span>
+          {% if t.unread %}<span class="ib-dot"></span>{% endif %}
+        </span>
+        <span class="ib-row-body">
+          <span class="ib-row-top">
+            <span class="ib-row-name">{{ t.name }}</span>
+            <span class="ib-row-time">{{ t.time | localtime }}</span>
+          </span>
+          <span class="ib-row-bot">
+            <span class="ib-chan" style="color: {{ t.ch_color }}; background: {{ t.ch_bg }};">{{ t.ch_label }}</span>
+            {% if t.service %}<span class="ib-svc" title="Specialty">{{ t.service }}</span>{% endif %}
+            <span class="ib-preview {{ 'is-unread' if t.unread }}">{{ t.preview }}</span>
+          </span>
+        </span>
+      </a>

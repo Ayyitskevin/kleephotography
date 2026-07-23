@@ -1,0 +1,8 @@
+{# HX fragment for the inbox POSTs (reply / retry-owner-email / notion-orphan
+   relink / notion-orphan dismiss): the whole conversation pane (swapped
+   outerHTML onto #ib-convo) plus the context pane and the active thread row
+   riding out-of-band, so one POST re-trues all three regions. Rendered by
+   inbox.py's _inbox_frag on HX-Request only. #}
+{% include "admin/_inbox_convo.html" %}
+{% include "admin/_inbox_context.html" %}
+{% if active_thread %}{% set t = active_thread %}{% include "admin/_inbox_row.html" %}{% endif %}

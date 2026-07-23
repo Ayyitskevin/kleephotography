@@ -519,4 +519,20 @@
     });
     applyFilter(box);
   });
+
+  /* data-snippet — inbox reply composer one-click snippets. Was an inline
+     script binding at page load; delegated because the composer now htmx-swaps
+     after every send. Clicking a chip drops its text into the closest form's
+     message textarea (appended after a space when it already has text) and
+     focuses it. */
+  document.addEventListener("click", function (ev) {
+    var chip = ev.target && ev.target.closest ? ev.target.closest("[data-snippet]") : null;
+    if (!chip) return;
+    var form = chip.closest("form");
+    var box = form && form.querySelector('textarea[name="message"]');
+    if (!box) return;
+    var t = chip.getAttribute("data-snippet");
+    box.value = box.value.trim() ? box.value.replace(/\s*$/, " ") + t : t;
+    box.focus();
+  });
 })();
