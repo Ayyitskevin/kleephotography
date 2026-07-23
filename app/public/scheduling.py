@@ -158,6 +158,10 @@ async def book_event(request: Request, slug: str):
         raise HTTPException(status_code=404)
     ctx = _picker_ctx(et, request)
     ctx["form_action"] = f"/book/{slug}"
+    # htmx picker swaps fetch just the card; plain GETs get the full page.
+    # Same _picker_ctx either way — this is a rendering fork, never a logic one.
+    if request.headers.get("hx-request") == "true":
+        return templates.TemplateResponse(request, "public/_book_card.html", ctx)
     return templates.TemplateResponse(request, "public/book_event.html", ctx)
 
 
@@ -332,6 +336,8 @@ async def reschedule_form(request: Request, token: str):
     ctx = _picker_ctx(et, request, is_reschedule=True, token=token, exclude_id=b["id"])
     ctx["form_action"] = f"/booking/{token}/reschedule"
     ctx["old_when"] = b["start_utc"]
+    if request.headers.get("hx-request") == "true":
+        return templates.TemplateResponse(request, "public/_book_card.html", ctx)
     return templates.TemplateResponse(request, "public/book_event.html", ctx)
 
 

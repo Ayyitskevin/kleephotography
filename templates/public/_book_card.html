@@ -1,0 +1,225 @@
+{# The booking picker card — rail + step 1 (calendar/slots) / step 2 (confirm),
+   as ONE swappable unit. Rendered full-page by book_event.html; rendered
+   standalone as the HX-Request fragment by scheduling.py's book_event /
+   reschedule_form handlers (same _picker_ctx either way — zero logic split).
+   Picker links (month nav, days, slots, confirm-step Back) and the tz form
+   carry hx-* so the card swaps in place with history (hx-push-url); without
+   JS the same hrefs do a full GET — progressive enhancement, no fork. Cross-
+   page links ("All event types", "Back to booking") stay plain navigations. #}
+{% set tzq = '&tz=' ~ visitor_tz if visitor_tz else '' %}
+{% set tz_options = [
+  ['America/New_York','Eastern Time — US & Canada'],
+  ['America/Chicago','Central Time — US & Canada'],
+  ['America/Denver','Mountain Time — US & Canada'],
+  ['America/Phoenix','Arizona'],
+  ['America/Los_Angeles','Pacific Time — US & Canada'],
+  ['America/Anchorage','Alaska'],
+  ['Pacific/Honolulu','Hawaii'],
+  ['America/Toronto','Toronto'],
+  ['America/Vancouver','Vancouver'],
+  ['America/Mexico_City','Mexico City'],
+  ['Europe/London','London'],
+  ['Europe/Paris','Central European — Paris, Berlin'],
+  ['Asia/Dubai','Dubai'],
+  ['Asia/Kolkata','India'],
+  ['Asia/Singapore','Singapore'],
+  ['Asia/Tokyo','Tokyo'],
+  ['Australia/Sydney','Sydney'],
+] %}
+{# resolve the selected slot's visitor-local label for the confirm step #}
+{% set ns = namespace(label=selected_slot_label) %}
+{% if sel_start and slots %}{% for s in slots %}{% if s.utc == sel_start %}{% set ns.label = s.label %}{% endif %}{% endfor %}{% endif %}
+{% macro hxswap(url) %}hx-get="{{ url }}" hx-target=".book-card" hx-swap="outerHTML" hx-push-url="true"{% endmacro %}
+<div class="book-card{% if sel_start %} book-card-confirm{% endif %}">
+
+  <aside class="book-rail">
+    <nav class="book-rail-nav">
+      {% if sel_start %}
+        <a href="{{ form_action }}?year={{ year }}&month={{ month }}&day={{ sel_day }}{{ tzq }}"
+           {{ hxswap(form_action ~ '?year=' ~ year ~ '&month=' ~ month ~ '&day=' ~ sel_day ~ tzq) }}>&larr; Back</a>
+      {% elif is_reschedule %}
+        <a href="/booking/{{ token }}">&larr; Back to booking</a>
+      {% else %}
+        <a href="/book">&larr; All event types</a>
+      {% endif %}
+    </nav>
+    <p class="book-rail-host">{{ site_name }}</p>
+    <h1 class="book-rail-title">{{ e.name }}</h1>
+
+    <ul class="book-meta">
+      {% if sel_start %}
+      <li class="book-meta-when">
+        <span class="book-meta-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-calendar"/></svg></span>
+        <span>{{ ns.label }}{% if ns.label %}, {% endif %}{{ sel_day }}</span>
+      </li>
+      {% endif %}
+      <li>
+        <span class="book-meta-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-clock"/></svg></span>
+        <span>{{ e.duration_min }} min</span>
+      </li>
+      {% if e.location %}
+      <li>
+        <span class="book-meta-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-circle"/></svg></span>
+        <span>{{ e.location }}</span>
+      </li>
+      {% endif %}
+      <li class="book-meta-tz">
+        <span class="book-meta-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-external"/></svg></span>
+        <form method="get" action="{{ form_action }}" class="book-tzform"
+              hx-get="{{ form_action }}" hx-trigger="change" hx-target=".book-card"
+              hx-swap="outerHTML" hx-push-url="true">
+          {% if sel_day %}<input type="hidden" name="year" value="{{ year }}">
+          <input type="hidden" name="month" value="{{ month }}">
+          <input type="hidden" name="day" value="{{ sel_day }}">{% endif %}
+          {% if sel_start %}<input type="hidden" name="start" value="{{ sel_start | urlencode }}">{% endif %}
+          <select name="tz" aria-label="Time zone">
+            <option value="{{ visitor_tz }}" selected>
+              {{ visitor_tz.split('/')[-1] | replace('_',' ') }} — current</option>
+            {% for z, lbl in tz_options if z != visitor_tz %}
+            <option value="{{ z }}">{{ lbl }}</option>
+            {% endfor %}
+          </select>
+          <noscript><button type="submit" class="book-tzgo">Set</button></noscript>
+        </form>
+      </li>
+    </ul>
+
+    {% if e.description %}<p class="book-rail-desc">{{ e.description }}</p>{% endif %}
+    {% if is_reschedule %}<p class="book-resked">Rescheduling — your name and details carry over.</p>{% endif %}
+  </aside>
+
+  <section class="book-main">
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+    {% if sel_start %}
+      {# ── Step 2: details / confirm ─────────────────────────────── #}
+      <h2 class="book-step-h">{% if is_reschedule %}Confirm your new time{% else %}Enter details{% endif %}</h2>
+      <form method="post" action="{{ form_action }}" class="stack-form book-confirm">
+        <input type="hidden" name="start" value="{{ sel_start }}">
+        <input type="hidden" name="tz" value="{{ visitor_tz }}">
+        {% if is_reschedule %}
+          <p class="muted">Your name and details carry over from the original booking.</p>
+          <button type="submit">Confirm new time</button>
+        {% else %}
+          <label>Name <input type="text" name="name" value="{{ submitted.name }}" required></label>
+          <label>Email <input type="email" name="email" value="{{ submitted.email }}" required></label>
+          <label>Phone <span class="muted">(optional)</span>
+            <input type="tel" name="phone" value="{{ submitted.phone }}"></label>
+          <label>Anything I should know? <span class="muted">(optional)</span>
+            <textarea name="notes" rows="3">{{ submitted.notes }}</textarea></label>
+          {% if e.creates_notion_session %}
+          {# Intake labels follow the event-type slug prefix convention
+             (ops/SPECIALTY-LAUNCH.md): 're-…' real estate, 'pl-…' portrait &
+             lifestyle, anything else keeps the original F&B intake. Labels
+             only — the input names/columns are identical in all three. #}
+          {% set sp = 're' if e.slug.startswith('re-') else ('pl' if e.slug.startswith('pl-') else 'fb') %}
+          <fieldset class="book-intake">
+            <legend>Shoot details <span class="muted">(helps me prep — optional)</span></legend>
+            {% if sp == 're' %}
+            {% if aerials_live() %}
+            <label class="check-opt book-aerial"><input type="checkbox" name="aerial_pass" value="1"{% if submitted.aerial_pass %} checked{% endif %}>
+              Add the Aerial Pass &mdash; drone stills + orbit clips, {{ aerial_pass_display() }} add-on
+              <span class="muted">(FAA Part 107 &middot; LAANC handled)</span></label>
+            {% endif %}
+            <label>Property address
+              <input type="text" name="venue_address" value="{{ submitted.venue_address }}"></label>
+            <label>Size &amp; rooms
+              <input type="text" name="dish_count" value="{{ submitted.dish_count }}" placeholder="e.g. 3,200 sq ft · 4 bed 3 bath"></label>
+            <label>Access &amp; parking notes
+              <input type="text" name="parking_notes" value="{{ submitted.parking_notes }}"></label>
+            <label>On-site contact <span class="muted">(name + number on the day)</span>
+              <input type="text" name="onsite_contact" value="{{ submitted.onsite_contact }}"></label>
+            <label>Listing link or references <span class="muted">(links or a few words)</span>
+              <textarea name="style_refs" rows="2">{{ submitted.style_refs }}</textarea></label>
+            {% elif sp == 'pl' %}
+            <label>Session location <span class="muted">(studio, your office, outdoors…)</span>
+              <input type="text" name="venue_address" value="{{ submitted.venue_address }}"></label>
+            <label>Who's being photographed?
+              <input type="text" name="dish_count" value="{{ submitted.dish_count }}" placeholder="e.g. just me · team of 8 · family of 5"></label>
+            <label>Parking &amp; access notes
+              <input type="text" name="parking_notes" value="{{ submitted.parking_notes }}"></label>
+            <label>On-site contact <span class="muted">(if it isn't you)</span>
+              <input type="text" name="onsite_contact" value="{{ submitted.onsite_contact }}"></label>
+            <label>Looks &amp; references <span class="muted">(links or a few words)</span>
+              <textarea name="style_refs" rows="2">{{ submitted.style_refs }}</textarea></label>
+            {% else %}
+            <label>Venue / shoot address
+              <input type="text" name="venue_address" value="{{ submitted.venue_address }}"></label>
+            <label>How many dishes or setups?
+              <input type="text" name="dish_count" value="{{ submitted.dish_count }}" placeholder="e.g. 8–10 dishes"></label>
+            <label>Parking &amp; loading notes
+              <input type="text" name="parking_notes" value="{{ submitted.parking_notes }}"></label>
+            <label>On-site contact <span class="muted">(name + number on the day)</span>
+              <input type="text" name="onsite_contact" value="{{ submitted.onsite_contact }}"></label>
+            <label>Style references <span class="muted">(links or a few words)</span>
+              <textarea name="style_refs" rows="2">{{ submitted.style_refs }}</textarea></label>
+            {% endif %}
+          </fieldset>
+          {% endif %}
+          <input type="text" name="website" class="hp-field" tabindex="-1"
+                 autocomplete="off" aria-hidden="true">
+          <button type="submit">Schedule event</button>
+        {% endif %}
+      </form>
+
+    {% else %}
+      {# ── Step 1: pick a date & time ────────────────────────────── #}
+      <h2 class="book-step-h">Select a date &amp; time</h2>
+      <div class="book-pick">
+        <div class="book-cal">
+          <div class="book-cal-nav">
+            {% if has_prev %}<a href="{{ form_action }}?year={{ prev_year }}&month={{ prev_month }}{{ tzq }}"
+               {{ hxswap(form_action ~ '?year=' ~ prev_year ~ '&month=' ~ prev_month ~ tzq) }} aria-label="Previous month">&larr;</a>{% else %}<span class="muted">&larr;</span>{% endif %}
+            <strong>{{ month_name }} {{ year }}</strong>
+            {% if has_next %}<a href="{{ form_action }}?year={{ next_year }}&month={{ next_month }}{{ tzq }}"
+               {{ hxswap(form_action ~ '?year=' ~ next_year ~ '&month=' ~ next_month ~ tzq) }} aria-label="Next month">&rarr;</a>{% else %}<span class="muted">&rarr;</span>{% endif %}
+          </div>
+          <table class="book-grid">
+            <thead><tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr></thead>
+            <tbody>
+            {% for week in weeks %}
+              <tr>
+              {% for day in week %}
+                {% if day == 0 %}
+                  <td class="book-cell book-empty"></td>
+                {% else %}
+                  {% set iso = "%04d-%02d-%02d"|format(year, month, day) %}
+                  {% set is_today = iso == today.isoformat() %}
+                  {% if iso in avail %}
+                    <td class="book-cell book-open{% if iso == sel_day %} book-sel{% endif %}{% if is_today %} book-today{% endif %}">
+                      <a href="{{ form_action }}?year={{ year }}&month={{ month }}&day={{ iso }}{{ tzq }}"
+                         {{ hxswap(form_action ~ '?year=' ~ year ~ '&month=' ~ month ~ '&day=' ~ iso ~ tzq) }}>{{ day }}</a>
+                    </td>
+                  {% else %}
+                    <td class="book-cell book-closed{% if is_today %} book-today{% endif %}">{{ day }}</td>
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="book-slots">
+          {% if sel_day %}
+            <h3 class="book-slots-h">{{ sel_day }}</h3>
+            {% if slots %}
+              <div class="book-slot-list">
+              {% for s in slots %}
+                <a class="book-slot{% if s.utc == sel_start %} book-slot-sel{% endif %}"
+                   href="{{ form_action }}?year={{ year }}&month={{ month }}&day={{ sel_day }}&start={{ s.utc | urlencode }}{{ tzq }}"
+                   {{ hxswap(form_action ~ '?year=' ~ year ~ '&month=' ~ month ~ '&day=' ~ sel_day ~ '&start=' ~ (s.utc | urlencode) ~ tzq) }}>{{ s.label }}</a>
+              {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No open times that day — try another.</p>
+            {% endif %}
+          {% else %}
+            <p class="book-slots-hint muted">Pick a highlighted day to see open times.</p>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </section>
+</div>
