@@ -76,10 +76,7 @@ def _posint(form, key: str, lo: int, hi: int, default: int = 0) -> int:
 
 
 def _get_event(event_id: int) -> "db.sqlite3.Row":
-    e = db.one("SELECT * FROM event_types WHERE id=?", (event_id,))
-    if not e:
-        raise HTTPException(status_code=404)
-    return e
+    return db.get_or_404("SELECT * FROM event_types WHERE id=?", (event_id,))
 
 
 def _fmt_dur(mins: int) -> str:
@@ -546,9 +543,7 @@ async def bookings(request: Request):
 
 @router.post("/booking/{booking_id}/cancel")
 async def admin_cancel(booking_id: int):
-    b = db.one("SELECT token FROM bookings WHERE id=?", (booking_id,))
-    if not b:
-        raise HTTPException(status_code=404)
+    b = db.get_or_404("SELECT token FROM bookings WHERE id=?", (booking_id,))
     if scheduling.cancel(b["token"], "Cancelled by Kevin Lee Photography"):
         booking_notify.cancelled(booking_id, by_admin=True)
     return RedirectResponse("/admin/scheduling/bookings", status_code=303)

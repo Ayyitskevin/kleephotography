@@ -76,11 +76,6 @@ def short_date(stored: str) -> str:
     return stored
 
 
-def today() -> dt.date:
-    """Studio wall-clock today (local). Monkeypatchable."""
-    return dt.date.today()
-
-
 def gallery_card(g, today_iso: str, soon_iso: str) -> dict:
     exp = g["expires_at"]
     expired = bool(exp and exp < today_iso)

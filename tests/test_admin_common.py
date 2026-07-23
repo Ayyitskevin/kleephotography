@@ -1,17 +1,8 @@
-import datetime as dt
-
 import pytest
 
 from app.admin import common
 
 pytestmark = pytest.mark.unit
-
-
-@pytest.mark.unit
-def test_today():
-    t = common.today()
-    assert isinstance(t, dt.date)
-    assert (dt.date.today() - t).days < 2
 
 
 @pytest.mark.unit
