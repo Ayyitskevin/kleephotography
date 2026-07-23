@@ -5,7 +5,7 @@
   <div class="pgtop-lead">
     <h1>{{ g.title }} — activity</h1>
     <p class="pgtop-sub">
-      <b>{{ visitors | length }}</b> visitor{{ "s" if visitors|length != 1 }} ·
+      <b>{{ visitors_total }}</b> visitor{{ "s" if visitors_total != 1 }} ·
       <b>{{ favorites | length }}</b> favorited ·
       <b>{{ downloads | length }}</b> download{{ "s" if downloads|length != 1 }}
     </p>
@@ -18,7 +18,7 @@
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <h2>Visitors ({{ visitors|length }})</h2>
+  <h2>Visitors ({{ visitors_total }})</h2>
   <table class="list">
     <tr><th>Email</th><th>First seen</th><th>Last seen</th><th>Downloads</th><th>Favorites</th></tr>
     {% for v in visitors %}
@@ -31,6 +31,9 @@
     </tr>
     {% endfor %}
   </table>
+  {% if visitors_total > visitors|length %}
+  <p class="muted">Showing the {{ visitors|length }} most recent — earlier visits omitted.</p>
+  {% endif %}
 
   <h2>Favorites</h2>
   <table class="list">

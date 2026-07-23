@@ -747,14 +747,19 @@ async def activity(request: Request, gallery_id: int):
     # g=None (empty title, empty lists) — matches the get_or_404 pattern used
     # across the admin lookups.
     g = db.get_or_404("SELECT * FROM galleries WHERE id=?", (gallery_id,))
+    # Visitors grow with every gated visit, so cap the render like the
+    # downloads list below; the header count stays the true total.
     visitors = db.all_(
         """SELECT v.*,
                           (SELECT COUNT(*) FROM downloads d WHERE d.visitor_id=v.id) AS n_dl,
                           (SELECT COUNT(*) FROM favorites f WHERE f.visitor_id=v.id) AS n_fav
                           FROM visitors v WHERE v.gallery_id=?
-                          ORDER BY v.first_seen DESC""",
+                          ORDER BY v.first_seen DESC LIMIT 200""",
         (gallery_id,),
     )
+    visitors_total = db.one("SELECT COUNT(*) AS n FROM visitors WHERE gallery_id=?", (gallery_id,))[
+        "n"
+    ]
     downloads = db.all_(
         """SELECT d.created_at, d.asset_id, a.filename, v.email
                            FROM downloads d
@@ -772,7 +777,13 @@ async def activity(request: Request, gallery_id: int):
     return templates.TemplateResponse(
         request,
         "admin/activity.html",
-        {"g": g, "visitors": visitors, "downloads": downloads, "favorites": favorites},
+        {
+            "g": g,
+            "visitors": visitors,
+            "visitors_total": visitors_total,
+            "downloads": downloads,
+            "favorites": favorites,
+        },
     )
 
 
