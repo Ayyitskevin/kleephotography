@@ -22,7 +22,7 @@ from .. import (
 )
 from ..gallery_comments import cascade_status, resolve_comment_parent, video_comment_thread
 from ..render import templates
-from . import common
+from . import common, studio
 
 log = logging.getLogger("mise.admin.galleries")
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -97,20 +97,11 @@ async def dashboard(request: Request):
                       AS n_proof_pending
                     FROM galleries g WHERE g.type='gallery'
                     ORDER BY g.created_at DESC""")
-    today = dt.date.today()
+    today = studio._today()
     failed_jobs = db.one("SELECT COUNT(*) AS n FROM jobs WHERE status='failed'")["n"]
-    # Unlinked-but-published galleries — usually orphans from a client force-
-    # delete (ship #53) or a manual unlink. Worth surfacing because a published
-    # gallery without a studio client means Kevin's lost the inquiry/proposal/
-    # invoice context. Unpublished + no-client is fine (could be a draft).
-    n_unlinked_pub = sum(1 for g in gs if g["client_id"] is None and g["published"])
-    # Pre-build the orphan list and client dropdown so the dashboard template
-    # can offer an inline "Link to client" picker per orphan (ship #55) —
-    # turns the warn into one-click action instead of click-into-each-gallery.
-    orphans = [g for g in gs if g["client_id"] is None and g["published"]]
-    link_clients = db.clients_for_select() if orphans else []
+    # Total media bytes feed only the summary strip; per-card sizes were dropped
+    # from the template, so don't build/pass per-gallery dicts.
     sizes_b = {g["id"]: common.dir_size(config.MEDIA_DIR / str(g["id"])) for g in gs}
-    sizes = {gid: common.fmt_size(b) for gid, b in sizes_b.items()}
     today_iso = today.isoformat()
     # Library roll-up for the summary strip (display-only).
     totals = {
@@ -135,31 +126,14 @@ async def dashboard(request: Request):
     card_counts = {"all": len(cards)}
     for k in ("delivered", "proofing", "expiring", "draft"):
         card_counts[k] = sum(1 for c in cards if c["status_lc"] == k)
-    free_gb = shutil.disk_usage(config.DATA_DIR).free / 1e9
-    backup_dir = config.DATA_DIR / "backups"
-    snaps = sorted(backup_dir.glob("*.db.gz")) if backup_dir.exists() else []
-    backup_age_h = (
-        (dt.datetime.now().timestamp() - snaps[-1].stat().st_mtime) / 3600 if snaps else None
-    )
     return templates.TemplateResponse(
         request,
         "admin/dashboard.html",
         {
-            "galleries": gs,
             "cards": cards,
             "card_counts": card_counts,
             "base_url": config.BASE_URL,
-            "today": today.isoformat(),
-            "soon": soon_iso,
             "failed_jobs": failed_jobs,
-            "sizes": sizes,
-            "free_gb": free_gb,
-            "min_free_gb": config.MIN_FREE_GB,
-            "backup_age_h": backup_age_h,
-            "n_unlinked_pub": n_unlinked_pub,
-            "orphans": orphans,
-            "link_clients": link_clients,
-            "sizes_b": sizes_b,
             "totals": totals,
         },
     )
