@@ -54,6 +54,47 @@ def _crop_link_status(asset: "db.sqlite3.Row", ratio_slugs: list[str]) -> list[d
     ]
 
 
+def _crops_ctx(p: dict) -> dict:
+    """Social-crops context, shared by the portal page and its self-polling
+    fragment: favorited ready photos with per-ratio link readiness, the
+    favorites trust line, and whether any crop is still encoding."""
+    crops = db.all_(
+        """SELECT DISTINCT a.*, g.title AS gallery_title
+                       FROM favorites f
+                       JOIN assets a ON a.id=f.asset_id
+                       JOIN galleries g ON g.id=a.gallery_id
+                       WHERE g.client_id=? AND g.published=1
+                         AND a.kind='photo' AND a.status='ready'
+                       ORDER BY g.created_at DESC, a.id""",
+        (p["client_id"],),
+    )
+    # Aggregate the client's favorites across every published gallery —
+    # one-line trust signal at the top of the Social crops section so the
+    # client knows how many selects they've already made.
+    fav_summary = db.one(
+        """SELECT COUNT(DISTINCT f.asset_id) AS n_faves,
+                                   COUNT(DISTINCT a.gallery_id) AS n_galleries
+                            FROM favorites f
+                            JOIN assets a ON a.id=f.asset_id
+                            JOIN galleries g ON g.id=a.gallery_id
+                            WHERE g.client_id=? AND g.published=1
+                              AND a.kind='photo' AND a.status='ready'""",
+        (p["client_id"],),
+    )
+    ratio_slugs = [ps["slug"] for ps in presets.active()]
+    crop_tiles = []
+    for a in crops:
+        tile = dict(a)
+        tile["crop_links"] = _crop_link_status(a, ratio_slugs)
+        crop_tiles.append(tile)
+    return {
+        "crops": crop_tiles,
+        "ratios": ratio_slugs,
+        "fav_summary": fav_summary,
+        "crops_pending": any(not link["ready"] for t in crop_tiles for link in t["crop_links"]),
+    }
+
+
 def _cookie_name(portal_id: int) -> str:
     return f"mise_p{portal_id}"
 
@@ -89,16 +130,6 @@ async def view(request: Request, slug: str):
     # client's permanent hub) would dead-end them. Flag those so the template
     # renders them unlinked with a "get in touch" note instead.
     expired_gallery_ids = {g["id"] for g in galleries if gallery.is_expired(g)}
-    crops = db.all_(
-        """SELECT DISTINCT a.*, g.title AS gallery_title
-                       FROM favorites f
-                       JOIN assets a ON a.id=f.asset_id
-                       JOIN galleries g ON g.id=a.gallery_id
-                       WHERE g.client_id=? AND g.published=1
-                         AND a.kind='photo' AND a.status='ready'
-                       ORDER BY g.created_at DESC, a.id""",
-        (p["client_id"],),
-    )
     # Delivered motion — ready videos across the client's live galleries. The
     # gallery stays the playback/review/download surface (it carries the
     # PIN/email gates); the portal lists the reels and routes into it.
@@ -116,19 +147,6 @@ async def view(request: Request, slug: str):
     ]
     brand = db.all_(
         "SELECT * FROM brand_assets WHERE client_id=? ORDER BY created_at DESC", (p["client_id"],)
-    )
-    # Aggregate the client's favorites across every published gallery —
-    # one-line trust signal at the top of the Social crops section so the
-    # client knows how many selects they've already made.
-    fav_summary = db.one(
-        """SELECT COUNT(DISTINCT f.asset_id) AS n_faves,
-                                   COUNT(DISTINCT a.gallery_id) AS n_galleries
-                            FROM favorites f
-                            JOIN assets a ON a.id=f.asset_id
-                            JOIN galleries g ON g.id=a.gallery_id
-                            WHERE g.client_id=? AND g.published=1
-                              AND a.kind='photo' AND a.status='ready'""",
-        (p["client_id"],),
     )
     # What-changed header: how many of each surface is new since prev_visit, +
     # a friendly relative-time string. None on first visit so the page lands
@@ -167,12 +185,6 @@ async def view(request: Request, slug: str):
         f"photos, and brand assets.\n"
     )
     share_href = f"mailto:?subject={share_subject}&body={share_body}"
-    ratio_slugs = [ps["slug"] for ps in presets.active()]
-    crop_tiles = []
-    for a in crops:
-        tile = dict(a)
-        tile["crop_links"] = _crop_link_status(a, ratio_slugs)
-        crop_tiles.append(tile)
     return templates.TemplateResponse(
         request,
         "public/portal.html",
@@ -180,15 +192,25 @@ async def view(request: Request, slug: str):
             "p": p,
             "galleries": galleries,
             "expired_gallery_ids": expired_gallery_ids,
-            "crops": crop_tiles,
             "motion": motion,
             "brand": brand,
-            "ratios": ratio_slugs,
             "prev_visit": prev_visit,
             "changes": changes,
-            "fav_summary": fav_summary,
             "share_href": share_href,
+            **_crops_ctx(p),
         },
+    )
+
+
+@router.get("/{slug}/crops", response_class=HTMLResponse)
+async def crops_fragment(request: Request, slug: str):
+    """Self-polling social-crops fragment — while any crop is still encoding the
+    block carries hx-get/every-8s and swaps whole, so "preparing…" chips turn
+    into real download links without the client reloading (REC-tile pattern)."""
+    p = get_live_portal(slug)
+    _require_access(request, p["id"])
+    return templates.TemplateResponse(
+        request, "public/_portal_crops.html", {"p": p, **_crops_ctx(p)}
     )
 
 

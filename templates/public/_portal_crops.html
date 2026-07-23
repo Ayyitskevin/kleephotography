@@ -1,0 +1,32 @@
+{# Social crops block — full render inside portal.html, or standalone as the
+   HX-Request fragment from /portal/{slug}/crops (portal.py) while any crop is
+   still encoding. While pending the block polls itself every 8s and swaps
+   whole — the "preparing…" chips turn into real download links without the
+   client reloading (same settle pattern as the gallery's REC tiles). #}
+<div id="portal-crops"{% if crops_pending %} hx-get="/portal/{{ p.slug }}/crops" hx-trigger="every 8s" hx-swap="outerHTML" aria-live="off"{% endif %}>
+  {% if crops %}
+  <p><a class="button" href="/portal/{{ p.slug }}/crops.zip">Download all crops (ZIP)</a></p>
+  <div class="grid">
+    {% for a in crops %}
+    <figure class="tile sr-skel">
+      <img src="/portal/{{ p.slug }}/thumb/{{ a.id }}" loading="lazy"
+           alt="{{ a.gallery_title }} — frame {{ '%04d'|format(a.id) }}">
+      <figcaption>
+        <span class="muted">{{ a.gallery_title }}</span>
+        <span class="crop-links">
+          {% for link in a.crop_links %}
+          {% if link.ready %}
+          <a href="/portal/{{ p.slug }}/crop/{{ a.id }}/{{ link.slug }}">{{ link.slug.replace('x', ':') }}</a>
+          {% else %}
+          <span class="muted crop-pending">{{ link.slug.replace('x', ':') }} preparing…</span>
+          {% endif %}
+          {% endfor %}
+        </span>
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">Favorite photos in your galleries and crops will appear here.</p>
+  {% endif %}
+</div>

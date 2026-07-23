@@ -66,30 +66,7 @@
     <a class="portal-cta" href="/contact?prefill=gallery_formats&amp;business={{ biz }}&amp;count={{ fav_summary.n_faves }}">Need different formats or print sizes? &rarr;</a></p>
   {% endif %}
   <p class="muted">Ready-to-post crops of your favorited photos — square, portrait, and story.</p>
-  {% if crops %}
-  <p><a class="button" href="/portal/{{ p.slug }}/crops.zip">Download all crops (ZIP)</a></p>
-  <div class="grid">
-    {% for a in crops %}
-    <figure class="tile">
-      <img src="/portal/{{ p.slug }}/thumb/{{ a.id }}" loading="lazy" alt="{{ a.filename }}">
-      <figcaption>
-        <span class="muted">{{ a.gallery_title }}</span>
-        <span class="crop-links">
-          {% for link in a.crop_links %}
-          {% if link.ready %}
-          <a href="/portal/{{ p.slug }}/crop/{{ a.id }}/{{ link.slug }}">{{ link.slug.replace('x', ':') }}</a>
-          {% else %}
-          <span class="muted crop-pending">{{ link.slug.replace('x', ':') }} preparing…</span>
-          {% endif %}
-          {% endfor %}
-        </span>
-      </figcaption>
-    </figure>
-    {% endfor %}
-  </div>
-  {% else %}
-  <p class="muted">Favorite photos in your galleries and crops will appear here.</p>
-  {% endif %}
+  {% include "public/_portal_crops.html" %}
 
   {% if motion %}
   <h2 class="section-name">Reels &amp; films
@@ -98,9 +75,9 @@
   <p class="muted">Delivered motion across your galleries &mdash; watch, leave timecoded notes, and download from the gallery.</p>
   <div class="grid">
     {% for v in motion %}
-    <figure class="tile">
+    <figure class="tile sr-skel">
       <a href="/g/{{ v.gallery_slug }}" title="Open {{ v.gallery_title }}">
-        <img src="/portal/{{ p.slug }}/thumb/{{ v.id }}" loading="lazy" alt="{{ v.filename }}">
+        <img src="/portal/{{ p.slug }}/thumb/{{ v.id }}" loading="lazy" alt="{{ v.gallery_title }} — reel">
         <span class="play-badge">&#9654;</span>
         {% if v.duration and v.duration|hms %}<span class="dur-badge">{{ v.duration|hms }}</span>{% endif %}
       </a>

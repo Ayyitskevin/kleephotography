@@ -7,6 +7,7 @@
   const dlMp4 = lb.querySelector(".lb-dl-mp4");
   const playBtn = lb.querySelector(".lb-play");
   const proofLabel = lb.querySelector(".lb-proof");
+  const live = lb.querySelector(".lb-live");
   const tiles = Array.from(document.querySelectorAll(".tile"));
   let idx = -1;
   let timer = null;
@@ -223,6 +224,7 @@
     const faved = fb.classList.contains("faved");
     favBtn.innerHTML = faved ? "♥" : "♡";
     favBtn.classList.toggle("faved", faved);
+    favBtn.setAttribute("aria-pressed", faved ? "true" : "false");
   }
 
   // Mirror the section's live "X of N picked" label into the lightbox when the
@@ -306,6 +308,12 @@
         restoreCommentDraft(null);
       }
     }
+    // Announce the stage change — the dialog is modal, so without a live
+    // region arrow/slideshow navigation is silent to screen readers.
+    if (live) {
+      const kindFallback = t.dataset.kind === "video" ? "Video" : "Photo";
+      live.textContent = mediaName(t, kindFallback) + " — " + (idx + 1) + " of " + tiles.length;
+    }
   }
 
   // Return focus to whatever opened the lightbox when it closes.
@@ -335,10 +343,16 @@
     lastFocused = null;
   }
 
-  // Each tile image opens the lightbox. It's a real control, so make it
-  // keyboard-reachable (Tab) and operable (Enter/Space), not just a click
-  // target — the figure itself stays a plain container.
+  // Openers: gallery tiles wrap the thumb in a real <button class="tile-open">
+  // (keyboard + AT native). Surfaces still carrying a bare <img> get the older
+  // upgrade — keyboard-reachable (Tab) and operable (Enter/Space) — so both
+  // shapes work; the figure itself stays a plain container.
   tiles.forEach((t, i) => {
+    const opener = t.querySelector(".tile-open");
+    if (opener) {
+      opener.addEventListener("click", () => open(i));
+      return;
+    }
     const img = t.querySelector("img");
     if (!img) return;
     img.setAttribute("tabindex", "0");
@@ -364,7 +378,7 @@
   function triggerFav() {
     const t = tiles[idx];
     if (!t || !t.dataset.fav) return;
-    const target = t.querySelector("button.icon-btn");
+    const target = t.querySelector("button.sr-take-btn");
     return htmx.ajax("POST", t.dataset.fav, { target: target, swap: "innerHTML" })
       .then(() => { syncFav(t); refreshProof(t); });
   }
@@ -455,6 +469,8 @@
     if (!el) {
       el = document.createElement("p");
       el.className = "vc-error";
+      el.setAttribute("role", "alert");
+      el.setAttribute("aria-live", "polite");
       cForm.appendChild(el);
     }
     el.textContent = msg;

@@ -1753,3 +1753,15 @@ body.sr-admin .admin-shell, body.sr-admin {
   color: var(--sr-ink-ghost); }
 .sr .flow-foot a { color: var(--sr-ink-soft); text-decoration: none; }
 .sr .flow-foot a:hover { color: var(--sr-amber); }
+
+/* ── tile openers + a11y utilities (gallery / portal) ───────────────────────
+   Thumb tiles open the lightbox from a real <button class="tile-open"> now
+   (keyboard + AT native); the button is invisible chrome around the img. */
+.sr .tile-open { display: block; width: 100%; padding: 0; border: 0;
+  background: none; color: inherit; cursor: zoom-in; }
+.sr .tile-open img { display: block; width: 100%; }
+.sr .tile-open:focus-visible { outline: 2px solid var(--sr-amber); outline-offset: 2px; }
+
+/* visually-hidden but announced (live regions like .lb-live) */
+.sr .sr-only { position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

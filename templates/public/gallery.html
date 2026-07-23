@@ -53,14 +53,17 @@
 {% endmacro %}
 
 {% macro tile(a) %}
-<figure class="tile" data-id="{{ a.id }}" data-kind="{{ a.kind }}"
+<figure class="tile sr-skel" data-id="{{ a.id }}" data-kind="{{ a.kind }}"
         data-web="/media/{{ g.slug }}/web/{{ a.id }}"
         data-fav="/g/{{ g.slug }}/fav/{{ a.id }}"
         data-dl="/g/{{ g.slug }}/download?asset_id={{ a.id }}"
         {% if a.kind == 'video' %}data-dl-web="/g/{{ g.slug }}/download?asset_id={{ a.id }}&web=1"{% endif %}
         {% if a.section_id %}data-section="{{ a.section_id }}"{% endif %}
         {% if a.kind == 'video' %}data-poster="/media/{{ g.slug }}/poster/{{ a.id }}"{% endif %}>
-  <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" loading="lazy" alt="{{ a.filename }}">
+  <button type="button" class="tile-open">
+    <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" loading="lazy"
+         alt="{{ g.title }} — frame {{ '%04d'|format(a.id) }}">
+  </button>
   {% if a.kind == 'video' %}<span class="play-badge"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-play"/></svg></span>
   {% if a.duration and a.duration|hms %}<span class="dur-badge">{{ a.duration|hms }}</span>{% endif %}
   {% endif %}
@@ -176,6 +179,7 @@
   <button class="lb-close" aria-label="Close">&times;</button>
   <button class="lb-prev" aria-label="Previous">&#8249;</button>
   <div class="lb-stage"></div>
+  <span class="lb-live sr-only" role="status" aria-live="polite"></span>
   <button class="lb-next" aria-label="Next">&#8250;</button>
   <div class="lb-actions">
     <span class="lb-proof" hidden></span>

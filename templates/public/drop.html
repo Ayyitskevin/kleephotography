@@ -17,14 +17,15 @@
 {% if assets %}
 <div class="grid" style="padding:1.2rem">
   {% for a in assets %}
-  <figure class="tile" data-id="{{ a.id }}" data-kind="{{ a.kind }}">
+  <figure class="tile sr-skel" data-id="{{ a.id }}" data-kind="{{ a.kind }}">
     {% if a.kind == 'video' %}
     <video controls playsinline preload="none" style="width:100%;display:block"
            poster="/media/{{ g.slug }}/poster/{{ a.id }}">
       <source src="/media/{{ g.slug }}/web/{{ a.id }}" type="video/mp4">
     </video>
     {% else %}
-    <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" loading="lazy" alt="{{ a.filename }}">
+    <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" loading="lazy"
+         alt="{{ g.title }} — frame {{ '%04d'|format(a.id) }}">
     {% endif %}
     <div class="tile-actions">
       <a class="sr-icon-btn" href="/g/{{ g.slug }}/download/asset/{{ a.id }}"
