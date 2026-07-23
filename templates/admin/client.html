@@ -24,81 +24,36 @@
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main">
-  <h2>Platekit packs</h2>
-  {% if platekit.enabled %}
-    <p class="muted">Platekit slug: <code>{{ platekit.slug or "—" }}</code>{% if platekit.status != "ok" %} · {{ platekit.message }}{% endif %}</p>
-    {% if platekit.packs %}
-    <table class="list">
-      <tr><th>Pack</th><th>Status</th><th>Recipe</th><th>Approved</th><th></th></tr>
-      {% for pack in platekit.packs %}
-      <tr>
-        <td><a href="{{ pack.share_url }}" target="_blank" rel="noopener">{{ pack.title }}</a></td>
-        <td>{{ pack.status }}</td>
-        <td class="muted">{{ pack.recipe.name if pack.recipe else "—" }}</td>
-        <td class="muted">{{ pack.approved_at[:10] if pack.approved_at else "—" }}</td>
-        <td><a href="{{ pack.share_url }}" target="_blank" rel="noopener">open</a></td>
-      </tr>
-      {% endfor %}
-    </table>
-    {% else %}
-    <p class="muted">No approved Platekit packs yet. Link a <code>platekit_slug</code> below and publish a gallery — Argus vision queues a draft pack automatically.</p>
-    {% endif %}
-  {% else %}
-    <p class="muted">Platekit service is not configured. Set <code>MISE_PLATEKIT_API_BASE</code> and token on flow.</p>
-  {% endif %}
+  {# Jump nav — this page is long; sessions/portal first, config folds last.
+     Sections below keep their ids; folds remember open state (details_persist). #}
+  <nav class="sr-anchors" aria-label="On this page">
+    <a href="#new-session">Sessions</a>
+    <a href="#portal">Portal</a>
+    <a href="#brand">Brand</a>
+    <a href="#kits">Brand kit</a>
+    <a href="#activity">Activity</a>
+    <a href="#licenses">Licenses</a>
+    <a href="#details">Details</a>
+  </nav>
 
-  <form method="post" action="/admin/studio/clients/{{ c.id }}" class="stack-form">
-    <label>Name <input type="text" name="name" value="{{ c.name }}" required></label>
-    <label>Company <input type="text" name="company" value="{{ c.company or '' }}"></label>
-    <label>Email <input type="email" name="email" value="{{ c.email or '' }}"></label>
-    <label>Phone <input type="text" name="phone" value="{{ c.phone or '' }}"></label>
-    <label>Notes <textarea name="notes" rows="3">{{ c.notes or '' }}</textarea></label>
-    <label>Usage rights <textarea name="usage_rights" rows="3"
-           placeholder="e.g. Social + web use, 12 months, no paid ads">{{ c.usage_rights or '' }}</textarea></label>
-    <label>Platekit slug <input type="text" name="platekit_slug" value="{{ c.platekit_slug or '' }}" placeholder="blue-plate">
-      <span class="muted">Overrides name/company matching for the Platekit bridge.</span>
-    </label>
-    <label>Market
-      <select name="market">
-        {% for m in markets %}
-        <option value="{{ m }}"{% if m == c.market %} selected{% endif %}>{{ m|capitalize }}</option>
-        {% endfor %}
-      </select>
-      <span class="muted">Home market — sets the license-fee suggestion's base rate card.</span>
-    </label>
-    <button type="submit">Save</button>
+  <h2 id="new-session">Sessions</h2>
+  <form method="post" action="/admin/studio/clients/{{ c.id }}/projects" class="inline-form">
+    <input type="text" name="title" placeholder="Session title (e.g. Spring menu shoot)" required>
+    <button type="submit">New session</button>
   </form>
-
-  <h2>Parent client</h2>
-  <p class="muted">Place this client under a hospitality group/region so it
-    inherits the parent's brand kit when it has none of its own.
-    {% if parent %}Currently under <a href="/admin/studio/clients/{{ parent.id }}">{{ parent.name }}</a>.{% endif %}</p>
-  <form method="post" action="/admin/studio/clients/{{ c.id }}/parent" class="inline-form">
-    <select name="parent_id">
-      <option value="">— none (top-level) —</option>
-      {% for p in parent_choices %}
-      <option value="{{ p.id }}"{% if parent and p.id == parent.id %} selected{% endif %}>{{ p.name }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit">Save parent</button>
-  </form>
-
-  {% if children %}
-  <h2>Venues under this group</h2>
-  <p class="muted">Everything beneath this client in the hierarchy (regions and
-    venues). Set a client's parent from its own page to change the tree.</p>
   <table class="list">
-    <tr><th>Name</th><th>Company</th></tr>
-    {% for ch in children %}
+    <tr><th>Session</th><th>Status</th><th>Created</th></tr>
+    {% for p in projects %}
     <tr>
-      <td><a href="/admin/studio/clients/{{ ch.id }}">{{ ch.name }}</a></td>
-      <td>{{ ch.company or "—" }}</td>
+      <td><a href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a></td>
+      <td>{{ p.status }}</td>
+      <td class="muted">{{ p.created_at[:10] }}</td>
     </tr>
     {% endfor %}
   </table>
-  {% endif %}
+  {% if not projects %}<p class="muted">No sessions yet.</p>{% endif %}
 
-  <h2>Portal</h2>
+  <h2 id="portal">Portal</h2>
   {% if portal %}
     <p>Portal link: <code class="slug">{{ base_url }}/portal/{{ portal.slug }}</code>
        &nbsp;PIN: <code>{{ portal.pin }}</code>
@@ -138,7 +93,7 @@
     </form>
   {% endif %}
 
-  <h2>Brand assets</h2>
+  <h2 id="brand">Brand assets</h2>
   <form method="post" action="/admin/studio/clients/{{ c.id }}/brand"
         enctype="multipart/form-data" class="inline-form">
     <input type="file" name="files" multiple
@@ -166,7 +121,7 @@
   <p class="muted">No brand assets yet.</p>
   {% endif %}
 
-  <h2>Brand kit (crop overlay)</h2>
+  <h2 id="kits">Brand kit (crop overlay)</h2>
   <p class="muted">A raster logo composited onto social crops. Only the newest
     <strong>active</strong> kit is used, and only on presets with brand overlay enabled.
     Swapping a logo won't re-render crops already cached on disk.</p>
@@ -221,24 +176,7 @@
   <p class="muted">No brand kit yet — crops render without an overlay.</p>
   {% endif %}
 
-  <h2 id="new-session">Sessions</h2>
-  <form method="post" action="/admin/studio/clients/{{ c.id }}/projects" class="inline-form">
-    <input type="text" name="title" placeholder="Session title (e.g. Spring menu shoot)" required>
-    <button type="submit">New session</button>
-  </form>
-  <table class="list">
-    <tr><th>Session</th><th>Status</th><th>Created</th></tr>
-    {% for p in projects %}
-    <tr>
-      <td><a href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a></td>
-      <td>{{ p.status }}</td>
-      <td class="muted">{{ p.created_at[:10] }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% if not projects %}<p class="muted">No sessions yet.</p>{% endif %}
-
-  <h2>Recent activity</h2>
+  <h2 id="activity">Recent activity</h2>
   {% if timeline %}
   <ul class="timeline">
     {% for e in timeline %}
@@ -255,9 +193,9 @@
     payments and emails across this client's sessions show up here.</p>
   {% endif %}
 
-  <h2>Licenses <a href="/admin/studio/licenses" class="muted" style="font-size:0.7em">(all)</a></h2>
+  <h2 id="licenses">Licenses <a href="/admin/studio/licenses" class="muted" style="font-size:0.7em">(all)</a></h2>
   <p class="muted">Usage-rights grants this client holds. The free-text "Usage rights"
-    field above is a quick note; these are the structured, auditable records.</p>
+    field in Edit details below is a quick note; these are the structured, auditable records.</p>
   <form method="post" action="/admin/studio/clients/{{ c.id }}/licenses" class="inline-form">
     <input type="text" name="title" placeholder="License title (e.g. Spring menu — social, 12mo)" required>
     <button type="submit">New license</button>
@@ -307,17 +245,100 @@
   </table>
   {% endif %}
 
-  <h2>Delete client</h2>
-  {% if blockers %}
-    {% set blocker_summary = "WARNING: This client still has " ~ blockers|join(", ") ~ ". Deleting will cascade through portal/projects/brand (rmtree on disk) and unlink any galleries. Are you sure?" %}
-  {% else %}
-    {% set blocker_summary = "Delete " ~ c.name ~ "? This is final." %}
-  {% endif %}
-  <form method="post" action="/admin/studio/clients/{{ c.id }}/delete"
-        class="inline" data-confirm="{{ blocker_summary }}">
-    {% if blockers %}<input type="hidden" name="force" value="1">{% endif %}
-    <button class="link danger">Delete client{% if blockers %} (despite {{ blockers|length }} blocker{{ "s" if blockers|length != 1 }}){% endif %}</button>
-  </form>
-  {% if blockers %}<p class="muted">Blockers: {{ blockers|join(" · ") }}</p>{% endif %}
+  <details class="client-fold" id="details">
+    <summary><h2>Edit details</h2></summary>
+    <form method="post" action="/admin/studio/clients/{{ c.id }}" class="stack-form">
+      <label>Name <input type="text" name="name" value="{{ c.name }}" required></label>
+      <label>Company <input type="text" name="company" value="{{ c.company or '' }}"></label>
+      <label>Email <input type="email" name="email" value="{{ c.email or '' }}"></label>
+      <label>Phone <input type="text" name="phone" value="{{ c.phone or '' }}"></label>
+      <label>Notes <textarea name="notes" rows="3">{{ c.notes or '' }}</textarea></label>
+      <label>Usage rights <textarea name="usage_rights" rows="3"
+             placeholder="e.g. Social + web use, 12 months, no paid ads">{{ c.usage_rights or '' }}</textarea></label>
+      <label>Platekit slug <input type="text" name="platekit_slug" value="{{ c.platekit_slug or '' }}" placeholder="blue-plate">
+        <span class="muted">Overrides name/company matching for the Platekit bridge.</span>
+      </label>
+      <label>Market
+        <select name="market">
+          {% for m in markets %}
+          <option value="{{ m }}"{% if m == c.market %} selected{% endif %}>{{ m|capitalize }}</option>
+          {% endfor %}
+        </select>
+        <span class="muted">Home market — sets the license-fee suggestion's base rate card.</span>
+      </label>
+      <button type="submit">Save</button>
+    </form>
+  </details>
+
+  <details class="client-fold" id="platekit">
+    <summary><h2>Platekit packs</h2></summary>
+    {% if platekit.enabled %}
+      <p class="muted">Platekit slug: <code>{{ platekit.slug or "—" }}</code>{% if platekit.status != "ok" %} · {{ platekit.message }}{% endif %}</p>
+      {% if platekit.packs %}
+      <table class="list">
+        <tr><th>Pack</th><th>Status</th><th>Recipe</th><th>Approved</th><th></th></tr>
+        {% for pack in platekit.packs %}
+        <tr>
+          <td><a href="{{ pack.share_url }}" target="_blank" rel="noopener">{{ pack.title }}</a></td>
+          <td>{{ pack.status }}</td>
+          <td class="muted">{{ pack.recipe.name if pack.recipe else "—" }}</td>
+          <td class="muted">{{ pack.approved_at[:10] if pack.approved_at else "—" }}</td>
+          <td><a href="{{ pack.share_url }}" target="_blank" rel="noopener">open</a></td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <p class="muted">No approved Platekit packs yet. Link a <code>platekit_slug</code> in Edit details and publish a gallery — Argus vision queues a draft pack automatically.</p>
+      {% endif %}
+    {% else %}
+      <p class="muted">Platekit service is not configured. Set <code>MISE_PLATEKIT_API_BASE</code> and token on flow.</p>
+    {% endif %}
+  </details>
+
+  <details class="client-fold" id="parent">
+    <summary><h2>Parent client</h2></summary>
+    <p class="muted">Place this client under a hospitality group/region so it
+      inherits the parent's brand kit when it has none of its own.
+      {% if parent %}Currently under <a href="/admin/studio/clients/{{ parent.id }}">{{ parent.name }}</a>.{% endif %}</p>
+    <form method="post" action="/admin/studio/clients/{{ c.id }}/parent" class="inline-form">
+      <select name="parent_id">
+        <option value="">— none (top-level) —</option>
+        {% for p in parent_choices %}
+        <option value="{{ p.id }}"{% if parent and p.id == parent.id %} selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Save parent</button>
+    </form>
+
+    {% if children %}
+    <h3>Venues under this group</h3>
+    <p class="muted">Everything beneath this client in the hierarchy (regions and
+      venues). Set a client's parent from its own page to change the tree.</p>
+    <table class="list">
+      <tr><th>Name</th><th>Company</th></tr>
+      {% for ch in children %}
+      <tr>
+        <td><a href="/admin/studio/clients/{{ ch.id }}">{{ ch.name }}</a></td>
+        <td>{{ ch.company or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </details>
+
+  <details class="client-fold client-fold--danger" id="danger">
+    <summary><h2>Delete client</h2></summary>
+    {% if blockers %}
+      {% set blocker_summary = "WARNING: This client still has " ~ blockers|join(", ") ~ ". Deleting will cascade through portal/projects/brand (rmtree on disk) and unlink any galleries. Are you sure?" %}
+    {% else %}
+      {% set blocker_summary = "Delete " ~ c.name ~ "? This is final." %}
+    {% endif %}
+    <form method="post" action="/admin/studio/clients/{{ c.id }}/delete"
+          class="inline" data-confirm="{{ blocker_summary }}">
+      {% if blockers %}<input type="hidden" name="force" value="1">{% endif %}
+      <button class="link danger">Delete client{% if blockers %} (despite {{ blockers|length }} blocker{{ "s" if blockers|length != 1 }}){% endif %}</button>
+    </form>
+    {% if blockers %}<p class="muted">Blockers: {{ blockers|join(" · ") }}</p>{% endif %}
+  </details>
 </main>
 {% endblock %}
