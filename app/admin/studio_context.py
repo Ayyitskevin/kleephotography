@@ -81,12 +81,11 @@ def _ctx_pipeline(today_iso: str) -> dict:
         for s, v in stage_value.items()
         if s in ("retainer_paid", "session_planning", "project_closed")
     )
+    # Counts span archived too: the board's Archived column is a live drag
+    # target, and its header tally was stuck at 0 when the query excluded it.
     counts = {
         r["status"]: r["n"]
-        for r in db.all_(
-            """SELECT status, COUNT(*) AS n FROM projects
-           WHERE status != 'archived' GROUP BY status"""
-        )
+        for r in db.all_("SELECT status, COUNT(*) AS n FROM projects GROUP BY status")
     }
     # Per-stage overdue-invoice rollup — projects whose current status puts
     # them in stage X AND have at least one overdue invoice. Lets the pipeline
