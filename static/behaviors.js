@@ -296,49 +296,215 @@
 
   var cullGrid = document.querySelector("[data-cull]");
   if (cullGrid) {
-    var tiles = Array.prototype.slice.call(cullGrid.querySelectorAll(".gd-tile"));
-    if (tiles.length) {
-      var cur = 0;
-      var m = location.hash.match(/^#asset-(\d+)$/);
-      if (m) {
-        var ix = tiles.map(function (t) { return t.id; }).indexOf("asset-" + m[1]);
-        if (ix >= 0) cur = ix;
-      }
-      var mark = function () {
-        tiles.forEach(function (t, i) { t.classList.toggle("is-culling", i === cur); });
-        tiles[cur].scrollIntoView({ block: "nearest" });
-        history.replaceState(null, "", "#" + tiles[cur].id);
-      };
-      var submitIn = function (sel) {
-        var f = tiles[cur].querySelector(sel);
-        if (!f) return false;
-        if (f.requestSubmit) f.requestSubmit(); else f.submit();
-        return true;
-      };
-      document.addEventListener("keydown", function (e) {
-        if (e.metaKey || e.ctrlKey || e.altKey) return;
-        if (e.target.matches && e.target.matches("input, textarea, select, [contenteditable]")) return;
-        var k = e.key;
-        if (k === "ArrowRight" || k === "ArrowLeft") {
+    var cullTiles = function () {
+      return Array.prototype.slice.call(cullGrid.querySelectorAll(".gd-tile"));
+    };
+    /* Track the active frame by its stable #asset-{id} and re-query on every
+       use — bench tile actions htmx-swap tiles in and out, so a captured
+       array (or index) goes stale mid-cull. */
+    var curId = null;
+    var m = location.hash.match(/^#asset-(\d+)$/);
+    if (m) curId = "asset-" + m[1];
+    var curTile = function () {
+      var ts = cullTiles();
+      if (!ts.length) return { list: ts, tile: null, index: -1 };
+      var t = ts.filter(function (x) { return x.id === curId; })[0];
+      if (!t) { t = ts[0]; curId = t.id; }
+      return { list: ts, tile: t, index: ts.indexOf(t) };
+    };
+    var mark = function () {
+      var cur = curTile();
+      if (!cur.tile) return;
+      cur.list.forEach(function (t) { t.classList.toggle("is-culling", t === cur.tile); });
+      cur.tile.scrollIntoView({ block: "nearest" });
+      history.replaceState(null, "", "#" + cur.tile.id);
+    };
+    var submitIn = function (sel) {
+      var cur = curTile();
+      var f = cur.tile && cur.tile.querySelector(sel);
+      if (!f) return false;
+      if (f.requestSubmit) f.requestSubmit(); else f.submit();
+      return true;
+    };
+    document.addEventListener("keydown", function (e) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target.matches && e.target.matches("input, textarea, select, [contenteditable]")) return;
+      var k = e.key;
+      if (k === "ArrowRight" || k === "ArrowLeft") {
+        var cur = curTile();
+        if (!cur.tile) return;
+        e.preventDefault();
+        var next = cur.list[(cur.index + (k === "ArrowRight" ? 1 : -1) + cur.list.length) % cur.list.length];
+        curId = next.id;
+        mark();
+      } else if (k === "s" || k === "S") {
+        if (submitIn('form[action$="/portfolio"]')) e.preventDefault();
+      } else if (k === "b" || k === "B") {
+        if (submitIn('form[action$="/cover"]')) e.preventDefault();
+      } else if (k >= "1" && k <= "9") {
+        var curS = curTile();
+        var sel = curS.tile && curS.tile.querySelector('form[action$="/section"] select[name="section_id"]');
+        if (sel && sel.options.length > +k) {
           e.preventDefault();
-          cur = (cur + (k === "ArrowRight" ? 1 : -1) + tiles.length) % tiles.length;
-          mark();
-        } else if (k === "s" || k === "S") {
-          if (submitIn('form[action$="/portfolio"]')) e.preventDefault();
-        } else if (k === "b" || k === "B") {
-          if (submitIn('form[action$="/cover"]')) e.preventDefault();
-        } else if (k >= "1" && k <= "9") {
-          var sel = tiles[cur].querySelector('form[action$="/section"] select[name="section_id"]');
-          if (sel && sel.options.length > +k) {
-            e.preventDefault();
-            sel.selectedIndex = +k;
-            if (sel.form.requestSubmit) sel.form.requestSubmit(); else sel.form.submit();
-          }
-        } else if (k === "x" || k === "X") {
-          if (submitIn('form[action$="/delete"]')) e.preventDefault();
+          sel.selectedIndex = +k;
+          if (sel.form.requestSubmit) sel.form.requestSubmit(); else sel.form.submit();
         }
-      });
-      mark();
-    }
+      } else if (k === "x" || k === "X") {
+        if (submitIn('form[action$="/delete"]')) e.preventDefault();
+      }
+    });
+    mark();
   }
+
+  /* data-drag-board — kanban drag-to-move (studio board). Fully delegated so
+     the board can htmx-swap whole after a move without rebinding. The board
+     carries data-drag-board="/admin/studio/projects/{pid}/status" and an
+     optional data-drag-target (selector to swap with the POST's HTML, sent
+     with an HX-Request header so the handler forks to its fragment).
+     window.__stuDragged suppresses the card's click-to-open after a drag. */
+  document.addEventListener("dragstart", function (ev) {
+    var card = ev.target && ev.target.closest ? ev.target.closest("[data-drag-board] .studio-row") : null;
+    if (!card) return;
+    card.closest("[data-drag-board]").__dragEl = card;
+    window.__stuDragged = true;
+    card.classList.add("stu-card-dragging");
+    ev.dataTransfer.effectAllowed = "move";
+    try { ev.dataTransfer.setData("text/plain", card.dataset.pid); } catch (_) {}
+  });
+  document.addEventListener("dragend", function (ev) {
+    var card = ev.target && ev.target.closest ? ev.target.closest("[data-drag-board] .studio-row") : null;
+    if (!card) return;
+    card.classList.remove("stu-card-dragging");
+    document.querySelectorAll(".stu-col-over").forEach(function (c) { c.classList.remove("stu-col-over"); });
+    var board = card.closest("[data-drag-board]");
+    if (board) board.__dragEl = null;
+    setTimeout(function () { window.__stuDragged = false; }, 0);
+  });
+  document.addEventListener("dragover", function (ev) {
+    var body = ev.target && ev.target.closest ? ev.target.closest("[data-drag-board] .stu-col-body") : null;
+    if (!body) return;
+    ev.preventDefault();
+    body.closest(".stu-col").classList.add("stu-col-over");
+  });
+  document.addEventListener("dragleave", function (ev) {
+    var body = ev.target && ev.target.closest ? ev.target.closest("[data-drag-board] .stu-col-body") : null;
+    if (!body) return;
+    if (!body.contains(ev.relatedTarget)) body.closest(".stu-col").classList.remove("stu-col-over");
+  });
+  document.addEventListener("drop", function (ev) {
+    var body = ev.target && ev.target.closest ? ev.target.closest("[data-drag-board] .stu-col-body") : null;
+    if (!body) return;
+    ev.preventDefault();
+    var board = body.closest("[data-drag-board]");
+    body.closest(".stu-col").classList.remove("stu-col-over");
+    var dragEl = board && board.__dragEl;
+    if (!dragEl) return;
+    var newStage = body.dataset.stage;
+    var pid = dragEl.dataset.pid;
+    if (dragEl.dataset.stage === newStage) return;
+    body.insertBefore(dragEl, body.querySelector(".stu-add"));  // optimistic
+    dragEl.dataset.stage = newStage;
+    var url = board.getAttribute("data-drag-board").replace("{pid}", pid);
+    var target = board.getAttribute("data-drag-target");
+    var fd = new FormData(); fd.append("status", newStage);
+    fetch(url, {
+      method: "POST", body: fd, credentials: "same-origin",
+      headers: target ? { "HX-Request": "true" } : {}
+    }).then(function (r) {
+      if (!r.ok) throw new Error("status " + r.status);
+      if (target && window.htmx) {
+        return r.text().then(function (html) { htmx.swap(target, html, { swapStyle: "outerHTML" }); });
+      }
+    }).catch(function () {
+      miseToast("Could not move the session — reloading to re-sync.", "danger");
+      location.reload();
+    });
+  });
+
+  /* Studio board/list pill + "+ Add" openers — delegated for the same reason
+     (the board swaps; these live around it). After a board swap, re-apply the
+     current view so the list view isn't clobbered by the fresh board. */
+  document.addEventListener("click", function (ev) {
+    var vp = ev.target && ev.target.closest ? ev.target.closest(".stu-viewpill button") : null;
+    if (vp) {
+      var view = vp.dataset.view;
+      var sec = document.getElementById("projects");
+      if (sec) sec.setAttribute("data-studio-view", view);
+      var board = document.getElementById("studio-board");
+      var listTable = document.getElementById("studio-list");
+      if (board) board.hidden = view !== "board";
+      if (listTable) listTable.hidden = view !== "list";
+      document.querySelectorAll(".stu-viewpill button").forEach(function (b) {
+        var on = b === vp;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      return;
+    }
+    var addBtn = ev.target && ev.target.closest ? ev.target.closest("[data-open-new]") : null;
+    if (addBtn) {
+      ev.preventDefault();
+      var d = document.getElementById("clients");
+      if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "center" });
+        var f = d.querySelector("input"); if (f) f.focus(); }
+    }
+  });
+  document.addEventListener("htmx:afterSwap", function (ev) {
+    if (!ev.target || ev.target.id !== "studio-board") return;
+    var sec = document.getElementById("projects");
+    if (!sec) return;
+    var view = sec.getAttribute("data-studio-view") || "board";
+    var board = document.getElementById("studio-board");
+    var listTable = document.getElementById("studio-list");
+    if (board) board.hidden = view !== "board";
+    if (listTable) listTable.hidden = view !== "list";
+  });
+
+  /* data-filter — delegated pill filtering, one behavior for every page that
+     used to re-implement it inline. Mark the region with data-filter (plus
+     data-filter-empty selector and data-filter-hide-class, default
+     "studio-hidden"); pills carry data-filter-key + data-filter-value (empty
+     value = "all"; clicking the active pill clears it); items carry
+     data-filter-item and data-<key> attributes. Delegated, so the filtered
+     region can htmx-swap freely. */
+  var filterState = new WeakMap();
+  var applyFilter = function (box) {
+    var state = filterState.get(box) || {};
+    var hideClass = box.getAttribute("data-filter-hide-class") || "studio-hidden";
+    var shown = 0;
+    box.querySelectorAll("[data-filter-item]").forEach(function (el) {
+      var ok = Object.keys(state).every(function (k) {
+        return !state[k] || el.getAttribute("data-" + k) === state[k];
+      });
+      el.classList.toggle(hideClass, !ok);
+      if (ok) shown++;
+    });
+    var emptySel = box.getAttribute("data-filter-empty");
+    if (emptySel) {
+      var empty = document.querySelector(emptySel);
+      if (empty) empty.hidden = shown !== 0;
+    }
+  };
+  document.addEventListener("click", function (ev) {
+    var pill = ev.target && ev.target.closest ? ev.target.closest("[data-filter-key][data-filter-value]") : null;
+    if (!pill) return;
+    var box = pill.closest("[data-filter]");
+    if (!box) return;
+    var key = pill.getAttribute("data-filter-key");
+    var value = pill.getAttribute("data-filter-value");
+    var state = filterState.get(box) || {};
+    /* default pill semantics are "set the filter" (an empty-value pill is the
+       All/clear control); data-filter-toggle opts into re-click-clears, for
+       independent on/off axes like the bench favorites toggle */
+    var togglable = pill.hasAttribute("data-filter-toggle");
+    var on = value ? (togglable ? state[key] !== value : true) : true;
+    state[key] = value && on ? value : null;
+    filterState.set(box, state);
+    box.querySelectorAll('[data-filter-key="' + key + '"]').forEach(function (p) {
+      var active = value ? (on && p === pill) : (state[key] === null && p === pill);
+      p.classList.toggle("is-active", !!active);
+      p.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    applyFilter(box);
+  });
 })();

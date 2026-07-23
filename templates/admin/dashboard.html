@@ -16,7 +16,7 @@
 </header>
 {% endblock %}
 {% block admin_body %}
-<main class="admin-main">
+<main class="admin-main" data-filter data-filter-empty="#gal-empty">
   <section id="new-gallery" class="gal-compose">
     <form method="post" action="/admin/galleries" class="inline-form">
       <input type="text" name="title" placeholder="Gallery title" required>
@@ -28,11 +28,11 @@
 
   {% if cards %}
   <div class="gx-filters" role="group" aria-label="Filter by status">
-    <button type="button" class="gx-pill is-active" data-status="" aria-pressed="true">All <span>{{ card_counts.all }}</span></button>
-    <button type="button" class="gx-pill" data-status="delivered" aria-pressed="false">Delivered <span>{{ card_counts.delivered }}</span></button>
-    <button type="button" class="gx-pill" data-status="proofing" aria-pressed="false">Proofing <span>{{ card_counts.proofing }}</span></button>
-    <button type="button" class="gx-pill" data-status="expiring" aria-pressed="false">Expiring <span>{{ card_counts.expiring }}</span></button>
-    <button type="button" class="gx-pill" data-status="draft" aria-pressed="false">Drafts <span>{{ card_counts.draft }}</span></button>
+    <button type="button" class="gx-pill is-active" data-filter-key="status" data-filter-value="" aria-pressed="true">All <span>{{ card_counts.all }}</span></button>
+    <button type="button" class="gx-pill" data-filter-key="status" data-filter-value="delivered" aria-pressed="false">Delivered <span>{{ card_counts.delivered }}</span></button>
+    <button type="button" class="gx-pill" data-filter-key="status" data-filter-value="proofing" aria-pressed="false">Proofing <span>{{ card_counts.proofing }}</span></button>
+    <button type="button" class="gx-pill" data-filter-key="status" data-filter-value="expiring" aria-pressed="false">Expiring <span>{{ card_counts.expiring }}</span></button>
+    <button type="button" class="gx-pill" data-filter-key="status" data-filter-value="draft" aria-pressed="false">Drafts <span>{{ card_counts.draft }}</span></button>
   </div>
 
   <div class="gx-grid" id="gal-grid">
@@ -41,7 +41,7 @@
        render between the card href and its </a> — the admin smoke tests slice
        the card exactly that way. Actions that can't nest in a link (copy chip)
        sit after the anchor, inside the same card shell. #}
-    <div class="gx-card gal-item" data-status="{{ c.status_lc }}">
+    <div class="gx-card gal-item" data-status="{{ c.status_lc }}" data-filter-item>
       <a class="gx-card-link" href="/admin/galleries/{{ c.id }}">
         <div class="gx-card-cover">
           {% if c.cover_asset_id %}
@@ -94,32 +94,6 @@
         compose.classList.remove('is-open');
       });
     }
-  })();
-  (function () {
-    var pills = Array.prototype.slice.call(document.querySelectorAll('.gx-pill'));
-    if (!pills.length) return;
-    var emptyMsg = document.getElementById('gal-empty');
-
-    function applyFilter(st) {
-      var shown = 0;
-      document.querySelectorAll('#gal-grid .gal-item').forEach(function (el) {
-        var ok = !st || el.dataset.status === st;
-        el.classList.toggle('studio-hidden', !ok);
-        if (ok) shown++;
-      });
-      if (emptyMsg) emptyMsg.hidden = shown !== 0;
-    }
-
-    pills.forEach(function (pill) {
-      pill.addEventListener('click', function () {
-        pills.forEach(function (p) {
-          var on = p === pill;
-          p.classList.toggle('is-active', on);
-          p.setAttribute('aria-pressed', on ? 'true' : 'false');
-        });
-        applyFilter(pill.dataset.status);
-      });
-    });
   })();
   </script>
 </main>
