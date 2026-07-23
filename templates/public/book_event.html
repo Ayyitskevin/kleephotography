@@ -67,22 +67,22 @@
       <ul class="book-meta">
         {% if sel_start %}
         <li class="book-meta-when">
-          <span class="book-meta-ic" aria-hidden="true">▦</span>
+          <span class="book-meta-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-calendar"/></svg></span>
           <span>{{ ns.label }}{% if ns.label %}, {% endif %}{{ sel_day }}</span>
         </li>
         {% endif %}
         <li>
-          <span class="book-meta-ic" aria-hidden="true">◷</span>
+          <span class="book-meta-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-clock"/></svg></span>
           <span>{{ e.duration_min }} min</span>
         </li>
         {% if e.location %}
         <li>
-          <span class="book-meta-ic" aria-hidden="true">⚲</span>
+          <span class="book-meta-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-circle"/></svg></span>
           <span>{{ e.location }}</span>
         </li>
         {% endif %}
         <li class="book-meta-tz">
-          <span class="book-meta-ic" aria-hidden="true">🌐</span>
+          <span class="book-meta-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-external"/></svg></span>
           <form method="get" action="{{ form_action }}" class="book-tzform">
             {% if sel_day %}<input type="hidden" name="year" value="{{ year }}">
             <input type="hidden" name="month" value="{{ month }}">

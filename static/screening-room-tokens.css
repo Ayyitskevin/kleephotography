@@ -45,6 +45,26 @@ body.sr {
   --sr-ok:           #7fc09a;
   --sr-ok-deep:      #4a8c6a;
   --sr-warn:         #c96f4a;
+  --sr-danger:       #e07856;   /* form errors / destructive — AA on the house */
+
+  /* space — 4px base scale; display chrome keeps its bespoke values, shared
+     components (screening.css "shared UI primitives") read these */
+  --sr-s1: 4px;  --sr-s2: 8px;  --sr-s3: 12px; --sr-s4: 16px;
+  --sr-s5: 24px; --sr-s6: 32px; --sr-s7: 48px; --sr-s8: 64px;
+
+  /* radii — square is the identity; pill only for takes/badges */
+  --sr-r-0: 0; --sr-r-1: 3px; --sr-r-pill: 999px;
+
+  /* elevation */
+  --sr-shadow-1: 0 8px 24px -12px rgba(0, 0, 0, 0.8);
+  --sr-shadow-2: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
+
+  /* stacking */
+  --sr-z-sticky: 10; --sr-z-overlay: 40; --sr-z-dialog: 50; --sr-z-toast: 60;
+
+  /* motion */
+  --sr-t-fast: 140ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  --sr-t-med:  260ms cubic-bezier(0.2, 0.7, 0.3, 1);
 
   /* money sheet (the one cream surface; prints as pure paper) */
   --sr-sheet:        #f2ead8;
@@ -59,6 +79,9 @@ body.sr {
   --sr-serif: 'Newsreader', Georgia, serif;                  /* italic beats    */
   --sr-mono:  'IBM Plex Mono', ui-monospace, Menlo, monospace; /* timecode/data.
                  Self-host Plex Mono woff2 exactly like fonts.css does today.  */
+
+  /* body text sizes — display sizes stay with the clamp() classes */
+  --sr-text-sm: 12px; --sr-text-base: 14px; --sr-text-lg: 17px;
 
   background: var(--sr-house);
   color: var(--sr-ink);

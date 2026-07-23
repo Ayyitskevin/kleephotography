@@ -29,7 +29,7 @@
     </p>
   </div>
   <form class="dash-search" method="get" action="/admin/search" role="search">
-    <span class="dash-search-ic" aria-hidden="true">&#8981;</span>
+    <span class="dash-search-ic" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-search"/></svg></span>
     <input type="search" name="q" placeholder="Search clients, projects, galleries&hellip;" autocomplete="off" aria-label="Search">
   </form>
   <div class="dash-top-actions">
@@ -118,7 +118,7 @@
             {% if c.key %}
             <form method="post" action="/admin/home/nudge/dismiss" class="sr-deckcard-snooze">
               <input type="hidden" name="key" value="{{ c.key }}">
-              <button type="submit" title="Snooze until tomorrow" aria-label="Snooze until tomorrow">&#9711;</button>
+              <button type="submit" title="Snooze until tomorrow" aria-label="Snooze until tomorrow"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-clock"/></svg></button>
             </form>
             {% endif %}
           </div>
@@ -174,7 +174,7 @@
           <p>{% if outstanding.cents %}${{ "%.0f" % (outstanding.cents / 100) }} out across
             {{ outstanding.n }} invoice{{ "s" if outstanding.n != 1 }}{% if overdue_inv %} · {{ overdue_inv }} overdue{% endif %}.
             {% else %}No invoices out. The month is young &mdash;{% endif %}</p>
-          <a class="v4-btn-gold" href="/admin/studio#invoices">Draft invoice &rarr;</a>
+          <a class="sr-btn" href="/admin/studio#invoices">Draft invoice &rarr;</a>
         </div>
         {% if recent_paid %}
         <div class="dash-money-paid">
@@ -238,9 +238,9 @@
           {% endif %}
         </div>
         <div class="v4-actions">
-          {% if queue %}<a class="v4-btn-gold" href="/admin/inbox?sel={{ queue[0].id }}">Convert {{ queue[0].name }} &rarr;</a>{% endif %}
-          <a class="v4-btn-ghost" href="/admin/studio">Draft a proposal</a>
-          <a class="v4-btn-ghost" href="/admin/studio#clients">+ New project</a>
+          {% if queue %}<a class="sr-btn" href="/admin/inbox?sel={{ queue[0].id }}">Convert {{ queue[0].name }} &rarr;</a>{% endif %}
+          <a class="sr-btn sr-btn--ghost" href="/admin/studio">Draft a proposal</a>
+          <a class="sr-btn sr-btn--ghost" href="/admin/studio#clients">+ New project</a>
         </div>
       </section>
 

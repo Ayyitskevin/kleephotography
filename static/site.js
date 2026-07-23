@@ -364,14 +364,73 @@
     }
   });
 
+  /* ── sr-dialog: styled confirm replacing window.confirm ──────────────────
+     Keep in sync with the sr-dialog block in static/behaviors.js — same
+     component, separate bundle (marketing pages don't load behaviors.js).
+     Optional extras: data-confirm-title, data-confirm-ok, data-confirm-danger. */
+  var dlg = null, dlgResolve = null, dlgChain = Promise.resolve();
+
+  function srDialogEl() {
+    if (dlg) return dlg;
+    dlg = document.createElement("dialog");
+    dlg.className = "sr-dialog";
+    dlg.innerHTML =
+      '<form method="dialog" class="sr-dialog-box">' +
+      '<p class="sr-dialog-kicker"></p>' +
+      '<p class="sr-dialog-msg"></p>' +
+      '<div class="sr-dialog-actions">' +
+      '<button value="0" class="sr-btn sr-btn--ghost" formnovalidate>Cancel</button>' +
+      '<button value="1" class="sr-btn sr-dialog-ok">Confirm</button>' +
+      "</div></form>";
+    dlg.addEventListener("close", function () {
+      if (dlgResolve) { var r = dlgResolve; dlgResolve = null; r(dlg.returnValue === "1"); }
+    });
+    return dlg;
+  }
+
+  function srConfirm(msg, opts) {
+    opts = opts || {};
+    var ask = function () {
+      return new Promise(function (resolve) {
+        var d = srDialogEl();
+        if (!d.showModal) { resolve(window.confirm(msg)); return; }
+        d.querySelector(".sr-dialog-kicker").textContent = opts.title || "Confirm";
+        d.querySelector(".sr-dialog-msg").textContent = msg;
+        var ok = d.querySelector(".sr-dialog-ok");
+        ok.textContent = opts.ok || "Confirm";
+        ok.classList.toggle("sr-btn--danger", !!opts.danger);
+        dlgResolve = resolve;
+        if (!document.body.contains(d)) document.body.appendChild(d);
+        d.showModal();
+      });
+    };
+    var p = dlgChain.then(ask);
+    dlgChain = p.catch(function () {});
+    return p;
+  }
+
   document.addEventListener(
     "submit",
     function (event) {
       var form = event.target;
       if (!form || !form.matches || !form.matches("form[data-confirm]")) return;
-      if (!window.confirm(form.getAttribute("data-confirm") || "Are you sure?")) {
-        event.preventDefault();
-      }
+      if (form.__srOk) { form.__srOk = false; return; }
+      event.preventDefault();
+      var submitter = event.submitter || null;
+      srConfirm(form.getAttribute("data-confirm") || "Are you sure?", {
+        title: form.getAttribute("data-confirm-title") || undefined,
+        ok: form.getAttribute("data-confirm-ok") || undefined,
+        danger: form.hasAttribute("data-confirm-danger")
+      }).then(function (ok) {
+        if (!ok) return;
+        form.__srOk = true;
+        if (form.requestSubmit) {
+          if (submitter && submitter.form === form) form.requestSubmit(submitter);
+          else form.requestSubmit();
+        } else {
+          form.submit();
+        }
+      });
     },
     true
   );

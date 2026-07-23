@@ -84,11 +84,11 @@
             {% endif %}
             <div class="stu-card-foot">
               {% if p.n_overdue %}
-                <span class="stu-step tone-urgent">&#9888; {{ p.n_overdue }} overdue</span>
+                <span class="stu-step tone-urgent"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-warning"/></svg> {{ p.n_overdue }} overdue</span>
               {% elif is_stale %}
                 <span class="stu-step tone-warn">stalled</span>
               {% elif p.shoot_date and not won %}
-                <span class="stu-step tone-ready">&#128247; {{ p.shoot_date }}</span>
+                <span class="stu-step tone-ready"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-camera"/></svg> {{ p.shoot_date }}</span>
               {% else %}
                 <span class="stu-step tone-calm">{{ stage_label.get(p.status, p.status) }}</span>
               {% endif %}
@@ -125,7 +125,7 @@
           data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
           data-created="{{ p.created_at or '' }}">
         <td><a href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
-          {% if p.n_overdue %}<span class="warn" title="{{ p.n_overdue }} overdue invoice(s)">&#9888;</span>{% endif %}</td>
+          {% if p.n_overdue %}<span class="warn" title="{{ p.n_overdue }} overdue invoice(s)"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-warning"/></svg></span>{% endif %}</td>
         <td>{{ p.client_name }}{% if p.company %}<span class="muted"> · {{ p.company }}</span>{% endif %}</td>
         <td><span class="studio-list-stage">{{ stage_label.get(p.status, p.status) }}</span></td>
         <td>{{ p.shoot_date or "—" }}</td>
@@ -209,7 +209,7 @@
         }).then(function (r) {
           if (!r.ok) throw new Error('status ' + r.status);
         }).catch(function () {
-          alert('Could not move the session — reloading to re-sync.');
+          miseToast('Could not move the session — reloading to re-sync.', 'danger');
           location.reload();
         });
       });

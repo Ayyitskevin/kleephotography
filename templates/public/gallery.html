@@ -21,7 +21,7 @@
     <div class="sr-premiere-actions">
       {% if films %}<a class="sr-btn sr-btn--ghost" href="#reel">&#9654; Roll the reel</a>{% endif %}
       {% if n_stills %}<a class="sr-btn" href="#frames">Back to the frames &darr;</a>{% endif %}
-      <a class="sr-btn sr-btn--ghost" href="/g/{{ g.slug }}/download">&darr; Download all</a>
+      <a class="sr-btn sr-btn--ghost" href="/g/{{ g.slug }}/download"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-download"/></svg> Download all</a>
     </div>
   </div>
 </header>
@@ -37,7 +37,7 @@
     <div class="sr-premiere-actions">
       {% if films %}<a class="sr-btn" href="#reel">&#9654; Roll the reel</a>{% endif %}
       {% if n_stills %}<a class="sr-btn sr-btn--ghost" href="#frames">Skip to the frames &darr;</a>{% endif %}
-      <a class="sr-btn sr-btn--ghost" href="/g/{{ g.slug }}/download">&darr; Download all</a>
+      <a class="sr-btn sr-btn--ghost" href="/g/{{ g.slug }}/download"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-download"/></svg> Download all</a>
     </div>
   </div>
   <p class="sr-premiere-foot sr-mono">{% if g.expires_at %}Screening open until {{ g.expires_at }} &middot; {% endif %}admitted with PIN &middot;&middot;&middot;&middot;</p>
@@ -45,7 +45,7 @@
 {% endif %}
 
 {% macro takebtn(a) %}
-<button class="icon-btn sr-take-btn" hx-post="/g/{{ g.slug }}/fav/{{ a.id }}" hx-swap="innerHTML"
+<button class="sr-icon-btn sr-take-btn" hx-post="/g/{{ g.slug }}/fav/{{ a.id }}" hx-swap="innerHTML"
         title="Circle this take" aria-label="Circle this take">
   {% if a.id in favs %}<span id="take-{{ a.id }}" class="fav-btn faved sr-take is-circled">{{ fav_order.get(a.id, '&#10003;') }}</span>
   {% else %}<span id="take-{{ a.id }}" class="fav-btn sr-take">&#9675;</span>{% endif %}
@@ -61,22 +61,22 @@
         {% if a.section_id %}data-section="{{ a.section_id }}"{% endif %}
         {% if a.kind == 'video' %}data-poster="/media/{{ g.slug }}/poster/{{ a.id }}"{% endif %}>
   <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" loading="lazy" alt="{{ a.filename }}">
-  {% if a.kind == 'video' %}<span class="play-badge">&#9654;</span>
+  {% if a.kind == 'video' %}<span class="play-badge"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-play"/></svg></span>
   {% if a.duration and a.duration|hms %}<span class="dur-badge">{{ a.duration|hms }}</span>{% endif %}
   {% endif %}
   {% if sr_enabled() %}<span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}</span>{% endif %}
   <div class="tile-actions">
     {{ takebtn(a) }}
     {% if a.kind == 'video' %}
-    <a class="icon-btn icon-btn-mp4" href="/g/{{ g.slug }}/download?asset_id={{ a.id }}&web=1"
+    <a class="sr-icon-btn icon-btn-mp4" href="/g/{{ g.slug }}/download?asset_id={{ a.id }}&web=1"
        title="Download web-ready MP4">MP4</a>
     {% for r in renditions.get(a.id, []) %}
-    <a class="icon-btn icon-btn-mp4" href="/g/{{ g.slug }}/download/rendition/{{ r.id }}"
+    <a class="sr-icon-btn icon-btn-mp4" href="/g/{{ g.slug }}/download/rendition/{{ r.id }}"
        title="Download {{ r.preset.replace('x', ':') }} social cut">{{ r.preset.replace('x', ':') }}</a>
     {% endfor %}
     {% endif %}
-    <a class="icon-btn" href="/g/{{ g.slug }}/download?asset_id={{ a.id }}"
-       title="Download original">&#8595;</a>
+    <a class="sr-icon-btn" href="/g/{{ g.slug }}/download?asset_id={{ a.id }}"
+       title="Download original"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-download"/></svg></a>
   </div>
 </figure>
 {% endmacro %}

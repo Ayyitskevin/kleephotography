@@ -1,11 +1,12 @@
 /* Delegated handlers for what used to be inline on*-attributes — the CSP ships
    without script-src 'unsafe-inline', so templates opt in via data attributes:
 
-     form[data-confirm]          confirm() at submit time; {name} in the message
-                                 interpolates the named form control's current
-                                 value (e.g. "Sign as {signer_name}?")
-     button/a[data-confirm]      confirm() at click time, for buttons that share
-                                 a form with non-destructive siblings
+     form[data-confirm]          styled <dialog> confirm at submit time; {name}
+                                 in the message interpolates the named form
+                                 control's current value (e.g. "Sign as
+                                 {signer_name}?")
+     button/a[data-confirm]      same at click time, for buttons that share a
+                                 form with non-destructive siblings
      [data-print]                window.print()
      select[data-autosubmit]     submit the owning form on change
      [data-goto]                 navigate to the given URL on click, unless
@@ -16,7 +17,10 @@
                                  first video) to the given second and play
 
    Capture-phase listeners so a cancelled confirm also stops htmx/other
-   delegated listeners from acting on the same event. */
+   delegated listeners from acting on the same event; on confirm the original
+   submit/click is re-issued with a one-shot flag that passes this handler, so
+   htmx & co. see an ordinary event. Optional dialog extras: data-confirm-title
+   (kicker), data-confirm-ok (button label), data-confirm-danger (red confirm). */
 (function () {
   "use strict";
 
@@ -28,16 +32,105 @@
     });
   }
 
+  /* ── sr-dialog: one lazy-built <dialog> answers every data-confirm ────────
+     Native <dialog>: Esc/backdrop cancel, focus returns to the trigger, and
+     the first focusable element (Cancel) takes initial focus — the safe
+     default. Where showModal is missing we fall back to native confirm(). */
+  var dlg = null, dlgResolve = null, dlgChain = Promise.resolve();
+
+  function srDialogEl() {
+    if (dlg) return dlg;
+    dlg = document.createElement("dialog");
+    dlg.className = "sr-dialog";
+    dlg.innerHTML =
+      '<form method="dialog" class="sr-dialog-box">' +
+      '<p class="sr-dialog-kicker"></p>' +
+      '<p class="sr-dialog-msg"></p>' +
+      '<div class="sr-dialog-actions">' +
+      '<button value="0" class="sr-btn sr-btn--ghost" formnovalidate>Cancel</button>' +
+      '<button value="1" class="sr-btn sr-dialog-ok">Confirm</button>' +
+      "</div></form>";
+    dlg.addEventListener("close", function () {
+      if (dlgResolve) { var r = dlgResolve; dlgResolve = null; r(dlg.returnValue === "1"); }
+    });
+    return dlg;
+  }
+
+  function srConfirm(msg, opts) {
+    opts = opts || {};
+    var ask = function () {
+      return new Promise(function (resolve) {
+        var d = srDialogEl();
+        if (!d.showModal) { resolve(window.confirm(msg)); return; }
+        d.querySelector(".sr-dialog-kicker").textContent = opts.title || "Confirm";
+        d.querySelector(".sr-dialog-msg").textContent = msg;
+        var ok = d.querySelector(".sr-dialog-ok");
+        ok.textContent = opts.ok || "Confirm";
+        ok.classList.toggle("sr-btn--danger", !!opts.danger);
+        dlgResolve = resolve;
+        if (!document.body.contains(d)) document.body.appendChild(d);
+        d.showModal();
+      });
+    };
+    /* serialize: two confirms never stack — each opens after the last closes */
+    var p = dlgChain.then(ask);
+    dlgChain = p.catch(function () {});
+    return p;
+  }
+
+  function confirmOpts(el) {
+    return {
+      title: el.getAttribute("data-confirm-title") || undefined,
+      ok: el.getAttribute("data-confirm-ok") || undefined,
+      danger: el.hasAttribute("data-confirm-danger")
+    };
+  }
+
+  /* ── toasts: window.miseToast(message, kind) — kind: ok / warn / danger ──
+     Lands in the .sr-toasts live region from base.html (created on demand if
+     a page lacks it); 4s dwell, max three stacked. */
+  window.miseToast = function (msg, kind) {
+    var host = document.querySelector(".sr-toasts");
+    if (!host) {
+      host = document.createElement("div");
+      host.className = "sr-toasts";
+      host.setAttribute("aria-live", "polite");
+      document.body.appendChild(host);
+    }
+    while (host.children.length >= 3) host.removeChild(host.firstChild);
+    var t = document.createElement("div");
+    t.className = "sr-toast" + (kind ? " sr-toast--" + kind : "");
+    t.setAttribute("role", "status");
+    t.textContent = msg;
+    host.appendChild(t);
+    window.setTimeout(function () {
+      t.classList.add("is-out");
+      window.setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 300);
+    }, 4000);
+  };
+
   document.addEventListener(
     "submit",
     function (ev) {
       var form = ev.target;
-      if (form && form.hasAttribute && form.hasAttribute("data-confirm")) {
-        if (!window.confirm(message(form, form))) {
-          ev.preventDefault();
-          ev.stopImmediatePropagation();
+      if (!form || !form.hasAttribute || !form.hasAttribute("data-confirm")) return;
+      if (form.__srOk) { form.__srOk = false; return; }
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      var submitter = ev.submitter || null;
+      srConfirm(message(form, form), confirmOpts(form)).then(function (ok) {
+        if (!ok) return;
+        form.__srOk = true;
+        if (form.requestSubmit) {
+          /* re-issue through the ORIGINAL button so its name/value (and any
+             formaction) rides along; the flag passes the new submit event
+             straight through this handler */
+          if (submitter && submitter.form === form) form.requestSubmit(submitter);
+          else form.requestSubmit();
+        } else {
+          form.submit();
         }
-      }
+      });
     },
     true
   );
@@ -65,10 +158,14 @@
         if (!window.__stuDragged) window.location.href = el.getAttribute("data-goto");
         return;
       }
-      if (!window.confirm(message(el, el.form || el.closest("form")))) {
-        ev.preventDefault();
-        ev.stopImmediatePropagation();
-      }
+      if (el.__srOk) { el.__srOk = false; return; }
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      srConfirm(message(el, el.form || el.closest("form")), confirmOpts(el)).then(function (ok) {
+        if (!ok) return;
+        el.__srOk = true;
+        el.click();
+      });
     },
     true
   );

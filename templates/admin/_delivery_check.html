@@ -11,27 +11,27 @@
   </div>
   {% if d %}
   <div class="sr-workbench-list">
-    <span class="is-ok">&#10003; {{ d.ready }} of {{ d.total }} file{{ 's' if d.total != 1 }} processed{% if d.films %} ({{ d.films }} film{{ 's' if d.films != 1 }}){% endif %}{% if d.sections %} &middot; sectioned{% endif %}{% if d.cover %} &middot; cover set{% endif %}</span>
+    <span class="is-ok"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-check"/></svg> {{ d.ready }} of {{ d.total }} file{{ 's' if d.total != 1 }} processed{% if d.films %} ({{ d.films }} film{{ 's' if d.films != 1 }}){% endif %}{% if d.sections %} &middot; sectioned{% endif %}{% if d.cover %} &middot; cover set{% endif %}</span>
     {% if d.processing %}
     <span class="is-recline"><i class="sr-rec">Rec</i> {{ d.processing }} encode{{ 's' if d.processing != 1 }} running{% if d.pending_renditions %} ({{ d.pending_renditions }} social cut{{ 's' if d.pending_renditions != 1 }}){% endif %}
       <i class="sr-progressline" aria-hidden="true"><b style="width: {{ d.pct }}%;"></b></i>
       <small class="sr-mono">{{ d.pct }}%</small></span>
     {% endif %}
     {% if d.failed %}
-    <span class="is-warn">&#10007; {{ d.failed }} file{{ 's' if d.failed != 1 }} failed — <a href="/admin/galleries/{{ d.gallery.id }}">retry from the bench</a></span>
+    <span class="is-warn"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-x"/></svg> {{ d.failed }} file{{ 's' if d.failed != 1 }} failed — <a href="/admin/galleries/{{ d.gallery.id }}">retry from the bench</a></span>
     {% endif %}
     {% if not d.client_linked %}
-    <span class="is-warn">&#10007; no client linked — <a href="/admin/galleries/{{ d.gallery.id }}">link on the bench</a></span>
+    <span class="is-warn"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-x"/></svg> no client linked — <a href="/admin/galleries/{{ d.gallery.id }}">link on the bench</a></span>
     {% endif %}
-    <span class="is-dim">&#9675; PIN + expiry review ({{ d.gallery.pin }}{% if d.gallery.expires_at %} &middot; closes {{ d.gallery.expires_at }}{% else %} &middot; no expiry{% endif %})</span>
+    <span class="is-dim"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-circle"/></svg> PIN + expiry review ({{ d.gallery.pin }}{% if d.gallery.expires_at %} &middot; closes {{ d.gallery.expires_at }}{% else %} &middot; no expiry{% endif %})</span>
   </div>
   <div class="sr-workbench-actions">
-    <a class="v4-btn-gold" href="/admin/galleries/{{ d.gallery.id }}">Open the bench &rarr;</a>
-    <a class="v4-btn-ghost" href="{{ base_url }}/g/{{ d.gallery.slug }}" target="_blank" rel="noopener">Preview as client</a>
+    <a class="sr-btn" href="/admin/galleries/{{ d.gallery.id }}">Open the bench &rarr;</a>
+    <a class="sr-btn sr-btn--ghost" href="{{ base_url }}/g/{{ d.gallery.slug }}" target="_blank" rel="noopener">Preview as client</a>
   </div>
   {% else %}
   <p class="muted">No gallery linked yet — create one in the library, then link
     it in project settings; the delivery checklist lands here.</p>
-  <div class="sr-workbench-actions"><a class="v4-btn-ghost" href="/admin/galleries">Open the library &rarr;</a></div>
+  <div class="sr-workbench-actions"><a class="sr-btn sr-btn--ghost" href="/admin/galleries">Open the library &rarr;</a></div>
   {% endif %}
 </section>

@@ -5,9 +5,6 @@
    untouched. Kill switch falls back to the cream login card. #}
 {% block title %}Admin · {{ site_name }}{% endblock %}
 {% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
-{% block cream_head %}
-<link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
-{% endblock %}
 {% block content %}
 {% if sr_enabled() %}
 <main class="center-card sr-gate">

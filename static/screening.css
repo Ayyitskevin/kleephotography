@@ -1604,3 +1604,133 @@ body.sr-admin .admin-shell, body.sr-admin {
   .sr .sr-filmstrip figure img, .sr a.sr-card .sr-card-media img,
   .sr .portfolio-masonry .tile img { transition: none; }
 }
+
+/* ═══ SHARED UI PRIMITIVES — the design-system component layer ═══════════════
+   Canonical primitives every surface builds with: button variants, form
+   fields, badges, cards, the confirm <dialog>, toasts, skeletons, icons.
+   Tokens from screening-room-tokens.css. Same body.sr scoping as the rest of
+   this sheet, so cream/kill-switch surfaces never see them. If a component is
+   used on more than one surface it belongs in this section, not in page CSS.
+   (ops/CSS-DUAL-STACK.md: new shared UI lives here, not in mise.css.)        */
+
+/* ── buttons — variants on the token layer's .sr-btn ────────────────────────
+   Canonical set: .sr-btn (filled stock) · --ghost (outline) · --danger
+   (destructive outline) · --subtle (borderless quiet) · --sm (compact).
+   Icon-only actions use .sr-icon-btn. Anything else is legacy — migrate,
+   don't add new one-off systems. */
+.sr .sr-btn--sm { padding: 9px 14px; font-size: 10.5px; letter-spacing: 0.08em; }
+.sr .sr-btn--danger { background: transparent; color: var(--sr-danger);
+  border: 1px solid var(--sr-danger); }
+.sr .sr-btn--danger:hover, .sr .sr-btn--danger:focus-visible {
+  background: var(--sr-danger); color: var(--sr-house); }
+.sr .sr-btn--subtle { background: transparent; border: 0; color: var(--sr-ink-soft);
+  padding-left: 10px; padding-right: 10px; }
+.sr .sr-btn--subtle:hover, .sr .sr-btn--subtle:focus-visible {
+  background: transparent; color: var(--sr-stock); }
+.sr .sr-btn:disabled, .sr .sr-icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.sr .sr-btn:disabled:hover { background: var(--sr-stock); color: var(--sr-house); }
+
+.sr .sr-icon-btn { display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0; background: transparent;
+  border: 1px solid var(--sr-line-raised); border-radius: 0;
+  color: var(--sr-ink-soft); cursor: pointer; }
+.sr .sr-icon-btn:hover, .sr .sr-icon-btn:focus-visible {
+  border-color: var(--sr-stock); color: var(--sr-stock); }
+
+/* ── icons — inline SVG sprite (static/icons.svg) ─────────────────────────── */
+.sr .sr-icon { width: 16px; height: 16px; flex: none; vertical-align: -3px;
+  fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round; }
+.sr .sr-icon--sm { width: 13px; height: 13px; }
+.sr .sr-icon--lg { width: 20px; height: 20px; }
+.sr .sr-btn .sr-icon, .sr .sr-icon-btn .sr-icon { vertical-align: 0; }
+
+/* ── form fields — one field anatomy for every dark surface ─────────────────
+   Base input dressing (well, border, focus) lives in the forms section above;
+   this is the field structure around it: label, hint, error, invalid, req. */
+.sr .sr-field { display: grid; gap: 7px; margin-bottom: var(--sr-s4); }
+.sr .sr-label { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--sr-ink-faint); }
+.sr .sr-req { color: var(--sr-amber); }
+.sr .sr-hint { margin: 0; font-size: var(--sr-text-sm); color: var(--sr-ink-ghost); }
+.sr .sr-error { margin: 0; display: flex; align-items: center; gap: 6px;
+  font-size: var(--sr-text-sm); color: var(--sr-danger); }
+.sr input[aria-invalid="true"], .sr select[aria-invalid="true"],
+.sr textarea[aria-invalid="true"] { border-color: var(--sr-danger); }
+.sr input[aria-invalid="true"]:focus-visible,
+.sr select[aria-invalid="true"]:focus-visible,
+.sr textarea[aria-invalid="true"]:focus-visible { border-color: var(--sr-danger);
+  outline-color: var(--sr-danger); }
+.sr input:disabled, .sr select:disabled, .sr textarea:disabled {
+  opacity: 0.45; cursor: not-allowed; }
+
+/* ── badges — canonical status pill (new work uses .sr-badge) ─────────────── */
+.sr .sr-badge { display: inline-flex; align-items: center; gap: 5px;
+  font: 700 9.5px/1 var(--sr-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 4px 8px; border: 1px solid var(--sr-line-raised); border-radius: 0;
+  background: var(--sr-house-deep); color: var(--sr-ink-soft); white-space: nowrap; }
+.sr .sr-badge.is-ok      { color: var(--sr-ok);     border-color: color-mix(in srgb, var(--sr-ok) 45%, transparent); }
+.sr .sr-badge.is-warn    { color: var(--sr-warn);   border-color: color-mix(in srgb, var(--sr-warn) 45%, transparent); }
+.sr .sr-badge.is-danger  { color: var(--sr-danger); border-color: color-mix(in srgb, var(--sr-danger) 45%, transparent); }
+.sr .sr-badge.is-signal  { color: var(--sr-amber);  border-color: color-mix(in srgb, var(--sr-amber) 45%, transparent); }
+.sr .sr-badge.is-stock   { color: var(--sr-stock);  border-color: color-mix(in srgb, var(--sr-stock) 45%, transparent); }
+
+/* ── cards / empty / skeleton ─────────────────────────────────────────────── */
+.sr .sr-card { background: var(--sr-card); border: 1px solid var(--sr-line);
+  border-radius: 0; padding: var(--sr-s5); }
+.sr .sr-card--raise { transition: border-color var(--sr-t-fast); }
+.sr .sr-card--raise:hover { border-color: var(--sr-line-raised); }
+
+/* same anatomy as the .empty-state section — new work writes .sr-empty so the
+   component has one name across surfaces */
+.sr .sr-empty { border: 1px dashed var(--sr-line-raised); padding: 44px 30px;
+  text-align: center; color: var(--sr-ink-mute); }
+.sr .sr-empty strong { display: block; font: 700 16px/1.4 var(--sr-sans);
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--sr-cream);
+  margin-bottom: 6px; }
+
+.sr .sr-skel { position: relative; overflow: hidden; background: var(--sr-house-deep); }
+.sr .sr-skel::after { content: ""; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(236, 228, 211, 0.06), transparent);
+  animation: sr-skel 1.6s infinite; }
+@keyframes sr-skel { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .sr .sr-skel::after { animation: none; } }
+
+/* ── confirm dialog — replaces window.confirm (behaviors.js drives it) ────── */
+.sr dialog.sr-dialog { border: 1px solid var(--sr-line-strong); border-radius: 0;
+  background: var(--sr-overlay); color: var(--sr-ink); padding: 0;
+  width: min(420px, calc(100vw - 48px)); box-shadow: var(--sr-shadow-2); }
+.sr dialog.sr-dialog::backdrop { background: rgba(6, 6, 7, 0.72); }
+.sr dialog.sr-dialog[open] { animation: sr-dialog-in var(--sr-t-fast); }
+@keyframes sr-dialog-in { from { opacity: 0; transform: translateY(6px); } }
+.sr .sr-dialog-box { padding: var(--sr-s5); }
+.sr .sr-dialog-kicker { margin: 0 0 10px; font: 500 10px/1 var(--sr-mono);
+  letter-spacing: 0.26em; text-transform: uppercase; color: var(--sr-amber); }
+.sr .sr-dialog-msg { margin: 0 0 var(--sr-s5); font-size: var(--sr-text-lg);
+  line-height: 1.5; color: var(--sr-cream); }
+.sr .sr-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .sr dialog.sr-dialog[open] { animation: none; }
+}
+
+/* ── toasts — window.miseToast(msg, kind) · kinds: ok / warn / danger ─────── */
+.sr .sr-toasts { position: fixed; right: 20px; bottom: 20px; z-index: var(--sr-z-toast);
+  display: flex; flex-direction: column; gap: 8px; max-width: min(360px, calc(100vw - 40px)); }
+.sr .sr-toast { background: var(--sr-overlay); border: 1px solid var(--sr-line-strong);
+  border-left: 2px solid var(--sr-stock); padding: 12px 16px;
+  font-size: var(--sr-text-base); color: var(--sr-cream); box-shadow: var(--sr-shadow-1);
+  animation: sr-toast-in var(--sr-t-med); }
+.sr .sr-toast--ok     { border-left-color: var(--sr-ok); }
+.sr .sr-toast--warn   { border-left-color: var(--sr-warn); }
+.sr .sr-toast--danger { border-left-color: var(--sr-danger); }
+.sr .sr-toast.is-out { opacity: 0; transform: translateY(4px);
+  transition: opacity var(--sr-t-med), transform var(--sr-t-med); }
+@keyframes sr-toast-in { from { opacity: 0; transform: translateY(8px); } }
+@media (max-width: 700px) {
+  .sr .sr-toasts { right: 12px; bottom: 12px; left: 12px; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sr .sr-toast { animation: none; }
+  .sr .sr-toast.is-out { transition: none; }
+}

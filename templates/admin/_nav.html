@@ -6,13 +6,13 @@
    becomes the 5-tab bottom bar (CSS). #}
 <aside class="admin-nav sr-rail" aria-label="Primary">
   <a class="sr-rail-brand" href="/admin/home" aria-label="Kevin Lee — the deck">K</a>
-  <a href="/admin/home" title="Deck"{% if _p.startswith('/admin/home') or _p.startswith('/admin/today') or _p.startswith('/admin/inbox') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true">&#9638;</span><span class="sr-rail-lbl">Deck</span></a>
-  <a href="/admin/studio" title="Projects"{% if _p.startswith('/admin/studio') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true">&#9707;</span><span class="sr-rail-lbl">Proj</span></a>
+  <a href="/admin/home" title="Deck"{% if _p.startswith('/admin/home') or _p.startswith('/admin/today') or _p.startswith('/admin/inbox') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-deck"/></svg></span><span class="sr-rail-lbl">Deck</span></a>
+  <a href="/admin/studio" title="Projects"{% if _p.startswith('/admin/studio') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-grid"/></svg></span><span class="sr-rail-lbl">Proj</span></a>
   <button type="button" class="sr-rail-cmd" id="ns-cmd-open" aria-haspopup="dialog"
-          title="⌘K — jump, act, create" aria-label="Command menu (Ctrl or ⌘ + K)"><span class="sr-rail-ico" aria-hidden="true">&#8981;</span><span class="sr-rail-lbl">&#8984;K</span></button>
-  <a href="/admin/financials" title="Money"{% if _p.startswith('/admin/financials') or _p.startswith('/admin/reports') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true">$</span><span class="sr-rail-lbl">Ledger</span></a>
-  <a href="/admin/galleries" title="Library"{% if _p.startswith('/admin/galleries') or _p.startswith('/admin/transfers') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true">&#9636;</span><span class="sr-rail-lbl">Lib</span></a>
-  <a href="/admin/scheduling" title="Day" class="sr-rail-day{% if _p.startswith('/admin/scheduling') or _p.startswith('/admin/calendar') %} is-active{% endif %}"><span class="sr-rail-ico" aria-hidden="true">&#9684;</span><span class="sr-rail-lbl">Day</span></a>
+          title="⌘K — jump, act, create" aria-label="Command menu (Ctrl or ⌘ + K)"><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-command"/></svg></span><span class="sr-rail-lbl">&#8984;K</span></button>
+  <a href="/admin/financials" title="Money"{% if _p.startswith('/admin/financials') or _p.startswith('/admin/reports') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-dollar"/></svg></span><span class="sr-rail-lbl">Ledger</span></a>
+  <a href="/admin/galleries" title="Library"{% if _p.startswith('/admin/galleries') or _p.startswith('/admin/transfers') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-film"/></svg></span><span class="sr-rail-lbl">Lib</span></a>
+  <a href="/admin/scheduling" title="Day" class="sr-rail-day{% if _p.startswith('/admin/scheduling') or _p.startswith('/admin/calendar') %} is-active{% endif %}"><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-clock"/></svg></span><span class="sr-rail-lbl">Day</span></a>
   <span class="ns-pulse sr-rail-pulse" title="self-hosted, synced" aria-hidden="true"></span>
 </aside>
 {% else %}

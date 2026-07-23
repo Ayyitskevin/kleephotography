@@ -80,7 +80,7 @@
     <div class="ib-reply">
       {% if not email_ok and not sms_ok %}
         {% if active.email %}
-        <a class="ib-reply-btn" href="mailto:{{ active.email }}?subject={{ active.reply_subject|urlencode }}">
+        <a class="sr-btn sr-btn--sm" href="mailto:{{ active.email }}?subject={{ active.reply_subject|urlencode }}">
           <span aria-hidden="true">✉</span> Reply by email
         </a>
         <span class="ib-reply-note">Mail isn't configured — this opens your mail client instead.</span>

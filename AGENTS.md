@@ -80,6 +80,15 @@ Full-site deploy is git pull on flow + restart — see `ops/DEPLOY.md`.
   They live in untracked `.env` per machine (`.env.example` documents the keys).
 - **One financial clock.** Studio date boundaries read `studio._today()` (monkeypatchable
   wall-clock), not `datetime.date.today()` directly.
+- **Design system.** `static/screening-room-tokens.css` is the canonical token layer;
+  shared components (button variants, fields, badges, dialog, toasts, icons) live in the
+  "SHARED UI PRIMITIVES" section of `static/screening.css` — all `body.sr`-scoped so the
+  `MISE_SCREENING_ROOM=false` kill switch stays honest (see `ops/CSS-DUAL-STACK.md`).
+  New UI uses `sr-*` tokens/classes, never raw hex. Icons come from the
+  `static/icons.svg` sprite (`<svg class="sr-icon"><use href="…#i-*"/></svg>`), not emoji.
+  Tests pin specific markup hooks (`client-pay-btn`, `lb-*`, `play-badge`, `sp-door`,
+  `cream-theme`, nav `is-active`, …): keep the hook on the element or move the assertion
+  in the same commit.
 
 ## Operating the live admin (if your task does, not just edits code)
 

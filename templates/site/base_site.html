@@ -27,11 +27,11 @@
 {% if og_img %}<meta property="og:image" content="{{ base_url }}/site/img/{{ og_img }}">{% endif %}
 <meta name="twitter:card" content="{{ 'summary_large_image' if og_img else 'summary' }}">
 {% endblock %}
-{# Self-hosted typefaces — no Google Fonts CDN; see static/fonts.css (shared
-   with the admin shell). Preload the two latin files the site paints first. #}
+{# Self-hosted typefaces — no Google Fonts CDN; fonts.css is loaded once for
+   every surface by base.html. These preloads just jump the queue for the two
+   latin files the site paints first. #}
 <link rel="preload" href="/static/fonts/newsreader-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/static/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
 {% if plausible_domain %}
 <script nonce="{{ csp_nonce }}">window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)};</script>
 {% endif %}

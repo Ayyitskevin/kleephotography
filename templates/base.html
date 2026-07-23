@@ -15,6 +15,11 @@
    and non-sr surfaces are untouched because every screening rule is
    body.sr-scoped. (style-src keeps 'unsafe-inline'; see app/main.py.) #}
 <style>@import url("/static/mise.css?v={{ static_rev }}") layer(mise);</style>
+{# Self-hosted faces for EVERY surface — @font-face is lazy, so a page only
+   downloads the families it actually paints with. Centralized here (was
+   per-template) so the cream client pages (gallery/portal/PIN/drop) stop
+   falling back to system sans; per-shell preloads stay where they are. #}
+<link rel="stylesheet" href="/static/fonts.css?v={{ static_rev }}">
 {# Screening Room token layer — scoped body.sr, inert on unconverted surfaces.
    Converted bases opt in via their bodyclass when sr_enabled() (config
    MISE_SCREENING_ROOM); legal/e-sign surfaces (contract.html) never do. #}
@@ -33,5 +38,8 @@
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% block content %}{% endblock %}
+{# Live region for window.miseToast (behaviors.js) — inert until a toast
+   lands; marketing pages don't ship behaviors.js and never use it. #}
+<div class="sr-toasts" aria-live="polite" aria-atomic="false"></div>
 </body>
 </html>
