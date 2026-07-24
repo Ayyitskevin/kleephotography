@@ -535,20 +535,17 @@ html.nav-menu-enhanced .sr .nav-mobile {
    straggler bands) keep their markup; these remaps pull the shared legacy
    classes onto the house tokens so every surface reads as one system. */
 .sr .page-hero, .sr .page-body, .sr .sec-inner { background: none; }
-.sr .eyebrow, .sr .esec-kicker, .sr .work-eyebrow, .sr .work-feature-eyebrow,
+.sr .esec-kicker, .sr .work-eyebrow, .sr .work-feature-eyebrow,
 .sr .cd-label { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.26em;
   text-transform: uppercase; color: var(--sr-ink-ghost); }
 .sr .site-body h1, .sr h1, .sr h2, .sr h3 { font-family: var(--sr-sans); }
 .sr .page-hero h1, .sr .work-detail-head h1 { font-weight: 700;
   letter-spacing: 0.03em; text-transform: uppercase; color: var(--sr-cream-strong); }
-.sr .it-accent { font-style: normal; color: var(--sr-stock); }
 .sr .lede, .sr .work-brief { color: var(--sr-ink-mute); }
 .sr .muted { color: var(--sr-ink-faint); }
-.sr .btn-saffron, .sr .btn-gold { background: var(--sr-stock); color: var(--sr-house);
+.sr .btn-gold { background: var(--sr-stock); color: var(--sr-house);
   border-radius: 0; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.sr .btn-ghost-dark { background: none; border: 1px solid rgba(236, 228, 211, 0.35);
-  color: var(--sr-cream); border-radius: 0; letter-spacing: 0.08em; text-transform: uppercase; }
-.sr .cta, .sr .cta-band, .sr .svc-foot-sec { background: none; }
+.sr .cta, .sr .cta-band { background: none; }
 /* services board: tier cards go house-dark with a stock pick */
 .sr .svc { border-top: 1px solid var(--sr-line); padding-top: 28px; margin-top: 28px; }
 .sr .svc-head h2 { font: 700 22px/1.2 var(--sr-sans); letter-spacing: 0.04em;
@@ -596,7 +593,6 @@ html.nav-menu-enhanced .sr .nav-mobile {
   text-transform: uppercase; }
 .sr .work-editorial-card h3, .sr .work-feature-copy h2 { color: var(--sr-cream); }
 .sr .work-feature-link { color: var(--sr-amber); }
-.sr .work-back a { color: var(--sr-ink-faint); }
 .sr .work-credit-label { font-family: var(--sr-mono); letter-spacing: 0.18em;
   text-transform: uppercase; color: var(--sr-ink-ghost); }
 .sr .work-pullquote blockquote { font-family: var(--sr-serif); font-style: italic;
@@ -692,10 +688,6 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .book-manage .btn.btn-ghost { background: none; border: 1px solid
   rgba(236, 228, 211, 0.35); color: var(--sr-cream); }
 .sr .book-manage .linkbtn.danger { color: var(--sr-warn); }
-/* generic pills that survive on booking/testimonial pages */
-.sr .sp-pill { border: 1px solid var(--sr-line-raised); border-radius: 0;
-  background: none; color: var(--sr-ink-soft); font: 500 10px/1 var(--sr-mono);
-  letter-spacing: 0.12em; text-transform: uppercase; }
 
 /* ── client delivery: the ticket gate (3f) ────────────────────────────────── */
 .sr .sr-gate { display: flex; flex-direction: column; align-items: center;
@@ -797,8 +789,7 @@ html.nav-menu-enhanced .sr .nav-mobile {
   color: rgba(236, 228, 211, 0.5); }
 .sr .sr-take.is-circled { border-style: solid; border-color: var(--sr-amber);
   color: var(--sr-amber); }
-.sr .icon-btn { border-radius: 0; }
-.sr .icon-btn-mp4, .sr .gallery-main a.icon-btn { background: rgba(6, 6, 7, 0.6);
+.sr .icon-btn-mp4 { background: rgba(6, 6, 7, 0.6);
   border: 1px solid rgba(236, 228, 211, 0.35); color: var(--sr-cream);
   font: 500 9px/1 var(--sr-mono); letter-spacing: 0.08em; }
 .sr .section-nav { background: none; border-top: 1px solid var(--sr-line);
@@ -1157,13 +1148,6 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr-admin .v4-bar.is-current { background: linear-gradient(180deg, var(--sr-amber), #8a5e1c); }
 .sr-admin .v4-mlabel { color: var(--sr-ink-ghost); font-family: var(--sr-mono); }
 .sr-admin .v4-mlabel.is-current { color: var(--sr-amber); }
-.sr-admin .v4-btn-gold { background: var(--sr-amber); color: var(--sr-house);
-  border-radius: 0; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.sr-admin .v4-btn-ghost, .sr-admin .v4-btn-solid { border-radius: 0; }
-.sr-admin .v4-btn-ghost { background: none; border: 1px solid var(--sr-line-raised);
-  color: var(--sr-ink-soft); }
-.sr-admin .v4-btn-solid { background: var(--sr-amber); color: var(--sr-house);
-  border: 0; font-weight: 700; }
 .sr-admin .v4-galcard, .sr-admin .v4-galnew { background: var(--sr-panel);
   border: 1px solid var(--sr-line-faint); border-radius: 0; }
 .sr-admin .v4-galcard:hover { border-color: var(--sr-amber); }
@@ -1188,7 +1172,7 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr-admin .unlinked-warn select, .sr-admin select, .sr-admin input, .sr-admin textarea {
   background: var(--sr-panel); border: 1px solid var(--sr-line-raised);
   color: var(--sr-cream); border-radius: 0; }
-.sr-admin .unlinked-warn button, .sr-admin button[type="submit"]:not(.dash-check):not(.sr-deckcard-snooze button) {
+.sr-admin .unlinked-warn button, .sr-admin button[type="submit"]:not(.sr-deckcard-snooze button) {
   background: var(--sr-amber); color: var(--sr-house); border: 0; border-radius: 0;
   font-weight: 700; cursor: pointer; }
 .sr-admin table { border-color: var(--sr-line-faint); }
@@ -1305,7 +1289,6 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr-admin .gd-stat-l { color: var(--sr-ink-ghost); font: 500 9px/1.4 var(--sr-mono);
   letter-spacing: 0.16em; text-transform: uppercase; }
 .sr-admin .gd-tile { border-radius: 0; background: var(--sr-house-deep); }
-.sr-admin .gd-btn-sm { border-radius: 0; }
 
 /* focused project (3h): workbench · money · wire */
 .sr-admin .sr-stockchip { border: 1px solid rgba(210, 145, 63, 0.4);

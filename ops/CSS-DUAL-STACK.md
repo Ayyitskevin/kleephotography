@@ -38,3 +38,23 @@ stay `.cream-theme`.
 - Bannered the cream `.site-body` marketing system and the **Editorial Dark**
   reskin the same way (still required for `MISE_SCREENING_ROOM=false`).
 - No hero/marketing redesign in this wave; no deletion of `.cream-theme`.
+
+### 2026-07-23 — dead-class excavation (UX revamp, final phase)
+
+Consumption analysis (1,762 classes in `mise.css`, cross-referenced against
+templates/app/JS incl. dynamic compositions) found **514 dead in both modes**,
+all orphaned by redesigns 2–5 weeks prior. Deleted them: `mise.css` drops from
+8,669 → 3,120 lines. Largest families: `ad-*` After Dark (139 — **overrides the
+banner-only caution above**: evidence showed zero `ad-*` emitted in either mode),
+old admin `dash-*`/`home-*`/`sched-*`, `kanban-*` (renamed `stu-*`), the
+editorial-dark `ework/eh/emotion/e*` sections, `gal2-*`, old proofing
+`crop/proof-*`, `status-col-*`, `stage-archived`, `is-amber/red/oldest`. Also
+deleted 13 entangled orphans from `screening.css` (`btn-saffron`, `btn-ghost-dark`,
+`v4-btn-solid/gold/ghost`, `icon-btn`, `gd-btn-sm`, `sp-pill`, `it-accent`,
+`work-back`, `dash-check`, `svc-foot-sec`, `eyebrow`, `fin-export-btn`,
+`ib-reply-btn`) — markup long migrated to `sr-btn`/`sr-icon-btn`.
+**Kill-switch-safe by construction:** the 29 cream-nav (`ns-*`) and cream-login
+(`login-*`) classes the rollback path still uses were kept and sit under the
+existing banner. Verification: full gates (unit/integration/smoke/ruff) +
+before/after screenshots on both themes + zero remaining references by script
+assertion.
