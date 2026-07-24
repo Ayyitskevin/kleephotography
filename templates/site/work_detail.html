@@ -51,7 +51,12 @@
 
 <section class="work-detail-head">
   <div class="work-detail-head-inner" data-reveal>
-    <p class="work-back"><a href="/work">&larr; All work</a></p>
+    <nav class="work-crumbs" aria-label="Breadcrumb">
+      <a href="/">Home</a><span aria-hidden="true">›</span>
+      <a href="/work">Work</a><span aria-hidden="true">›</span>
+      <a href="/work#{{ g.slug }}">{{ feature_name }}</a><span aria-hidden="true">›</span>
+      <span>{{ cs_title }}</span>
+    </nav>
     <p class="work-eyebrow">
       {{ g.client_name or "Case study" }}{% if g.client_name and g.cs_location %} · {% endif %}{{ g.cs_location or "" }}
     </p>
@@ -120,6 +125,50 @@
       <p class="work-credit-label">{{ c.label }}</p>
       <p class="work-credit-value">{{ c.value }}</p>
     </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if prev_study or next_study %}
+<nav class="work-pn" aria-label="More case studies">
+  {% if prev_study %}
+  <a class="work-pn-link" href="/work/{{ prev_study.slug }}">
+    <span class="sr-mono">&larr; Newer</span>
+    <span class="work-pn-title">{{ prev_study.cs_tagline or prev_study.title }}</span>
+  </a>
+  {% else %}<span></span>{% endif %}
+  {% if next_study %}
+  <a class="work-pn-link work-pn-next" href="/work/{{ next_study.slug }}">
+    <span class="sr-mono">Older &rarr;</span>
+    <span class="work-pn-title">{{ next_study.cs_tagline or next_study.title }}</span>
+  </a>
+  {% else %}<span></span>{% endif %}
+</nav>
+{% endif %}
+
+{% if related %}
+<section class="sr-wrap sr-section" aria-label="More from {{ feature_name }}">
+  <div class="work-group-head" data-reveal>
+    <p class="esec-kicker">More from {{ feature_name }}</p>
+  </div>
+  <div class="work-editorial-grid" data-reveal>
+    {% for s in related %}
+    <a class="work-editorial-card" href="/work/{{ s.slug }}">
+      <div class="work-editorial-img">
+        {% if s.hero_id %}
+        <img src="{{ s.hero_image.thumb.url }}" loading="lazy" decoding="async"
+             {% if s.hero_image.thumb.width %}width="{{ s.hero_image.thumb.width }}" height="{{ s.hero_image.thumb.height }}"{% endif %}
+             {% if s.hero_image.srcset %}srcset="{{ s.hero_image.srcset }}"
+             sizes="(max-width: 700px) 100vw, 33vw"{% endif %}
+             alt="{{ s.cs_tagline or s.title }}">
+        {% else %}
+        <span class="placeholder">no hero photo starred yet</span>
+        {% endif %}
+      </div>
+      <h3>{{ s.cs_tagline or s.title }}</h3>
+      <p class="muted">{{ s.client_name or "" }}{% if s.client_name and s.cs_location %} · {% endif %}{{ s.cs_location or "" }}</p>
+    </a>
     {% endfor %}
   </div>
 </section>

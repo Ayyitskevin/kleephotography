@@ -805,7 +805,8 @@ async def work_detail(request: Request, slug: str):
     photo_images = {photo["id"]: _public_photo_spec(photo) for photo in photos}
     credit_items = _parse_cs_credits(g["cs_credits"])
     testimonials = _testimonials(gallery_id=g["id"])
-    specialty_key = _cs_specialty_map().get(g["id"], specialties.DEFAULT_KEY)
+    csmap = _cs_specialty_map()
+    specialty_key = csmap.get(g["id"], specialties.DEFAULT_KEY)
     cta = {
         "re": {
             "heading": "Like the look? Let's shoot your listing.",
@@ -823,6 +824,23 @@ async def work_detail(request: Request, slug: str):
             "service": "Food & Beverage",
         },
     }[specialty_key]
+    # Wayfinding: neighbors in the same newest-first archive work_index shows,
+    # plus up to three siblings from this study's feature. Read-only views over
+    # the same helpers the index uses — nothing here changes what's public.
+    studies = _case_studies()
+    ids = [s["id"] for s in studies]
+    prev_study = next_study = None
+    if g["id"] in ids:
+        ix = ids.index(g["id"])
+        if ix > 0:
+            prev_study = studies[ix - 1]
+        if ix < len(studies) - 1:
+            next_study = studies[ix + 1]
+    related = [
+        _case_study_view(s)
+        for s in studies
+        if s["id"] != g["id"] and csmap.get(s["id"], specialties.DEFAULT_KEY) == specialty_key
+    ][:3]
     return templates.TemplateResponse(
         request,
         "site/work_detail.html",
@@ -834,6 +852,10 @@ async def work_detail(request: Request, slug: str):
             "testimonials": testimonials,
             "pull_quote": testimonials[0] if testimonials else None,
             "cta": cta,
+            "prev_study": prev_study,
+            "next_study": next_study,
+            "related": related,
+            "feature_name": specialties.SPECIALTIES[specialty_key]["name"],
         },
     )
 

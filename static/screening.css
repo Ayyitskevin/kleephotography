@@ -1828,3 +1828,17 @@ body.sr-admin .admin-shell, body.sr-admin {
 
 /* strip reels are tap-for-sound (delegated in site.js) — show the affordance */
 .sr .motion-strip video { cursor: pointer; }
+
+/* ── work_detail wayfinding: visible breadcrumb + prev/next ───────────────── */
+.sr .work-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 0 0 14px; font: 500 10px/1.5 var(--sr-mono); letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .work-crumbs a { color: var(--sr-ink-soft); text-decoration: none; }
+.sr .work-crumbs a:hover { color: var(--sr-amber); }
+.sr .work-pn { display: flex; justify-content: space-between; gap: 16px;
+  margin: 28px 0 8px; padding: 18px 0; border-top: 1px solid var(--sr-line); }
+.sr .work-pn-link { display: grid; gap: 6px; text-decoration: none; max-width: 46%; }
+.sr .work-pn-link .sr-mono { color: var(--sr-ink-ghost); }
+.sr .work-pn-link .work-pn-title { color: var(--sr-cream); font: 600 15px/1.3 var(--sr-sans); }
+.sr .work-pn-link:hover .work-pn-title { color: var(--sr-amber); }
+.sr .work-pn-next { text-align: right; justify-items: end; }
