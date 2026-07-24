@@ -1842,3 +1842,16 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr .work-pn-link .work-pn-title { color: var(--sr-cream); font: 600 15px/1.3 var(--sr-sans); }
 .sr .work-pn-link:hover .work-pn-title { color: var(--sr-amber); }
 .sr .work-pn-next { text-align: right; justify-items: end; }
+
+/* ── page-head rhythm modifiers (the inline-style one-offs, codified) ─────── */
+.sr .sr-kickrow--mt10 { margin-top: 10px; }
+.sr .sr-kickrow--mt12 { margin-top: 12px; }
+.sr .sr-kickrow--mt14 { margin-top: 14px; }
+.sr .sr-beat--flush { margin: 0; }
+.sr .sr-lede--mt14 { margin-top: 14px; }
+.sr .sr-pagehead--edgeless { border-bottom: 0; }
+
+/* closing title-card on the spokes (was border/font/margin inline styles) */
+.sr .sr-cta-final { text-align: center; }
+.sr .sr-cta-final .sr-title { font-size: clamp(26px, 3vw, 44px); }
+.sr .sr-cta-final .sr-titlecard-actions { margin-top: 20px; }

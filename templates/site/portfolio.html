@@ -27,8 +27,8 @@
   <div class="sr-pagehead">
     <span class="sr-mono">Every frame on file</span>
     <h1>The Archive</h1>
-    <div class="sr-kickrow" style="margin-top: 10px;">
-      <p class="sr-beat" style="margin: 0;">spaces, faces, and plates across Asheville &amp; WNC — filter by stock or subject</p>
+    <div class="sr-kickrow sr-kickrow--mt10">
+      <p class="sr-beat sr-beat--flush">spaces, faces, and plates across Asheville &amp; WNC — filter by stock or subject</p>
       {% set n_stills = assets|selectattr("kind", "equalto", "photo")|list|length %}
       {% set n_films = assets|selectattr("kind", "equalto", "video")|list|length %}
       {% if assets %}<span class="sr-mono">{{ n_stills }} still{{ 's' if n_stills != 1 }}{% if n_films %} &middot; {{ n_films }} film{{ 's' if n_films != 1 }}{% endif %}</span>{% endif %}

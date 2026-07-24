@@ -8,8 +8,8 @@
   <div class="sr-pagehead">
     <span class="sr-mono">The projection booth</span>
     <h1>Films <em>first.</em></h1>
-    <div class="sr-kickrow" style="margin-top: 10px;">
-      <p class="sr-beat" style="margin: 0;">walkthroughs, brand films, and the first cut — built vertical for the feed</p>
+    <div class="sr-kickrow sr-kickrow--mt10">
+      <p class="sr-beat sr-beat--flush">walkthroughs, brand films, and the first cut — built vertical for the feed</p>
       {% if reels %}<span class="sr-mono">{{ reels|length }} film{{ 's' if reels|length != 1 }} &middot; <a class="sr-mono sr-mono--signal" href="/portfolio">full archive &rarr;</a></span>{% endif %}
     </div>
   </div>
@@ -80,7 +80,7 @@
 {% call cta.cta_band(
     [("&#9654; Motion", "that earns the scroll"), ("1 visit", "photo + film together")],
     "Book", "/book", "Book a shoot &rarr;", reveal=false) %}
-  <p class="sr-kickrow" style="margin-top: 12px;">
+  <p class="sr-kickrow sr-kickrow--mt12">
     <a class="sr-mono" href="/services#svc-videography">Videography tiers, in detail &rarr;</a>
   </p>
 {% endcall %}

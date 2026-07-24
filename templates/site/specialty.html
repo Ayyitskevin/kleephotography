@@ -356,7 +356,7 @@
     {% endfor %}
     <div class="sr-tier sr-stat--cta"><a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta_final or page.sr.cta }} &rarr;</a></div>
   </div>
-  <p class="sr-kickrow" style="margin-top: 12px;">
+  <p class="sr-kickrow sr-kickrow--mt12">
     <a class="sr-mono" href="/services">Every tier, in detail &rarr;</a>
     {% if sp_key == "re" and aerials_live() %}<span class="sr-mono sr-mono--stock">Aerial Pass {{ aerial_rate }} on any tier</span>{% endif %}
   </p>
@@ -409,9 +409,9 @@
 
 {# ═══ SHARED: CLOSING CTA ════════════════════════════════════════════════════ #}
 <section class="sr-wrap sr-section" aria-label="Book">
-  <div class="sr-pagehead" style="border-bottom: 0; text-align: center;">
-    <h2 class="sr-title" style="font-size: clamp(26px, 3vw, 44px);">{{ page.cta_h1 }} <span class="sr-em">{{ page.cta_h2 }}</span></h2>
-    <div class="sr-titlecard-actions" style="margin-top: 20px;">
+  <div class="sr-pagehead sr-pagehead--edgeless sr-cta-final">
+    <h2 class="sr-title">{{ page.cta_h1 }} <span class="sr-em">{{ page.cta_h2 }}</span></h2>
+    <div class="sr-titlecard-actions">
       <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
       <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
     </div>
