@@ -40,6 +40,11 @@
          {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
          sizes="(max-width: 700px) 100vw, 1344px"{% endif %}
          alt="{{ featured[0]|portfolio_alt }}">
+    {% else %}
+    <div class="sr-screen-empty">
+      <span class="sr-rec">Reel</span>
+      <p>The house reel is being threaded — first screening lands soon.</p>
+    </div>
     {% endif %}
     <span class="sr-screen-scrim" aria-hidden="true"></span>
     <div class="sr-screen-title">

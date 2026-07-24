@@ -5,14 +5,13 @@
   "use strict";
 
   // Respect the OS "reduce motion" setting (also honored in mise.css). When set,
-  // we skip the JS-driven hero parallax — an inline transform CSS can't override.
+  // ambient autoplay videos stop too (handled below).
   var reduceMotion = window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // --- fixed nav scroll state + scroll progress + parallax ---
+  // --- fixed nav scroll state + scroll progress ---
   var nav = document.querySelector("[data-nav]");
   var progressBar = document.querySelector("[data-progress-bar]");
-  var parallaxEls = document.querySelectorAll("[data-parallax]");
   var ticking = false;
   function onScroll() {
     if (ticking) return;
@@ -23,12 +22,6 @@
       if (progressBar) {
         var h = document.documentElement.scrollHeight - window.innerHeight;
         progressBar.style.width = (h > 0 ? (y / h) * 100 : 0) + "%";
-      }
-      if (!reduceMotion) {
-        parallaxEls.forEach(function (el) {
-          var speed = parseFloat(el.getAttribute("data-parallax")) || 0;
-          el.style.transform = "translateY(" + (y * speed) + "px)";
-        });
       }
       ticking = false;
     });
@@ -286,64 +279,6 @@
       if (el.getBoundingClientRect().top < window.innerHeight * 0.92) return;
       el.classList.add("reveal-hidden");
       io.observe(el);
-    });
-  }
-
-  // --- delivery: interactive proofing demo ---
-  var proof = document.querySelector("[data-proof]");
-  if (proof) {
-    var thumbs = proof.querySelectorAll("[data-proof-thumb]");
-    var countEl = proof.querySelector("[data-proof-count]");
-    var fillEl = proof.querySelector("[data-proof-fill]");
-    var total = thumbs.length;
-    var sync = function () {
-      var picked = proof.querySelectorAll(".proof-thumb.picked").length;
-      if (countEl) countEl.textContent = picked;
-      if (fillEl) fillEl.style.width = (total ? picked / total * 100 : 0) + "%";
-    };
-    thumbs.forEach(function (t) {
-      t.addEventListener("click", function () {
-        t.classList.toggle("picked");
-        sync();
-      });
-    });
-    sync();
-  }
-
-  // --- magnetic buttons (fine-pointer + motion-safe only) ---
-  if (!reduceMotion && window.matchMedia &&
-      window.matchMedia("(pointer: fine)").matches) {
-    document.querySelectorAll("[data-magnetic]").forEach(function (el) {
-      var arrow = el.querySelector("[data-arrow]");
-      el.addEventListener("mousemove", function (e) {
-        var r = el.getBoundingClientRect();
-        var dx = e.clientX - (r.left + r.width / 2);
-        var dy = e.clientY - (r.top + r.height / 2);
-        el.style.transform = "translate(" + (dx * 0.18) + "px," + (dy * 0.22) + "px)";
-        if (arrow) arrow.style.transform = "translateX(4px)";
-      });
-      el.addEventListener("mouseleave", function () {
-        el.style.transform = "";
-        if (arrow) arrow.style.transform = "";
-      });
-    });
-  }
-
-  // --- delivery: social-crop switcher ---
-  var crop = document.querySelector("[data-crop]");
-  if (crop) {
-    var btns = crop.querySelectorAll("[data-crop-btn]");
-    var preview = crop.querySelector("[data-crop-preview]");
-    var nameEl = crop.querySelector("[data-crop-name]");
-    var useEl = crop.querySelector("[data-crop-use]");
-    btns.forEach(function (b) {
-      b.addEventListener("click", function () {
-        btns.forEach(function (x) { x.classList.remove("on"); });
-        b.classList.add("on");
-        if (preview) preview.style.aspectRatio = b.dataset.ratio;
-        if (nameEl) nameEl.textContent = b.dataset.name;
-        if (useEl) useEl.textContent = b.dataset.use;
-      });
     });
   }
 
