@@ -445,4 +445,54 @@
     video.currentTime = seconds;
     video.play().catch(function () {});
   });
+
+  /* data-sound-toggle / motion-strip reels — tap-for-sound on the reels page.
+     Reels autoplay muted; the feature button unmutes the feature video, strip
+     reels unmute on tap (one at a time — unmuting one re-mutes the rest).
+     Delegated like everything else here: no per-page inline scripts, and the
+     button label swaps sprite icons, never emoji. */
+  function muteAllReels() {
+    document.querySelectorAll(".motion-page video").forEach(function (v) { v.muted = true; });
+    var btn = document.querySelector("[data-sound-toggle]");
+    if (btn) setSoundBtn(btn, false);
+  }
+  function setSoundBtn(btn, on) {
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    var off = btn.querySelector(".sound-off-ic");
+    var on_ = btn.querySelector(".sound-on-ic");
+    if (off) off.hidden = on;
+    if (on_) on_.hidden = !on;
+    var lbl = btn.querySelector(".sound-lbl");
+    if (lbl) lbl.textContent = on ? "Sound on" : "Sound";
+  }
+  function toggleStripReel(v) {
+    var wasMuted = v.muted;
+    muteAllReels();
+    v.muted = !wasMuted;
+    if (wasMuted) v.play().catch(function () {});
+  }
+  document.addEventListener("click", function (event) {
+    var btn = event.target.closest && event.target.closest("[data-sound-toggle]");
+    if (btn) {
+      var feature = document.querySelector(".motion-feature video");
+      if (!feature) return;
+      var enable = feature.muted;
+      muteAllReels();
+      if (enable) {
+        feature.muted = false;
+        feature.play().catch(function () {});
+        setSoundBtn(btn, true);
+      }
+      return;
+    }
+    var v = event.target.closest && event.target.closest(".motion-strip video");
+    if (v) toggleStripReel(v);
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    var v = event.target.closest && event.target.closest(".motion-strip video");
+    if (!v) return;
+    event.preventDefault();
+    toggleStripReel(v);
+  });
 })();

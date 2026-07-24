@@ -41,14 +41,18 @@
           <p>{{ reels[0].portfolio_tag|tag_label if reels[0].portfolio_tag else 'Featured reel' }}</p>
         </div>
         <button type="button" class="motion-sound" data-sound-toggle aria-pressed="false"
-                title="Reels autoplay muted — turn the sound on">&#128264; Sound</button>
+                title="Reels autoplay muted — turn the sound on">
+          <span class="sound-off-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm"><use href="/static/icons.svg?v={{ static_rev }}#i-sound-off"/></svg></span>
+          <span class="sound-on-ic" aria-hidden="true" hidden><svg class="sr-icon sr-icon--sm"><use href="/static/icons.svg?v={{ static_rev }}#i-sound"/></svg></span>
+          <span class="sound-lbl">Sound</span>
+        </button>
       </div>
     </div>
     {% if reels|length > 1 %}
     <div class="motion-strip" data-reveal>
       {% for r in reels[1:] %}
       <figure class="motion-reel" data-sp="{{ r.portfolio_tag|tag_specialty }}">
-        <video autoplay muted loop playsinline preload="metadata" data-reel-video
+        <video autoplay muted loop playsinline preload="metadata" data-reel-video tabindex="0"
                aria-label="{{ r.portfolio_tag|tag_label if r.portfolio_tag else 'Portfolio' }} reel; activate to toggle sound"
                poster="/site/poster/{{ r.id }}">
           <source src="/site/vid/{{ r.id }}" type="video/mp4">
@@ -99,46 +103,6 @@
 }{% if not loop.last %},{% endif %}
 {% endfor %}
 ]
-</script>
-{% endif %}
-{% if reels %}
-<script nonce="{{ csp_nonce }}">
-  (function () {
-    // Tap-for-sound: reels autoplay muted; the toggle unmutes the feature and
-    // any strip reel unmutes on click/keyboard (one at a time).
-    const feature = document.querySelector(".motion-feature video");
-    const btn = document.querySelector("[data-sound-toggle]");
-    function muteAll() {
-      document.querySelectorAll(".motion-page video").forEach(v => { v.muted = true; });
-      if (btn) { btn.setAttribute("aria-pressed", "false"); btn.innerHTML = "&#128264; Sound"; }
-    }
-    if (btn && feature) {
-      btn.addEventListener("click", () => {
-        const enable = feature.muted;
-        muteAll();
-        if (enable) {
-          feature.muted = false;
-          feature.play().catch(() => {});
-          btn.setAttribute("aria-pressed", "true");
-          btn.innerHTML = "&#128266; Sound on";
-        }
-      });
-    }
-    document.querySelectorAll(".motion-strip video").forEach(v => {
-      v.style.cursor = "pointer";
-      v.setAttribute("tabindex", "0");
-      const toggle = () => {
-        const wasMuted = v.muted;
-        muteAll();
-        v.muted = !wasMuted;
-        if (wasMuted) v.play().catch(() => {});
-      };
-      v.addEventListener("click", toggle);
-      v.addEventListener("keydown", e => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
-      });
-    });
-  })();
 </script>
 {% endif %}
 {% if sp_chips %}

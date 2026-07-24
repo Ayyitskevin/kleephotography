@@ -383,7 +383,10 @@ html.nav-menu-enhanced .sr .nav-mobile {
 /* ── /reels — the projection booth ────────────────────────────────────────── */
 .sr .motion-feature { position: relative; border: 1px solid var(--sr-line-strong);
   background: var(--sr-house-deep); border-radius: 0; overflow: hidden; }
-.sr .motion-feature video { display: block; width: 100%; }
+.sr .motion-feature video { display: block; width: 100%;
+  /* reset the cream-era absolute overlay (mise.css:1259) — it covered the
+     static meta bar below and swallowed every click on the sound toggle */
+  position: static; }
 .sr .motion-feature-meta { display: flex; justify-content: space-between;
   align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--sr-line);
   position: static; background: none; }
@@ -1822,3 +1825,6 @@ body.sr-admin .admin-shell, body.sr-admin {
 @media (prefers-reduced-motion: reduce) {
   .sr-admin .client-fold > summary::before { transition: none; }
 }
+
+/* strip reels are tap-for-sound (delegated in site.js) — show the affordance */
+.sr .motion-strip video { cursor: pointer; }
