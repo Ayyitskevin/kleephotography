@@ -114,7 +114,10 @@
   </div>
 </section>
 {% else %}
-<p class="muted work-gallery-empty">No photos starred for this case study yet.</p>
+<div class="empty-state">
+  <strong>Frames being chosen</strong>
+  <p class="muted">No photos starred for this case study yet.</p>
+</div>
 {% endif %}
 
 {% if credit_items %}
@@ -178,8 +181,8 @@
   <div class="cta-inner" data-reveal>
     <h2>{{ cta.heading }}</h2>
     <div class="cta-actions">
-      <a class="btn-pill" href="/contact?service={{ cta.service|urlencode }}">{{ cta.label }} &rarr;</a>
-      <a class="btn-ghost" href="/work">More work</a>
+      <a class="sr-btn btn-pill" href="/contact?service={{ cta.service|urlencode }}">{{ cta.label }} &rarr;</a>
+      <a class="sr-btn btn-ghost" href="/work">More work</a>
     </div>
   </div>
 </section>

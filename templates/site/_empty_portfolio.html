@@ -4,14 +4,14 @@
   <p class="muted">Every shoot premieres in a private gallery — proofing,
      full-res downloads, and social crops, usually within the week.</p>
   <div class="empty-state-actions">
-    <a class="btn-pill" href="/contact">Request a quote <span>&rarr;</span></a>
+    <a class="sr-btn btn-pill" href="/contact">Request a quote <span>&rarr;</span></a>
     {% if demo_gallery %}
-    <a class="btn-ghost" href="{{ demo_gallery.url }}"
+    <a class="sr-btn btn-ghost" href="{{ demo_gallery.url }}"
        data-analytics-event="Demo Gallery Click" data-analytics-page="{{ request.url.path }}">Try sample gallery</a>
     {% if demo_gallery.pin %}
     <span class="muted empty-pin">Gallery PIN: <b>{{ demo_gallery.pin }}</b></span>
     {% else %}
-    <a class="btn-ghost" href="/contact?prefill=demo_gallery">Ask for gallery PIN</a>
+    <a class="sr-btn btn-ghost" href="/contact?prefill=demo_gallery">Ask for gallery PIN</a>
     {% endif %}
     {% endif %}
   </div>

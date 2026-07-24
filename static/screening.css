@@ -441,12 +441,12 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .faq-foot a { color: var(--sr-amber); }
 
 /* empty states — "no frames on the reel yet" */
-.sr .empty-state { border: 1px dashed var(--sr-line-raised); padding: 44px 30px;
+.sr .empty-state, .sr .sr-empty { border: 1px dashed var(--sr-line-raised); padding: 44px 30px;
   text-align: center; color: var(--sr-ink-mute); background: none; border-radius: 0; }
-.sr .empty-state strong { display: block; font: 700 16px/1.4 var(--sr-sans);
+.sr .empty-state strong, .sr .sr-empty strong { display: block; font: 700 16px/1.4 var(--sr-sans);
   letter-spacing: 0.05em; text-transform: uppercase; color: var(--sr-cream);
   margin-bottom: 6px; }
-.sr .empty-state .muted { color: var(--sr-ink-faint); }
+.sr .empty-state .muted, .sr .sr-empty .muted { color: var(--sr-ink-faint); }
 .sr .empty-state-actions { display: flex; justify-content: center; gap: 12px;
   margin-top: 20px; flex-wrap: wrap; }
 .sr .btn-pill, .sr .btn-ghost { border-radius: 0; }
@@ -1686,14 +1686,6 @@ body.sr-admin .admin-shell, body.sr-admin {
   border-radius: 0; padding: var(--sr-s5); }
 .sr .sr-card--raise { transition: border-color var(--sr-t-fast); }
 .sr .sr-card--raise:hover { border-color: var(--sr-line-raised); }
-
-/* same anatomy as the .empty-state section — new work writes .sr-empty so the
-   component has one name across surfaces */
-.sr .sr-empty { border: 1px dashed var(--sr-line-raised); padding: 44px 30px;
-  text-align: center; color: var(--sr-ink-mute); }
-.sr .sr-empty strong { display: block; font: 700 16px/1.4 var(--sr-sans);
-  letter-spacing: 0.05em; text-transform: uppercase; color: var(--sr-cream);
-  margin-bottom: 6px; }
 
 .sr .sr-skel { position: relative; overflow: hidden; background: var(--sr-house-deep); }
 .sr .sr-skel::after { content: ""; position: absolute; inset: 0;
