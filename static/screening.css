@@ -1852,6 +1852,6 @@ body.sr-admin .admin-shell, body.sr-admin {
 @media (max-width: 700px) {
   .sr .sr-titlecard { min-height: 68vh; }
 }
-.sr .sr-screen-empty { display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 10px; min-height: 320px; padding: 40px 20px;
-  color: var(--sr-ink-mute); font-size: var(--sr-text-base); text-align: center; }
+.sr .sr-screen-empty { position: absolute; left: 28px; bottom: 64px; display: flex;
+  flex-direction: column; gap: 6px; max-width: 46ch; color: var(--sr-ink-mute);
+  font-size: var(--sr-text-sm); }
