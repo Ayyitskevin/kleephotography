@@ -1,4 +1,5 @@
 {% extends "site/base_site.html" %}
+{% import "site/_cta_band.html" as cta %}
 {% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
 {% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
@@ -71,11 +72,9 @@
     <p class="sr-mono">Based in Asheville &middot; on the road across WNC</p>
     <span class="sr-mono">Asheville &rarr; Charlotte &rarr; Raleigh &rarr; Wilmington</span>
   </div>
-  <div class="sr-stats" data-reveal>
-    <div class="sr-stat"><b>120+</b><small>Menus shot</small></div>
-    <div class="sr-stat"><b>Same week</b><small>Gallery delivery</small></div>
-    <div class="sr-stat"><b>8 yrs</b><small>Behind the lens</small></div>
-    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/contact">Work with me &rarr;</a></div>
-  </div>
 </section>
+
+{{ cta.cta_band(
+    [("120+", "Menus shot"), ("Same week", "Gallery delivery"), ("8 yrs", "Behind the lens")],
+    "Service area", "/contact", "Work with me &rarr;") }}
 {% endblock %}

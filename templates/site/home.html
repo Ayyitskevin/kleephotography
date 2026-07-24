@@ -1,4 +1,5 @@
 {% extends "site/base_site.html" %}
+{% import "site/_cta_band.html" as cta %}
 {# The Lobby (Screening Room 3a): marquee house reel with a live timecode,
    three feature title cards on their film stocks, the ticker band, then the
    credits footer (base_site). The archive filmstrip keeps a lightbox-able set
@@ -144,13 +145,9 @@
 </section>
 {% endif %}
 
-<section class="sr-wrap sr-section" aria-label="Book">
-  <div class="sr-stats" data-reveal>
-    <div class="sr-stat"><b>Ready for your close-up?</b><small>Pick a time, or request a tailored quote for a custom project.</small></div>
-    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Book a shoot &rarr;</a></div>
-    <div class="sr-stat sr-stat--cta"><a class="sr-btn sr-btn--ghost" href="/contact">Request a quote</a></div>
-  </div>
-</section>
+{{ cta.cta_band(
+    [("Ready for your close-up?", "Pick a time, or request a tailored quote for a custom project.")],
+    "Book", "/book", "Book a shoot &rarr;", "/contact", "Request a quote") }}
 
 {% if featured %}{% include "site/_lightbox.html" %}{% endif %}
 {% endblock %}

@@ -1,4 +1,5 @@
 {% extends "site/base_site.html" %}
+{% import "site/_cta_band.html" as cta %}
 {% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
 {% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
@@ -76,16 +77,13 @@
 </section>
 {% endif %}
 
-<section class="sr-wrap sr-section" aria-label="Book">
-  <div class="sr-stats">
-    <div class="sr-stat"><b>&#9654; Motion</b><small>that earns the scroll</small></div>
-    <div class="sr-stat"><b>1 visit</b><small>photo + film together</small></div>
-    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Book a shoot &rarr;</a></div>
-  </div>
+{% call cta.cta_band(
+    [("&#9654; Motion", "that earns the scroll"), ("1 visit", "photo + film together")],
+    "Book", "/book", "Book a shoot &rarr;", reveal=false) %}
   <p class="sr-kickrow" style="margin-top: 12px;">
     <a class="sr-mono" href="/services#svc-videography">Videography tiers, in detail &rarr;</a>
   </p>
-</section>
+{% endcall %}
 
 {% if reels %}
 <script type="application/ld+json">

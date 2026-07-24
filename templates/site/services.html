@@ -1,4 +1,5 @@
 {% extends "site/base_site.html" %}
+{% import "site/_cta_band.html" as cta %}
 {% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
 {% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% block site_content %}
@@ -62,19 +63,9 @@
 </section>
 {% endif %}
 
-{# FOOT #}
-<section class="sr-wrap sr-section" aria-label="Not sure which tier">
-  <div class="sr-stats">
-    <div class="sr-stat">
-      <b>Not sure which tier?</b>
-      <small>Menu count, deliverable goal, or content rhythm &mdash; tailored
-        proposal within a business day. Asheville &amp; WNC; Charlotte,
-        Raleigh, Wilmington on rotation.</small>
-    </div>
-    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Book a shoot &rarr;</a></div>
-    <div class="sr-stat sr-stat--cta"><a class="sr-btn sr-btn--ghost" href="/work">See past work</a></div>
-  </div>
-</section>
+{{ cta.cta_band(
+    [("Not sure which tier?", "Menu count, deliverable goal, or content rhythm &mdash; tailored proposal within a business day. Asheville &amp; WNC; Charlotte, Raleigh, Wilmington on rotation.")],
+    "Not sure which tier", "/book", "Book a shoot &rarr;", "/work", "See past work", reveal=false) }}
 
 {# Service + Offer JSON-LD from the same SERVICES catalog the cards render.
    price uses the PRESET floor (price_cents) so schema stays honest even when

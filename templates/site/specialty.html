@@ -1,4 +1,5 @@
 {% extends "site/base_site.html" %}
+{% import "site/_cta_band.html" as cta %}
 {# Shared spoke template for /real-estate, /portraits, /food-beverage — the
    three Screening Room features (3b The Space · 3k The Face · 3c+3l The
    Plate). One route + context per spoke (site.SPECIALTY_PAGES, .sr = the
@@ -170,15 +171,7 @@
 </section>
 {% endif %}
 
-{# ═══ PROOF STRIP ════════════════════════════════════════════════════════════ #}
-<section class="sr-wrap" aria-label="Turnaround">
-  <div class="sr-stats">
-    {% for n, label in page.sr.proof %}
-    <div class="sr-stat"><b>{{ n }}</b><small>{{ label }}</small></div>
-    {% endfor %}
-    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a></div>
-  </div>
-</section>
+{{ cta.cta_band(page.sr.proof, "Turnaround", book_url, page.sr.cta ~ " &rarr;", reveal=false, section_class="sr-wrap") }}
 
 {% elif sp_key == "pl" %}
 {# ═══ 3k · THE FACE — direction promised up front ════════════════════════════ #}

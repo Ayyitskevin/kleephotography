@@ -1,0 +1,30 @@
+{# The closing strip — stats + action cells, ONE anatomy for every page's
+   final ask (was 8 hand-copied .sr-stats blocks drifting page by page).
+
+   The CTA rule this codifies: /book is the primary action site-wide (nav,
+   sticky CTA, heroes, closing bands); /contact is the tailored-quote path
+   (services tiers, per-specialty quotes, about/press). work_detail keeps its
+   own pinned cta-band instead of this macro.
+
+   Usage:
+     {% import "site/_cta_band.html" as cta %}
+     {{ cta.cta_band([("One grid", "stills &amp; films together")],
+                     "Book", "/book", "Book a shoot &rarr;") }}
+   Optional: secondary_href/secondary_label (ghost cell), reveal=false,
+   section_class, and a {% call %} block for extra content inside the
+   <section> after the strip. Stat/label copy renders |safe (literal
+   entities like &middot; pass through — callers are trusted templates). #}
+{% macro cta_band(stats, label, primary_href, primary_label, secondary_href="", secondary_label="", reveal=true, section_class="sr-wrap sr-section") %}
+<section class="{{ section_class }}" aria-label="{{ label }}">
+  <div class="sr-stats"{% if reveal %} data-reveal{% endif %}>
+    {% for b, s in stats %}
+    <div class="sr-stat"><b>{{ b|safe }}</b><small>{{ s|safe }}</small></div>
+    {% endfor %}
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="{{ primary_href }}">{{ primary_label|safe }}</a></div>
+    {% if secondary_href %}
+    <div class="sr-stat sr-stat--cta"><a class="sr-btn sr-btn--ghost" href="{{ secondary_href }}">{{ secondary_label|safe }}</a></div>
+    {% endif %}
+  </div>
+  {% if caller %}{{ caller() }}{% endif %}
+</section>
+{% endmacro %}

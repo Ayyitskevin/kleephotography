@@ -1,4 +1,5 @@
 {% extends "site/base_site.html" %}
+{% import "site/_cta_band.html" as cta %}
 {# The Archive (Screening Room 3d): stills & films on one projector grid —
    mono frame metadata instead of captions, film-stock filter chips, films
    sort first on the ▶ toggle, and the lightbox screens everything dark. #}
@@ -122,13 +123,9 @@
 </section>
 {% endif %}
 
-<section class="sr-wrap sr-section" aria-label="Book">
-  <div class="sr-stats">
-    <div class="sr-stat"><b>One grid</b><small>stills &amp; films together</small></div>
-    <div class="sr-stat"><b>Three stocks</b><small>250D &middot; 800T &middot; 500T</small></div>
-    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Add your shoot to the archive &rarr;</a></div>
-  </div>
-</section>
+{{ cta.cta_band(
+    [("One grid", "stills &amp; films together"), ("Three stocks", "250D &middot; 800T &middot; 500T")],
+    "Book", "/book", "Add your shoot to the archive &rarr;", reveal=false) }}
 
 {% include "site/_lightbox.html" %}
 {% if tags or sp_chips %}

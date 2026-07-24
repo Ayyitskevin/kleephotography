@@ -1,4 +1,5 @@
 {% extends "site/base_site.html" %}
+{% import "site/_cta_band.html" as cta %}
 {% block title %}{{ marketing_meta(request.url.path).title }}{% endblock %}
 {% block meta_description %}{{ marketing_meta(request.url.path).description }}{% endblock %}
 {% set feat = studies[0] if studies else None %}
@@ -79,10 +80,7 @@
   {% endif %}
 </main>
 
-<section class="sr-wrap sr-section" aria-label="Book">
-  <div class="sr-stats">
-    <div class="sr-stat"><b>Your shoot</b><small>could be the next screening here</small></div>
-    <div class="sr-stat sr-stat--cta"><a class="sr-btn" href="/book">Book a shoot &rarr;</a></div>
-  </div>
-</section>
+{{ cta.cta_band(
+    [("Your shoot", "could be the next screening here")],
+    "Book", "/book", "Book a shoot &rarr;", reveal=false) }}
 {% endblock %}
