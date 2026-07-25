@@ -13,6 +13,11 @@ from ..render import templates
 log = logging.getLogger("mise.public.pay")
 router = APIRouter()
 
+# Real Stripe events are a few KB; anything near 1 MB is junk. The signature is
+# verified only after the body is read, so an unbounded read is a memory DoS —
+# reject on Content-Length up front and on the actual length after reading.
+_MAX_BODY = 1 << 20
+
 
 def _invoice_or_404(slug: str) -> "db.sqlite3.Row":
     d = db.one(
@@ -157,7 +162,12 @@ async def pay_invoice(request: Request, slug: str):
 async def stripe_webhook(request: Request):
     if not features.stripe_webhook_enabled():
         raise HTTPException(status_code=503, detail="webhook not configured")
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > _MAX_BODY:
+        raise HTTPException(status_code=413, detail="payload too large")
     payload = await request.body()
+    if len(payload) > _MAX_BODY:
+        raise HTTPException(status_code=413, detail="payload too large")
     try:
         event = stripe.Webhook.construct_event(
             payload, request.headers.get("stripe-signature", ""), config.STRIPE_WEBHOOK_SECRET
@@ -174,8 +184,16 @@ async def stripe_webhook(request: Request):
     if session["payment_status"] != "paid":  # ACH settles via the async event
         return {"ok": True, "pending": True}
 
-    invoice_id = int(session["metadata"]["invoice_id"])
-    kind = session["metadata"]["kind"]
+    # StripeObject has no .get() — `in` + [] is the equivalent. A foreign/stray
+    # checkout session on the same Stripe account carries no usable invoice_id:
+    # ack and ignore instead of KeyError → 500, which makes Stripe retry and
+    # eventually disable the webhook endpoint.
+    metadata = (session["metadata"] if "metadata" in session else None) or {}
+    invoice_id = metadata["invoice_id"] if "invoice_id" in metadata else None
+    if not invoice_id or not str(invoice_id).isdigit():
+        return {"ok": True, "ignored": "no invoice_id"}
+    invoice_id = int(invoice_id)
+    kind = metadata["kind"] if "kind" in metadata else None
     d = db.one("SELECT * FROM invoices WHERE id=?", (invoice_id,))
     if not d:
         log.error("stripe webhook for unknown invoice %s", invoice_id)

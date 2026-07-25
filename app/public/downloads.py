@@ -3,6 +3,7 @@
 import hashlib
 import logging
 import re
+import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -213,12 +214,18 @@ async def download_favorites(request: Request, slug: str):
     )
     if not assets:
         raise HTTPException(status_code=404, detail="no favorites yet")
-    # small subset of originals — built synchronously, content-keyed per visitor
+    # small subset of originals — built synchronously, keyed by the fav-set hash
+    # (not the visitor) so identical favorites share one file and stale cleanup
+    # bounds the gallery to a single favorites ZIP on disk
     key = hashlib.sha256(",".join(str(a["id"]) for a in assets).encode()).hexdigest()[:8]
-    out = config.ZIP_DIR / f"g{g['id']}-v{visitor['id']}-{key}.zip"
+    out = config.ZIP_DIR / f"g{g['id']}-fav-{key}.zip"
     if not out.is_file():
+        # Same pre-write disk floor as the upload handlers — a fresh visitor
+        # must not be able to force an unbounded ZIP build on a full disk.
+        if shutil.disk_usage(config.DATA_DIR).free / 1e9 < config.MIN_FREE_GB:
+            raise HTTPException(status_code=507, detail="low disk space — download refused")
         _store_zip(g["id"], assets, out)
-        for old in config.ZIP_DIR.glob(f"g{g['id']}-v{visitor['id']}-*.zip"):
+        for old in config.ZIP_DIR.glob(f"g{g['id']}-fav-*.zip"):
             if old != out:
                 old.unlink(missing_ok=True)
     db.run(
@@ -285,8 +292,10 @@ async def download_zip(request: Request, slug: str):
 
 
 @router.get("/{slug}/download/zip/status")
-async def zip_status(slug: str):
-    g = get_live_gallery(slug)
+async def zip_status(request: Request, slug: str):
+    # Same gates as the sibling download routes — without them this was an
+    # unauthenticated status oracle for any known slug.
+    g, _ = _gate(request, slug)
     if jobs.zip_path(g["id"], g["content_rev"]).is_file():
         return {"ready": True, "failed": False}
     # Surface a build that exhausted its retries so the wait page can stop

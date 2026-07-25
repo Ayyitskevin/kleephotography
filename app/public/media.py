@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from .. import config, db, security
+from .downloads import _email_required
 from .gallery import get_live_gallery, is_expired
 
 router = APIRouter(prefix="/media")
@@ -20,7 +21,12 @@ def _resolve(slug: str, variant: str, asset_id: int, request: Request):
     g = get_live_gallery(slug)
     if is_expired(g):
         raise HTTPException(status_code=410)
-    security.require_visitor(request, g["id"])
+    visitor = security.require_visitor(request, g["id"])
+    # Originals carry the email-capture control the download routes enforce —
+    # serving them here ungated would let a no-email visitor (e.g. a drop-link
+    # holder) bulk-pull masters. thumb/web stay open; drops don't gate at all.
+    if variant == "original" and _email_required(g) and not visitor["email"]:
+        raise HTTPException(status_code=403, detail="email required for originals")
     a = db.one(
         "SELECT * FROM assets WHERE id=? AND gallery_id=? AND status='ready'", (asset_id, g["id"])
     )
