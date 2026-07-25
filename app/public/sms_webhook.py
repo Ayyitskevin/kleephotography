@@ -25,6 +25,11 @@ from .. import config, db, sms
 log = logging.getLogger("mise.public.sms_webhook")
 router = APIRouter()
 
+# Same posture as the Stripe webhook (pay.py): the signature is verified only
+# after the body is read, so cap the read — reject on Content-Length up front
+# and on the actual length after reading. Real Quo events are a few KB.
+_MAX_BODY = 1 << 20
+
 # Call statuses that mean nobody connected — rendered as a "Missed call".
 _MISSED = {
     "missed",
@@ -169,7 +174,12 @@ def _handle_call(etype: str, obj: dict) -> dict:
 async def quo_webhook(request: Request):
     if not config.QUO_WEBHOOK_SECRET:
         raise HTTPException(status_code=503, detail="sms webhook not configured")
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > _MAX_BODY:
+        raise HTTPException(status_code=413, detail="payload too large")
     raw = await request.body()
+    if len(raw) > _MAX_BODY:
+        raise HTTPException(status_code=413, detail="payload too large")
     if not sms.verify_webhook(raw, request.headers.get("openphone-signature", "")):
         raise HTTPException(status_code=400, detail="bad signature")
     try:

@@ -272,9 +272,9 @@ def test_full_gallery_flow(admin):
         # media serves
         assert pub.get(f"/media/{g['slug']}/thumb/{a['id']}").status_code == 200
         assert pub.get(f"/media/{g['slug']}/web/{a['id']}").status_code == 200
-        # Range request honored
-        r = pub.get(f"/media/{g['slug']}/original/{a['id']}", headers={"Range": "bytes=0-99"})
-        assert r.status_code == 206 and len(r.content) == 100
+        # originals carry the email-capture control — 403 until the visitor
+        # leaves an email (thumb/web above stay open)
+        assert pub.get(f"/media/{g['slug']}/original/{a['id']}").status_code == 403
         # favorite toggle
         r = pub.post(f"/g/{g['slug']}/fav/{a['id']}")
         assert r.status_code == 200 and "faved" in r.text
@@ -296,6 +296,9 @@ def test_full_gallery_flow(admin):
         # single download works now
         r = pub.get(f"/g/{g['slug']}/download/asset/{a['id']}")
         assert r.status_code == 200 and r.headers["content-type"] == "application/octet-stream"
+        # Range request honored (email now on file)
+        r = pub.get(f"/media/{g['slug']}/original/{a['id']}", headers={"Range": "bytes=0-99"})
+        assert r.status_code == 206 and len(r.content) == 100
         # ZIP: first request enqueues, then becomes ready
         r = pub.get(f"/g/{g['slug']}/download/zip")
         assert r.status_code == 200

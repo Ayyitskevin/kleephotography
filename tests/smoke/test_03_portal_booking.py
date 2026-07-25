@@ -1317,6 +1317,9 @@ def test_zip_wait_reports_failed_build(admin):
     g = db.one("SELECT id, content_rev FROM galleries WHERE id=?", (gid,))
     try:
         with TestClient(app) as pub:
+            # gated like the sibling download routes — no visitor cookie, no oracle
+            assert pub.get("/g/zip-fail-01/download/zip/status").status_code == 403
+            pub.post("/g/zip-fail-01/pin", data={"pin": "1234"}, follow_redirects=False)
             # nothing built yet, no failed job → still waiting
             s = pub.get("/g/zip-fail-01/download/zip/status").json()
             assert s["ready"] is False and s["failed"] is False

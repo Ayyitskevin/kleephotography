@@ -8,7 +8,7 @@ User=mise
 Group=mise
 WorkingDirectory=/opt/mise
 EnvironmentFile=/opt/mise/.env
-ExecStart=/opt/mise/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8400
+ExecStart=/opt/mise/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8400
 Restart=on-failure
 RestartSec=5
 

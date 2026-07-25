@@ -48,6 +48,7 @@ def _checkout_event(
     amount,
     payment_status="paid",
     etype="checkout.session.completed",
+    metadata=None,
 ):
     return json.dumps(
         {
@@ -61,7 +62,11 @@ def _checkout_event(
                     "object": "checkout.session",
                     "payment_status": payment_status,
                     "amount_total": amount,
-                    "metadata": {"invoice_id": str(invoice_id), "kind": kind},
+                    "metadata": (
+                        metadata
+                        if metadata is not None
+                        else {"invoice_id": str(invoice_id), "kind": kind}
+                    ),
                 }
             },
         }
@@ -303,3 +308,55 @@ def test_webhook_ach_pending_records_nothing(client, monkeypatch):
     assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
     assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "sent"
     _cleanup_money_chain(cid, pid, iid)
+
+
+# ── Webhook body cap + foreign sessions ─────────────────────────────────────
+
+
+def test_webhook_rejects_oversized_body(client, monkeypatch):
+    """Cap fires on Content-Length before the body is read/signature-checked."""
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    r = client.post("/webhooks/stripe", content=b"x" * (pay._MAX_BODY + 1))
+    assert r.status_code == 413
+
+
+def test_webhook_caps_body_without_content_length(client, monkeypatch):
+    """A missing Content-Length must not bypass the cap — enforced post-read."""
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    r = client.post("/webhooks/stripe", content=iter([b"x" * (pay._MAX_BODY + 1)]))
+    assert r.status_code == 413
+
+
+def test_webhook_ignores_foreign_session_without_invoice_id(client, monkeypatch):
+    """A checkout session not created by this app (same Stripe account) is a
+    200 no-op — a KeyError 500 would make Stripe disable the endpoint."""
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    r = _post_signed(client, _checkout_event("evt_foreign_meta", None, None, 5000, metadata={}))
+    assert r.status_code == 200 and r.json() == {"ok": True, "ignored": "no invoice_id"}
+    assert (
+        db.one("SELECT COUNT(*) AS n FROM payments WHERE stripe_event_id=?", ("evt_foreign_meta",))[
+            "n"
+        ]
+        == 0
+    )
+
+
+def test_webhook_ignores_non_numeric_invoice_id(client, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    r = _post_signed(
+        client,
+        _checkout_event(
+            "evt_foreign_junk",
+            None,
+            None,
+            5000,
+            metadata={"invoice_id": "not-an-id", "kind": "full"},
+        ),
+    )
+    assert r.status_code == 200 and r.json() == {"ok": True, "ignored": "no invoice_id"}
+    assert (
+        db.one("SELECT COUNT(*) AS n FROM payments WHERE stripe_event_id=?", ("evt_foreign_junk",))[
+            "n"
+        ]
+        == 0
+    )
