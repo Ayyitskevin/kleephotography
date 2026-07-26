@@ -2,7 +2,7 @@
 # Stage 1 (runs as the mise user, nightly): consistent, SELF-VERIFIED SQLite snapshot.
 # sqlite3 .backup is WAL-safe. The snapshot is integrity-checked before it is kept,
 # so a corrupt snapshot fails loud instead of silently replacing a good one.
-# This stage is LOCAL ONLY — off-machine durability is the mickey-side pull (see ops/BACKUP.md).
+# This stage is LOCAL ONLY on the prod host (mickey). Off-host DR is pending — see ops/BACKUP.md.
 set -euo pipefail
 DATA=/opt/mise/data
 OUT="$DATA/backups"

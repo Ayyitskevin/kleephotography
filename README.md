@@ -1,8 +1,8 @@
 # Mise — Kevin Lee Photography
 
 FastAPI + Jinja + HTMX + SQLite studio app for [kleephotography.com](https://kleephotography.com).
-Live production runs on **flow** at `/opt/mise` (port 8400). This clone is a
-working copy — never scratch-edit the flow tree.
+Live production runs on **mickey** at `/opt/mise` (port 8400, loopback + Cloudflare).
+This clone is a working copy — never scratch-edit the prod tree.
 
 Agent scope contract: **[AGENTS.md](AGENTS.md)** (green/red lights, gates, money rules).
 Ops runbooks live under [`ops/`](ops/).
@@ -60,16 +60,16 @@ ruff check . && ruff format --check .
 
 ## Deploy
 
-Canonical full-site deploy is **git pull on flow + restart mise**.
+Canonical full-site deploy is **git pull on mickey + restart mise**.
 See [`ops/DEPLOY.md`](ops/DEPLOY.md).
 
-`scripts/deploy-flow.sh` is a **specialty rsync slice** (Plutus/Argus/Platekit bits),
-not the full-tree deploy path.
+`scripts/deploy-flow.sh` is a **specialty rsync slice** (legacy name; target mickey —
+Plutus/Argus/Platekit bits), not the full-tree deploy path.
 
 ## Related docs
 
 - [`AGENTS.md`](AGENTS.md) — agent permission boundaries
-- [`ops/BACKUP.md`](ops/BACKUP.md) — nightly snapshot → mickey pull → restore-verify
+- [`ops/BACKUP.md`](ops/BACKUP.md) — nightly local snapshot on mickey (off-host DR pending)
 - [`ops/DEPLOY.md`](ops/DEPLOY.md) — production deploy
 - [`ops/SPECIALTY-LAUNCH.md`](ops/SPECIALTY-LAUNCH.md) — specialty / aerials launch
 - [`HANDOFF.md`](HANDOFF.md) — historical refactor notes (prefer AGENTS.md + this README)

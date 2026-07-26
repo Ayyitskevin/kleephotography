@@ -1,5 +1,8 @@
 # HANDOFF — UX revamp final phase: commit + deploy the CSS excavation
 
+> **Host note (2026-07-25):** production is **mickey** `/opt/mise`, not flow.
+> Prefer [`ops/DEPLOY.md`](DEPLOY.md) over the flow-era commands below.
+
 **Written:** 2026-07-23, by the Kimi agent that ran the revamp. **For:** the next
 agent (any fleet member). Everything below is verified state and exact commands;
 no investigation needed beyond the listed checks.

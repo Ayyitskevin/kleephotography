@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# harden-flow.sh — one-shot security hardening for the Mise host ("flow").
+# harden-flow.sh — one-shot security hardening for the Mise prod host.
+# Filename is historical ("flow"); production is mickey as of 2026-07-25.
 #
 # Run ON the server, as root:
 #     cd /opt/mise && sudo bash ops/harden-flow.sh

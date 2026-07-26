@@ -7,8 +7,9 @@ Do not treat [§7](#7-what-remains-ordered-work-queue) as an active autonomous q
 **Standing truths:**
 
 - §6a security red-lights are **fixed** on main.
-- **Full-site deploy** = git pull on flow `/opt/mise` + restart — [`ops/DEPLOY.md`](ops/DEPLOY.md).
-  `scripts/deploy-flow.sh` is a specialty rsync slice only.
+- **Full-site deploy** = git pull on mickey `/opt/mise` + restart — [`ops/DEPLOY.md`](ops/DEPLOY.md).
+  `scripts/deploy-flow.sh` is a specialty rsync slice only (legacy name; target mickey).
+  Prod moved flow→mickey on 2026-07-25; older “deploy on flow” notes below are historical.
 - Screening Room / Aerials kill switches: `.env.example`. Migrations policy: [`ops/MIGRATIONS.md`](ops/MIGRATIONS.md).
 - Do not start leftover §6b / §6c items without Kevin's explicit ask.
 
@@ -157,9 +158,9 @@ The audit remediation and the follow-up queue finished as:
 - **Design pass:** marketing + client-facing form polish, focus-visible states,
   testimonials elevation (#14, #15). Refactor duplication collapse (#11).
 - Gates at completion: **50 unit + 166 smoke, ruff clean**, CI green on main.
-- **Standing deploy reminders for Kevin:** full-site deploy via git pull on flow
+- **Standing deploy reminders for Kevin:** full-site deploy via git pull on mickey
   ([`ops/DEPLOY.md`](ops/DEPLOY.md)); delete/flip any `MISE_COOKIE_SECURE=false`
-  left in flow's `.env`; expect one admin re-login after the 065 session-table
+  left in prod `.env`; expect one admin re-login after the 065 session-table
   migration; post-deploy click through admin flows — a missed CSP spot fails
   silently with a console `Refused to execute…` line.
 - **Do not start §6b-remaining / §6c or anything new without Kevin's explicit ask.**
@@ -342,7 +343,7 @@ created by earlier tests), TODO/FIXME grep, mailer/gcal/notion failure modes.
 ## 7. What remains (STALE — archive only)
 
 > **Stale.** The PR #2 / `claude/klee-photography-refactor-y9tr5g` queue below is
-> historical. For deploy, use [`ops/DEPLOY.md`](ops/DEPLOY.md) (git pull on flow),
+> historical. For deploy, use [`ops/DEPLOY.md`](ops/DEPLOY.md) (git pull on mickey),
 > not `scripts/deploy-flow.sh`. Ask Kevin before picking up §6b / §6c leftovers.
 
 1. ~~Green fixes from §6b~~ — only with Kevin's explicit ask.
@@ -350,7 +351,7 @@ created by earlier tests), TODO/FIXME grep, mailer/gcal/notion failure modes.
 3. ~~Keep PR #2 body current~~ — superseded.
 4. §6c sweeps — optional, Kevin-gated.
 5. ~~Finalize draft PR #2~~ — superseded.
-6. **Deploy:** git pull on flow `/opt/mise` + restart mise ([`ops/DEPLOY.md`](ops/DEPLOY.md)).
+6. **Deploy:** git pull on mickey `/opt/mise` + restart mise ([`ops/DEPLOY.md`](ops/DEPLOY.md)).
    Post-deploy: `/healthz`, home, spoke, `/admin` login, one gallery PIN page.
    Rollback look: `MISE_SCREENING_ROOM=false`. Data: nightly backups per `ops/BACKUP.md`.
 
