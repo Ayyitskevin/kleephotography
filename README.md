@@ -1,8 +1,6 @@
 # Mise — Kevin Lee Photography
 
-FastAPI + Jinja + HTMX + SQLite studio app for [kleephotography.com](https://kleephotography.com).
-Live production runs on **mickey** at `/opt/mise` (port 8400, loopback + Cloudflare).
-This clone is a working copy — never scratch-edit the prod tree.
+FastAPI + Jinja + HTMX + SQLite studio app
 
 Agent scope contract: **[AGENTS.md](AGENTS.md)** (green/red lights, gates, money rules).
 Ops runbooks live under [`ops/`](ops/).
