@@ -110,12 +110,10 @@
   <div class="sr-aerialpass">
     <div class="sr-aerialpass-grid">
       <figure>
+        {# Only aerial-tagged frames here — never a ground still dressed as drone work. #}
         {% if aerial_leads %}
         <img src="/site/img/{{ aerial_leads[0].id }}?variant=web" loading="lazy" decoding="async"
              sizes="(max-width: 1000px) 100vw, 820px" alt="{{ aerial_leads[0]|portfolio_alt }}">
-        {% elif photos %}
-        <img src="/site/img/{{ photos[-1].id }}?variant=web" loading="lazy" decoding="async"
-             sizes="(max-width: 1000px) 100vw, 820px" alt="{{ photos[-1]|portfolio_alt }}">
         {% endif %}
         <span class="sr-screen-scrim" aria-hidden="true"></span>
         <span class="sr-screenbadge">&#9650; The Aerial Pass</span>

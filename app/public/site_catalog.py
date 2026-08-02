@@ -360,8 +360,8 @@ _CONTACT_SCOPE = {
         "food-beverage",
     ),
     "Brand Partner (monthly retainer)": (
-        "Dishes / setups",
-        "e.g. 8–10 dishes · 3 drink setups",
+        "Monthly content scope",
+        "e.g. 1 shoot day · 8–12 stills + 2 reels",
         "Brand Partner (monthly retainer)",
         "food-beverage",
     ),
@@ -447,15 +447,16 @@ BOOK_ACTIVE_PROMISES = [
 BOOK_FAQS = [
     (
         "How far in advance should I book?",
-        "Two to three weeks is comfortable, but I keep a few slots open for menu "
-        "changes and launches. If it is urgent, say so in the form and I will tell "
-        "you honestly what is possible.",
+        "Two to three weeks is comfortable for listings, sessions, and menu work. "
+        "I keep a few slots open for launches and go-lives — if it is urgent, say so "
+        "in the form and I will tell you honestly what is possible.",
     ),
     (
-        "Do you style the food?",
-        "Light, honest styling is included — the goal is for the dish to look like "
-        "what arrives at the table, at its best. For elaborate set styling I can "
-        "bring in a stylist and fold it into the quote.",
+        "Do you direct on set?",
+        "Yes — direction is included either way. Light honest food styling, listing "
+        "flow that sells rooms, and portrait direction so you always know what to do "
+        "with your hands. Elaborate prop styling or wardrobe support is quoted "
+        "separately when you need it.",
     ),
     (
         "What do I actually get, and when?",

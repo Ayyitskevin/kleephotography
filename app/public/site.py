@@ -548,8 +548,8 @@ def _about_portrait_static() -> str | None:
     """Filename under /static for the About studio portrait, if present.
 
     Prefers MISE_ABOUT_PORTRAIT when set; otherwise the first of
-    about-portrait.{jpg,jpeg,png,webp} that exists on disk. Returns None so
-    the template can fall back to a starred portfolio still.
+    about-portrait.{jpg,jpeg,png,webp} that exists on disk. Returns None when
+    missing — About then ships without a portrait frame (never a random still).
     """
     static = ROOT / "static"
     if config.ABOUT_PORTRAIT:
@@ -570,16 +570,14 @@ def _about_portrait_static() -> str | None:
 
 @router.get("/about", response_class=HTMLResponse)
 async def about(request: Request):
+    # Only a dedicated studio portrait stands in as "Meet Kevin" — never a random
+    # portfolio still (that read as a mismatched hero when the asset was a dish).
     portrait_static = _about_portrait_static()
-    featured = _portfolio_assets()[:1]
-    featured_image = _public_photo_spec(featured[0]) if featured and not portrait_static else None
     return templates.TemplateResponse(
         request,
         "site/about.html",
         {
             "portrait_static": portrait_static,
-            "featured": featured,
-            "featured_image": featured_image,
         },
     )
 

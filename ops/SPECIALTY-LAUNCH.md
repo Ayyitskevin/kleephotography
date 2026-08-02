@@ -36,7 +36,13 @@ optional specialty prefix:
 
 ## 2. Booking event types (live admin → Scheduling)
 
-Event types are DB rows — create these in the live admin, no commit needed.
+Event types are DB rows — create these in the live admin, or run the idempotent
+helper on the host (see also [`SITE-CONTENT-CHECKLIST.md`](SITE-CONTENT-CHECKLIST.md)):
+
+```sh
+cd /opt/mise && sudo -u mise .venv/bin/python scripts/ensure-specialty-event-types.py
+```
+
 **The slug prefix matters**: the public booking form shows real-estate
 intake labels for slugs starting `re-`, portrait labels for `pl-`, and the
 original F&B intake for everything else (legacy event types keep working

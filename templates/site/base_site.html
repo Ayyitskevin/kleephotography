@@ -94,13 +94,13 @@
      by <b>Kevin Lee</b>, Asheville NC</p>
   <div class="sr-footlinks">
     {% if instagram_url %}<a href="{{ instagram_url }}" rel="me noopener noreferrer" target="_blank">Instagram</a>{% endif %}
-    <a href="/press">Press</a>
+    {% if has_press_features() %}<a href="/press">Press</a>{% endif %}
     <a href="/portfolio">Portfolio</a>
+    <a href="/reels">Reels</a>
   </div>
   <div class="sr-footlinks sr-footlinks-quiet">
     <a href="/services">Rates</a>
     <a href="/work">In the wild</a>
-    <a href="/reels">Reels</a>
     <a href="/about">About</a>
     <a href="/book">Book a shoot</a>
     <a href="/contact">Request a quote</a>

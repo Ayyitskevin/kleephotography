@@ -80,7 +80,9 @@ def test_specialty_pages(admin):
         with TestClient(app) as pub:
             r = pub.get("/real-estate")
             assert f'data-web="/site/img/{re_id}"' in r.text
-            assert f"/site/img/{fb_id}" not in r.text
+            # Grid attrs only — sitewide JSON-LD/og may reference any starred still
+            # (default share card prefers newest starred id, often another specialty).
+            assert f'data-web="/site/img/{fb_id}"' not in r.text
             # prefix-derived craft phrase lands in the alt text
             assert "real estate photography by" in r.text
             # the spoke og:image is its own specialty's lead asset
@@ -94,8 +96,6 @@ def test_specialty_pages(admin):
             assert f'data-web="/site/img/{fb_id}"' in r.text
             assert f'data-web="/site/img/{re_id}"' not in r.text
 
-            # (grid attributes, not bare substrings — the sitewide JSON-LD
-            # image may legitimately reference any starred asset on any page)
             r = pub.get("/portraits")
             assert f'data-web="/site/img/{re_id}"' not in r.text
             assert f'data-web="/site/img/{fb_id}"' not in r.text

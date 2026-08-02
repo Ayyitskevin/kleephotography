@@ -18,14 +18,6 @@
       <img src="/static/{{ portrait_static }}?v={{ static_rev }}" loading="lazy" decoding="async"
            alt="Kevin Lee — photographer and filmmaker in Asheville, NC">
     </div>
-    {% elif featured %}
-    <div class="about-photo ab-photo" data-reveal>
-      <img src="{{ featured_image.web.url }}" loading="lazy" decoding="async"
-           {% if featured_image.web.width %}width="{{ featured_image.web.width }}" height="{{ featured_image.web.height }}"{% endif %}
-           {% if featured_image.srcset %}srcset="{{ featured_image.srcset }}"
-           sizes="(max-width: 900px) 100vw, 40vw"{% endif %}
-           alt="{{ featured[0]|portfolio_alt }}">
-    </div>
     {% endif %}
   </div>
 </section>
@@ -75,6 +67,6 @@
 </section>
 
 {{ cta.cta_band(
-    [("120+", "Menus shot"), ("Same week", "Gallery delivery"), ("8 yrs", "Behind the lens")],
+    [("3", "Specialties — space, face, plate"), ("Same week", "Gallery delivery"), ("WNC", "Based in Asheville · on the road")],
     "Service area", "/contact", "Work with me &rarr;") }}
 {% endblock %}

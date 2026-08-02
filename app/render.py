@@ -50,12 +50,28 @@ templates.env.globals["static_rev"] = _static_rev()
 
 
 def _og_image_id() -> int | None:
+    """Newest starred ready photo — stronger share cards than the oldest id."""
     row = db.one("""SELECT id FROM assets WHERE portfolio=1 AND status='ready'
-                    AND kind='photo' ORDER BY id LIMIT 1""")
+                    AND kind='photo' ORDER BY id DESC LIMIT 1""")
     return row["id"] if row else None
 
 
+def _has_press_features() -> bool:
+    """True when at least one press hit is cleared for the public footer/nav."""
+    return (
+        db.one(
+            """SELECT 1 AS x FROM press
+               WHERE deleted_at IS NULL AND show_on_site=1
+                 AND publish_date IS NOT NULL
+                 AND publish_date <= date('now','localtime')
+               LIMIT 1"""
+        )
+        is not None
+    )
+
+
 templates.env.globals["og_image_id"] = _og_image_id
+templates.env.globals["has_press_features"] = _has_press_features
 templates.env.globals["instagram_url"] = config.INSTAGRAM_URL
 templates.env.globals["google_business_url"] = config.GOOGLE_BUSINESS_URL
 templates.env.globals["contact_email"] = config.CONTACT_EMAIL

@@ -1,13 +1,17 @@
 {# Shared marketing nav — same links on every page, desktop and mobile.
    Pass quiet=true for the mobile overlay's secondary Contact row. #}
-<a href="/real-estate">The Space</a>
-<a href="/portraits">The Face</a>
-<a href="/food-beverage">The Plate</a>
-<a href="/portfolio">Portfolio</a>
-<a href="/services">Rates</a>
-<a href="/work">Work</a>
-<a href="/about">About</a>
-<a href="/book" class="nav-cta">Book a shoot</a>
+{% macro nav_a(href, label, cta=false, quiet=false) -%}
+<a href="{{ href }}"{% if cta %} class="nav-cta"{% elif quiet %} class="nav-mobile-quiet"{% endif %}{% if request.url.path == href or (href != '/' and request.url.path.startswith(href + '/')) %} aria-current="page"{% endif %}>{{ label }}</a>
+{%- endmacro %}
+{{ nav_a("/real-estate", "The Space") }}
+{{ nav_a("/portraits", "The Face") }}
+{{ nav_a("/food-beverage", "The Plate") }}
+{{ nav_a("/portfolio", "Portfolio") }}
+{{ nav_a("/reels", "Reels") }}
+{{ nav_a("/services", "Rates") }}
+{{ nav_a("/work", "Work") }}
+{{ nav_a("/about", "About") }}
+{{ nav_a("/book", "Book a shoot", cta=true) }}
 {% if quiet %}
-<a class="nav-mobile-quiet" href="/contact">Request a quote</a>
+{{ nav_a("/contact", "Request a quote", quiet=true) }}
 {% endif %}

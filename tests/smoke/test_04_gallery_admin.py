@@ -977,11 +977,6 @@ def test_secondary_marketing_images_use_actual_derivative_metadata(
             thumb_url,
             "(max-width: 700px) 100vw, 33vw",
         ),
-        "about": (
-            r'<div class="about-photo ab-photo".*?</div>',
-            web_url,
-            "(max-width: 900px) 100vw, 40vw",
-        ),
         "contact": (
             r'<div class="contact-photo".*?</div>',
             web_url,
@@ -1025,6 +1020,10 @@ def test_secondary_marketing_images_use_actual_derivative_metadata(
         return match.group(1) if match else None
 
     rendered = responses()
+    # About never falls back to a random portfolio still — missing studio
+    # portrait means no about-photo frame (honest empty, not a mismatched dish).
+    assert rendered["about"].status_code == 200
+    assert "about-photo" not in rendered["about"].text
     for name, (pattern, source, sizes) in scopes.items():
         expected_status = 400 if name == "contact_error" else 200
         assert rendered[name].status_code == expected_status

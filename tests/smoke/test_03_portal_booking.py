@@ -448,6 +448,7 @@ def test_marketing_site(admin, monkeypatch):
             "/portraits",
             "/food-beverage",
             "/portfolio",
+            "/reels",
             "/services",
             "/work",
             "/about",

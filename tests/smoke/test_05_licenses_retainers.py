@@ -85,7 +85,7 @@ def test_faq_block():
     from app.public.site import BOOK_FAQS, CONTACT_FAQS
 
     pages = {
-        "/book": (BOOK_FAQS, "How far in advance should I book?"),
+        "/book": (BOOK_FAQS, "Do you direct on set?"),
         "/contact": (CONTACT_FAQS, "What does a typical project cost?"),
     }
     with TestClient(app) as pub:
