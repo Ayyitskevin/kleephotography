@@ -253,6 +253,47 @@ def test_console_lists_and_deletes_global_overrides(admin_client):
         db.run("DELETE FROM date_overrides WHERE day IN (?,?)", (hours_day, block_day))
 
 
+def _gcal_status(**over) -> dict:
+    return {
+        "configured": False,
+        "connected": False,
+        "connected_at": None,
+        "calendar_id": "studio@example.test",
+        "redirect_uri": "https://example.test/admin/scheduling/google/callback",
+        **over,
+    }
+
+
+@pytest.mark.integration
+def test_google_card_renders_each_connection_state(admin_client, monkeypatch):
+    def status(**over):
+        monkeypatch.setattr(admin_scheduling.gcal, "status", lambda: _gcal_status(**over))
+        page = admin_client.get("/admin/scheduling")
+        assert page.status_code == 200
+        return page.text
+
+    # Not provisioned: no OAuth client in .env — neither control is offered.
+    page = status()
+    assert 'data-gcal="unset"' in page
+    assert "/admin/scheduling/google/connect" not in page
+    assert "/admin/scheduling/google/disconnect" not in page
+
+    page = status(configured=True)
+    assert 'data-gcal="ready"' in page
+    assert 'href="/admin/scheduling/google/connect"' in page
+    assert "studio@example.test" in page
+    assert "/admin/scheduling/google/disconnect" not in page
+
+    page = status(configured=True, connected=True, connected_at="2035-03-04 15:30:00")
+    assert 'data-gcal="connected"' in page
+    assert "studio@example.test" in page
+    assert "/admin/scheduling/google/connect" not in page
+    form = page.split('action="/admin/scheduling/google/disconnect"', 1)[1].split("</form>", 1)[0]
+    assert "data-confirm=" in form
+    # the stored UTC instant is rendered in the business timezone, never raw
+    assert "2035-03-04 15:30:00" not in page
+
+
 @pytest.mark.integration
 def test_historical_same_scope_override_uses_latest_row():
     day = dt.date(2035, 7, 21)
