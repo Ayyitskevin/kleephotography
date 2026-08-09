@@ -343,8 +343,11 @@ async def healthz():
         # A job parked behind its retry backoff is queued but not runnable yet;
         # jobs_stuck is one that stayed that way long past its turn, i.e. the
         # queue is not draining. Without these two the limbo is invisible here.
+        # jobs_running_stale is the other silent state: claimed, then never
+        # finished or failed, which no sweep re-offers.
         "jobs_waiting_retry": None,
         "jobs_stuck": None,
+        "jobs_running_stale": None,
         "disk_free_gb": None,
         "disk_low": None,
         "backup_present": None,
@@ -363,6 +366,7 @@ async def healthz():
         payload["jobs_failed"] = health["failed"]
         payload["jobs_waiting_retry"] = health["waiting_retry"]
         payload["jobs_stuck"] = health["stuck"]
+        payload["jobs_running_stale"] = health["running_stale"]
     except Exception:
         log.exception("healthz database check failed")
         payload["ok"] = False

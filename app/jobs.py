@@ -317,8 +317,12 @@ def _execute(job_id: int) -> None:
     job = _claim(job_id)
     if not job:
         return
-    payload = json.loads(job["payload"])
+    # Parsed INSIDE the try: a corrupt payload is a job failure like any other.
+    # Parsed outside, it raised past the recorder and left the row 'running'
+    # forever — no retry, no sweep, no log, only a restart.
+    payload: dict = {}
     try:
+        payload = json.loads(job["payload"])
         HANDLERS[job["kind"]](payload)
         db.run(
             "UPDATE jobs SET status='done', error=NULL, next_attempt_at=NULL, "
@@ -391,31 +395,40 @@ def retry(job_id: int) -> bool:
 
 
 def queue_health() -> dict:
-    """The three numbers that tell you whether the queue is actually moving.
+    """The four numbers that tell you whether the queue is actually moving.
 
     `failed` is the old signal (dead, awaiting a human). `waiting_retry` is the
     limbo the backoff introduced — queued, but deliberately not runnable yet.
     `stuck` is the one that means something is wrong: a retry whose
     next_attempt_at passed over JOB_STUCK_AFTER_SECONDS ago and still has not
     been claimed, so the sweeper thread or the pool is not doing its job (or the
-    timestamp itself is bad). Read by /healthz and by the ops heartbeat — a
-    parked or wedged queue must never be invisible.
+    timestamp itself is bad). `running_stale` is the other wrong: a row _claim
+    flipped to 'running' (which is what sets updated_at) more than
+    JOB_STUCK_AFTER_SECONDS ago and never moved off it — a worker that died
+    mid-handler, or one still grinding a genuinely long transcode. Nothing else
+    reports it: sweep() only re-offers queued rows, so a wedged 'running' row
+    waits for a restart. Read by /healthz and by the ops heartbeat — a parked or
+    wedged queue must never be invisible.
 
     Deliberately NOT counted as stuck: a never-attempted queued job, however
     old. Two workers chewing through a batch of video transcodes leave fresh
     work queued for an hour as a matter of course, and alerting on that would
-    cry wolf on a healthy queue — `jobs_pending` is the number for depth.
+    cry wolf on a healthy queue — `jobs_pending` is the number for depth. Same
+    reason the running ceiling is generous: it is not a per-job SLA, it is the
+    line past which "still working" stops being the likely explanation.
     """
+    window = f"-{config.JOB_STUCK_AFTER_SECONDS} seconds"
     row = db.one(
         "SELECT "
         "SUM(status='failed') AS failed, "
         "SUM(status='queued' AND next_attempt_at IS NOT NULL) AS waiting_retry, "
         "SUM(status='queued' AND next_attempt_at IS NOT NULL "
-        "    AND next_attempt_at <= datetime('now', ?)) AS stuck "
+        "    AND next_attempt_at <= datetime('now', ?)) AS stuck, "
+        "SUM(status='running' AND updated_at <= datetime('now', ?)) AS running_stale "
         "FROM jobs",
-        (f"-{config.JOB_STUCK_AFTER_SECONDS} seconds",),
+        (window, window),
     )
-    return {k: int(row[k] or 0) for k in ("failed", "waiting_retry", "stuck")}
+    return {k: int(row[k] or 0) for k in ("failed", "waiting_retry", "stuck", "running_stale")}
 
 
 def sweep() -> None:

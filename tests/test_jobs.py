@@ -205,6 +205,67 @@ def test_failed_attempt_waits_out_backoff_before_the_next_one(monkeypatch):
         db.run("DELETE FROM jobs WHERE id=?", (job_id,))
 
 
+def test_corrupt_payload_fails_the_job_instead_of_wedging_it(monkeypatch):
+    """A payload json can't parse must take the normal failure path.
+
+    Parsed outside the try, it raised past the recorder: the row stayed
+    'running' forever — queue_health summed only failed/queued, sweep re-offered
+    only queued, and the pool future's exception was never observed. Nothing
+    short of a restart moved it, and nothing anywhere said so.
+    """
+    freeze_job_pool(monkeypatch)
+    job_id = db.run("INSERT INTO jobs (kind, payload) VALUES (?,?)", ("zip_build", "{not json"))
+    try:
+        for attempt in range(1, jobs.MAX_ATTEMPTS + 1):
+            elapse_backoff(job_id)
+            jobs._execute(job_id)
+            job = db.one("SELECT status, attempts, error FROM jobs WHERE id=?", (job_id,))
+            assert job["status"] == ("failed" if attempt == jobs.MAX_ATTEMPTS else "queued")
+            assert job["attempts"] == attempt
+            assert job["error"]
+    finally:
+        db.run("DELETE FROM jobs WHERE id=?", (job_id,))
+
+
+def test_a_job_wedged_in_running_is_visible_to_healthz_and_the_heartbeat(client, monkeypatch):
+    """'running' is the one state no sweep re-offers, so it has to be reported."""
+    freeze_job_pool(monkeypatch)
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(ops_monitor.alerts, "is_enabled", lambda: True)
+    monkeypatch.setattr(ops_monitor.alerts, "ops_alert", lambda sig, msg: sent.append((sig, msg)))
+
+    before = client.get("/healthz").json()
+    working = db.run(
+        "INSERT INTO jobs (kind, payload, status, updated_at) "
+        "VALUES (?,?, 'running', datetime('now'))",
+        ("video_transcode", "{}"),
+    )
+    wedged = db.run(
+        "INSERT INTO jobs (kind, payload, status, updated_at) "
+        "VALUES (?,?, 'running', datetime('now'))",
+        ("zip_build", "{}"),
+    )
+    try:
+        ops_monitor.sweep()
+        assert not [s for s, _ in sent if s == "jobs_running_stale"]  # a worker mid-job is fine
+
+        db.run(
+            "UPDATE jobs SET updated_at=datetime('now', ?) WHERE id=?",
+            (f"-{config.JOB_STUCK_AFTER_SECONDS + 60} seconds", wedged),
+        )
+        after = client.get("/healthz").json()
+        assert after["jobs_running_stale"] == before["jobs_running_stale"] + 1  # not `working`
+        assert after["ok"] is True  # visibility, not a 503 — the site still serves
+
+        sent.clear()
+        ops_monitor.sweep()
+        alerted = [m for s, m in sent if s == "jobs_running_stale"]
+        assert len(alerted) == 1
+        assert "running for over" in alerted[0]
+    finally:
+        db.run("DELETE FROM jobs WHERE id IN (?,?)", (working, wedged))
+
+
 class _RecordingPool:
     """Stand-in for the live pool: records what dispatch offers, executes nothing."""
 
