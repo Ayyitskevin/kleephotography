@@ -66,7 +66,7 @@ def _clients_with_content() -> list[dict]:
 
 
 @router.get("", response_class=HTMLResponse)
-async def content(request: Request):
+def content(request: Request):
     try:
         sel = int(request.query_params.get("client", ""))
     except (TypeError, ValueError):

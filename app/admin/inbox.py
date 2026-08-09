@@ -398,7 +398,7 @@ def _inbox_ctx(request: Request, tab: str, sel: int | None) -> dict:
 
 
 @router.get("", response_class=HTMLResponse)
-async def inbox(request: Request, tab: str = "all", sel: int | None = None):
+def inbox(request: Request, tab: str = "all", sel: int | None = None):
     return templates.TemplateResponse(request, "admin/inbox.html", _inbox_ctx(request, tab, sel))
 
 
@@ -414,7 +414,7 @@ def _inbox_frag(request: Request, tab: str, inquiry_id: int):
 
 
 @router.post("/{inquiry_id}/reply")
-async def reply(
+def reply(
     request: Request,
     inquiry_id: int,
     tab: str = Form("all"),
@@ -496,7 +496,7 @@ async def reply(
 
 
 @router.post("/{inquiry_id}/retry-owner-email")
-async def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("all")):
+def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("all")):
     """Re-queue idempotent owner notification. Safe under concurrency."""
     inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
     if not inq:
@@ -520,7 +520,7 @@ async def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("
 
 
 @router.post("/{inquiry_id}/notion-orphan/relink")
-async def notion_orphan_relink(request: Request, inquiry_id: int, tab: str = Form("all")):
+def notion_orphan_relink(request: Request, inquiry_id: int, tab: str = Form("all")):
     if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
         raise HTTPException(status_code=404)
     if not notion_sync.relink_notion_orphan(inquiry_id):
@@ -533,7 +533,7 @@ async def notion_orphan_relink(request: Request, inquiry_id: int, tab: str = For
 
 
 @router.post("/{inquiry_id}/notion-orphan/dismiss")
-async def notion_orphan_dismiss(request: Request, inquiry_id: int, tab: str = Form("all")):
+def notion_orphan_dismiss(request: Request, inquiry_id: int, tab: str = Form("all")):
     if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
         raise HTTPException(status_code=404)
     if not notion_sync.dismiss_notion_orphan(inquiry_id):

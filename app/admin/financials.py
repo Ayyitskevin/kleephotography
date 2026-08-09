@@ -155,7 +155,7 @@ def _ledger(start: str, end: str) -> list[dict]:
 
 
 @router.get("", response_class=HTMLResponse)
-async def income(request: Request, range: str = "quarter"):
+def income(request: Request, range: str = "quarter"):
     if range not in _RANGE_LABELS:
         range = "quarter"
     start, end = _range_bounds(range)
@@ -239,7 +239,7 @@ async def income(request: Request, range: str = "quarter"):
 
 
 @router.get("/income.csv", response_class=PlainTextResponse)
-async def income_csv(
+def income_csv(
     range: str = "quarter", inc_paid: str = "", inc_out: str = "", fmt: str = "itemized"
 ):
     """Collected cash + open AR in range — accountant-ready. Real data only;
@@ -278,7 +278,7 @@ async def income_csv(
 
 
 @router.get("/clients", response_class=HTMLResponse)
-async def client_pnl(request: Request, sort: str = "revenue"):
+def client_pnl(request: Request, sort: str = "revenue"):
     if sort not in ("revenue", "projects"):
         sort = "revenue"
     order = (
@@ -389,7 +389,7 @@ def _ded(amount_cents: int, pct: int) -> int:
 
 
 @router.get("/expenses", response_class=HTMLResponse)
-async def expenses(request: Request, cat: str = "all"):
+def expenses(request: Request, cat: str = "all"):
     all_rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
     if cat not in _EXP_CAT_COLOR:
         cat = "all"
@@ -479,7 +479,7 @@ async def expenses(request: Request, cat: str = "all"):
 
 
 @router.post("/expenses")
-async def expense_create(
+def expense_create(
     spent_on: str = Form(...),
     vendor: str = Form(...),
     category: str = Form("Other"),
@@ -509,13 +509,13 @@ async def expense_create(
 
 
 @router.post("/expenses/{expense_id}/delete")
-async def expense_delete(expense_id: int):
+def expense_delete(expense_id: int):
     db.run("DELETE FROM expenses WHERE id=?", (expense_id,))
     return RedirectResponse("/admin/financials/expenses", status_code=303)
 
 
 @router.get("/expenses.csv", response_class=PlainTextResponse)
-async def expenses_csv():
+def expenses_csv():
     rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
     out = ["date,vendor,category,amount_usd,deductible_pct,deductible_usd,notes"]
     for r in rows:
@@ -530,7 +530,7 @@ async def expenses_csv():
 
 
 @router.get("/receipts", response_class=HTMLResponse)
-async def receipts(request: Request, filter: str = "all"):
+def receipts(request: Request, filter: str = "all"):
     if filter not in ("all", "linked", "unlinked"):
         filter = "all"
     all_rows = db.all_(
@@ -625,7 +625,7 @@ async def receipt_upload(file: UploadFile = File(...), expense_id: int | None = 
 
 
 @router.post("/receipts/{receipt_id}/delete")
-async def receipt_delete(receipt_id: int):
+def receipt_delete(receipt_id: int):
     rc = db.one("SELECT stored FROM receipts WHERE id=?", (receipt_id,))
     if rc:
         (config.RECEIPTS_DIR / rc["stored"]).unlink(missing_ok=True)
@@ -634,7 +634,7 @@ async def receipt_delete(receipt_id: int):
 
 
 @router.get("/receipts/{receipt_id}/file")
-async def receipt_file(receipt_id: int):
+def receipt_file(receipt_id: int):
     rc = db.one("SELECT * FROM receipts WHERE id=?", (receipt_id,))
     if not rc:
         raise HTTPException(status_code=404)
@@ -647,7 +647,7 @@ async def receipt_file(receipt_id: int):
 
 
 @router.get("/mileage", response_class=HTMLResponse)
-async def mileage(request: Request):
+def mileage(request: Request):
     rows = db.all_("SELECT * FROM mileage ORDER BY drove_on DESC, id DESC")
     miles = sum(r["miles"] for r in rows)
     deduction = sum(round(r["miles"] * r["rate_cents"]) for r in rows)
@@ -703,7 +703,7 @@ async def mileage(request: Request):
 
 
 @router.post("/mileage")
-async def mileage_create(
+def mileage_create(
     drove_on: str = Form(...),
     from_place: str = Form(...),
     to_place: str = Form(...),
@@ -724,13 +724,13 @@ async def mileage_create(
 
 
 @router.post("/mileage/{trip_id}/delete")
-async def mileage_delete(trip_id: int):
+def mileage_delete(trip_id: int):
     db.run("DELETE FROM mileage WHERE id=?", (trip_id,))
     return RedirectResponse("/admin/financials/mileage", status_code=303)
 
 
 @router.get("/mileage.csv", response_class=PlainTextResponse)
-async def mileage_csv():
+def mileage_csv():
     rows = db.all_("SELECT * FROM mileage ORDER BY drove_on DESC, id DESC")
     out = ["date,from,to,purpose,miles,rate_usd,deduction_usd"]
     for r in rows:

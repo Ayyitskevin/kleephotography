@@ -64,7 +64,7 @@ def parse_quota(form) -> str:
 
 
 @router.post("/projects/{project_id}/recurring")
-async def create_plan(project_id: int, title: str = Form(...)):
+def create_plan(project_id: int, title: str = Form(...)):
     get_project(project_id)
     if not title.strip():
         raise HTTPException(status_code=400, detail="title required")
@@ -86,7 +86,7 @@ async def create_plan(project_id: int, title: str = Form(...)):
 
 
 @router.get("/recurring/{plan_id}", response_class=HTMLResponse)
-async def plan_detail(request: Request, plan_id: int):
+def plan_detail(request: Request, plan_id: int):
     d = get_plan(plan_id)
     p = get_project(d["project_id"])
     items = json.loads(d["line_items"])
@@ -207,7 +207,7 @@ async def update_plan(request: Request, plan_id: int):
 
 
 @router.post("/recurring/{plan_id}/deliveries")
-async def log_delivery(
+def log_delivery(
     plan_id: int,
     label: str = Form(...),
     qty: int = Form(...),
@@ -251,7 +251,7 @@ async def log_delivery(
 
 
 @router.post("/recurring/{plan_id}/deliveries/{delivery_id}/delete")
-async def delete_delivery(plan_id: int, delivery_id: int):
+def delete_delivery(plan_id: int, delivery_id: int):
     get_plan(plan_id)
     with db.tx() as con:
         # Scope the delete to this plan so a wrong id can't reach another plan's log.
@@ -270,7 +270,7 @@ async def delete_delivery(plan_id: int, delivery_id: int):
 
 
 @router.post("/recurring/{plan_id}/calendar")
-async def add_calendar_slot(
+def add_calendar_slot(
     plan_id: int,
     slot_date: str = Form(...),
     label: str = Form(...),
@@ -310,7 +310,7 @@ async def add_calendar_slot(
 
 
 @router.post("/recurring/{plan_id}/calendar/{slot_id}/status")
-async def set_calendar_status(plan_id: int, slot_id: int, status: str = Form(...)):
+def set_calendar_status(plan_id: int, slot_id: int, status: str = Form(...)):
     """Advance a slot planned -> shot -> delivered. Scoped to the plan so a wrong
     id can't reach another plan's calendar.
 
@@ -355,7 +355,7 @@ async def set_calendar_status(plan_id: int, slot_id: int, status: str = Form(...
 
 
 @router.post("/recurring/{plan_id}/calendar/{slot_id}/delete")
-async def delete_calendar_slot(plan_id: int, slot_id: int):
+def delete_calendar_slot(plan_id: int, slot_id: int):
     get_plan(plan_id)
     with db.tx() as con:
         deleted = con.execute(
@@ -384,7 +384,7 @@ def _caption_slot_id(plan_id: int, raw: str) -> int | None:
 
 
 @router.post("/recurring/{plan_id}/captions")
-async def add_caption(
+def add_caption(
     plan_id: int,
     label: str = Form(...),
     body: str = Form(...),
@@ -423,7 +423,7 @@ async def add_caption(
 
 
 @router.post("/recurring/{plan_id}/captions/{caption_id}")
-async def update_caption(
+def update_caption(
     plan_id: int,
     caption_id: int,
     label: str = Form(...),
@@ -455,7 +455,7 @@ async def update_caption(
 
 
 @router.post("/recurring/{plan_id}/captions/{caption_id}/status")
-async def set_caption_status(plan_id: int, caption_id: int, status: str = Form(...)):
+def set_caption_status(plan_id: int, caption_id: int, status: str = Form(...)):
     """Advance a caption draft -> approved. Plan-scoped.
 
     Assisted credit (NOT auto-credit): on a draft -> approved transition we redirect
@@ -499,7 +499,7 @@ async def set_caption_status(plan_id: int, caption_id: int, status: str = Form(.
 
 
 @router.post("/recurring/{plan_id}/captions/{caption_id}/delete")
-async def delete_caption(plan_id: int, caption_id: int):
+def delete_caption(plan_id: int, caption_id: int):
     get_plan(plan_id)
     with db.tx() as con:
         deleted = con.execute(
@@ -524,7 +524,7 @@ def _is_human_body(cap: "db.sqlite3.Row") -> bool:
 
 
 @router.post("/recurring/{plan_id}/captions/{caption_id}/draft")
-async def draft_caption(plan_id: int, caption_id: int, replace: str = Form("")):
+def draft_caption(plan_id: int, caption_id: int, replace: str = Form("")):
     """Draft this caption with AI — an EXPLICIT human action (never on page load).
 
     The draft lands in the editable `body` as a SUGGESTION: status stays 'draft' and
@@ -650,7 +650,7 @@ def run_due_plans(today: dt.date | None = None) -> int:
 
 
 @router.post("/recurring/{plan_id}/generate")
-async def generate_draft(plan_id: int):
+def generate_draft(plan_id: int):
     d = get_plan(plan_id)
     if not d["active"]:
         raise HTTPException(status_code=400, detail="plan is paused — activate it first")
@@ -666,7 +666,7 @@ async def generate_draft(plan_id: int):
 
 
 @router.post("/recurring/{plan_id}/delete")
-async def delete_plan(plan_id: int):
+def delete_plan(plan_id: int):
     d = get_plan(plan_id)
     with db.tx() as con:
         con.execute("UPDATE recurring_plans SET deleted_at=datetime('now') WHERE id=?", (plan_id,))

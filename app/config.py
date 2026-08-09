@@ -283,9 +283,10 @@ TELEGRAM_CHAT_ID = os.environ.get("MISE_TELEGRAM_CHAT_ID", "")
 MIN_FREE_GB = int(os.environ.get("MISE_MIN_FREE_GB", "10"))
 
 # Favorites / per-section ZIPs are built INLINE while the client waits — a
-# STORED copy, so it costs one read+write of every byte, and because the
-# download handlers are async that copy blocks the whole event loop, not just
-# the one request. Above either ceiling the bundle goes to the job queue and the
+# STORED copy, so it costs one read+write of every byte. The download handlers
+# are sync, so that copy now occupies a threadpool worker rather than the whole
+# event loop; it still holds one of only ~40 slots for its duration, which is
+# why the ceiling stays. Above either ceiling the bundle goes to the job queue and the
 # client gets the same wait/poll page the full-gallery ZIP has always used.
 #   bytes: 150 MB is ~1s of copying on a modest SSD (the longest stall worth
 #          taking in-request) and 3x the 50 MB at which the gallery export rail

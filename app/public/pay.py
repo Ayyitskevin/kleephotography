@@ -46,7 +46,7 @@ def next_payment(d: "db.sqlite3.Row") -> tuple[int, str]:
 
 
 @router.get("/i/{slug}", response_class=HTMLResponse)
-async def view_invoice(request: Request, slug: str, thanks: str = ""):
+def view_invoice(request: Request, slug: str, thanks: str = ""):
     d = _invoice_or_404(slug)
     if d["status"] == "sent":
         db.run(
@@ -99,7 +99,7 @@ async def view_invoice(request: Request, slug: str, thanks: str = ""):
 
 
 @router.get("/i/{slug}/receipt", response_class=HTMLResponse)
-async def view_receipt(request: Request, slug: str):
+def view_receipt(request: Request, slug: str):
     """Printable receipt — a read-only render of payments Stripe already
     recorded, so it can never disagree with what was charged. 404 until at
     least one payment exists."""
@@ -126,7 +126,7 @@ async def view_receipt(request: Request, slug: str):
 
 
 @router.post("/i/{slug}/pay")
-async def pay_invoice(request: Request, slug: str):
+def pay_invoice(request: Request, slug: str):
     d = _invoice_or_404(slug)
     amount, kind = next_payment(d)
     if not amount:

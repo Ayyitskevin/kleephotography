@@ -110,7 +110,7 @@ def _require_access(request: Request, portal_id: int) -> None:
 
 
 @router.get("/{slug}", response_class=HTMLResponse)
-async def view(request: Request, slug: str):
+def view(request: Request, slug: str):
     p = get_live_portal(slug)
     if not _has_access(request, p["id"]):
         return templates.TemplateResponse(
@@ -203,7 +203,7 @@ async def view(request: Request, slug: str):
 
 
 @router.get("/{slug}/crops", response_class=HTMLResponse)
-async def crops_fragment(request: Request, slug: str):
+def crops_fragment(request: Request, slug: str):
     """Self-polling social-crops fragment — while any crop is still encoding the
     block carries hx-get/every-8s and swaps whole, so "preparing…" chips turn
     into real download links without the client reloading (REC-tile pattern)."""
@@ -215,7 +215,7 @@ async def crops_fragment(request: Request, slug: str):
 
 
 @router.post("/{slug}/pin")
-async def check_pin(request: Request, slug: str, pin: str = Form(...)):
+def check_pin(request: Request, slug: str, pin: str = Form(...)):
     p = get_live_portal(slug)
     ip = security.client_ip(request)
     bucket = _pin_bucket(p["id"])
@@ -249,7 +249,7 @@ def _client_asset(portal: "db.sqlite3.Row", asset_id: int) -> "db.sqlite3.Row":
 
 
 @router.get("/{slug}/thumb/{asset_id}")
-async def thumb(request: Request, slug: str, asset_id: int):
+def thumb(request: Request, slug: str, asset_id: int):
     p = get_live_portal(slug)
     _require_access(request, p["id"])
     a = _client_asset(p, asset_id)
@@ -262,7 +262,7 @@ async def thumb(request: Request, slug: str, asset_id: int):
 
 
 @router.get("/{slug}/crop/{asset_id}/{ratio}")
-async def crop(request: Request, slug: str, asset_id: int, ratio: str):
+def crop(request: Request, slug: str, asset_id: int, ratio: str):
     # `ratio` is an untrusted URL token. Only resolve it to a file if it names
     # an active preset; any other value (unknown or inactive) → clean 404 so a
     # token can't be steered toward a path outside the intended crop set.
@@ -283,7 +283,7 @@ async def crop(request: Request, slug: str, asset_id: int, ratio: str):
 
 
 @router.get("/{slug}/crops.zip")
-async def crops_zip(request: Request, slug: str):
+def crops_zip(request: Request, slug: str):
     p = get_live_portal(slug)
     _require_access(request, p["id"])
     rows = db.all_(
@@ -327,7 +327,7 @@ async def crops_zip(request: Request, slug: str):
 
 
 @router.get("/{slug}/brand/{ba_id}")
-async def brand_file(request: Request, slug: str, ba_id: int):
+def brand_file(request: Request, slug: str, ba_id: int):
     p = get_live_portal(slug)
     _require_access(request, p["id"])
     b = db.one("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, p["client_id"]))

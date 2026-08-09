@@ -109,7 +109,7 @@ def _target(
 
 
 @router.get("/{slug}/download", response_class=HTMLResponse)
-async def download_page(
+def download_page(
     request: Request,
     slug: str,
     asset_id: int | None = None,
@@ -135,7 +135,7 @@ async def download_page(
 
 
 @router.post("/{slug}/email", response_class=HTMLResponse)
-async def capture_email(
+def capture_email(
     request: Request,
     slug: str,
     email: str = Form(...),
@@ -166,7 +166,7 @@ async def capture_email(
 
 
 @router.get("/{slug}/download/asset/{asset_id}")
-async def download_asset(request: Request, slug: str, asset_id: int):
+def download_asset(request: Request, slug: str, asset_id: int):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download?asset_id={asset_id}", status_code=303)
@@ -186,7 +186,7 @@ async def download_asset(request: Request, slug: str, asset_id: int):
 
 
 @router.get("/{slug}/download/web/{asset_id}")
-async def download_web_video(request: Request, slug: str, asset_id: int):
+def download_web_video(request: Request, slug: str, asset_id: int):
     """Web-ready MP4 for a delivered video — the same transcoded H.264 the
     gallery streams, offered as a download so clients get a post-anywhere file
     without pulling the multi-GB camera original."""
@@ -212,7 +212,7 @@ async def download_web_video(request: Request, slug: str, asset_id: int):
 
 
 @router.get("/{slug}/download/rendition/{rendition_id}")
-async def download_rendition(request: Request, slug: str, rendition_id: int):
+def download_rendition(request: Request, slug: str, rendition_id: int):
     """A ready social-cut rendition (9:16 / 1:1) as an attachment. Same gates
     as every other download; the tile only links renditions once they're ready,
     so the email-gate redirect just returns the visitor to the gallery flow."""
@@ -242,7 +242,7 @@ async def download_rendition(request: Request, slug: str, rendition_id: int):
 
 
 @router.get("/{slug}/download/favorites")
-async def download_favorites(request: Request, slug: str):
+def download_favorites(request: Request, slug: str):
     g, visitor = _gate(request, slug)
     # Match download_asset/download_zip: only email-gate when this gallery type
     # actually requires it. A drop (transfer) skips the gate, and the plain
@@ -280,7 +280,7 @@ async def download_favorites(request: Request, slug: str):
 
 
 @router.get("/{slug}/download/section/{section_id}")
-async def download_section(request: Request, slug: str, section_id: int):
+def download_section(request: Request, slug: str, section_id: int):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download?section={section_id}", status_code=303)
@@ -309,7 +309,7 @@ async def download_section(request: Request, slug: str, section_id: int):
 
 
 @router.get("/{slug}/download/zip")
-async def download_zip(request: Request, slug: str):
+def download_zip(request: Request, slug: str):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download", status_code=303)
@@ -342,7 +342,7 @@ async def download_zip(request: Request, slug: str):
 
 
 @router.get("/{slug}/download/zip/status")
-async def zip_status(request: Request, slug: str, name: str | None = None):
+def zip_status(request: Request, slug: str, name: str | None = None):
     # Same gates as the sibling download routes — without them this was an
     # unauthenticated status oracle for any known slug.
     g, _ = _gate(request, slug)

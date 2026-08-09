@@ -14,7 +14,7 @@ KINDS = {"proposals": "proposal", "contracts": "contract", "invoices": "invoice"
 
 
 @router.post("/{kind}/{doc_id}/email")
-async def email_doc(
+def email_doc(
     kind: str, doc_id: int, to: str = Form(...), subject: str = Form(...), message: str = Form(...)
 ):
     if kind not in KINDS:

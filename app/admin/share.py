@@ -97,7 +97,7 @@ def _build_urls() -> list[dict]:
 
 
 @router.get("/share", response_class=HTMLResponse)
-async def share_debugger(request: Request):
+def share_debugger(request: Request):
     return templates.TemplateResponse(
         request,
         "admin/share.html",

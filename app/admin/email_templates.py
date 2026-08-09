@@ -27,7 +27,7 @@ MERGE_FIELDS = [
 
 
 @router.get("/email-templates", response_class=HTMLResponse)
-async def list_templates(request: Request):
+def list_templates(request: Request):
     rows = db.all_("SELECT * FROM email_templates WHERE deleted_at IS NULL ORDER BY name")
     return templates.TemplateResponse(
         request,
@@ -37,7 +37,7 @@ async def list_templates(request: Request):
 
 
 @router.post("/email-templates")
-async def create_template(name: str = Form(...), subject: str = Form(...), body: str = Form(...)):
+def create_template(name: str = Form(...), subject: str = Form(...), body: str = Form(...)):
     name, subject = name.strip(), subject.strip()
     if not (name and subject and body.strip()):
         raise HTTPException(status_code=400, detail="name, subject and body required")
@@ -49,7 +49,7 @@ async def create_template(name: str = Form(...), subject: str = Form(...), body:
 
 
 @router.post("/email-templates/{template_id}")
-async def update_template(
+def update_template(
     template_id: int, name: str = Form(...), subject: str = Form(...), body: str = Form(...)
 ):
     d = db.one("SELECT id FROM email_templates WHERE id=? AND deleted_at IS NULL", (template_id,))
@@ -66,7 +66,7 @@ async def update_template(
 
 
 @router.post("/email-templates/{template_id}/delete")
-async def delete_template(template_id: int):
+def delete_template(template_id: int):
     db.run("UPDATE email_templates SET deleted_at=datetime('now') WHERE id=?", (template_id,))
     log.info("email template %s soft-deleted", template_id)
     return RedirectResponse("/admin/studio/email-templates", status_code=303)

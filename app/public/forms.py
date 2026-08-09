@@ -36,7 +36,7 @@ def _fields(form_id: int) -> list[dict]:
 
 
 @router.get("/forms/{slug}", response_class=HTMLResponse)
-async def show_form(request: Request, slug: str):
+def show_form(request: Request, slug: str):
     f = _load_form(slug)
     return templates.TemplateResponse(
         request,

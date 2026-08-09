@@ -11,12 +11,12 @@ router = APIRouter(prefix="/admin")
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_form(request: Request):
+def login_form(request: Request):
     return templates.TemplateResponse(request, "admin/login.html", {"error": None})
 
 
 @router.post("/login")
-async def login(request: Request, password: str = Form(...)):
+def login(request: Request, password: str = Form(...)):
     ip = security.client_ip(request)
     if security.pin_locked(ip, 0):
         return templates.TemplateResponse(
@@ -38,7 +38,7 @@ async def login(request: Request, password: str = Form(...)):
 
 
 @router.post("/logout", dependencies=[Depends(security.require_admin)])
-async def logout(request: Request, everywhere: str = Form("")):
+def logout(request: Request, everywhere: str = Form("")):
     # Real revocation: delete this session's server-side row so the cookie is dead
     # even if it was copied elsewhere. `everywhere` kills ALL admin sessions (the
     # emergency switch for a known-leaked cookie on a device you can't reach).
