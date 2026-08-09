@@ -99,9 +99,14 @@ def home(request: Request):
         "AND created_at >= datetime('now', '-14 days') "
         "AND created_at < datetime('now', '-7 days')"
     )["n"]
+    # Collected money — every figure on this page sums the `payments` table
+    # (Stripe webhook events), the same ground truth Financials and Reports
+    # read. Summing invoices.total_cents by paid_at would count a
+    # deposit-paid-but-still-open invoice as zero and attribute cash to the day
+    # the invoice closed rather than the day it arrived.
     collected_7d = db.one(
-        "SELECT COALESCE(SUM(total_cents), 0) AS cents FROM invoices "
-        "WHERE paid_at >= datetime('now', '-7 days')"
+        "SELECT COALESCE(SUM(amount_cents), 0) AS cents FROM payments "
+        "WHERE created_at >= datetime('now', '-7 days')"
     )["cents"]
     kpi = {
         "inquiries_delta": inq_7d - inq_prev,
@@ -185,10 +190,9 @@ def home(request: Request):
     month_cents = {
         r["ym"]: r["cents"]
         for r in db.all_(
-            """SELECT strftime('%Y-%m', paid_at) AS ym,
-                      COALESCE(SUM(total_cents), 0) AS cents
-               FROM invoices WHERE status='paid' AND paid_at IS NOT NULL
-               GROUP BY ym"""
+            """SELECT strftime('%Y-%m', created_at) AS ym,
+                      COALESCE(SUM(amount_cents), 0) AS cents
+               FROM payments GROUP BY ym"""
         )
     }
     scale = max(
@@ -490,9 +494,9 @@ def home(request: Request):
 
     # --- Revenue snapshot: collected this month vs goal (display-only) ---
     paid_mtd = db.one(
-        """SELECT COALESCE(SUM(total_cents), 0) AS cents, COUNT(*) AS n
-           FROM invoices WHERE status='paid'
-             AND strftime('%Y-%m', paid_at) = strftime('%Y-%m', 'now', 'localtime')"""
+        """SELECT COALESCE(SUM(amount_cents), 0) AS cents, COUNT(*) AS n
+           FROM payments
+           WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now', 'localtime')"""
     )
     goal_cents = config.MONTHLY_GOAL_CENTS
     revenue = {
