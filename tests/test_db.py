@@ -1,11 +1,14 @@
-"""Tests for db.ident's SQL-identifier gate and the migration runner.
+"""Tests for db.ident's SQL-identifier gate, db.tx() and the migration runner.
 
-The ident cases stay pure units; the migration cases touch SQLite and are
-marked integration. Full row/404 behavior is covered by smoke + integration.
+The ident cases stay pure units; the migration and transaction cases touch
+SQLite and are marked integration. Full row/404 behavior is covered by smoke +
+integration.
 """
 
 import shutil
 import sqlite3
+import threading
+import time
 
 import pytest
 
@@ -24,6 +27,54 @@ def test_ident_rejects_disallowed_raises():
     with pytest.raises(ValueError) as exc:
         db.ident("; DROP TABLE clients;", {"clients"})
     assert "disallowed" in str(exc.value).lower()
+
+
+@pytest.mark.integration
+def test_tx_serializes_two_concurrent_read_then_write_units():
+    """Two tx() units bumping the same counter must land BOTH bumps, not one.
+
+    This is the read-modify-write shape every upload takes (read content_rev,
+    write content_rev+1). Deferred, the read runs outside the transaction, so
+    both threads read the same value and the second bump silently overwrites the
+    first — and a unit that did hold a read snapshot would fail the upgrade with
+    SQLITE_BUSY_SNAPSHOT, which busy_timeout does not wait out. BEGIN IMMEDIATE
+    makes the loser WAIT: no exception, and the final value is start + 2.
+    """
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("tx-serialization-probe", "tx serialization fixture", "1234"),
+    )
+    ready = threading.Barrier(2)
+    errors: list[Exception] = []
+
+    def bump() -> None:
+        try:
+            ready.wait(timeout=5)
+            with db.tx() as con:
+                rev = con.execute(
+                    "SELECT content_rev FROM galleries WHERE id=?", (gallery_id,)
+                ).fetchone()["content_rev"]
+                # Hold the unit open long enough that a deferred transaction
+                # would let the peer read the same rev before either writes.
+                time.sleep(0.05)
+                con.execute("UPDATE galleries SET content_rev=? WHERE id=?", (rev + 1, gallery_id))
+        except Exception as exc:
+            errors.append(exc)
+
+    try:
+        threads = [threading.Thread(target=bump) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30)
+            assert not t.is_alive(), "tx() deadlocked instead of waiting its turn"
+        assert errors == []
+        assert (
+            db.one("SELECT content_rev FROM galleries WHERE id=?", (gallery_id,))["content_rev"]
+            == 2
+        )
+    finally:
+        db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
 
 
 def _isolated_db(tmp_path, monkeypatch):

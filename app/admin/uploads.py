@@ -82,7 +82,6 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
     if staged:
         try:
             with db.tx() as con:
-                con.execute("BEGIN IMMEDIATE")
                 if (
                     section_id is not None
                     and not con.execute(

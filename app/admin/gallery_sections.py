@@ -100,7 +100,6 @@ def move_asset(
     request: Request, gallery_id: int, asset_id: int, section_id: int | None = Form(None)
 ):
     with db.tx() as con:
-        con.execute("BEGIN IMMEDIATE")
         if (
             section_id is not None
             and not con.execute(
@@ -124,7 +123,6 @@ async def bulk_move_assets(request: Request, gallery_id: int):
     raw = form.get("section_id") or ""
     section_id = int(raw) if raw else None
     with db.tx() as con:
-        con.execute("BEGIN IMMEDIATE")
         if (
             section_id is not None
             and not con.execute(
