@@ -18,6 +18,27 @@ Forward SQL lives in [`migrations/`](../migrations/). Apply order is
 5. Schema / migration edits are **red-light** ([`AGENTS.md`](../AGENTS.md)):
    branch + PR, human merge.
 
+## How a file is applied
+
+Each file runs in **one transaction together with its `schema_migrations` row**:
+a statement failing part-way rolls the whole file back, so the file is never
+half-applied and the next boot re-runs it from a clean slate. That means:
+
+- Write statements assuming they all commit or none do. Plain
+  `ALTER TABLE … ADD COLUMN` is fine — it no longer has to be idempotent.
+- A file's own `BEGIN` / `COMMIT` / `END` is **stripped** — the runner owns the
+  transaction (it opens `BEGIN IMMEDIATE`, taking the write lock up front).
+  Keeping them (as `031` does) is harmless.
+- A stray `ROLLBACK` is **rejected** — the runner can neither honor it nor
+  ignore it safely, so the whole run stops before any statement executes.
+- `PRAGMA` runs *outside* that transaction, and only at the **top or bottom**
+  of a file (SQLite silently ignores `PRAGMA foreign_keys` inside a
+  transaction). A pragma between statements fails loud before anything runs,
+  and so does any pragma other than `foreign_keys`: prologue pragmas land on the
+  connection shared by every later file in the run, so the runner only allows
+  the ones it knows how to restore (`db._RESTORABLE_PRAGMAS`).
+- Nothing that can't run inside a transaction — no `VACUUM`, no `ATTACH`.
+
 ## Known duplicate prefixes (do not “fix” by renaming)
 
 These coexist on purpose of history; apply order is still deterministic by full
