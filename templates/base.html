@@ -13,7 +13,10 @@
    html[data-theme] selectors whose specificity would otherwise out-rank any
    sanely-scoped restyle. Unlayered-over-layered is specificity-independent,
    and non-sr surfaces are untouched because every screening rule is
-   body.sr-scoped. (style-src keeps 'unsafe-inline'; see app/main.py.) #}
+   body.sr-scoped. (style-src keeps 'unsafe-inline'; see app/main.py.)
+   This is the public + shared + client half only; the .admin-shell half is
+   static/mise-admin.css, attached by admin/base_admin.html into this same
+   layer. Never add it here — base_cream.html is worn by client pages too. #}
 <style>@import url("/static/mise.css?v={{ static_rev }}") layer(mise);</style>
 {# Self-hosted faces for EVERY surface — @font-face is lazy, so a page only
    downloads the families it actually paints with. Centralized here (was
