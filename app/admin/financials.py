@@ -195,7 +195,9 @@ def income(request: Request, range: str = "quarter"):
     ranges = [{"key": k, "label": lbl, "on": k == range} for k, lbl in _RANGES]
 
     # Month reel (Screening Room 3i): trailing six months of collected cash,
-    # heights proportional to the best month. Read-only.
+    # heights proportional to the best month. Read-only. Buckets convert to
+    # 'localtime' because created_at is UTC while the window comes from the
+    # studio clock — a 9 PM payment belongs to the month the operator lived it.
     first_of_month = studio._today().replace(day=1)
     reel_months, cursor = [], first_of_month
     # NB: the route's `range` query param shadows the builtin in this scope
@@ -206,7 +208,7 @@ def income(request: Request, range: str = "quarter"):
     by_ym = {
         r["ym"]: r["cents"]
         for r in db.all_(
-            """SELECT strftime('%Y-%m', created_at) AS ym,
+            """SELECT strftime('%Y-%m', created_at, 'localtime') AS ym,
                       COALESCE(SUM(amount_cents), 0) AS cents
                FROM payments GROUP BY ym"""
         )

@@ -65,9 +65,11 @@ def _trend(cur: int, prior: int) -> dict:
 
 
 def _collected_by_month():
-    """Cash collected per YYYY-MM from Stripe payment events (source of truth)."""
+    """Cash collected per YYYY-MM from Stripe payment events (source of truth).
+    created_at is UTC; the month is decided on the studio's wall clock, so a
+    late-evening payment counts in the month the operator collected it."""
     rows = db.all_(
-        """SELECT strftime('%Y-%m', created_at) AS ym,
+        """SELECT strftime('%Y-%m', created_at, 'localtime') AS ym,
                   COALESCE(SUM(amount_cents), 0) AS cents
            FROM payments GROUP BY ym"""
     )
@@ -278,9 +280,10 @@ def reports(request: Request, period: str = Query("ytd", alias="range")):
 
 @router.get("/revenue.csv", response_class=PlainTextResponse)
 def revenue_csv():
-    """Collected cash per month, all-time — for the accountant/spreadsheet."""
+    """Collected cash per month, all-time — for the accountant/spreadsheet.
+    Same wall-clock bucketing as the on-page chart, so the two never disagree."""
     rows = db.all_(
-        """SELECT strftime('%Y-%m', created_at) AS month,
+        """SELECT strftime('%Y-%m', created_at, 'localtime') AS month,
                   COALESCE(SUM(amount_cents), 0) AS cents
            FROM payments GROUP BY month ORDER BY month"""
     )

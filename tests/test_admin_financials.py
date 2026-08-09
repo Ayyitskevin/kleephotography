@@ -7,12 +7,18 @@ pins one of those seams over real routes and the real SQLite schema.
 """
 
 import csv
+import datetime as dt
 import io
+import os
+import re
+import time
+from contextlib import contextmanager
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app import config, db
+from app.admin import reports, studio
 from app.main import app
 
 pytestmark = pytest.mark.integration
@@ -104,3 +110,97 @@ def test_export_panel_form_sends_the_include_marker(admin):
     silently starts overriding an operator's explicit 'neither'."""
     page = admin.get("/admin/financials").text
     assert '<input type="hidden" name="inc" value="1">' in page
+
+
+# --- D1: a payment's month is decided on the studio's wall clock ------------
+
+_LATE_CENTS = 98_765_400  # dominates the month reel's scale, whatever else is seeded
+
+
+@pytest.fixture
+def new_york():
+    """Pins the process TZ so SQLite's 'localtime' means something, and dates a
+    payment 23:30 on 31 May 2026 — 03:30 UTC on 1 June. Bucketed on raw UTC it
+    lands in a month the operator never collected it in."""
+    prev = os.environ.get("TZ")
+    os.environ["TZ"] = "America/New_York"
+    time.tzset()
+    created_utc = dt.datetime(2026, 5, 31, 23, 30).astimezone(dt.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    assert created_utc == "2026-06-01 03:30:00"  # the TZ really took
+    try:
+        yield {"created_utc": created_utc, "local": "2026-05", "utc": "2026-06"}
+    finally:
+        if prev is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = prev
+        time.tzset()
+
+
+@contextmanager
+def _payment_at(created_utc: str, cents: int):
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Boundary Co",))
+    pid = db.run("INSERT INTO projects (client_id, title) VALUES (?,?)", (cid, "Late Job"))
+    iid = db.run(
+        """INSERT INTO invoices (project_id, slug, title, line_items, total_cents, status)
+           VALUES (?,?,?,?,?,?)""",
+        (pid, "boundary-late", "Late Job", "[]", cents, "paid"),
+    )
+    db.run(
+        """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
+           amount_cents, kind, created_at) VALUES (?,?,?,?,?,?)""",
+        (iid, "evt_boundary", "cs_boundary", cents, "full", created_utc),
+    )
+    try:
+        yield
+    finally:
+        db.run("DELETE FROM payments WHERE invoice_id=?", (iid,))
+        db.run("DELETE FROM invoices WHERE id=?", (iid,))
+        db.run("DELETE FROM projects WHERE id=?", (pid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))
+
+
+def _revenue_months(body: str) -> dict[str, float]:
+    rows = list(csv.reader(io.StringIO(body)))
+    assert rows[0] == ["month", "collected_usd"]
+    return {r[0]: float(r[1]) for r in rows[1:]}
+
+
+def test_revenue_csv_counts_a_late_payment_in_the_local_month(admin, new_york):
+    """revenue.csv is what the accountant reconciles against — a 23:30 payment
+    must not appear in the next month's row."""
+    before = _revenue_months(admin.get("/admin/reports/revenue.csv").text)
+    with _payment_at(new_york["created_utc"], _LATE_CENTS):
+        after = _revenue_months(admin.get("/admin/reports/revenue.csv").text)
+    assert after[new_york["local"]] - before.get(new_york["local"], 0.0) == _LATE_CENTS / 100
+    assert after.get(new_york["utc"], 0.0) == before.get(new_york["utc"], 0.0)
+
+
+def test_reports_chart_buckets_a_late_payment_in_the_local_month(admin, new_york):
+    """The 12-month revenue chart reads the same buckets as the CSV."""
+    before = reports._collected_by_month()
+    with _payment_at(new_york["created_utc"], _LATE_CENTS):
+        after = reports._collected_by_month()
+    assert after[new_york["local"]] - before.get(new_york["local"], 0) == _LATE_CENTS
+    assert after.get(new_york["utc"], 0) == before.get(new_york["utc"], 0)
+
+
+def _month_reel(page: str) -> dict[str, int]:
+    """Bar height per month label from the Financials month reel."""
+    return {
+        label: int(pct)
+        for pct, label in re.findall(
+            r'style="height: (\d+)%;"></i>\s*<small[^>]*>([A-Z]{3})</small>', page
+        )
+    }
+
+
+def test_month_reel_bar_lands_in_the_local_month(admin, new_york, monkeypatch):
+    """The reel's tallest bar answers 'how did that month go' — on UTC the money
+    slides one bar to the right for anything collected after 8 PM EDT."""
+    monkeypatch.setattr(config, "SCREENING_ROOM", True)
+    monkeypatch.setattr(studio, "_today", lambda: dt.date(2026, 6, 13))
+    with _payment_at(new_york["created_utc"], _LATE_CENTS):
+        reel = _month_reel(admin.get("/admin/financials").text)
+    assert reel["MAY"] == 100  # the payment set the scale, so its month is full height
+    assert reel["JUN"] < 100
