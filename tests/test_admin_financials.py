@@ -261,3 +261,38 @@ def test_income_csv_summary_totals_come_from_raw_cents(admin, ledger):
     assert rows["Outstanding"] == ["0", "0.00"]
     paid_n, paid_usd = rows["Paid"]
     assert int(paid_n) >= 1 and float(paid_usd) >= 500.00  # the seeded $500 payment
+
+
+# --- D6: bookkeeping dates are stored normalized or not at all --------------
+
+
+def test_expense_rejects_a_non_iso_date(admin):
+    """type=date guards only the happy path; a hand-built post storing
+    '6/15/2026' would sort into the wrong place in a string-ordered ledger."""
+    r = admin.post(
+        "/admin/financials/expenses",
+        data={
+            "spent_on": "6/15/2026",
+            "vendor": "Bad Date Co",
+            "category": "Equipment",
+            "amount": "12.00",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 400
+    assert db.one("SELECT id FROM expenses WHERE vendor='Bad Date Co'") is None
+
+
+def test_mileage_rejects_a_non_iso_date(admin):
+    r = admin.post(
+        "/admin/financials/mileage",
+        data={
+            "drove_on": "next tuesday",
+            "from_place": "Studio",
+            "to_place": "Bad Date Cafe",
+            "miles": "3.2",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 400
+    assert db.one("SELECT id FROM mileage WHERE to_place='Bad Date Cafe'") is None

@@ -513,6 +513,12 @@ def expense_create(
     vendor = vendor.strip()
     if not vendor:
         raise HTTPException(status_code=400, detail="vendor required")
+    # ORDER BY spent_on is a string comparison — a non-ISO date sorts the row
+    # into the wrong place in the ledger and the CSV, silently.
+    try:
+        spent_on = dt.date.fromisoformat(spent_on).isoformat()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="bad date")
     try:
         cents = _to_cents(amount)
     except ValueError:
@@ -744,6 +750,11 @@ def mileage_create(
     from_place, to_place = from_place.strip(), to_place.strip()
     if not from_place or not to_place:
         raise HTTPException(status_code=400, detail="from and to required")
+    # same string-ordered ledger as expenses: only ISO dates sort honestly
+    try:
+        drove_on = dt.date.fromisoformat(drove_on).isoformat()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="bad date")
     if miles <= 0:
         raise HTTPException(status_code=400, detail="miles must be positive")
     db.run(
