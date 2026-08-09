@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import db
+from app.admin import tasks as admin_tasks
 from app.main import app
 
 
@@ -186,3 +187,43 @@ def test_bench_stats_split_photos_from_films(admin_client, gallery):
         '<span class="gd-stat-n">2</span><span class="gd-stat-l">Photos &middot; 1 film</span>'
         in page.text
     )
+
+
+@pytest.mark.integration
+def test_calendar_month_query_keeps_the_local_day_edge_booking(admin_client, monkeypatch):
+    """The month band is UTC and the grid is local: 2035-08-01 01:00 UTC is
+    still July 31 in America/New_York, so the guard band must fetch it while
+    a booking three months out never leaves SQLite."""
+    event_id = db.run(
+        "INSERT INTO event_types (slug, name, duration_min) VALUES (?,?,?)",
+        ("cal-band-consult", "Consult", 30),
+    )
+    edge_utc, far_utc = "2035-08-01 01:00:00", "2035-10-05 15:00:00"
+    try:
+        for token, name, start in (
+            ("cal-band-edge", "Edge Booking", edge_utc),
+            ("cal-band-far", "Far Booking", far_utc),
+        ):
+            db.run(
+                """INSERT INTO bookings (token, event_type_id, name, email, start_utc, end_utc)
+                   VALUES (?,?,?,?,?,?)""",
+                (token, event_id, name, "edge@example.com", start, start),
+            )
+
+        fetched: list[str] = []
+        real_all = db.all_
+
+        def spy(sql, params=()):
+            rows = real_all(sql, params)
+            if "FROM bookings" in sql:
+                fetched.extend(r["start_utc"] for r in rows)
+            return rows
+
+        monkeypatch.setattr(admin_tasks.db, "all_", spy)
+        page = admin_client.get("/admin/calendar?year=2035&month=7")
+        assert page.status_code == 200
+        assert "21:00 Consult · Edge Booking" in page.text
+        assert fetched == [edge_utc]
+    finally:
+        db.run("DELETE FROM bookings WHERE event_type_id=?", (event_id,))
+        db.run("DELETE FROM event_types WHERE id=?", (event_id,))
