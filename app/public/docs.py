@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import db, security
 from ..render import templates
+from . import telemetry
 
 log = logging.getLogger("mise.public.docs")
 router = APIRouter()
@@ -31,7 +32,9 @@ def _proposal_or_404(slug: str) -> "db.sqlite3.Row":
 @router.get("/p/{slug}", response_class=HTMLResponse)
 def view_proposal(request: Request, slug: str):
     d = _proposal_or_404(slug)
-    if d["status"] == "sent":
+    # Read telemetry only — see app/public/telemetry.py for why a bare GET is
+    # not proof that a person opened the document.
+    if d["status"] == "sent" and telemetry.is_human_view(request):
         db.run(
             "UPDATE proposals SET status='viewed', viewed_at=datetime('now') WHERE id=?", (d["id"],)
         )
@@ -100,7 +103,9 @@ def _contract_or_404(slug: str) -> "db.sqlite3.Row":
 @router.get("/c/{slug}", response_class=HTMLResponse)
 def view_contract(request: Request, slug: str):
     d = _contract_or_404(slug)
-    if d["status"] == "sent":
+    # Read telemetry only — see app/public/telemetry.py. A contract reading
+    # "viewed" because a scanner touched the link is a claim about a client.
+    if d["status"] == "sent" and telemetry.is_human_view(request):
         db.run(
             "UPDATE contracts SET status='viewed', viewed_at=datetime('now') WHERE id=?", (d["id"],)
         )
