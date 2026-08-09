@@ -1,8 +1,8 @@
 """Operational heartbeat — pushes a Telegram alert when the box is in a state
 Kevin would want to know about WITHOUT opening the admin: free disk under the
-upload floor, the nightly backup gone stale/missing, or background jobs waiting
-in a failed state. It runs off the same recurring sweep as the reminders (no
-cron, no second process).
+upload floor, the nightly backup gone stale/missing, or background jobs left in
+a failed state / wedged past their retry time. It runs off the same recurring
+sweep as the reminders (no cron, no second process).
 
 This is the active-push counterpart to the Settings storage panel, which only
 shows the same facts when someone happens to look. Silence is not evidence
@@ -19,7 +19,7 @@ import datetime as dt
 import logging
 import shutil
 
-from . import alerts, config, db
+from . import alerts, config, jobs
 
 log = logging.getLogger("mise.ops_monitor")
 
@@ -71,12 +71,32 @@ def _check_backup(status: dict | None = None) -> None:
 
 
 def _check_failed_jobs() -> None:
-    failed = db.one("SELECT COUNT(*) AS n FROM jobs WHERE status='failed'")["n"]
+    """Dead jobs AND wedged ones.
+
+    Counting only status='failed' used to be enough: every retry happened inside
+    a second, so a job was either done or dead. With a retry backoff a job also
+    sits queued-but-not-yet-runnable, and if the sweeper thread that re-offers it
+    ever stops, that row waits forever while `failed` stays 0 — a silent stall.
+    So we also assert the positive: no retry has been due-and-unclaimed for
+    longer than JOB_STUCK_AFTER_SECONDS (never-attempted work is excluded on
+    purpose — see jobs.queue_health).
+    """
+    health = jobs.queue_health()
+    failed = health["failed"]
     if failed:
         alerts.ops_alert(
             "jobs_failed",
             f"{failed} background job{'s have' if failed != 1 else ' has'} failed. "
             "Open Admin → Jobs to review and retry the failures.",
+        )
+    stuck = health["stuck"]
+    if stuck:
+        alerts.ops_alert(
+            "jobs_stuck",
+            f"{stuck} background job{'s are' if stuck != 1 else ' is'} past its retry "
+            f"time by over {config.JOB_STUCK_AFTER_SECONDS // 60} minutes — the queue may "
+            "have stopped draining. Open Admin → Jobs, use 'run now', and check the "
+            "service is up.",
         )
 
 

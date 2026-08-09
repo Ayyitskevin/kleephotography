@@ -6,6 +6,7 @@
     <h1>Jobs</h1>
     <p class="pgtop-sub">
       <b>{{ pending }}</b> pending
+      {% if waiting %}· <b>{{ waiting|length }}</b> waiting to retry{% endif %}
       {% if failed %}· <span class="neg"><b>{{ failed|length }}</b> failed</span>{% endif %}
     </p>
   </div>
@@ -35,6 +36,28 @@
   </table>
   {% else %}
   <p class="muted">No failed jobs.</p>
+  {% endif %}
+
+  <h2>Waiting to retry</h2>
+  {% if waiting %}
+  <p class="muted">These failed once and are waiting out a backoff. They run themselves;
+    <b>run now</b> skips the wait.</p>
+  <table class="list">
+    <tr><th>#</th><th>Kind</th><th>Attempts</th><th>Last error</th><th>Runs at (UTC)</th><th></th></tr>
+    {% for j in waiting %}
+    <tr>
+      <td>{{ j.id }}</td>
+      <td>{{ j.kind }}</td>
+      <td>{{ j.attempts }}</td>
+      <td><span class="warn">{{ j.error }}</span></td>
+      <td>{{ j.next_attempt_at }}</td>
+      <td><form method="post" action="/admin/jobs/{{ j.id }}/retry" class="inline">
+        <button class="link">run now</button></form></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">No jobs waiting on a retry backoff.</p>
   {% endif %}
 
   <h2>Recent</h2>

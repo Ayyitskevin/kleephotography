@@ -70,4 +70,5 @@ Plutus/Argus/Platekit bits to the host you point it at), not the full-tree deplo
 - [`ops/BACKUP.md`](ops/BACKUP.md) — nightly local snapshot on the prod host (off-host DR pending)
 - [`ops/DEPLOY.md`](ops/DEPLOY.md) — production deploy
 - [`ops/SPECIALTY-LAUNCH.md`](ops/SPECIALTY-LAUNCH.md) — specialty / aerials launch
+- [`ops/AT-LEAST-ONCE.md`](ops/AT-LEAST-ONCE.md) — jobs/reminders send-then-record contract
 - [`HANDOFF.md`](HANDOFF.md) — historical refactor notes (prefer AGENTS.md + this README)
