@@ -10,6 +10,7 @@
     {% for a in crops %}
     <figure class="tile sr-skel">
       <img src="/portal/{{ p.slug }}/thumb/{{ a.id }}" loading="lazy"
+           {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
            alt="{{ a.gallery_title }} — frame {{ '%04d'|format(a.id) }}">
       <figcaption>
         <span class="muted">{{ a.gallery_title }}</span>

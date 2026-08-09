@@ -1,5 +1,5 @@
-"""Crawlability, responsive-metadata and structured-data contracts for the
-public marketing surface."""
+"""Public-surface rendering contracts: crawlability, responsive image metadata,
+tile dimensions (CLS) and structured data."""
 
 from __future__ import annotations
 
@@ -175,3 +175,96 @@ def test_video_asset_urls_stay_crawlable(client):
 
     private = client.get("/g/seo-reel-crawlable")
     assert private.headers["X-Robots-Tag"] == "noindex, nofollow"
+
+
+@pytest.fixture
+def delivery():
+    """Client-delivery rows (gallery, drop, portal) removed after the test."""
+    made: dict[str, list[int]] = {"galleries": [], "portals": [], "clients": []}
+    try:
+        yield made
+    finally:
+        for gid in made["galleries"]:
+            db.run(
+                "DELETE FROM favorites WHERE asset_id IN "
+                "(SELECT id FROM assets WHERE gallery_id=?)",
+                (gid,),
+            )
+            db.run("DELETE FROM visitors WHERE gallery_id=?", (gid,))
+            db.run("DELETE FROM assets WHERE gallery_id=?", (gid,))
+            db.run("DELETE FROM galleries WHERE id=?", (gid,))
+        for pid in made["portals"]:
+            db.run("DELETE FROM portals WHERE id=?", (pid,))
+        for cid in made["clients"]:
+            db.run("DELETE FROM clients WHERE id=?", (cid,))
+
+
+def _seed_delivery_asset(gid: int, stem: str, kind: str, size: tuple[int, int] | None) -> int:
+    width, height = size or (None, None)
+    return db.run(
+        """INSERT INTO assets (gallery_id, kind, filename, stored, status, width, height)
+           VALUES (?,?,?,?,'ready',?,?)""",
+        (gid, kind, f"{stem}.jpg", f"{stem}.jpg", width, height),
+    )
+
+
+def test_gallery_and_drop_tiles_carry_stored_dimensions(client, delivery):
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published, type) VALUES (?,?,?,1,'gallery')",
+        ("cls-premiere", "CLS Premiere", "1234"),
+    )
+    drop_id = db.run(
+        """INSERT INTO galleries (slug, title, pin, published, type, require_pin)
+           VALUES (?,?,?,1,'drop',0)""",
+        ("cls-dailies", "CLS Dailies", "5678"),
+    )
+    delivery["galleries"] += [gid, drop_id]
+    measured = _seed_delivery_asset(gid, "measured", "photo", (4000, 3000))
+    unmeasured = _seed_delivery_asset(gid, "unmeasured", "photo", None)
+    dropped = _seed_delivery_asset(drop_id, "dailies", "photo", (1600, 1200))
+
+    assert client.post("/g/cls-premiere/pin", data={"pin": "1234"}).status_code == 200
+    premiere = client.get("/g/cls-premiere")
+    assert premiere.status_code == 200
+    (measured_tag,) = _tags_for(premiere.text, f"/media/cls-premiere/thumb/{measured}")
+    assert 'width="4000" height="3000"' in measured_tag
+    # Pre-ingest rows have no stored dimensions — no zeros, no guesses.
+    (unmeasured_tag,) = _tags_for(premiere.text, f"/media/cls-premiere/thumb/{unmeasured}")
+    assert "width=" not in unmeasured_tag and "height=" not in unmeasured_tag
+
+    dailies = client.get("/g/cls-dailies")
+    assert dailies.status_code == 200
+    (drop_tag,) = _tags_for(dailies.text, f"/media/cls-dailies/thumb/{dropped}")
+    assert 'width="1600" height="1200"' in drop_tag
+
+
+def test_portal_crop_and_motion_tiles_carry_stored_dimensions(client, delivery):
+    cid = db.run(
+        "INSERT INTO clients (name, company, email) VALUES (?,?,?)",
+        ("CLS Client", "CLS Co", "cls@example.test"),
+    )
+    delivery["clients"].append(cid)
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published, client_id) VALUES (?,?,?,1,?)",
+        ("cls-portal-gallery", "CLS Portal Gallery", "1234", cid),
+    )
+    delivery["galleries"].append(gid)
+    pid = db.run(
+        "INSERT INTO portals (client_id, slug, pin, published) VALUES (?,?,?,1)",
+        (cid, "cls-portal", "2468"),
+    )
+    delivery["portals"].append(pid)
+    crop = _seed_delivery_asset(gid, "crop", "photo", (5000, 4000))
+    reel = _seed_delivery_asset(gid, "reel", "video", (1080, 1920))
+    visitor = db.run(
+        "INSERT INTO visitors (gallery_id, token) VALUES (?,?)", (gid, "cls-portal-visitor")
+    )
+    db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (visitor, crop))
+
+    assert client.post("/portal/cls-portal/pin", data={"pin": "2468"}).status_code == 200
+    page = client.get("/portal/cls-portal")
+    assert page.status_code == 200
+    (crop_tag,) = _tags_for(page.text, f"/portal/cls-portal/thumb/{crop}")
+    assert 'width="5000" height="4000"' in crop_tag
+    (reel_tag,) = _tags_for(page.text, f"/portal/cls-portal/thumb/{reel}")
+    assert 'width="1080" height="1920"' in reel_tag
