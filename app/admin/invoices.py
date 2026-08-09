@@ -21,7 +21,7 @@ def get_invoice(invoice_id: int) -> "db.sqlite3.Row":
 
 
 @router.post("/projects/{project_id}/invoices")
-async def create_invoice(project_id: int):
+def create_invoice(project_id: int):
     p = get_project(project_id)
     accepted = db.one(
         """SELECT line_items, total_cents FROM proposals
@@ -41,7 +41,7 @@ async def create_invoice(project_id: int):
 
 
 @router.get("/invoices/{invoice_id}", response_class=HTMLResponse)
-async def invoice_detail(request: Request, invoice_id: int):
+def invoice_detail(request: Request, invoice_id: int):
     d = get_invoice(invoice_id)
     p = get_project(d["project_id"])
     items = json.loads(d["line_items"])
@@ -84,7 +84,7 @@ async def update_invoice(request: Request, invoice_id: int):
 
 
 @router.post("/invoices/{invoice_id}/duplicate")
-async def duplicate_invoice(invoice_id: int):
+def duplicate_invoice(invoice_id: int):
     """Clone a locked invoice (sent/viewed/paid) into a fresh editable draft.
     Copies title/line items/total/deposit/due date/terms under a new slug; the new
     draft carries no payments, Stripe session, or paid status. The original — and the
@@ -110,7 +110,7 @@ async def duplicate_invoice(invoice_id: int):
 
 
 @router.post("/invoices/{invoice_id}/send")
-async def mark_invoice_sent(invoice_id: int):
+def mark_invoice_sent(invoice_id: int):
     d = get_invoice(invoice_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="already sent")

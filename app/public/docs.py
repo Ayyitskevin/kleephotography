@@ -29,7 +29,7 @@ def _proposal_or_404(slug: str) -> "db.sqlite3.Row":
 
 
 @router.get("/p/{slug}", response_class=HTMLResponse)
-async def view_proposal(request: Request, slug: str):
+def view_proposal(request: Request, slug: str):
     d = _proposal_or_404(slug)
     if d["status"] == "sent":
         db.run(
@@ -42,7 +42,7 @@ async def view_proposal(request: Request, slug: str):
 
 
 @router.post("/p/{slug}/accept")
-async def accept_proposal(request: Request, slug: str):
+def accept_proposal(request: Request, slug: str):
     d = _proposal_or_404(slug)
     if d["status"] not in ("sent", "viewed"):
         if request.headers.get("hx-request") == "true":
@@ -64,7 +64,7 @@ async def accept_proposal(request: Request, slug: str):
 
 
 @router.post("/p/{slug}/decline")
-async def decline_proposal(request: Request, slug: str):
+def decline_proposal(request: Request, slug: str):
     d = _proposal_or_404(slug)
     if d["status"] not in ("sent", "viewed"):
         if request.headers.get("hx-request") == "true":
@@ -98,7 +98,7 @@ def _contract_or_404(slug: str) -> "db.sqlite3.Row":
 
 
 @router.get("/c/{slug}", response_class=HTMLResponse)
-async def view_contract(request: Request, slug: str):
+def view_contract(request: Request, slug: str):
     d = _contract_or_404(slug)
     if d["status"] == "sent":
         db.run(
@@ -109,7 +109,7 @@ async def view_contract(request: Request, slug: str):
 
 
 @router.post("/c/{slug}/sign")
-async def sign_contract(
+def sign_contract(
     request: Request, slug: str, signer_name: str = Form(...), agree: str = Form(...)
 ):
     d = _contract_or_404(slug)
@@ -172,7 +172,7 @@ def _testimonial_request_or_404(slug: str) -> "db.sqlite3.Row":
 
 
 @router.get("/t/{slug}", response_class=HTMLResponse)
-async def view_testimonial_form(request: Request, slug: str):
+def view_testimonial_form(request: Request, slug: str):
     r = _testimonial_request_or_404(slug)
     return templates.TemplateResponse(
         request, "public/testimonial.html", {"r": r, "submitted": bool(r["submitted_at"])}
@@ -180,7 +180,7 @@ async def view_testimonial_form(request: Request, slug: str):
 
 
 @router.post("/t/{slug}", response_class=HTMLResponse)
-async def submit_testimonial(
+def submit_testimonial(
     request: Request,
     slug: str,
     quote: str = Form(...),

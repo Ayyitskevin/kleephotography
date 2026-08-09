@@ -153,7 +153,7 @@ def press_for_license(license_row) -> list[dict]:
 
 
 @router.get("/press", response_class=HTMLResponse)
-async def press_list(request: Request):
+def press_list(request: Request):
     # All-time ordering (Q4): press is inherently dated, not period-scoped. Pending
     # (no publish_date yet) float to the top as the actionable ones, then published
     # newest-first.
@@ -254,7 +254,7 @@ async def update_press(request: Request, press_id: int):
 
 
 @router.post("/press/{press_id}/delete")
-async def delete_press(press_id: int):
+def delete_press(press_id: int):
     d = get_press(press_id)
     with db.tx() as con:
         con.execute("UPDATE press SET deleted_at=datetime('now') WHERE id=?", (press_id,))

@@ -122,7 +122,7 @@ async def update_shot(request: Request, shot_id: int):
 
 
 @router.post("/shots/{shot_id}/delete")
-async def delete_shot(shot_id: int):
+def delete_shot(shot_id: int):
     d = _get_shot(shot_id)
     with db.tx() as con:
         con.execute("UPDATE shot_list SET deleted_at=datetime('now') WHERE id=?", (shot_id,))

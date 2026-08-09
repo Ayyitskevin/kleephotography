@@ -75,7 +75,7 @@ def _collected_by_month():
 
 
 @router.get("", response_class=HTMLResponse)
-async def reports(request: Request, period: str = Query("ytd", alias="range")):
+def reports(request: Request, period: str = Query("ytd", alias="range")):
     """Read-only business analytics — the HoneyBook 'Reports' tab. Cash from
     the payments (Stripe webhook) table is the truth for collected revenue;
     invoices give booked value and AR; inquiries give leads/conversion.
@@ -277,7 +277,7 @@ async def reports(request: Request, period: str = Query("ytd", alias="range")):
 
 
 @router.get("/revenue.csv", response_class=PlainTextResponse)
-async def revenue_csv():
+def revenue_csv():
     """Collected cash per month, all-time — for the accountant/spreadsheet."""
     rows = db.all_(
         """SELECT strftime('%Y-%m', created_at) AS month,

@@ -105,7 +105,7 @@ def render_template(p: "db.sqlite3.Row") -> str:
 
 
 @router.post("/projects/{project_id}/contracts")
-async def create_contract(project_id: int, template_key: str = Form("standard")):
+def create_contract(project_id: int, template_key: str = Form("standard")):
     p = get_project(project_id)
     if template_key in CONTRACT_LIBRARY:
         body = resolve_merge(load_library_template(template_key), p)
@@ -123,7 +123,7 @@ async def create_contract(project_id: int, template_key: str = Form("standard"))
 
 
 @router.get("/contracts/{contract_id}", response_class=HTMLResponse)
-async def contract_detail(request: Request, contract_id: int):
+def contract_detail(request: Request, contract_id: int):
     d = get_contract(contract_id)
     p = get_project(d["project_id"])
     return templates.TemplateResponse(
@@ -132,7 +132,7 @@ async def contract_detail(request: Request, contract_id: int):
 
 
 @router.post("/contracts/{contract_id}")
-async def update_contract(contract_id: int, title: str = Form(...), body: str = Form(...)):
+def update_contract(contract_id: int, title: str = Form(...), body: str = Form(...)):
     d = get_contract(contract_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="sent contracts are locked")
@@ -146,7 +146,7 @@ async def update_contract(contract_id: int, title: str = Form(...), body: str = 
 
 
 @router.post("/contracts/{contract_id}/duplicate")
-async def duplicate_contract(contract_id: int):
+def duplicate_contract(contract_id: int):
     """Clone a locked contract (sent/viewed/signed) into a fresh editable draft.
     Copies the resolved body snapshot + title under a new slug; the new draft has
     no hash or signature until it is sent and signed in its own right. The original
@@ -161,9 +161,7 @@ async def duplicate_contract(contract_id: int):
 
 
 @router.post("/contracts/{contract_id}/countersign")
-async def countersign_contract(
-    request: Request, contract_id: int, countersigner_name: str = Form(...)
-):
+def countersign_contract(request: Request, contract_id: int, countersigner_name: str = Form(...)):
     """Studio-side typed-name signature, recorded after the client signs, completing
     the bilateral record. Same ESIGN basis as the client signature (name + timestamp).
     Only a client-signed contract can be countersigned, and only once."""
@@ -187,7 +185,7 @@ async def countersign_contract(
 
 
 @router.post("/contracts/{contract_id}/send")
-async def mark_contract_sent(contract_id: int):
+def mark_contract_sent(contract_id: int):
     d = get_contract(contract_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="already sent")

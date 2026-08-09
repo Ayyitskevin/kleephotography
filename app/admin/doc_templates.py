@@ -109,7 +109,7 @@ def _contract_cards() -> list[dict]:
 
 
 @router.get("", response_class=HTMLResponse)
-async def gallery(request: Request):
+def gallery(request: Request):
     projects = db.all_(
         """SELECT p.id, p.title, c.name AS client_name
            FROM projects p JOIN clients c ON c.id=p.client_id
@@ -128,15 +128,15 @@ async def gallery(request: Request):
 
 
 @router.post("/use")
-async def use_template(project_id: int = Form(...), doc_type: str = Form(...), key: str = Form("")):
+def use_template(project_id: int = Form(...), doc_type: str = Form(...), key: str = Form("")):
     """Dispatch to the existing per-project create handler for the chosen doc
     type. Each handler validates the project (404s if missing), creates the
     populated draft, and returns a 303 to its own editor — so the gallery never
     duplicates creation logic."""
     if doc_type == "proposal":
-        return await create_proposal(project_id, preset=key or "blank")
+        return create_proposal(project_id, preset=key or "blank")
     if doc_type == "invoice":
-        return await create_invoice(project_id)
+        return create_invoice(project_id)
     if doc_type == "contract":
-        return await create_contract(project_id, template_key=key or "standard")
+        return create_contract(project_id, template_key=key or "standard")
     raise HTTPException(status_code=400, detail="bad doc_type")

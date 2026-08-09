@@ -329,7 +329,7 @@ def parse_items(form) -> tuple[str, int]:
 
 
 @router.post("/projects/{project_id}/proposals")
-async def create_proposal(project_id: int, preset: str = Form("blank")):
+def create_proposal(project_id: int, preset: str = Form("blank")):
     p = get_project(project_id)
     tpl = PRESETS.get(preset, PRESETS["blank"])
     intro = None if preset == "blank" else OUR_STORY_INTRO
@@ -350,7 +350,7 @@ async def create_proposal(project_id: int, preset: str = Form("blank")):
 
 
 @router.get("/proposals/{proposal_id}", response_class=HTMLResponse)
-async def proposal_detail(request: Request, proposal_id: int):
+def proposal_detail(request: Request, proposal_id: int):
     d = get_proposal(proposal_id)
     p = get_project(d["project_id"])
     items = json.loads(d["line_items"])
@@ -381,7 +381,7 @@ async def update_proposal(request: Request, proposal_id: int):
 
 
 @router.post("/proposals/{proposal_id}/convert")
-async def convert_proposal(proposal_id: int):
+def convert_proposal(proposal_id: int):
     """Once a client accepts, spawn the matching draft contract + draft invoice in
     one click instead of rebuilding both by hand. Both are DRAFTS — Kevin still
     reviews and hits Send/Issue (R16); nothing is sent or charged here. The invoice
@@ -411,7 +411,7 @@ async def convert_proposal(proposal_id: int):
 
 
 @router.post("/proposals/{proposal_id}/duplicate")
-async def duplicate_proposal(proposal_id: int):
+def duplicate_proposal(proposal_id: int):
     """Clone a locked proposal (sent/viewed/accepted/declined) into a fresh
     editable draft — the revise-and-re-send path. Copies title/intro/line items
     into a new proposal with its own slug; the original is untouched. Useful when
@@ -434,7 +434,7 @@ async def duplicate_proposal(proposal_id: int):
 
 
 @router.post("/proposals/{proposal_id}/send")
-async def mark_proposal_sent(proposal_id: int):
+def mark_proposal_sent(proposal_id: int):
     d = get_proposal(proposal_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="already sent")

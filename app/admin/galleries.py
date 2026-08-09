@@ -143,14 +143,14 @@ def _bench_fragment(request: Request, gallery_id: int):
 
 
 @router.get("")
-async def admin_root():
+def admin_root():
     # Home is the studio landing now; the bare /admin keeps working for old
     # bookmarks and redirects there. Galleries moved to /admin/galleries.
     return RedirectResponse("/admin/home", status_code=307)
 
 
 @router.get("/galleries", response_class=HTMLResponse)
-async def dashboard(request: Request):
+def dashboard(request: Request):
     gs = db.all_("""SELECT g.*,
                     (SELECT COUNT(*) FROM assets a WHERE a.gallery_id=g.id) AS n_assets,
                     (SELECT COUNT(*) FROM assets a WHERE a.gallery_id=g.id
@@ -214,7 +214,7 @@ async def dashboard(request: Request):
 
 
 @router.post("/galleries")
-async def create_gallery(title: str = Form(...), client_name: str = Form("")):
+def create_gallery(title: str = Form(...), client_name: str = Form("")):
     gid = db.run(
         "INSERT INTO galleries (slug, title, client_name, pin) VALUES (?,?,?,?)",
         (security.new_slug(), title.strip(), client_name.strip() or None, security.new_pin()),
@@ -293,7 +293,7 @@ def _transfer_card(g, size: str, today_iso: str, soon_iso: str) -> dict:
 
 
 @router.get("/transfers", response_class=HTMLResponse)
-async def transfers(request: Request):
+def transfers(request: Request):
     ds = db.all_("""SELECT g.*,
                     (SELECT COUNT(*) FROM assets a WHERE a.gallery_id=g.id) AS n_assets,
                     (SELECT COUNT(*) FROM assets a WHERE a.gallery_id=g.id
@@ -329,7 +329,7 @@ async def transfers(request: Request):
 
 
 @router.post("/transfers")
-async def create_transfer(
+def create_transfer(
     title: str = Form(...), expires_days: str = Form(""), require_pin: bool = Form(False)
 ):
     expires_at = None
@@ -355,7 +355,7 @@ async def create_transfer(
 
 
 @router.get("/galleries/{gallery_id}", response_class=HTMLResponse)
-async def gallery_detail(request: Request, gallery_id: int):
+def gallery_detail(request: Request, gallery_id: int):
     g = get_gallery(gallery_id)
     # unique-asset selection counts per section (proofing progress signal for admin)
     section_picks = {
@@ -424,7 +424,7 @@ async def gallery_detail(request: Request, gallery_id: int):
 
 
 @router.post("/galleries/{gallery_id}/link-client")
-async def link_client(gallery_id: int, client_id: int = Form(...)):
+def link_client(gallery_id: int, client_id: int = Form(...)):
     """Quick re-link from the /admin dashboard orphan picker. Validates the
     client exists, then UPDATE galleries SET client_id=?. Re-link only; does
     NOT change anything else about the gallery (use the full settings form for
@@ -438,7 +438,7 @@ async def link_client(gallery_id: int, client_id: int = Form(...)):
 
 
 @router.post("/galleries/{gallery_id}/settings")
-async def update_gallery(
+def update_gallery(
     gallery_id: int,
     title: str = Form(...),
     client_name: str = Form(""),
@@ -517,7 +517,7 @@ async def update_gallery(
 
 
 @router.post("/galleries/{gallery_id}/argus-analyze")
-async def argus_analyze_now(gallery_id: int):
+def argus_analyze_now(gallery_id: int):
     """Manual re-trigger of Argus folder analyze for a published gallery."""
     g = get_gallery(gallery_id)
     if not g["published"]:
@@ -532,7 +532,7 @@ async def argus_analyze_now(gallery_id: int):
 
 
 @router.post("/galleries/{gallery_id}/plutus-recommend")
-async def plutus_recommend_now(gallery_id: int):
+def plutus_recommend_now(gallery_id: int):
     """Manual re-trigger of Plutus print upsell for a published gallery."""
     g = get_gallery(gallery_id)
     if not g["published"]:
@@ -560,7 +560,7 @@ _PRE_DELIVERED_STATUSES = (
 
 
 @router.post("/galleries/{gallery_id}/email")
-async def email_gallery(
+def email_gallery(
     gallery_id: int,
     to: str = Form(...),
     subject: str = Form(...),
@@ -606,7 +606,7 @@ async def email_gallery(
 
 
 @router.get("/thumb/{gallery_id}/{asset_id}")
-async def admin_thumb(gallery_id: int, asset_id: int):
+def admin_thumb(gallery_id: int, asset_id: int):
     a = db.one("SELECT stored FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
     if not a:
         raise HTTPException(status_code=404)
@@ -653,7 +653,7 @@ async def bulk_star_tag(request: Request, gallery_id: int):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/move")
-async def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: str = Form(...)):
+def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: str = Form(...)):
     if dir not in ("left", "right"):
         raise HTTPException(status_code=400, detail="dir must be left or right")
     a = db.one("SELECT section_id FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
@@ -679,7 +679,7 @@ async def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: s
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/cover")
-async def set_cover(request: Request, gallery_id: int, asset_id: int):
+def set_cover(request: Request, gallery_id: int, asset_id: int):
     g = get_gallery(gallery_id)
     a = db.one(
         "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='photo'", (asset_id, gallery_id)
@@ -694,7 +694,7 @@ async def set_cover(request: Request, gallery_id: int, asset_id: int):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/renditions")
-async def build_renditions(request: Request, gallery_id: int, asset_id: int):
+def build_renditions(request: Request, gallery_id: int, asset_id: int):
     """Queue the social-cut renditions (9:16 / 1:1) for a ready video. Idempotent:
     INSERT OR IGNORE per preset; failed rows re-queue as pending so the button
     doubles as a retry. Encoding happens in the job pool off-request."""
@@ -724,7 +724,7 @@ async def build_renditions(request: Request, gallery_id: int, asset_id: int):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/portfolio")
-async def toggle_portfolio(request: Request, gallery_id: int, asset_id: int):
+def toggle_portfolio(request: Request, gallery_id: int, asset_id: int):
     db.run(
         "UPDATE assets SET portfolio = 1 - portfolio WHERE id=? AND gallery_id=? AND kind IN ('photo', 'video')",
         (asset_id, gallery_id),
@@ -735,7 +735,7 @@ async def toggle_portfolio(request: Request, gallery_id: int, asset_id: int):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/tag")
-async def set_portfolio_tag(
+def set_portfolio_tag(
     request: Request, gallery_id: int, asset_id: int, portfolio_tag: str = Form("")
 ):
     db.run(
@@ -764,7 +764,7 @@ def _portal_fav_count(gallery_id: int, client_id: int | None) -> int:
 
 
 @router.post("/galleries/{gallery_id}/delete")
-async def delete_gallery(gallery_id: int, force: bool = Form(False)):
+def delete_gallery(gallery_id: int, force: bool = Form(False)):
     g = get_gallery(gallery_id)
     if g["published"] and g["type"] != "drop":
         raise HTTPException(
@@ -799,7 +799,7 @@ async def delete_gallery(gallery_id: int, force: bool = Form(False)):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/delete")
-async def delete_asset(request: Request, gallery_id: int, asset_id: int):
+def delete_asset(request: Request, gallery_id: int, asset_id: int):
     a = db.one("SELECT * FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
     if a:
         base = config.MEDIA_DIR / str(gallery_id)
@@ -827,7 +827,7 @@ async def delete_asset(request: Request, gallery_id: int, asset_id: int):
 
 
 @router.post("/galleries/{gallery_id}/comments/{asset_id}")
-async def admin_add_comment(
+def admin_add_comment(
     gallery_id: int,
     asset_id: int,
     body: str = Form(...),
@@ -857,7 +857,7 @@ async def admin_add_comment(
 
 
 @router.post("/comments/{comment_id}/hide")
-async def admin_hide_comment(comment_id: int):
+def admin_hide_comment(comment_id: int):
     """Moderation: soft-delete a comment AND its descendant replies in one
     recursive UPDATE (so no reply dangles under a hidden parent). This is the
     one auditable human act in this slice — logged to audit_log."""
@@ -925,10 +925,10 @@ def _transition_comment(comment_id: int, *, want: str, to: str):
 
 
 @router.post("/comments/{comment_id}/resolve")
-async def admin_resolve_comment(comment_id: int):
+def admin_resolve_comment(comment_id: int):
     return _transition_comment(comment_id, want="open", to="resolved")
 
 
 @router.post("/comments/{comment_id}/reopen")
-async def admin_reopen_comment(comment_id: int):
+def admin_reopen_comment(comment_id: int):
     return _transition_comment(comment_id, want="resolved", to="open")

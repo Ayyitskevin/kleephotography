@@ -33,7 +33,7 @@ PIPELINE_STAGES = [
 
 
 @router.get("/home", response_class=HTMLResponse)
-async def home(request: Request):
+def home(request: Request):
     """The studio landing — HoneyBook-style 'Home': a glanceable greeting page
     with headline stat tiles, quick-create shortcuts, and panels that each link
     out to the deep view (Studio pipeline, Today feed, Galleries). Read-only
@@ -559,7 +559,7 @@ async def home(request: Request):
 
 
 @router.get("/palette.json")
-async def palette_data():
+def palette_data():
     """Client bindings for the ⌘K command runner — fetched lazily the first
     time the palette opens so page renders stay lean. Read-only."""
     return JSONResponse(
@@ -582,7 +582,7 @@ _NUDGE_PREFIXES = frozenset(
 
 
 @router.post("/home/nudge/dismiss")
-async def nudge_dismiss(key: str = Form(...)):
+def nudge_dismiss(key: str = Form(...)):
     """Clear a Home 'Needs you today' nudge for the rest of the local day.
     The nudges are recomputed from live data, so we can't mark a stored row
     done — instead we record the dismissal and home() filters it out until the
@@ -599,7 +599,7 @@ async def nudge_dismiss(key: str = Form(...)):
 
 
 @router.get("/jobs", response_class=HTMLResponse)
-async def jobs_view(request: Request):
+def jobs_view(request: Request):
     failed = db.all_("SELECT * FROM jobs WHERE status='failed' ORDER BY updated_at DESC LIMIT 50")
     recent = db.all_("SELECT * FROM jobs WHERE status!='failed' ORDER BY id DESC LIMIT 30")
     return templates.TemplateResponse(
@@ -610,14 +610,14 @@ async def jobs_view(request: Request):
 
 
 @router.post("/jobs/{job_id}/retry")
-async def job_retry(job_id: int):
+def job_retry(job_id: int):
     if not jobs.retry(job_id):
         raise HTTPException(status_code=404, detail="no failed job with that id")
     return RedirectResponse("/admin/jobs", status_code=303)
 
 
 @router.get("/emails", response_class=HTMLResponse)
-async def emails_view(request: Request, offset: int = 0):
+def emails_view(request: Request, offset: int = 0):
     """Download-gate captures, newest first. Paginated like /admin/sent — the
     .txt export remains the full-list path."""
     offset = max(0, offset)
@@ -647,14 +647,14 @@ async def emails_view(request: Request, offset: int = 0):
 
 
 @router.get("/emails.txt", response_class=PlainTextResponse)
-async def emails_export():
+def emails_export():
     rows = db.all_("""SELECT DISTINCT email FROM visitors
                       WHERE email IS NOT NULL ORDER BY email""")
     return "\n".join(r["email"] for r in rows) + ("\n" if rows else "")
 
 
 @router.get("/today", response_class=HTMLResponse)
-async def today_view(request: Request):
+def today_view(request: Request):
     """Single-page 'what happened in the last 24h?' across inquiries,
     downloads, favorites, sent emails, and portal visits. Threads with the
     sparklines (ship #57/#58) — sparkline says 'something happened'; this
@@ -714,7 +714,7 @@ async def today_view(request: Request):
 
 
 @router.get("/sent", response_class=HTMLResponse)
-async def sent_emails_view(request: Request, offset: int = 0):
+def sent_emails_view(request: Request, offset: int = 0):
     """Manual send audit log — proposal/contract/invoice/delivery emails Kevin
     has fired from the studio. Paginated 50/page, newest first."""
     offset = max(0, offset)
@@ -742,7 +742,7 @@ async def sent_emails_view(request: Request, offset: int = 0):
 
 
 @router.get("/galleries/{gallery_id}/activity", response_class=HTMLResponse)
-async def activity(request: Request, gallery_id: int):
+def activity(request: Request, gallery_id: int):
     # 404 on a missing/deleted gallery instead of ghost-rendering the page with
     # g=None (empty title, empty lists) — matches the get_or_404 pattern used
     # across the admin lookups.
@@ -788,7 +788,7 @@ async def activity(request: Request, gallery_id: int):
 
 
 @router.get("/galleries/{gallery_id}/favorites.txt", response_class=PlainTextResponse)
-async def favorites_export(gallery_id: int):
+def favorites_export(gallery_id: int):
     rows = db.all_(
         """SELECT DISTINCT a.filename
                       FROM favorites f JOIN assets a ON a.id=f.asset_id

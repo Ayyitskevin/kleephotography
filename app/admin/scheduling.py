@@ -273,7 +273,7 @@ def _global_overrides() -> list[dict]:
 
 
 @router.get("", response_class=HTMLResponse)
-async def home(request: Request):
+def home(request: Request):
     events = db.all_("""SELECT et.*,
                         (SELECT COUNT(*) FROM bookings b
                          WHERE b.event_type_id=et.id AND b.status='confirmed'
@@ -327,7 +327,7 @@ async def save_availability(request: Request):
 
 
 @router.post("/override")
-async def add_override(
+def add_override(
     request: Request,
     day: str = Form(...),
     mode: str = Form("block"),
@@ -389,7 +389,7 @@ async def add_override(
 
 
 @router.post("/override/{override_id}/delete")
-async def del_override(override_id: int):
+def del_override(override_id: int):
     with db.tx() as con:
         con.execute(
             "DELETE FROM date_overrides WHERE id=? AND event_type_id IS NULL", (override_id,)
@@ -404,7 +404,7 @@ _STATE_COOKIE = "g_oauth_state"
 
 
 @router.get("/google/connect")
-async def google_connect(request: Request):
+def google_connect(request: Request):
     """Kick off the OAuth consent flow. A random state is stashed in an HttpOnly
     cookie and echoed to Google, then re-checked on callback (CSRF defence)."""
     if not gcal.configured():
@@ -416,7 +416,7 @@ async def google_connect(request: Request):
 
 
 @router.get("/google/callback")
-async def google_callback(request: Request):
+def google_callback(request: Request):
     """Consent return leg. Verify state, trade the code for a refresh token, and
     land back on the console with a success or error banner."""
     q = request.query_params
@@ -447,7 +447,7 @@ async def google_callback(request: Request):
 
 
 @router.post("/google/disconnect")
-async def google_disconnect(request: Request):
+def google_disconnect(request: Request):
     gcal.disconnect()
     with db.tx() as con:
         audit.log(con, "google_calendar", 1, "disconnect")
@@ -458,7 +458,7 @@ async def google_disconnect(request: Request):
 
 
 @router.post("/event")
-async def create_event(
+def create_event(
     request: Request, name: str = Form(...), slug: str = Form(...), duration_min: int = Form(30)
 ):
     name, slug = name.strip(), slug.strip().lower()
@@ -481,7 +481,7 @@ async def create_event(
 
 
 @router.get("/event/{event_id}", response_class=HTMLResponse)
-async def edit_event(request: Request, event_id: int):
+def edit_event(request: Request, event_id: int):
     e = _get_event(event_id)
     return templates.TemplateResponse(
         request, "admin/scheduling_event.html", {"e": e, "base_url": scheduling.config.BASE_URL}
@@ -525,7 +525,7 @@ async def update_event(request: Request, event_id: int):
 
 
 @router.post("/event/{event_id}/toggle")
-async def toggle_event(event_id: int):
+def toggle_event(event_id: int):
     e = _get_event(event_id)
     new = 0 if e["active"] else 1
     with db.tx() as con:
@@ -535,7 +535,7 @@ async def toggle_event(event_id: int):
 
 
 @router.post("/event/{event_id}/delete")
-async def delete_event(event_id: int):
+def delete_event(event_id: int):
     e = _get_event(event_id)
     n = db.one("SELECT COUNT(*) AS n FROM bookings WHERE event_type_id=?", (event_id,))
     if n["n"]:
@@ -553,7 +553,7 @@ async def delete_event(event_id: int):
 
 
 @router.get("/bookings", response_class=HTMLResponse)
-async def bookings(request: Request):
+def bookings(request: Request):
     upcoming = db.all_("""SELECT b.*, e.name AS event_name FROM bookings b
                           JOIN event_types e ON e.id=b.event_type_id
                           WHERE b.status='confirmed' AND b.start_utc >= datetime('now')
@@ -570,7 +570,7 @@ async def bookings(request: Request):
 
 
 @router.post("/booking/{booking_id}/cancel")
-async def admin_cancel(booking_id: int):
+def admin_cancel(booking_id: int):
     b = db.get_or_404("SELECT token FROM bookings WHERE id=?", (booking_id,))
     if scheduling.cancel(b["token"], "Cancelled by Kevin Lee Photography"):
         booking_notify.cancelled(booking_id, by_admin=True)

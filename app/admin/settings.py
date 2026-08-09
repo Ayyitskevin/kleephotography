@@ -216,7 +216,7 @@ def _storage() -> dict:
 
 
 @router.get("", response_class=HTMLResponse)
-async def settings(request: Request):
+def settings(request: Request):
     return templates.TemplateResponse(
         request,
         "admin/settings.html",

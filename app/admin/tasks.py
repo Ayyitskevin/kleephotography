@@ -41,7 +41,7 @@ def _task_due_label(due: str | None, today: dt.date) -> tuple[str, bool]:
 
 
 @router.get("/tasks", response_class=HTMLResponse)
-async def tasks_view(request: Request):
+def tasks_view(request: Request):
     """Studio to-do board (strict-1:1 prototype): three columns — Today (due
     today or overdue), This week (every other open task), Done (recently
     completed). Each card toggles done via a POST form; due_date feeds the
@@ -114,7 +114,7 @@ async def tasks_view(request: Request):
 
 
 @router.post("/tasks")
-async def task_create(title: str = Form(...), due_date: str = Form(""), project_id: str = Form("")):
+def task_create(title: str = Form(...), due_date: str = Form(""), project_id: str = Form("")):
     title = title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="title required")
@@ -128,7 +128,7 @@ async def task_create(title: str = Form(...), due_date: str = Form(""), project_
 
 
 @router.post("/tasks/{task_id}/toggle")
-async def task_toggle(task_id: int):
+def task_toggle(task_id: int):
     t = db.one("SELECT done FROM tasks WHERE id=?", (task_id,))
     if not t:
         raise HTTPException(status_code=404, detail="no such task")
@@ -141,7 +141,7 @@ async def task_toggle(task_id: int):
 
 
 @router.post("/tasks/{task_id}/delete")
-async def task_delete(task_id: int):
+def task_delete(task_id: int):
     if not db.one("SELECT 1 FROM tasks WHERE id=?", (task_id,)):
         raise HTTPException(status_code=404, detail="no such task")
     db.run("DELETE FROM tasks WHERE id=?", (task_id,))
@@ -163,7 +163,7 @@ _CAL_BUCKET = {
 
 
 @router.get("/calendar", response_class=HTMLResponse)
-async def calendar_view(request: Request, year: int = 0, month: int = 0):
+def calendar_view(request: Request, year: int = 0, month: int = 0):
     """Month grid overlaying three real date sources, bucketed to the prototype's
     legend: shoots (clay), confirmed consults (green), invoices due (gold).
     Read-only — each cell entry links to the project/booking/invoice it represents."""

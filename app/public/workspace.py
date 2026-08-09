@@ -47,7 +47,7 @@ def _has_access(request: Request, project_id: int) -> bool:
 
 
 @router.get("/{slug}", response_class=HTMLResponse)
-async def view(request: Request, slug: str):
+def view(request: Request, slug: str):
     p = get_live_workspace(slug)
     if not _has_access(request, p["id"]):
         return templates.TemplateResponse(
@@ -108,7 +108,7 @@ async def view(request: Request, slug: str):
 
 
 @router.post("/{slug}/pin")
-async def check_pin(request: Request, slug: str, pin: str = Form(...)):
+def check_pin(request: Request, slug: str, pin: str = Form(...)):
     p = get_live_workspace(slug)
     ip = security.client_ip(request)
     key = PIN_OFFSET + p["id"]
