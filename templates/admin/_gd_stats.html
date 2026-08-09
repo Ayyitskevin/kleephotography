@@ -3,8 +3,10 @@
    _studio_list_table.html) so move/bulk actions re-true the counts. The
    whole block swaps: #gd-stats is the swap root. #}
 {% set n_fav = assets | selectattr("n_fav") | list | length %}
+{% set n_photo = assets | selectattr("kind", "equalto", "photo") | list | length %}
+{% set n_video = assets | selectattr("kind", "equalto", "video") | list | length %}
 <div class="gd-stats" id="gd-stats"{% if request.headers.get("hx-request") %} hx-swap-oob="outerHTML"{% endif %}>
-  <div class="gd-stat"><span class="gd-stat-n">{{ assets|length }}</span><span class="gd-stat-l">Photos</span></div>
+  <div class="gd-stat"><span class="gd-stat-n">{{ n_photo }}</span><span class="gd-stat-l">Photos{% if n_video %} &middot; {{ n_video }} film{{ "s" if n_video != 1 }}{% endif %}</span></div>
   <div class="gd-stat"><span class="gd-stat-n gd-stat-gold">{{ n_fav }}</span><span class="gd-stat-l">Favorited</span></div>
   <div class="gd-stat"><span class="gd-stat-n">{{ n_views }}</span><span class="gd-stat-l">Client views</span></div>
   <div class="gd-stat"><span class="gd-stat-n gd-stat-ok">{{ n_downloads }}</span><span class="gd-stat-l">Downloads</span></div>

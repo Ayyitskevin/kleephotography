@@ -116,3 +116,73 @@ def test_gallery_settings_rejects_a_non_iso_expiry_and_keeps_empty_as_never(admi
     assert response.status_code == 303
     row = db.one("SELECT expires_at FROM galleries WHERE id=?", (gallery,))
     assert row["expires_at"] is None
+
+
+@pytest.mark.integration
+def test_task_board_offers_a_confirm_guarded_delete(admin_client):
+    tid = db.run("INSERT INTO tasks (title) VALUES (?)", ("Deletable board task",))
+    try:
+        page = admin_client.get("/admin/tasks")
+        assert page.status_code == 200
+        assert f'formaction="/admin/tasks/{tid}/delete"' in page.text
+        card = page.text.split("Deletable board task")[1]
+        assert "data-confirm=" in card.split("</form>")[0]
+
+        response = admin_client.post(f"/admin/tasks/{tid}/delete", follow_redirects=False)
+        assert response.status_code == 303
+        assert db.one("SELECT id FROM tasks WHERE id=?", (tid,)) is None
+        assert "Deletable board task" not in admin_client.get("/admin/tasks").text
+    finally:
+        db.run("DELETE FROM tasks WHERE id=?", (tid,))
+
+
+@pytest.mark.integration
+def test_content_caption_card_counts_past_the_rendered_window(admin_client):
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Caption Card Co",))
+    pid = db.run("INSERT INTO projects (client_id, title) VALUES (?,?)", (cid, "Caption retainer"))
+    plan_id = db.run(
+        "INSERT INTO recurring_plans (project_id, title) VALUES (?,?)", (pid, "Monthly captions")
+    )
+    try:
+        con = db.connect()
+        try:
+            # Approved packs are the oldest, so the newest-60 window would miss
+            # them entirely and the split would read 0 approved.
+            con.executemany(
+                """INSERT INTO retainer_captions (plan_id, period, label, body, status)
+                   VALUES (?,?,?,?,?)""",
+                [
+                    (plan_id, f"2035-{n // 12 + 1:02d}", "IG", f"caption {n}", status)
+                    for n, status in enumerate(["approved"] * 3 + ["draft"] * 58)
+                ],
+            )
+            con.commit()
+        finally:
+            con.close()
+
+        page = admin_client.get(f"/admin/content?client={cid}")
+        assert page.status_code == 200
+        assert '<div class="fin-card-val">61</div>' in page.text
+        assert '<span class="fin-card-sub">3 approved · 58 draft</span>' in page.text
+        assert "Newest 60 of 61" in page.text
+    finally:
+        db.run("DELETE FROM retainer_captions WHERE plan_id=?", (plan_id,))
+        db.run("DELETE FROM recurring_plans WHERE id=?", (plan_id,))
+        db.run("DELETE FROM projects WHERE id=?", (pid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))
+
+
+@pytest.mark.integration
+def test_bench_stats_split_photos_from_films(admin_client, gallery):
+    for kind, name in (("photo", "one.jpg"), ("photo", "two.jpg"), ("video", "reel.mp4")):
+        db.run(
+            """INSERT INTO assets (gallery_id, kind, filename, stored, status)
+               VALUES (?,?,?,?, 'ready')""",
+            (gallery, kind, name, f"stored-{name}"),
+        )
+    page = admin_client.get(f"/admin/galleries/{gallery}")
+    assert page.status_code == 200
+    assert (
+        '<span class="gd-stat-n">2</span><span class="gd-stat-l">Photos &middot; 1 film</span>'
+        in page.text
+    )
