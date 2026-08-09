@@ -1,4 +1,4 @@
-"""One-way "arm a deferred reminder" push to Hermes (flow :7020).
+"""One-way "arm a deferred reminder" push to Hermes, an external reminder service.
 
 Hermes owns the persistent, late-safe, precise-time reminder engine; Mise owns the
 events. At an event instant Mise pushes an arm request and Hermes schedules a single

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.requir
 # Brand Sessions (brand_halfday / brand_full) are admin-only anchors — not on
 # the public board — and keep their own figures.
 #
-# IMPORTANT: Odysseus Products catalog on mickey :7010 may still hold older
+# IMPORTANT: the external Odysseus Products catalog may still hold older
 # backfill prices. Update that catalog separately or proposal_engine will draft
 # against stale numbers outside Mise.
 

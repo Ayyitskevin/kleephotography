@@ -19,7 +19,7 @@ def _configure_tmp_db(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "RECEIPTS_DIR", tmp_path / "receipts")
     monkeypatch.setattr(config, "SECRET_KEY", "test-secret")
     monkeypatch.setattr(config, "ADMIN_PASSWORD", "test-pw")
-    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus.example.internal")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     db.migrate()
 

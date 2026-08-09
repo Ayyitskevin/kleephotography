@@ -49,14 +49,14 @@ def test_argus_is_enabled(monkeypatch):
     monkeypatch.setattr(config, "ARGUS_URL", "")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "")
     assert argus_analyze.is_enabled() is False
-    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus.example.internal")
     assert argus_analyze.is_enabled() is False
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     assert argus_analyze.is_enabled() is True
 
 
 def test_publish_enqueues_argus_job(admin_client, monkeypatch):
-    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus.example.internal")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
@@ -110,7 +110,7 @@ def test_publish_does_not_enqueue_when_argus_disabled(admin_client, monkeypatch)
 
 def test_run_for_gallery_records_queued(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
-    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus.example.internal")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
@@ -137,7 +137,7 @@ def test_run_for_gallery_records_queued(tmp_path, monkeypatch):
 
 def test_run_for_gallery_records_sync_run(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
-    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus.example.internal")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
@@ -159,16 +159,16 @@ def test_run_for_gallery_records_sync_run(tmp_path, monkeypatch):
     row = db.one("SELECT * FROM galleries WHERE id=?", (gid,))
     assert row["argus_last_run_id"] == 42
     assert row["argus_last_status"] == "done"
-    assert row["argus_last_review_url"] == "http://argus:8010/runs/42"
+    assert row["argus_last_review_url"] == "http://argus.example.internal/runs/42"
 
 
 def test_sync_argus_enqueues_plutus(tmp_path, monkeypatch):
     from app import jobs
 
     _configure_tmp_db(tmp_path, monkeypatch)
-    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus.example.internal")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
-    monkeypatch.setattr(config, "PLUTUS_URL", "http://plutus:8030")
+    monkeypatch.setattr(config, "PLUTUS_URL", "http://plutus.example.internal")
     monkeypatch.setattr(config, "PLUTUS_TOKEN", "secret")
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
@@ -187,7 +187,7 @@ def test_sync_argus_enqueues_plutus(tmp_path, monkeypatch):
                 {
                     "mode": "sync",
                     "run_id": 7,
-                    "review_url": "http://argus:8010/runs/7",
+                    "review_url": "http://argus.example.internal/runs/7",
                 }
             ).encode()
 
@@ -204,7 +204,7 @@ def test_sync_argus_enqueues_plutus(tmp_path, monkeypatch):
 
 def test_run_for_gallery_swallows_errors(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
-    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus.example.internal")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
@@ -222,7 +222,7 @@ def test_run_for_gallery_swallows_errors(tmp_path, monkeypatch):
 
 
 def test_manual_analyze_route(admin_client, monkeypatch):
-    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus.example.internal")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "secret")
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
@@ -254,7 +254,7 @@ def test_argus_callback_updates_gallery(admin_client, monkeypatch):
 
 
 def test_galleries_api(admin_client, monkeypatch):
-    monkeypatch.setattr(config, "ARGUS_URL", "http://argus:8010")
+    monkeypatch.setattr(config, "ARGUS_URL", "http://argus.example.internal")
     monkeypatch.setattr(config, "ARGUS_TOKEN", "")
     r = admin_client.get("/api/galleries")
     assert r.status_code == 503

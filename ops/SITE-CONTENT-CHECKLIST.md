@@ -24,7 +24,7 @@ Unblocks: home doors, spoke filmstrips, `/portfolio` chips, `/reels`.
 
 ## 3. Booking event types
 
-Either create in **Admin → Scheduling**, or on mickey:
+Either create in **Admin → Scheduling**, or on the prod host:
 
 ```sh
 cd /opt/mise && sudo -u mise .venv/bin/python scripts/ensure-specialty-event-types.py

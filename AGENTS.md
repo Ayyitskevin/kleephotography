@@ -1,15 +1,14 @@
 # AGENTS.md — scope contract for autonomous work on Mise
 
-Mise is **live production**: mickey `100.125.80.91:8400` · `/opt/mise` · `kleephotography.com`
-(uvicorn loopback; public via Cloudflare). Mickey is the always-on host — flow is not
-the live origin. It handles **real Stripe money for real clients**. This file is the
-contract that lets an agent work continuously without a human watching every commit.
-Read it before you touch anything. When code and this file disagree, stop and ask —
-don't reconcile silently.
+Mise is **live production**: `<prod-host>` · `/opt/mise` · `kleephotography.com`
+(uvicorn on loopback; public via Cloudflare tunnel). `<prod-host>` is the always-on
+box — a laptop or agent workspace is never the live origin. It handles **real Stripe
+money for real clients**. This file is the contract that lets an agent work
+continuously without a human watching every commit. Read it before you touch anything.
+When code and this file disagree, stop and ask — don't reconcile silently.
 
-This repo (`~/ai-workspace/mise-claude`, or your own clone) is a **working copy, NOT
-production**. mickey `/opt/mise` is git + deploy canonical. Never scratch-edit the
-prod tree.
+This repo (your own clone) is a **working copy, NOT production**. The `<prod-host>`
+tree at `/opt/mise` is git + deploy canonical. Never scratch-edit the prod tree.
 
 Scope derivation: the red/green split below narrows the fleet-wide **Permission
 Boundaries** block (canonical in each machine's CLAUDE.md / GROK.md /
@@ -39,8 +38,8 @@ self-merge**. A human presses the button (R1).
 - **Schema / migrations** — any new file in `migrations/`, any `ALTER`/`CREATE`/`DROP`,
   any change to table shape or a UNIQUE/CHECK constraint. (Migrations are forward-only
   and run against the live DB.)
-- **Deploy** — touching the mickey prod tree, `scripts/deploy-flow.sh`, `mise.service`,
-  `ops/backup.sh`, `ops/harden-flow.sh`, the systemd units, or anything in the
+- **Deploy** — touching the prod tree, `scripts/deploy-flow.sh`, `mise.service`,
+  `ops/backup.sh`, host hardening, the systemd units, or anything in the
   backup/restore chain.
 - **Security** — `app/security.py`, `app/admin/auth.py`, CSRF/session/cookie logic,
   rate-limit/lockout, secrets handling.
@@ -67,9 +66,9 @@ ruff check . && ruff format --check .
 "Tests pass" is false if any were skipped or mocked without saying so. Run all four
 locally before pushing — CI runs the same on `main` and on PRs.
 
-Full-site deploy is git pull on mickey + restart — see `ops/DEPLOY.md`.
-`scripts/deploy-flow.sh` is a specialty rsync slice (legacy name; target mickey),
-not the normal path.
+Full-site deploy is git pull on the prod host + restart — see `ops/DEPLOY.md`.
+`scripts/deploy-flow.sh` is a specialty rsync slice (legacy name; it targets whatever
+host you point it at), not the normal path.
 
 ## Conventions that bite if you miss them
 
@@ -99,17 +98,15 @@ not the normal path.
 
 After any **write** in Mise admin (client/project/shot create or update, status change),
 append one row to the Notion **Mise Activity Log** (Command Center · db
-`14ed3722-8165-48a2-82e0-cecbaf4c5daa`) — one-way, display-only, one row per write. Never
-read that log back into any Mise flow.
+`<notion-activity-log-db-id>`, kept with the operator's private ops notes) — one-way,
+display-only, one row per write. Never read that log back into any Mise flow.
 
 ## Safety net (so you know what's catching you)
 
-Nightly on **mickey**: integrity-checked SQLite snapshot at 02:30
-(`mise-backup.timer` → `ops/backup.sh` → `/opt/mise/data/backups/`). The old
-flow→mickey off-host pull + restore-verify cron was **retired 2026-07-25** when prod
-moved; replacement off-host DR is pending. See `ops/BACKUP.md`. Local nightlies do
-**not** make a bad migration or a wrong Stripe charge a non-event. Red-light rules
-still hold.
+Nightly on the prod host: integrity-checked SQLite snapshot
+(`mise-backup.timer` → `ops/backup.sh` → `/opt/mise/data/backups/`). Off-host DR is a
+**known open gap**, tracked in `ops/BACKUP.md`. Local nightlies do **not** make a bad
+migration or a wrong Stripe charge a non-event. Red-light rules still hold.
 
 ## Done means
 

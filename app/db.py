@@ -13,7 +13,7 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 # must use a unique NNN_ prefix — never reuse 054/055 (those collisions already
 # exist on disk; do not renumber them on a live DB). Policy: ops/MIGRATIONS.md.
 MIGRATION_ALIASES = {
-    # Flow briefly applied the Plutus gallery columns under this later filename.
+    # An earlier host briefly applied the Plutus gallery columns under this later filename.
     # Treat both names as equivalent so a clean GitHub deploy does not re-run
     # the same ALTER TABLE statements against production.
     "055_plutus_upsell.sql": {"058_plutus_upsell.sql"},

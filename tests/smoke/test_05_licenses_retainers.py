@@ -2567,7 +2567,7 @@ def test_caption_ai_live_wiring(admin, monkeypatch):
     from app import caption_ai
     from app.admin.recurring import _period
 
-    URL = "http://mickey:7010/draft/caption"
+    URL = "http://caption.example.internal/draft/caption"
     TOKEN = "stub-bearer-do-not-log"
     monkeypatch.setattr(config, "ODYSSEUS_CAPTION_URL", URL)
     monkeypatch.setattr(config, "ODYSSEUS_CAPTION_TOKEN", TOKEN)

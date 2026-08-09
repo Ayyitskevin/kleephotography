@@ -273,7 +273,8 @@ def check_admin_password(password: str) -> bool:
 def require_argus_token(request: Request) -> None:
     """Bearer gate for the published-gallery index (config.ARGUS_TOKEN).
 
-    Token unset -> 503: disarmed until MISE_ARGUS_TOKEN is provisioned on flow.
+    Token unset -> 503: disarmed until MISE_ARGUS_TOKEN is provisioned in the
+    deployment's environment.
     """
     if not config.ARGUS_TOKEN:
         raise HTTPException(status_code=503, detail="galleries api disarmed")
@@ -287,7 +288,7 @@ def require_shots_token(request: Request) -> None:
     """Bearer gate for the shot-list read API (config.SHOTS_TOKEN).
 
     Token unset -> 503: the endpoint is disarmed, not merely unauthorized. This is the
-    deliberate dormant state on flow until Kevin provisions MISE_SHOTS_TOKEN, and it
+    deliberate dormant state until Kevin provisions MISE_SHOTS_TOKEN, and it
     reads differently from a real auth failure (401) for an arming caller.
     """
     if not features.shots_api_enabled():

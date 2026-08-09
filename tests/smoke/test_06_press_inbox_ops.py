@@ -619,7 +619,7 @@ def test_shot_list_crud_and_audit(admin):
 def test_shots_read_api(admin):
     """Domain F / B-Direct: the inbound /api/shots read surface Odysseus's
     preshoot_pack calls. Proves the WHY of each rule:
-      - disarmed (SHOTS_TOKEN unset) -> 503, NOT 401: the route ships dormant on flow
+      - disarmed (SHOTS_TOKEN unset) -> 503, NOT 401: the route ships dormant
         and a 503 reads as 'not turned on yet', distinct from a real auth failure;
       - missing/bad bearer -> 401 once armed (secrets.compare_digest gate);
       - good bearer + a session mapped via projects.notion_page_id -> matched True with

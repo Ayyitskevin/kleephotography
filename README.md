@@ -58,16 +58,16 @@ ruff check . && ruff format --check .
 
 ## Deploy
 
-Canonical full-site deploy is **git pull on mickey + restart mise**.
+Canonical full-site deploy is **git pull on the production host + restart mise**.
 See [`ops/DEPLOY.md`](ops/DEPLOY.md).
 
-`scripts/deploy-flow.sh` is a **specialty rsync slice** (legacy name; target mickey —
-Plutus/Argus/Platekit bits), not the full-tree deploy path.
+`scripts/deploy-flow.sh` is a **specialty rsync slice** (legacy name; it ships only the
+Plutus/Argus/Platekit bits to the host you point it at), not the full-tree deploy path.
 
 ## Related docs
 
 - [`AGENTS.md`](AGENTS.md) — agent permission boundaries
-- [`ops/BACKUP.md`](ops/BACKUP.md) — nightly local snapshot on mickey (off-host DR pending)
+- [`ops/BACKUP.md`](ops/BACKUP.md) — nightly local snapshot on the prod host (off-host DR pending)
 - [`ops/DEPLOY.md`](ops/DEPLOY.md) — production deploy
 - [`ops/SPECIALTY-LAUNCH.md`](ops/SPECIALTY-LAUNCH.md) — specialty / aerials launch
 - [`HANDOFF.md`](HANDOFF.md) — historical refactor notes (prefer AGENTS.md + this README)

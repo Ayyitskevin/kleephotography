@@ -2,7 +2,7 @@
 
 Dormant unless MISE_TELEGRAM_TOKEN + MISE_TELEGRAM_CHAT_ID are set in .env. Sending
 is a one-shot HTTP POST — it never calls getUpdates, so it can NEVER conflict with
-the single Telegram polling consumer (MickeyBot) elsewhere on the fleet. Fire-and-
+the operator's single Telegram polling consumer elsewhere on their fleet. Fire-and-
 forget on a daemon thread: a slow/down Telegram must never block or stall an auth
 path, so failures are logged and swallowed. Alerts fire only on ANOMALIES (lockouts
 after repeated failures) — never on a normal login or a deploy restart — to avoid

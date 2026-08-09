@@ -325,13 +325,13 @@ def test_forwarded_host_is_not_trusted_as_a_host_rewrite(monkeypatch):
 
     with TestClient(
         proxied_app,
-        base_url="http://flow:8400",
+        base_url="http://origin:8400",
         client=("127.0.0.1", 43210),
     ) as proxied:
         response = proxied.get(
             "/contact",
             headers={
-                "host": "flow:8400",
+                "host": "origin:8400",
                 "x-forwarded-host": "kleephotography.com",
                 "x-forwarded-proto": "https",
             },
@@ -417,5 +417,5 @@ def test_private_origin_health_and_service_api_bypass_redirect(client, monkeypat
     monkeypatch.setattr(config, "BASE_URL", "https://kleephotography.com")
     monkeypatch.setattr(config, "CANONICAL_REDIRECTS", True)
 
-    assert client.get("http://flow:8400/healthz", follow_redirects=False).status_code == 200
-    assert client.get("http://flow:8400/api/shots", follow_redirects=False).status_code == 503
+    assert client.get("http://origin:8400/healthz", follow_redirects=False).status_code == 200
+    assert client.get("http://origin:8400/api/shots", follow_redirects=False).status_code == 503

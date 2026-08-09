@@ -1,4 +1,4 @@
-"""Mickey Prompt 2 — durable owner-email delivery + Notion orphan recovery.
+"""Durable owner-email delivery + Notion orphan recovery.
 
 Drives shipped inquiry_notify + jobs + notion_sync paths. Mailer/Notion network
 mocked at seams only.

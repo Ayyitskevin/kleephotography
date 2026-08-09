@@ -157,7 +157,7 @@ GCAL_AVAILABILITY_STRICT = os.environ.get("MISE_GCAL_AVAILABILITY_STRICT", "").l
 # Mise only POSTs context + a bearer token and reads back {"caption","model"}.
 # Timeout is 210s — deliberately ABOVE Odysseus's ~180s caption budget so the ENDPOINT
 # decides failure (returns a clean 502) and this synchronous client never fires first,
-# orphaning an in-flight generation on mickey.
+# orphaning an in-flight generation on the Odysseus side.
 ODYSSEUS_CAPTION_URL = os.environ.get("MISE_ODYSSEUS_CAPTION_URL", "")
 ODYSSEUS_CAPTION_TOKEN = os.environ.get("MISE_ODYSSEUS_CAPTION_TOKEN", "")
 ODYSSEUS_TIMEOUT = int(os.environ.get("MISE_ODYSSEUS_TIMEOUT", "210"))
@@ -188,7 +188,7 @@ REOPEN_NOTIFY_TIMEOUT = int(os.environ.get("MISE_REOPEN_NOTIFY_TIMEOUT", "5"))
 # Two-way SMS inbox (Quo, formerly OpenPhone). All three empty = feature INERT:
 # sms.configured() is false, no outbound texts are sent, the /webhooks/quo route
 # returns 503, and the Inbox stays email-only. Arming needs Kevin to provision a Quo
-# number + API key into flow's .env. QUO_NUMBER is the E.164 business line Quo sends
+# number + API key into the deployment's .env. QUO_NUMBER is the E.164 business line Quo sends
 # FROM (and the inbound webhook's "to"); QUO_WEBHOOK_SECRET is Quo's signing secret
 # used to verify inbound webhook HMACs (sms.verify_webhook). API base is overridable
 # in case Quo's host changes post-rebrand. No money/legal state.
@@ -202,7 +202,7 @@ QUO_TIMEOUT = int(os.environ.get("MISE_QUO_TIMEOUT", "20"))
 # reads Mise's local shot list over GET /api/shots?session=<notion_page_id> with a
 # bearer token. Empty = endpoint DISARMED: every request returns 503 (not 401), so the
 # route ships dormant and only goes live once Kevin provisions MISE_SHOTS_TOKEN into
-# flow's .env. This is the ONLY inbound service-bearer surface in Mise.
+# the deployment's .env. This is the ONLY inbound service-bearer surface in Mise.
 SHOTS_TOKEN = os.environ.get("MISE_SHOTS_TOKEN", "")
 
 # Platekit/Dionysus bridge. Empty values keep the admin panel and Argus hook dormant.
@@ -251,8 +251,8 @@ CONTRACT_NUDGE_DAYS = int(os.environ.get("MISE_CONTRACT_NUDGE_DAYS", "3"))
 BACKUP_STALE_HOURS = int(os.environ.get("MISE_BACKUP_STALE_HOURS", "26"))
 
 # Event-driven reminder net (hermes_arm): at a Mise event instant, fire-and-forget
-# an "arm a deferred owner reminder" push to Hermes (flow :7020), which owns the
-# persistent late-safe precise-time engine. One-way (R-doctrine): Mise never reads
+# an "arm a deferred owner reminder" push to Hermes, the external service that owns
+# the persistent late-safe precise-time engine. One-way (R-doctrine): Mise never reads
 # back, and the whole path is dormant unless MISE_HERMES_ARM_URL is set. Two arms:
 # a gallery delivered → +N day "did the review land?" check, and a shoot finished →
 # +N day "pull/cull/back-up the cards" ops nudge. Hermes dedups by key, so a job

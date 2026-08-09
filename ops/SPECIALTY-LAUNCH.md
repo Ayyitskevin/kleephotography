@@ -103,7 +103,7 @@ Suggested setup (durations/buffers are starting points — adjust to taste):
 
 `MISE_AERIALS_LIVE` now **defaults ON** (`app/config.py`); the next deploy
 takes the offering live with no `.env` edit. Setting
-`MISE_AERIALS_LIVE=false` in flow's `.env` is the kill switch that hides it
+`MISE_AERIALS_LIVE=false` in the prod `.env` is the kill switch that hides it
 everywhere at once (band, booking add-on, ticker, credits, ▲ badges).
 
 Live state:

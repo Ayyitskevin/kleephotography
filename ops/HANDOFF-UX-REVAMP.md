@@ -1,7 +1,8 @@
 # HANDOFF — UX revamp final phase: commit + deploy the CSS excavation
 
-> **Host note (2026-07-25):** production is **mickey** `/opt/mise`, not flow.
-> Prefer [`ops/DEPLOY.md`](DEPLOY.md) over the flow-era commands below.
+> **Host note (2026-07-25):** production moved to a dedicated always-on host
+> (`/opt/mise` there). Prefer [`ops/DEPLOY.md`](DEPLOY.md) over the older
+> deploy-from-the-dev-box commands below.
 
 **Written:** 2026-07-23, by the Kimi agent that ran the revamp. **For:** the next
 agent (any fleet member). Everything below is verified state and exact commands;
@@ -113,7 +114,7 @@ Data is untouched (no migrations in this phase); nightly backup chain is intact.
 - **htmx gotchas found this project:** the bundled htmx exposes NO public
   `htmx.swap` (use `htmx.ajax`); a bare `<tbody>` can't ride a fragment (swap
   whole tables); fragment swap roots must carry their own id (outerHTML).
-- **flow = this machine.** `/opt/mise` is kevin-lee-owned (git ops fine);
+- **Ownership on the host:** `/opt/mise` is owned by the deploy user (git ops fine);
   `/opt/mise/data` is `mise:mise` (backups/service need sudo).
 - Red-light per AGENTS.md: money (`app/public/pay.py`), schema/migrations,
   deploy files, security, contracts logic — PR, never direct to main.

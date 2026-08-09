@@ -28,7 +28,7 @@ def test_plutus_is_enabled(monkeypatch):
     monkeypatch.setattr(config, "PLUTUS_URL", "")
     monkeypatch.setattr(config, "PLUTUS_TOKEN", "")
     assert plutus_recommend.is_enabled() is False
-    monkeypatch.setattr(config, "PLUTUS_URL", "http://plutus:8030")
+    monkeypatch.setattr(config, "PLUTUS_URL", "http://plutus.example.internal")
     assert plutus_recommend.is_enabled() is False
     monkeypatch.setattr(config, "PLUTUS_TOKEN", "secret")
     assert plutus_recommend.is_enabled() is True
@@ -36,7 +36,7 @@ def test_plutus_is_enabled(monkeypatch):
 
 def test_run_for_gallery_records_done(tmp_path, monkeypatch):
     _configure_tmp_db(tmp_path, monkeypatch)
-    monkeypatch.setattr(config, "PLUTUS_URL", "http://plutus:8030")
+    monkeypatch.setattr(config, "PLUTUS_URL", "http://plutus.example.internal")
     monkeypatch.setattr(config, "PLUTUS_TOKEN", "secret")
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin, type, published) VALUES (?,?,?,?,1)",
@@ -100,7 +100,7 @@ def test_argus_callback_enqueues_plutus(tmp_path, monkeypatch):
     from app import argus_analyze
 
     _configure_tmp_db(tmp_path, monkeypatch)
-    monkeypatch.setattr(config, "PLUTUS_URL", "http://plutus:8030")
+    monkeypatch.setattr(config, "PLUTUS_URL", "http://plutus.example.internal")
     monkeypatch.setattr(config, "PLUTUS_TOKEN", "secret")
     gid = db.run(
         "INSERT INTO galleries (slug, title, pin, type, published) VALUES (?,?,?,?,1)",

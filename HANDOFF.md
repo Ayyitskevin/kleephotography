@@ -7,9 +7,10 @@ Do not treat [§7](#7-what-remains-ordered-work-queue) as an active autonomous q
 **Standing truths:**
 
 - §6a security red-lights are **fixed** on main.
-- **Full-site deploy** = git pull on mickey `/opt/mise` + restart — [`ops/DEPLOY.md`](ops/DEPLOY.md).
-  `scripts/deploy-flow.sh` is a specialty rsync slice only (legacy name; target mickey).
-  Prod moved flow→mickey on 2026-07-25; older “deploy on flow” notes below are historical.
+- **Full-site deploy** = git pull on the prod host `/opt/mise` + restart — [`ops/DEPLOY.md`](ops/DEPLOY.md).
+  `scripts/deploy-flow.sh` is a specialty rsync slice only (legacy name; it targets
+  whatever host you point it at). Production has moved hosts since these notes were
+  written; older “deploy on the dev box” instructions below are historical.
 - Screening Room / Aerials kill switches: `.env.example`. Migrations policy: [`ops/MIGRATIONS.md`](ops/MIGRATIONS.md).
 - Do not start leftover §6b / §6c items without Kevin's explicit ask.
 
@@ -32,10 +33,10 @@ migration 068 and changes canonical transport behavior.
   unsafe noncanonical methods receive 421 without replay, and opaque/malformed
   browser Origins are rejected. Private `/healthz` and bearer `/api/*` access
   remain available.
-- Activation and rollback are in `ops/TRUTHFUL-HTTPS.md`. No Cloudflare, Flow,
-  production database, deploy, or live content mutation belongs in this branch.
+- Activation and rollback are in `ops/TRUTHFUL-HTTPS.md`. No Cloudflare, production
+  host, production database, deploy, or live content mutation belongs in this branch.
 - Human gates still open: live proof/release inventory, fresh verified backup,
-  Kevin review/merge, Cloudflare rules, Flow deploy, and post-deploy smoke.
+  Kevin review/merge, Cloudflare rules, prod deploy, and post-deploy smoke.
 
 Local acceptance: 61 unit, 87 integration, 185 smoke, Ruff check/format, and
 `git diff --check` pass; exact-SHA GitHub Actions remains the publication gate. Preserve payment and
@@ -158,7 +159,7 @@ The audit remediation and the follow-up queue finished as:
 - **Design pass:** marketing + client-facing form polish, focus-visible states,
   testimonials elevation (#14, #15). Refactor duplication collapse (#11).
 - Gates at completion: **50 unit + 166 smoke, ruff clean**, CI green on main.
-- **Standing deploy reminders for Kevin:** full-site deploy via git pull on mickey
+- **Standing deploy reminders for Kevin:** full-site deploy via git pull on the prod host
   ([`ops/DEPLOY.md`](ops/DEPLOY.md)); delete/flip any `MISE_COOKIE_SECURE=false`
   left in prod `.env`; expect one admin re-login after the 065 session-table
   migration; post-deploy click through admin flows — a missed CSP spot fails
@@ -177,7 +178,7 @@ without breaking galleries, admin, contracts, invoices, Stripe, uploads, or SEO.
   features, tests, docs, surgical refactors, dep bumps that pass the suite.
 - Red-light (document; PR for Kevin; NEVER self-merge): `app/public/pay.py`/Stripe/
   invoice-payment math+state; `migrations/`+schema; deploy files (`scripts/deploy-flow.sh`,
-  `mise.service`, `ops/backup.sh`, flow tree); `app/security.py`, `app/admin/auth.py`,
+  `mise.service`, `ops/backup.sh`, the prod tree); `app/security.py`, `app/admin/auth.py`,
   CSRF/session/cookie/rate-limit/lockout/secrets; contracts/e-sign. Unsure ⇒ red.
 - **Session override:** all work goes to branch `claude/klee-photography-refactor-y9tr5g`
   (platform constraint; do not push to main or any other branch). Delivered via
@@ -270,27 +271,7 @@ UNVERIFIED = single-auditor claim, re-verify the code before fixing.
 
 ### 6a. RED-LIGHT — document in PR only; Kevin decides (NO code changes)
 
-1. **[CONFIRMED·med] Portal PIN-lockout buckets collide with inquiry-throttle sentinels**
-   `app/public/portal.py:151` uses bucket `-p["id"]`; portals 2/3/4 collide with
-   `security.py:94-96` sentinels −2/−3/−4 (contact/book/forms throttles). 3 portal-PIN
-   typos ⇒ /contact 429s for that IP; successful portal login wipes contact throttle;
-   spurious Telegram alerts. Fix pattern exists: `workspace.py:24` PIN_OFFSET=2_000_000.
-2. **[CONFIRMED·med] Admin session = irrevocable signed constant, 90 days**
-   `security.py:191`; logout deletes only the browser cookie; revocation requires
-   rotating MISE_SECRET_KEY (kills all client cookies too). Fix: server-side session
-   token table (also needs migration ⇒ doubly red).
-3. **[UNVERIFIED·med] COOKIE_SECURE defaults false** `app/config.py:243` + `.env.example`
-   ships false; live site is HTTPS. Fix: default true or derive from BASE_URL. **Also:
-   Kevin should check flow's `.env` has `MISE_COOKIE_SECURE=true` today.**
-4. **[UNVERIFIED·med] No per-target (cross-IP) PIN attempt cap** `security.py:54` —
-   distributed guessing of 4-digit PINs is unbounded; alerting is per-IP only.
-5. **[UNVERIFIED·high] Stripe success return ignored** `app/public/pay.py:123` sets
-   `success_url=/i/{slug}?thanks=1` but `view_invoice` never reads `thanks`; client
-   returns from Checkout to a stale invoice with a live Pay button until the webhook
-   lands (days for ACH) — can double-open Checkout sessions.
-6. **[minor·red] Rate limiter exempts `/c/`, `/w/`, `/t/`** `app/ratelimit.py:34`.
-7. **[minor·red] `check_admin_password` TypeError→500 on non-ASCII password**
-   `security.py:204` — compare `.encode()` bytes; also skips lockout bookkeeping.
+Findings raised here are **fixed on main**; the inventory lives in the operator's private ops notes, not in this public repo.
 
 ### 6b. GREEN — ✅ DONE (rounds 2–4, PR #3 merged / PR #4 open)
 
@@ -343,7 +324,7 @@ created by earlier tests), TODO/FIXME grep, mailer/gcal/notion failure modes.
 ## 7. What remains (STALE — archive only)
 
 > **Stale.** The PR #2 / `claude/klee-photography-refactor-y9tr5g` queue below is
-> historical. For deploy, use [`ops/DEPLOY.md`](ops/DEPLOY.md) (git pull on mickey),
+> historical. For deploy, use [`ops/DEPLOY.md`](ops/DEPLOY.md) (git pull on the prod host),
 > not `scripts/deploy-flow.sh`. Ask Kevin before picking up §6b / §6c leftovers.
 
 1. ~~Green fixes from §6b~~ — only with Kevin's explicit ask.
@@ -351,7 +332,7 @@ created by earlier tests), TODO/FIXME grep, mailer/gcal/notion failure modes.
 3. ~~Keep PR #2 body current~~ — superseded.
 4. §6c sweeps — optional, Kevin-gated.
 5. ~~Finalize draft PR #2~~ — superseded.
-6. **Deploy:** git pull on mickey `/opt/mise` + restart mise ([`ops/DEPLOY.md`](ops/DEPLOY.md)).
+6. **Deploy:** git pull on the prod host `/opt/mise` + restart mise ([`ops/DEPLOY.md`](ops/DEPLOY.md)).
    Post-deploy: `/healthz`, home, spoke, `/admin` login, one gallery PIN page.
    Rollback look: `MISE_SCREENING_ROOM=false`. Data: nightly backups per `ops/BACKUP.md`.
 
@@ -371,5 +352,5 @@ created by earlier tests), TODO/FIXME grep, mailer/gcal/notion failure modes.
   ordering-brittle tests (`test_expired_gallery`, `test_gallery_notion_writeback`) fail
   under `-k` subsets because they read the newest gallery/project from earlier tests —
   a good §6c test-hardening target (make them self-sufficient).
-- Deploy remains BLOCKED from this env (no flow access) — Kevin deploys merged main via
+- Deploy remains BLOCKED from this env (no prod-host access) — Kevin deploys merged main via
   `scripts/deploy-flow.sh`; post-deploy spot-check `/work/{slug}` (fonts+menu+hero).

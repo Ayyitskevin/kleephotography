@@ -8,7 +8,7 @@ only unpublishes exact invented-content fingerprints.
 
 This pull request contains a migration and changes public/security behavior.
 Kevin reviews and merges it. A human separately approves the Cloudflare changes,
-Flow deploy, and every live content mutation.
+the production deploy, and every live content mutation.
 
 ## Before any live mutation
 
@@ -50,7 +50,7 @@ provider changes.
 
 4. On the old production code, set `MISE_SHOWCASE_SEED=false` and restart Mise
    before manually unpublishing anything. This closes the startup race that could
-   recreate the prototype proof. Keep this legacy key in Flow's environment
+   recreate the prototype proof. Keep this legacy key in the production environment
    through any rollback to pre-PR code; the new code safely ignores it.
 
 5. With human approval, unpublish proof without verified provenance. Rotate the
@@ -63,7 +63,7 @@ provider changes.
 1. Confirm cloudflared reaches Uvicorn from exactly `127.0.0.1` or `::1`,
    sends `X-Forwarded-Proto: https`, and preserves the original public `Host`
    header. Uvicorn does not use `X-Forwarded-Host` to rewrite Host; a tunnel that
-   sends `Host: flow:8400` would create a redirect loop.
+   sends the origin’s own private hostname as `Host` would create a redirect loop.
 
 2. After the backup and proxy checks, stage these values:
 
@@ -99,7 +99,7 @@ depth and deliberately rejects noncanonical unsafe methods with 421.
 ## Deploy sequence
 
 1. Kevin merges the reviewed PR.
-2. Deploy the exact merge SHA to Flow by fast-forward only. Restart Mise with
+2. Deploy the exact merge SHA to production by fast-forward only. Restart Mise with
    `MISE_CANONICAL_REDIRECTS=false`; migration 068 should run once.
 3. Verify the private health/API bypasses and the temporary public edge behavior.
 4. Set `MISE_CANONICAL_REDIRECTS=true`, restart once, and run all acceptance
@@ -129,7 +129,7 @@ Expected final URL:
 `https://kleephotography.com/contact?src=baseline`, status 200, with an apex
 canonical link. Also verify:
 
-- `/healthz` remains 200 on the private Flow origin and public apex.
+- `/healthz` remains 200 on the private origin and the public apex.
 - Bearer-gated `/api/*` routes do not canonical-redirect on the private origin.
 - The three retired prototype quotes, the invented tasting-menu tagline, and its
   invented same-week brief are absent from every public surface.

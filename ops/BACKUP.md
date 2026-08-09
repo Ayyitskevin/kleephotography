@@ -1,60 +1,57 @@
-# Mise backup & restore — deployed topology
+# Mise backup & restore
 
-**Production host is mickey** (`/opt/mise`). As of **2026-07-25**, Mise was moved
-off flow onto mickey (always-on). The old flow→mickey pull topology is retired.
+Production runs from `/opt/mise` on a single always-on host (`<prod-host>` — see
+[`DEPLOY.md`](DEPLOY.md)). This file is the runbook for what protects the database
+and how to get it back.
 
 ## What runs today
 
-| When  | Where  | Mechanism | What |
-|-------|--------|-----------|------|
-| 02:30 | **mickey** | `mise-backup.timer` → `mise-backup.service` (systemd, **enabled**) → `ops/backup.sh` | Consistent WAL-safe `sqlite3 .backup` of `/opt/mise/data/mise.db`, **integrity-checked before it is kept**, gzipped to `/opt/mise/data/backups/`, 14-day local retention. |
+A systemd timer (`mise-backup.timer` → `mise-backup.service` → [`backup.sh`](backup.sh))
+takes a nightly snapshot of `/opt/mise/data/mise.db`:
 
-Local stage-1 is live and healthy (see `journalctl -u mise-backup.service`).
+- `sqlite3 .backup`, so it is consistent and WAL-safe against a live database;
+- **integrity-checked before it is kept** — a corrupt snapshot fails loud instead of
+  silently replacing a good one;
+- gzipped into `/opt/mise/data/backups/`, with older snapshots pruned on a rolling
+  window.
 
-## Off-host DR — pending
+Check the last run with `journalctl -u mise-backup.service`. The app also watches for
+staleness (`app/ops_monitor.py`, threshold `MISE_BACKUP_STALE_HOURS`) and fires a
+throttled ops alert, so a silently dead timer announces itself instead of being
+discovered during a restore.
 
-When prod lived on flow, mickey also ran:
+## Off-host DR — a known open gap
 
-- `03:30` cron → `~/.local/bin/mise-backup-pull` (rsync flow backups/media/brand → `~/backups/mise/`)
-- `04:00` cron → `~/.local/bin/mise-backup-verify` (restore-prove + Telegram on failure)
+**This chain is host-local.** Snapshots protect against the failure modes that
+actually happen most — a bad migration, a wrong delete, a corrupted table — and they
+do not constitute disaster recovery. A replacement off-host sink (second machine or
+object store) plus an automated restore-verify is **pending and tracked**; until it
+lands, treat "we have backups" as "we can undo a mistake," not "we can survive losing
+the host."
 
-Those cron lines were **retired 2026-07-25** on mickey (commented in crontab): pulling
-from flow would mirror a frozen origin, and verifying that copy no longer protects
-live data. Scripts remain on disk under `~/.local/bin/` for reference; do not
-re-enable them against flow.
+An earlier two-machine pull-and-verify chain existed and was retired when production
+moved hosts (verifying a frozen copy protects nothing). The lesson worth keeping: the
+off-host sink has to be a *different* box from the origin of truth, and the copy is
+only real once a scripted restore has proven it.
 
-**Gap (honest):** nightly snapshots currently share a disk with live data on
-mickey. Replacement off-host DR (second machine or object store + restore-verify)
-is **pending**. Until that lands, a mickey disk loss is not covered by the old
-two-machine story.
-
-Uptime still polls every 2 minutes via `~/.local/bin/mise-uptime-check` (cron).
-
-## Why the old mickey-pull existed
-
-The off-site copy lived on mickey so verification survived **flow** being down.
-With prod on mickey, that inversion no longer holds — the always-on box is now
-the origin of truth, so off-host durability must target a *different* sink.
-
-## History
-
-An earlier **flow-push** design (`mise-offsite.service`/`.timer`, `offsite-sync.sh`,
-`restore-test.sh`) was never installed and was **pruned 2026-06-25** in favour of
-mickey-pull. Prod then moved flow→mickey on **2026-07-25**; pull/verify cron was
-retired the same day. `ops/` holds the deployed `backup.sh` + unit templates;
-machine-local pull/verify/uptime scripts stay on mickey under `~/.local/bin/`.
+Because the gap is open, the red-light rules in [`AGENTS.md`](../AGENTS.md) do real
+work: a nightly snapshot is not a license to run an unreviewed migration or a live
+money change.
 
 ## Restore (manual)
 
 ```sh
-# on mickey — newest local snapshot (needs mise-readable path / sudo)
+# on the prod host — newest local snapshot (needs a mise-readable path / sudo)
 sudo ls /opt/mise/data/backups/
 sudo gunzip -k /opt/mise/data/backups/mise-YYYY-MM-DD-HHMM.db.gz
 sudo sqlite3 /opt/mise/data/backups/mise-YYYY-MM-DD-HHMM.db "PRAGMA integrity_check;"
 # then: sudo systemctl stop mise
-# swap /opt/mise/data/mise.db as user mise (keep permissions)
+# swap /opt/mise/data/mise.db as user mise (keep ownership and permissions)
 # sudo systemctl start mise
 ```
 
-Historical copies under `~/backups/mise/db/` on mickey are from the pre-move
-flow pull — useful archaeology, not a live off-host chain.
+Always run the `integrity_check` before swapping anything in, and never restore over
+the live file without stopping the service first.
+
+Machine-local helper scripts and any pre-move archive copies live on the host under
+the operator's own home directory — useful archaeology, not a live off-host chain.
