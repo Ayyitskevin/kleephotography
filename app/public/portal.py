@@ -45,13 +45,44 @@ def _pin_bucket(portal_id: int) -> int:
     return PIN_OFFSET - portal_id
 
 
-def _crop_link_status(asset: "db.sqlite3.Row", ratio_slugs: list[str]) -> list[dict]:
+def _stalled_crop_assets(asset_ids: list[int]) -> set[int]:
+    """Assets whose social_crops encode exhausted its retries with nothing
+    queued behind it. Readiness alone can't tell "still encoding" from "never
+    coming", so without this the portal promises a file that no longer has a
+    job to produce it — and the fragment below polls for it forever. Only a
+    failure nothing supersedes counts: the operator's retry re-queues the same
+    asset_id, and that live row must win over the dead one."""
+    if not asset_ids:
+        return set()
+    ph = ",".join("?" * len(asset_ids))  # only ever "?,?,…" placeholders
+    rows = db.all_(
+        f"""SELECT DISTINCT json_extract(j.payload,'$.asset_id') AS asset_id
+              FROM jobs j
+             WHERE j.kind='social_crops' AND j.status='failed'
+               AND json_extract(j.payload,'$.asset_id') IN ({ph})
+               AND NOT EXISTS (
+                     SELECT 1 FROM jobs live
+                      WHERE live.kind='social_crops'
+                        AND live.status IN ('queued','running')
+                        AND json_extract(live.payload,'$.asset_id')
+                            = json_extract(j.payload,'$.asset_id'))""",
+        tuple(asset_ids),
+    )
+    return {r["asset_id"] for r in rows}
+
+
+def _crop_link_status(
+    asset: "db.sqlite3.Row", ratio_slugs: list[str], stalled: set[int]
+) -> list[dict]:
     """Per-ratio readiness for portal crop links — avoids 404s while jobs run."""
     base = jobs.crops_dir(asset["gallery_id"])
     stem = Path(asset["stored"]).stem
-    return [
-        {"slug": slug, "ready": (base / f"{stem}_{slug}.jpg").is_file()} for slug in ratio_slugs
-    ]
+    dead = asset["id"] in stalled
+    links = []
+    for slug in ratio_slugs:
+        ready = (base / f"{stem}_{slug}.jpg").is_file()
+        links.append({"slug": slug, "ready": ready, "stalled": dead and not ready})
+    return links
 
 
 def _crops_ctx(p: dict) -> dict:
@@ -82,16 +113,23 @@ def _crops_ctx(p: dict) -> dict:
         (p["client_id"],),
     )
     ratio_slugs = [ps["slug"] for ps in presets.active()]
+    stalled = _stalled_crop_assets([a["id"] for a in crops])
     crop_tiles = []
     for a in crops:
         tile = dict(a)
-        tile["crop_links"] = _crop_link_status(a, ratio_slugs)
+        tile["crop_links"] = _crop_link_status(a, ratio_slugs, stalled)
         crop_tiles.append(tile)
     return {
         "crops": crop_tiles,
         "ratios": ratio_slugs,
         "fav_summary": fav_summary,
-        "crops_pending": any(not link["ready"] for t in crop_tiles for link in t["crop_links"]),
+        # A stalled ratio is not pending: leaving it in would keep the fragment
+        # polling for a file no job is going to write.
+        "crops_pending": any(
+            not link["ready"] and not link["stalled"]
+            for t in crop_tiles
+            for link in t["crop_links"]
+        ),
     }
 
 
