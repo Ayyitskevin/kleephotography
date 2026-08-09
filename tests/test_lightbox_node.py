@@ -1,4 +1,4 @@
-"""Behavioral JavaScript timing contracts for the shared lightbox."""
+"""Behavioral JavaScript contracts for the shared lightbox."""
 
 import shutil
 import subprocess
@@ -7,14 +7,13 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.unit
-def test_lightbox_comment_outcomes_in_node():
+def _run_node_suite(name: str) -> None:
     root = Path(__file__).resolve().parents[1]
     node = shutil.which("node")
-    assert node, "Node.js is required to run the lightbox timing contract"
+    assert node, "Node.js is required to run the lightbox contracts"
 
     result = subprocess.run(
-        [node, "--test", str(root / "tests/js/lightbox-comments.test.mjs")],
+        [node, "--test", str(root / "tests/js" / name)],
         cwd=root,
         capture_output=True,
         text=True,
@@ -22,3 +21,13 @@ def test_lightbox_comment_outcomes_in_node():
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.unit
+def test_lightbox_comment_outcomes_in_node():
+    _run_node_suite("lightbox-comments.test.mjs")
+
+
+@pytest.mark.unit
+def test_lightbox_filtered_announcement_in_node():
+    _run_node_suite("lightbox-filter.test.mjs")
