@@ -187,10 +187,13 @@ def home(request: Request):
         rev_months.append(cursor)
         cursor = (cursor - dt.timedelta(days=1)).replace(day=1)
     rev_months.reverse()
+    # Bucket in local time (like _spark_series): payments are stored UTC, so an
+    # evening payment on the last of the month is already tomorrow — and next
+    # month — by UTC. Kevin's month ends when his day does.
     month_cents = {
         r["ym"]: r["cents"]
         for r in db.all_(
-            """SELECT strftime('%Y-%m', created_at) AS ym,
+            """SELECT strftime('%Y-%m', created_at, 'localtime') AS ym,
                       COALESCE(SUM(amount_cents), 0) AS cents
                FROM payments GROUP BY ym"""
         )
@@ -496,7 +499,8 @@ def home(request: Request):
     paid_mtd = db.one(
         """SELECT COALESCE(SUM(amount_cents), 0) AS cents, COUNT(*) AS n
            FROM payments
-           WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now', 'localtime')"""
+           WHERE strftime('%Y-%m', created_at, 'localtime')
+                 = strftime('%Y-%m', 'now', 'localtime')"""
     )
     goal_cents = config.MONTHLY_GOAL_CENTS
     revenue = {

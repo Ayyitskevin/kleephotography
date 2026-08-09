@@ -5,6 +5,10 @@ have to be honest: the reply queue must surface the longest-waiting leads, and
 every "collected" figure must agree with Financials/Reports.
 """
 
+import datetime as dt
+import os
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -131,3 +135,39 @@ def test_home_collected_counts_a_deposit_on_a_still_open_invoice(admin_client):
         assert collected["value"] == f"${ctx['revenue']['paid_cents'] / 100:,.2f}"
     finally:
         _drop_client(client_id)
+
+
+@pytest.mark.integration
+def test_month_money_buckets_an_evening_payment_in_the_local_month(admin_client):
+    """A 9:30 PM payment on the last of the month is that month's money. It is
+    stored UTC, where the same instant is already the first of the next month,
+    so both the reel and the month-to-date headline must bucket in local time."""
+    original_tz = os.environ.get("TZ")
+    os.environ["TZ"] = "America/New_York"
+    time.tzset()
+    try:
+        first_of_month = dt.date.today().replace(day=1)
+        last_month = first_of_month - dt.timedelta(days=1)
+        # 21:30 local on the last of last month, as SQLite stores it
+        stored_utc = f"{first_of_month.isoformat()} 01:30:00"
+
+        def month_cents(ctx, day):
+            label = day.strftime("%b").upper()
+            return next(m["cents"] for m in ctx["revenue_months"] if m["label"] == label)
+
+        before = admin_client.get("/admin/home").context
+        client_id = _deposit_paid_invoice("home-month-edge", 50_000, 12_500, paid_at=stored_utc)
+        try:
+            ctx = admin_client.get("/admin/home").context
+            assert month_cents(ctx, last_month) == month_cents(before, last_month) + 12_500
+            # …and it stays out of this month, on the bar and in the headline
+            assert month_cents(ctx, first_of_month) == month_cents(before, first_of_month)
+            assert ctx["revenue"]["paid_cents"] == before["revenue"]["paid_cents"]
+        finally:
+            _drop_client(client_id)
+    finally:
+        if original_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = original_tz
+        time.tzset()
