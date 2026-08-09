@@ -33,6 +33,13 @@ log = logging.getLogger("mise.jobs")
 _pool: ThreadPoolExecutor | None = None
 _sweeper: threading.Thread | None = None
 _sweeper_stop = threading.Event()
+# Job ids currently offered to the pool, so sweep() does not hand the same
+# backlog to the executor again every tick. An OPTIMIZATION ONLY: _claim is the
+# correctness gate, and every entry is released in _execute's finally (so a
+# handler that raises, or a worker killed by BaseException, still frees its id)
+# or by stop(), which cancels futures that will never reach that finally.
+_inflight: set[int] = set()
+_inflight_lock = threading.Lock()
 MAX_ATTEMPTS = 3
 # Delay before the Nth retry, indexed by the attempt that just failed. Bounded and
 # modest on purpose — this is a solo-operator queue, not a distributed system. It
@@ -265,9 +272,13 @@ def dispatch(job_ids: list[int]) -> None:
     if not pool:
         return
     for offset, job_id in enumerate(job_ids):
+        with _inflight_lock:
+            _inflight.add(job_id)
         try:
             pool.submit(_execute, job_id)
         except RuntimeError:
+            with _inflight_lock:
+                _inflight.discard(job_id)
             log.warning("job pool unavailable; %d queued jobs remain", len(job_ids) - offset)
             break
 
@@ -314,49 +325,57 @@ def _claim(job_id: int) -> "db.sqlite3.Row | None":
 
 
 def _execute(job_id: int) -> None:
-    job = _claim(job_id)
-    if not job:
-        return
-    # Parsed INSIDE the try: a corrupt payload is a job failure like any other.
-    # Parsed outside, it raised past the recorder and left the row 'running'
-    # forever — no retry, no sweep, no log, only a restart.
-    payload: dict = {}
     try:
-        payload = json.loads(job["payload"])
-        HANDLERS[job["kind"]](payload)
-        db.run(
-            "UPDATE jobs SET status='done', error=NULL, next_attempt_at=NULL, "
-            "updated_at=datetime('now') WHERE id=?",
-            (job_id,),
-        )
-        log.info("job %s %s done", job_id, job["kind"])
-    except Exception as e:
-        status = "queued" if job["attempts"] < MAX_ATTEMPTS else "failed"
-        # Park the retry behind a backoff instead of resubmitting it here: an
-        # immediate resubmit burned every attempt inside a second, so a vendor
-        # blip looked identical to a permanent failure. The sweeper thread picks
-        # it back up once the wait elapses, and retry() can force it sooner.
-        # datetime('now', NULL) is NULL, so a terminal failure clears the column
-        # in the same statement.
-        retry_in = _retry_delay(job["attempts"]) if status == "queued" else None
-        db.run(
-            "UPDATE jobs SET status=?, error=?, updated_at=datetime('now'), "
-            "next_attempt_at=datetime('now', ?) WHERE id=?",
-            (status, str(e)[:500], retry_in, job_id),
-        )
-        log.exception(
-            "job %s %s attempt %s -> %s%s",
-            job_id,
-            job["kind"],
-            job["attempts"],
-            status,
-            f" (retry {retry_in})" if retry_in else "",
-        )
-        # Only primary ingest owns the canonical asset's readiness. Optional
-        # derivatives (social crops/renditions) report their own job failure
-        # without removing an already delivered asset from every reader.
-        if status == "failed" and job["kind"] in PRIMARY_ASSET_JOB_KINDS and "asset_id" in payload:
-            db.run("UPDATE assets SET status='failed' WHERE id=?", (payload["asset_id"],))
+        job = _claim(job_id)
+        if not job:
+            return
+        # Parsed INSIDE the try: a corrupt payload is a job failure like any
+        # other. Parsed outside, it raised past the recorder and left the row
+        # 'running' forever — no retry, no sweep, no log, only a restart.
+        payload: dict = {}
+        try:
+            payload = json.loads(job["payload"])
+            HANDLERS[job["kind"]](payload)
+            db.run(
+                "UPDATE jobs SET status='done', error=NULL, next_attempt_at=NULL, "
+                "updated_at=datetime('now') WHERE id=?",
+                (job_id,),
+            )
+            log.info("job %s %s done", job_id, job["kind"])
+        except Exception as e:
+            status = "queued" if job["attempts"] < MAX_ATTEMPTS else "failed"
+            # Park the retry behind a backoff instead of resubmitting it here: an
+            # immediate resubmit burned every attempt inside a second, so a vendor
+            # blip looked identical to a permanent failure. The sweeper thread picks
+            # it back up once the wait elapses, and retry() can force it sooner.
+            # datetime('now', NULL) is NULL, so a terminal failure clears the column
+            # in the same statement.
+            retry_in = _retry_delay(job["attempts"]) if status == "queued" else None
+            db.run(
+                "UPDATE jobs SET status=?, error=?, updated_at=datetime('now'), "
+                "next_attempt_at=datetime('now', ?) WHERE id=?",
+                (status, str(e)[:500], retry_in, job_id),
+            )
+            log.exception(
+                "job %s %s attempt %s -> %s%s",
+                job_id,
+                job["kind"],
+                job["attempts"],
+                status,
+                f" (retry {retry_in})" if retry_in else "",
+            )
+            # Only primary ingest owns the canonical asset's readiness. Optional
+            # derivatives (social crops/renditions) report their own job failure
+            # without removing an already delivered asset from every reader.
+            if (
+                status == "failed"
+                and job["kind"] in PRIMARY_ASSET_JOB_KINDS
+                and "asset_id" in payload
+            ):
+                db.run("UPDATE assets SET status='failed' WHERE id=?", (payload["asset_id"],))
+    finally:
+        with _inflight_lock:
+            _inflight.discard(job_id)
 
 
 def retry(job_id: int) -> bool:
@@ -389,8 +408,7 @@ def retry(job_id: int) -> bool:
     if cur.rowcount != 1:
         return False
     log.info("job %s retried by admin", job_id)
-    if _pool:
-        _pool.submit(_execute, job_id)
+    dispatch([job_id])
     return True
 
 
@@ -432,17 +450,26 @@ def queue_health() -> dict:
 
 
 def sweep() -> None:
-    """Re-offer every due queued job to the pool — the queue's only self-heal.
+    """Re-offer due queued jobs the pool is not already holding — the queue's
+    only self-heal.
 
     Two ways a durable row strands with the process still up: dispatch found no
     pool (see dispatch()), or a failed attempt parked it behind its backoff.
-    Neither is re-drained by anything else short of a restart. Re-submitting a
-    job the pool already holds is harmless — _claim is the one queued->running
-    gate, so the duplicate just no-ops.
+    Neither is re-drained by anything else short of a restart.
+
+    Skipping ids in _inflight is throughput, not correctness — _claim is still
+    the one queued->running gate. Without the skip, a backlog deeper than the
+    worker count got re-submitted whole on every tick: each duplicate future
+    ran _claim, a write transaction that no-ops, so a 200-job queue spent
+    thousands of write-lock acquisitions an hour contending with request-path
+    writes, and the executor's deque grew without bound. A missed skip only
+    costs one of those no-ops.
     """
     if not _pool:
         return
-    due = _due_job_ids()
+    candidates = _due_job_ids()
+    with _inflight_lock:
+        due = [job_id for job_id in candidates if job_id not in _inflight]
     if due:
         dispatch(due)
         log.info("job sweep re-dispatched %d queued jobs", len(due))
@@ -484,8 +511,7 @@ def start() -> None:
     db.run("UPDATE jobs SET status='queued' WHERE status='running'")
     _pool = ThreadPoolExecutor(max_workers=config.JOB_WORKERS, thread_name_prefix="mise-job")
     backlog = _due_job_ids()
-    for job_id in backlog:
-        _pool.submit(_execute, job_id)
+    dispatch(backlog)
     if backlog:
         log.info("re-queued %d jobs from previous run", len(backlog))
     # Anything not due yet (a retry parked mid-crash) is the sweeper's job.
@@ -503,3 +529,8 @@ def stop() -> None:
     if _pool:
         _pool.shutdown(wait=False, cancel_futures=True)
         _pool = None
+    # cancel_futures drops submissions that will never reach _execute's finally,
+    # so their ids have to be released here or the next pool in this process
+    # (a test restarting the queue) would treat them as permanently in flight.
+    with _inflight_lock:
+        _inflight.clear()

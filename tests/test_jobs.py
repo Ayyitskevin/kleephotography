@@ -205,6 +205,16 @@ def test_failed_attempt_waits_out_backoff_before_the_next_one(monkeypatch):
         db.run("DELETE FROM jobs WHERE id=?", (job_id,))
 
 
+class _RecordingPool:
+    """Stand-in for the live pool: records what dispatch offers, executes nothing."""
+
+    def __init__(self) -> None:
+        self.offered: list[int] = []
+
+    def submit(self, fn, job_id: int) -> None:
+        self.offered.append(job_id)
+
+
 def test_corrupt_payload_fails_the_job_instead_of_wedging_it(monkeypatch):
     """A payload json can't parse must take the normal failure path.
 
@@ -266,16 +276,6 @@ def test_a_job_wedged_in_running_is_visible_to_healthz_and_the_heartbeat(client,
         db.run("DELETE FROM jobs WHERE id IN (?,?)", (working, wedged))
 
 
-class _RecordingPool:
-    """Stand-in for the live pool: records what dispatch offers, executes nothing."""
-
-    def __init__(self) -> None:
-        self.offered: list[int] = []
-
-    def submit(self, fn, job_id: int) -> None:
-        self.offered.append(job_id)
-
-
 def test_sweep_redispatches_stranded_jobs_and_honors_backoff(monkeypatch):
     """The row a dead pool dropped, and the row a failure parked, both get re-offered."""
     freeze_job_pool(monkeypatch)
@@ -301,6 +301,35 @@ def test_sweep_redispatches_stranded_jobs_and_honors_backoff(monkeypatch):
         assert waiting in pool.offered
     finally:
         db.run("DELETE FROM jobs WHERE id IN (?,?)", (stranded, waiting))
+
+
+def test_sweep_does_not_re_offer_a_job_the_pool_already_holds(monkeypatch):
+    """Every tick used to re-submit the WHOLE due backlog.
+
+    200 transcodes behind 2 workers meant ~200 duplicate futures a minute, each
+    running _claim — a write transaction that no-ops — against the same lock the
+    request path needs, plus an executor deque that only grew.
+    """
+    freeze_job_pool(monkeypatch)
+    queued = [jobs.enqueue("zip_build", {"gallery_id": 0, "rev": n}) for n in range(3)]
+    try:
+        pool = _RecordingPool()
+        monkeypatch.setattr(jobs, "_pool", pool)
+
+        jobs.sweep()
+        assert [j for j in pool.offered if j in queued] == queued
+        jobs.sweep()
+        assert [j for j in pool.offered if j in queued] == queued  # N, not 2N
+
+        # The set is released by the worker, not left to expire: once a job has
+        # actually run, a later sweep is free to offer it again.
+        monkeypatch.setitem(jobs.HANDLERS, "zip_build", lambda p: None)
+        jobs._execute(queued[0])
+        assert queued[0] not in jobs._inflight
+    finally:
+        db.run("DELETE FROM jobs WHERE id IN (?,?,?)", tuple(queued))
+        with jobs._inflight_lock:
+            jobs._inflight.clear()
 
 
 def test_queue_runs_its_own_clock_fine_enough_to_honor_the_backoff(monkeypatch):
