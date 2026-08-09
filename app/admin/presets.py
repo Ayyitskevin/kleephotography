@@ -101,7 +101,7 @@ def _parse(form) -> dict:
 
 
 @router.get("/presets", response_class=HTMLResponse)
-async def presets_list(request: Request):
+def presets_list(request: Request):
     rows = db.all_("SELECT * FROM crop_presets ORDER BY active DESC, sort, id")
     trail = db.all_(
         """SELECT entity_id, action, actor, diff_json, created_at FROM audit_log
@@ -188,7 +188,7 @@ async def update_preset(request: Request, preset_id: int):
 
 
 @router.post("/presets/{preset_id}/active")
-async def toggle_active(preset_id: int):
+def toggle_active(preset_id: int):
     p = get_preset(preset_id)
     new = 0 if p["active"] else 1
     with db.tx() as con:
@@ -201,7 +201,7 @@ async def toggle_active(preset_id: int):
 
 
 @router.post("/presets/{preset_id}/overlay")
-async def toggle_overlay(preset_id: int):
+def toggle_overlay(preset_id: int):
     p = get_preset(preset_id)
     new = 0 if p["brand_overlay"] else 1
     with db.tx() as con:

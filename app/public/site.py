@@ -481,7 +481,7 @@ def _specialty_doors() -> list[dict]:
 
 
 @router.get("/", response_class=HTMLResponse)
-async def home(request: Request):
+def home(request: Request):
     featured = _portfolio_assets()[:6]
     reels = _portfolio_reels()
     hero_reel = reels[0] if reels else None
@@ -505,7 +505,7 @@ async def home(request: Request):
 
 
 @router.get("/portfolio", response_class=HTMLResponse)
-async def portfolio(request: Request):
+def portfolio(request: Request):
     # photos AND starred videos share the masonry — /services sells motion, so
     # the archive shouldn't be stills-only. Videos play in the same lightbox.
     assets = sorted(
@@ -569,7 +569,7 @@ def _about_portrait_static() -> str | None:
 
 
 @router.get("/about", response_class=HTMLResponse)
-async def about(request: Request):
+def about(request: Request):
     # Only a dedicated studio portrait stands in as "Meet Kevin" — never a random
     # portfolio still (that read as a mismatched hero when the asset was a dish).
     portrait_static = _about_portrait_static()
@@ -583,12 +583,12 @@ async def about(request: Request):
 
 
 @router.get("/press", response_class=HTMLResponse)
-async def press(request: Request):
+def press(request: Request):
     return templates.TemplateResponse(request, "site/press.html", {"press": _press_features()})
 
 
 @router.get("/services", response_class=HTMLResponse)
-async def services(request: Request):
+def services(request: Request):
     return templates.TemplateResponse(
         request,
         "site/services.html",
@@ -597,7 +597,7 @@ async def services(request: Request):
 
 
 @router.get("/contact", response_class=HTMLResponse)
-async def contact(request: Request):
+def contact(request: Request):
     """Optional ?prefill=<kind>&service=&tier= for cross-surface deep links
     (parsed in _contact_prefill straight off the query string)."""
     pf = _contact_prefill(request)
@@ -625,7 +625,7 @@ async def contact(request: Request):
 
 
 @router.post("/contact", response_class=HTMLResponse)
-async def submit_inquiry(
+def submit_inquiry(
     request: Request,
     name: str = Form(...),
     email: str = Form(...),
@@ -772,7 +772,7 @@ async def submit_inquiry(
 
 
 @router.get("/work", response_class=HTMLResponse)
-async def work_index(request: Request):
+def work_index(request: Request):
     studies = [_case_study_view(study) for study in _case_studies()]
     csmap = _cs_specialty_map()
     # Group by derived specialty (SPECIALTIES order). Headings only render
@@ -790,7 +790,7 @@ async def work_index(request: Request):
 
 
 @router.get("/work/{slug}", response_class=HTMLResponse)
-async def work_detail(request: Request, slug: str):
+def work_detail(request: Request, slug: str):
     g = db.one("SELECT * FROM galleries WHERE slug=? AND cs_published=1", (slug,))
     if not g:
         raise HTTPException(status_code=404)
@@ -859,7 +859,7 @@ async def work_detail(request: Request, slug: str):
 
 
 @router.get("/reels", response_class=HTMLResponse)
-async def reels(request: Request):
+def reels(request: Request):
     vids = _portfolio_reels()
     sp_counts = Counter(specialties.specialty_key(r["portfolio_tag"]) for r in vids)
     sp_chips = [
@@ -933,22 +933,22 @@ def _specialty_page(request: Request, key: str):
 
 
 @router.get("/real-estate", response_class=HTMLResponse)
-async def specialty_real_estate(request: Request):
+def specialty_real_estate(request: Request):
     return _specialty_page(request, "re")
 
 
 @router.get("/portraits", response_class=HTMLResponse)
-async def specialty_portraits(request: Request):
+def specialty_portraits(request: Request):
     return _specialty_page(request, "pl")
 
 
 @router.get("/food-beverage", response_class=HTMLResponse)
-async def specialty_food_beverage(request: Request):
+def specialty_food_beverage(request: Request):
     return _specialty_page(request, "fb")
 
 
 @router.get("/site/img/{asset_id}")
-async def portfolio_image(asset_id: int, variant: str = "web"):
+def portfolio_image(asset_id: int, variant: str = "web"):
     """Unauthenticated — serves ONLY portfolio-flagged, ready photos."""
     if variant not in ("web", "thumb"):
         raise HTTPException(status_code=404)
@@ -972,7 +972,7 @@ async def portfolio_image(asset_id: int, variant: str = "web"):
 
 
 @router.get("/site/vid/{asset_id}")
-async def portfolio_video(asset_id: int):
+def portfolio_video(asset_id: int):
     """Unauthenticated — serves ONLY portfolio-flagged, ready videos (the /reels
     showcase). FileResponse handles HTTP Range, so iOS scrubbing works."""
     a = db.one(
@@ -991,7 +991,7 @@ async def portfolio_video(asset_id: int):
 
 
 @router.get("/site/poster/{asset_id}")
-async def portfolio_video_poster(asset_id: int):
+def portfolio_video_poster(asset_id: int):
     """Poster frame for a portfolio video — same public portfolio gate."""
     a = db.one(
         """SELECT * FROM assets WHERE id=? AND portfolio=1
@@ -1009,7 +1009,7 @@ async def portfolio_video_poster(asset_id: int):
 
 
 @router.get("/favicon.ico", include_in_schema=False)
-async def favicon():
+def favicon():
     """Old crawlers and share scrapers request /favicon.ico directly, ignoring
     the <link rel=icon> tags — serve the real file instead of a 404."""
     return FileResponse(
@@ -1020,7 +1020,7 @@ async def favicon():
 
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
-async def robots():
+def robots():
     return (
         "User-agent: *\n"
         "Disallow: /g/\nDisallow: /portal/\nDisallow: /media/\n"
@@ -1031,7 +1031,7 @@ async def robots():
 
 
 @router.get("/.well-known/security.txt", response_class=PlainTextResponse)
-async def security_txt():
+def security_txt():
     """RFC 9116 — tells security researchers where to report vulnerabilities
     instead of leaving them to guess (or post publicly). Expires is required by
     the RFC and must stay under a year out; rendering it live keeps the file
@@ -1070,7 +1070,7 @@ def _sitemap_url(path: str, lastmod: str) -> str:
 
 
 @router.get("/sitemap.xml")
-async def sitemap():
+def sitemap():
     # Static marketing paths share the newest /static asset mtime — a cheap
     # freshness signal that moves on every CSS/JS deploy without inventing
     # per-page edit dates we don't store.

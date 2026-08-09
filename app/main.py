@@ -301,6 +301,9 @@ async def branded_errors(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(Exception)
 async def unhandled_errors(request: Request, exc: Exception):
+    # Async for the same reason as /healthz: this is a degradation path. If the
+    # threadpool is saturated, a sync handler could not run, and the one request
+    # guaranteed to need it is the one that already failed.
     # An uncaught exception means a 500 the user already hit — make it loud.
     # Log the full traceback for debugging, fire ONE throttled Telegram alert so
     # Kevin hears about the bug while the app is still up, then return a branded
@@ -325,6 +328,12 @@ async def unhandled_errors(request: Request, exc: Exception):
 
 @app.get("/healthz")
 async def healthz():
+    # Deliberately stays on the event loop while the rest of the app moved to
+    # the threadpool. Its whole job is to answer when things are going wrong,
+    # and a sync handler queues behind the same 40 worker slots it is trying to
+    # report on — under enough concurrent slow requests it would time out and
+    # tell the monitor "down" when the truth is "busy". The body is a stat and
+    # two indexed counts, so it costs the loop almost nothing.
     payload = {
         "ok": True,
         "service": "mise",

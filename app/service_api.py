@@ -21,6 +21,7 @@ import datetime as dt
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 
 from . import argus_analyze, config, db, plutus_recommend, security
 
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/api")
 
 
 @router.get("/shots", dependencies=[Depends(security.require_shots_token)])
-async def shots(session: str = ""):
+def shots(session: str = ""):
     session = (session or "").strip()
     if not session:
         raise HTTPException(status_code=400, detail="session required")
@@ -55,7 +56,7 @@ async def shots(session: str = ""):
 
 
 @router.get("/galleries/expiring", dependencies=[Depends(security.require_shots_token)])
-async def galleries_expiring(days: int = 7):
+def galleries_expiring(days: int = 7):
     """Published galleries expiring within `days` days. For Odysseus gallery_expiration_warn."""
     if days < 1 or days > 30:
         raise HTTPException(status_code=400, detail="days must be 1-30")
@@ -73,7 +74,7 @@ async def galleries_expiring(days: int = 7):
 
 
 @router.get("/press/recent", dependencies=[Depends(security.require_shots_token)])
-async def press_recent(days: int = 30):
+def press_recent(days: int = 30):
     """Press hits with publish_date in the last `days` days. For Odysseus press_to_outreach."""
     if days < 1 or days > 90:
         raise HTTPException(status_code=400, detail="days must be 1-90")
@@ -91,7 +92,7 @@ async def press_recent(days: int = 30):
 
 
 @router.get("/galleries", dependencies=[Depends(security.require_argus_token)])
-async def galleries(published: bool = True):
+def galleries(published: bool = True):
     """Read-only published gallery index for Argus (Phase 6 slice 1)."""
     if published:
         rows = db.all_(
@@ -144,7 +145,12 @@ async def argus_callback(request: Request, gallery_id: int):
         raise HTTPException(status_code=400, detail="json body required")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="json object required")
-    argus_analyze.apply_callback(gallery_id, payload)
+    # apply_callback fans out to platekit.notify_argus_complete, which makes a
+    # blocking urlopen (MISE_PLATEKIT_TIMEOUT, default 10s). This handler must stay
+    # async for `await request.json()`, so the blocking segment goes to the
+    # threadpool — otherwise a slow Platekit stalls the whole event loop.
+    # plutus_callback below needs no such wrap: its apply_callback is DB-only.
+    await run_in_threadpool(argus_analyze.apply_callback, gallery_id, payload)
     return {"ok": True, "gallery_id": gallery_id}
 
 

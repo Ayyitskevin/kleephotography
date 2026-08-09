@@ -53,7 +53,7 @@ async def upload_brand(client_id: int, files: list[UploadFile]):
 
 
 @router.get("/clients/{client_id}/brand/{ba_id}")
-async def admin_brand_file(client_id: int, ba_id: int):
+def admin_brand_file(client_id: int, ba_id: int):
     b = db.one("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, client_id))
     if not b:
         raise HTTPException(status_code=404)
@@ -64,7 +64,7 @@ async def admin_brand_file(client_id: int, ba_id: int):
 
 
 @router.post("/clients/{client_id}/brand/{ba_id}/delete")
-async def delete_brand(client_id: int, ba_id: int):
+def delete_brand(client_id: int, ba_id: int):
     b = db.one("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, client_id))
     if b:
         (config.BRAND_DIR / str(client_id) / b["stored"]).unlink(missing_ok=True)
@@ -121,7 +121,7 @@ async def upload_kit(
 
 
 @router.post("/clients/{client_id}/kits/{kit_id}")
-async def update_kit(
+def update_kit(
     client_id: int,
     kit_id: int,
     label: str = Form(""),
@@ -153,7 +153,7 @@ async def update_kit(
 
 
 @router.get("/clients/{client_id}/kits/{kit_id}/logo")
-async def admin_kit_logo(client_id: int, kit_id: int):
+def admin_kit_logo(client_id: int, kit_id: int):
     k = db.one("SELECT * FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
     if not k:
         raise HTTPException(status_code=404)
@@ -164,7 +164,7 @@ async def admin_kit_logo(client_id: int, kit_id: int):
 
 
 @router.post("/clients/{client_id}/kits/{kit_id}/delete")
-async def delete_kit(client_id: int, kit_id: int):
+def delete_kit(client_id: int, kit_id: int):
     k = db.one("SELECT * FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
     if k:
         (config.BRAND_DIR / str(client_id) / k["stored"]).unlink(missing_ok=True)

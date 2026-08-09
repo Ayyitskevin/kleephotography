@@ -16,7 +16,7 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin
 
 
 @router.post("/galleries/{gallery_id}/sections")
-async def add_section(gallery_id: int, name: str = Form(...)):
+def add_section(gallery_id: int, name: str = Form(...)):
     get_gallery(gallery_id)
     row = db.one(
         "SELECT COALESCE(MAX(position),-1)+1 AS p FROM sections WHERE gallery_id=?", (gallery_id,)
@@ -35,7 +35,7 @@ def get_section(gallery_id: int, section_id: int) -> "db.sqlite3.Row":
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/rename")
-async def rename_section(gallery_id: int, section_id: int, name: str = Form(...)):
+def rename_section(gallery_id: int, section_id: int, name: str = Form(...)):
     get_section(gallery_id, section_id)
     if not name.strip():
         raise HTTPException(status_code=400, detail="name required")
@@ -44,7 +44,7 @@ async def rename_section(gallery_id: int, section_id: int, name: str = Form(...)
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/proof")
-async def set_section_proof(gallery_id: int, section_id: int, proof_target: str = Form("")):
+def set_section_proof(gallery_id: int, section_id: int, proof_target: str = Form("")):
     """Set or clear the proofing target on a section.
     Empty/0/non-numeric → clear (section becomes free-form again)."""
     get_section(gallery_id, section_id)
@@ -61,7 +61,7 @@ async def set_section_proof(gallery_id: int, section_id: int, proof_target: str 
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/caption")
-async def set_section_caption(gallery_id: int, section_id: int, caption: str = Form("")):
+def set_section_caption(gallery_id: int, section_id: int, caption: str = Form("")):
     """Set or clear the public-facing caption shown under the section heading."""
     get_section(gallery_id, section_id)
     db.run("UPDATE sections SET caption=? WHERE id=?", (caption.strip() or None, section_id))
@@ -69,7 +69,7 @@ async def set_section_caption(gallery_id: int, section_id: int, caption: str = F
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/move")
-async def reorder_section(gallery_id: int, section_id: int, dir: str = Form(...)):
+def reorder_section(gallery_id: int, section_id: int, dir: str = Form(...)):
     if dir not in ("up", "down"):
         raise HTTPException(status_code=400, detail="dir must be up or down")
     get_section(gallery_id, section_id)
@@ -90,13 +90,13 @@ async def reorder_section(gallery_id: int, section_id: int, dir: str = Form(...)
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/delete")
-async def delete_section(gallery_id: int, section_id: int):
+def delete_section(gallery_id: int, section_id: int):
     db.run("DELETE FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id))
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/section")
-async def move_asset(
+def move_asset(
     request: Request, gallery_id: int, asset_id: int, section_id: int | None = Form(None)
 ):
     with db.tx() as con:

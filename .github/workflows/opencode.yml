@@ -6,14 +6,26 @@ on:
   pull_request_review_comment:
     types: [created]
 
+# One agent run per issue/PR thread. Repeat /oc on the same thread queues behind
+# the run in flight instead of stacking a second agent on the same conversation.
+concurrency:
+  group: opencode-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   opencode:
+    # Repo is public: gate on the author, not just the command, so a stranger's
+    # comment can't spend API credits or aim a prompt injection at the key.
+    # Both declared triggers carry the association at github.event.comment.*.
     if: |
-      contains(github.event.comment.body, ' /oc') ||
-      startsWith(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, ' /opencode') ||
-      startsWith(github.event.comment.body, '/opencode')
+      github.event.comment.author_association == 'OWNER' && (
+        contains(github.event.comment.body, ' /oc') ||
+        startsWith(github.event.comment.body, '/oc') ||
+        contains(github.event.comment.body, ' /opencode') ||
+        startsWith(github.event.comment.body, '/opencode')
+      )
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       id-token: write
       contents: read
@@ -26,7 +38,8 @@ jobs:
           persist-credentials: false
 
       - name: Run opencode
-        uses: anomalyco/opencode/github@latest
+        # Pinned to the commit the mutable `latest` tag resolved to on 2026-08-08.
+        uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a # github-v1.2.19
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:

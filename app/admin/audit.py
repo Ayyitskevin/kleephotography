@@ -143,7 +143,7 @@ def _counts() -> dict:
 
 
 @router.get("", response_class=HTMLResponse)
-async def audit_log_view(request: Request, cat: str = "all"):
+def audit_log_view(request: Request, cat: str = "all"):
     if cat not in _FILTERS:
         cat = "all"
     counts = _counts()
@@ -169,7 +169,7 @@ async def audit_log_view(request: Request, cat: str = "all"):
 
 
 @router.get(".csv", response_class=PlainTextResponse)
-async def audit_csv():
+def audit_csv():
     """Full window as CSV — append-only evidence for a dispute or accountant."""
     buf = io.StringIO()
     w = csv.writer(buf)

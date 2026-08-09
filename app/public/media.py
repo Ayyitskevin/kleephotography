@@ -48,7 +48,7 @@ def _resolve(slug: str, variant: str, asset_id: int, request: Request):
 # Registered before the generic /{variant}/ route below — otherwise "poster" binds
 # to {variant} (not in VARIANTS) and 404s, leaving video <video> posters broken.
 @router.get("/{slug}/poster/{asset_id}")
-async def poster(request: Request, slug: str, asset_id: int):
+def poster(request: Request, slug: str, asset_id: int):
     g = get_live_gallery(slug)
     # Mirror _resolve: an expired gallery is 410 everywhere, and only ready
     # assets serve — the poster route skipped both of these gates.
@@ -71,7 +71,7 @@ async def poster(request: Request, slug: str, asset_id: int):
 
 
 @router.get("/{slug}/{variant}/{asset_id}")
-async def serve(request: Request, slug: str, variant: str, asset_id: int):
+def serve(request: Request, slug: str, variant: str, asset_id: int):
     a, path = _resolve(slug, variant, asset_id, request)
     media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
     return FileResponse(

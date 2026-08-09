@@ -266,18 +266,6 @@ CONTRACT_NUDGE_DAYS = int(os.environ.get("MISE_CONTRACT_NUDGE_DAYS", "3"))
 # grace past the normal 24h gap before it reads as stale/missing.
 BACKUP_STALE_HOURS = int(os.environ.get("MISE_BACKUP_STALE_HOURS", "26"))
 
-# Event-driven reminder net (hermes_arm): at a Mise event instant, fire-and-forget
-# an "arm a deferred owner reminder" push to Hermes, the external service that owns
-# the persistent late-safe precise-time engine. One-way (R-doctrine): Mise never reads
-# back, and the whole path is dormant unless MISE_HERMES_ARM_URL is set. Two arms:
-# a gallery delivered → +N day "did the review land?" check, and a shoot finished →
-# +N day "pull/cull/back-up the cards" ops nudge. Hermes dedups by key, so a job
-# retry or a re-scan can't double-arm.
-HERMES_ARM_URL = os.environ.get("MISE_HERMES_ARM_URL", "")
-HERMES_ARM_TOKEN = os.environ.get("MISE_HERMES_ARM_TOKEN", "")
-REVIEW_CHECK_DAYS = int(os.environ.get("MISE_REVIEW_CHECK_DAYS", "7"))
-POSTSHOOT_CULL_DAYS = int(os.environ.get("MISE_POSTSHOOT_CULL_DAYS", "1"))
-
 PIN_MAX_FAILS = int(os.environ.get("MISE_PIN_MAX_FAILS", "5"))
 PIN_LOCKOUT_MIN = int(os.environ.get("MISE_PIN_LOCKOUT_MIN", "15"))
 
@@ -311,9 +299,10 @@ TELEGRAM_CHAT_ID = os.environ.get("MISE_TELEGRAM_CHAT_ID", "")
 MIN_FREE_GB = int(os.environ.get("MISE_MIN_FREE_GB", "10"))
 
 # Favorites / per-section ZIPs are built INLINE while the client waits — a
-# STORED copy, so it costs one read+write of every byte, and because the
-# download handlers are async that copy blocks the whole event loop, not just
-# the one request. Above either ceiling the bundle goes to the job queue and the
+# STORED copy, so it costs one read+write of every byte. The download handlers
+# are sync, so that copy now occupies a threadpool worker rather than the whole
+# event loop; it still holds one of only ~40 slots for its duration, which is
+# why the ceiling stays. Above either ceiling the bundle goes to the job queue and the
 # client gets the same wait/poll page the full-gallery ZIP has always used.
 #   bytes: 150 MB is ~1s of copying on a modest SSD (the longest stall worth
 #          taking in-request) and 3x the 50 MB at which the gallery export rail

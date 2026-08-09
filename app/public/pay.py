@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import alerts, config, db, features, jobs, security
 from ..render import templates
+from . import telemetry
 
 log = logging.getLogger("mise.public.pay")
 router = APIRouter()
@@ -46,9 +47,12 @@ def next_payment(d: "db.sqlite3.Row") -> tuple[int, str]:
 
 
 @router.get("/i/{slug}", response_class=HTMLResponse)
-async def view_invoice(request: Request, slug: str, thanks: str = ""):
+def view_invoice(request: Request, slug: str, thanks: str = ""):
     d = _invoice_or_404(slug)
-    if d["status"] == "sent":
+    # Read telemetry only — never payment state. Gated so a mail scanner or a
+    # HEAD probe cannot fabricate "the client has seen this invoice"
+    # (app/public/telemetry.py).
+    if d["status"] == "sent" and telemetry.is_human_view(request):
         db.run(
             "UPDATE invoices SET status='viewed', viewed_at=datetime('now') WHERE id=?", (d["id"],)
         )
@@ -99,7 +103,7 @@ async def view_invoice(request: Request, slug: str, thanks: str = ""):
 
 
 @router.get("/i/{slug}/receipt", response_class=HTMLResponse)
-async def view_receipt(request: Request, slug: str):
+def view_receipt(request: Request, slug: str):
     """Printable receipt — a read-only render of payments Stripe already
     recorded, so it can never disagree with what was charged. 404 until at
     least one payment exists."""
@@ -126,7 +130,7 @@ async def view_receipt(request: Request, slug: str):
 
 
 @router.post("/i/{slug}/pay")
-async def pay_invoice(request: Request, slug: str):
+def pay_invoice(request: Request, slug: str):
     d = _invoice_or_404(slug)
     amount, kind = next_payment(d)
     if not amount:

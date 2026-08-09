@@ -131,7 +131,7 @@ def _picker_ctx(
 
 
 @router.get("/book", response_class=HTMLResponse)
-async def book_index(request: Request):
+def book_index(request: Request):
     from .site import _portfolio_assets, _public_photo_spec
     from .site_catalog import BOOK_ACTIVE_PROMISES, BOOK_FAQS, BOOK_PROMISES
 
@@ -153,7 +153,7 @@ async def book_index(request: Request):
 
 
 @router.get("/book/{slug}", response_class=HTMLResponse)
-async def book_event(request: Request, slug: str):
+def book_event(request: Request, slug: str):
     et = scheduling.event_by_slug(slug)
     if not et:
         raise HTTPException(status_code=404)
@@ -167,7 +167,7 @@ async def book_event(request: Request, slug: str):
 
 
 @router.post("/book/{slug}", response_class=HTMLResponse)
-async def confirm_booking(
+def confirm_booking(
     request: Request,
     slug: str,
     name: str = Form(...),
@@ -259,7 +259,7 @@ async def confirm_booking(
 
 
 @router.get("/booking/{token}", response_class=HTMLResponse)
-async def manage(request: Request, token: str):
+def manage(request: Request, token: str):
     b = scheduling.booking_by_token(token)
     if not b:
         raise HTTPException(status_code=404)
@@ -285,7 +285,7 @@ async def manage(request: Request, token: str):
 
 
 @router.get("/booking/{token}/invite.ics")
-async def invite(token: str):
+def invite(token: str):
     b = scheduling.booking_by_token(token)
     if not b:
         raise HTTPException(status_code=404)
@@ -318,7 +318,7 @@ async def invite(token: str):
 
 
 @router.post("/booking/{token}/cancel")
-async def cancel_booking(request: Request, token: str, reason: str = Form("")):
+def cancel_booking(request: Request, token: str, reason: str = Form("")):
     b = scheduling.booking_by_token(token)
     if not b:
         raise HTTPException(status_code=404)
@@ -328,7 +328,7 @@ async def cancel_booking(request: Request, token: str, reason: str = Form("")):
 
 
 @router.get("/booking/{token}/reschedule", response_class=HTMLResponse)
-async def reschedule_form(request: Request, token: str):
+def reschedule_form(request: Request, token: str):
     b = scheduling.booking_by_token(token)
     if not b or b["status"] != "confirmed":
         raise HTTPException(status_code=404)
@@ -344,7 +344,7 @@ async def reschedule_form(request: Request, token: str):
 
 
 @router.post("/booking/{token}/reschedule")
-async def do_reschedule(request: Request, token: str, start: str = Form(...), tz: str = Form("")):
+def do_reschedule(request: Request, token: str, start: str = Form(...), tz: str = Form("")):
     b = scheduling.booking_by_token(token)
     if not b or b["status"] != "confirmed":
         raise HTTPException(status_code=404)

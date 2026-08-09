@@ -1440,88 +1440,26 @@ def test_ops_monitor_heartbeat(monkeypatch, tmp_path):
     assert sent == []
 
 
-def test_postshoot_reminder_sweep(monkeypatch):
-    # A confirmed booking whose end just passed arms ONE deferred post-shoot
-    # "cull & back up" owner nudge via Hermes. One-shot via armed_postshoot,
-    # retries when Hermes is down, ignores old/future/cancelled shoots, and the
-    # whole sweep no-ops when the reminder net isn't configured.
-    import datetime as dt
+def test_hermes_reminder_net_is_gone(admin):
+    # Hermes was retired fleet-wide (2026-07-05) and nothing listens on its port.
+    # Mise used to ship an armable push to it (hermes_arm, the post-shoot cull
+    # sweep, and the +Nd delivery review-check). The replacement for the old
+    # "ships dormant" tests: assert the surface is GONE, not merely unconfigured,
+    # so nobody can re-arm a dead service by setting one env var.
+    import importlib
 
-    from app import db, hermes_arm, postshoot_reminders
+    from app import features, notion_sync, scheduler
 
-    eid = db.run(
-        """INSERT INTO event_types (slug, name, duration_min, active)
-                    VALUES (?,?,?,1)""",
-        ("ps-shoot", "Plated Shoot", 90),
-    )
-
-    def mk(token, end_delta_h, status="confirmed"):
-        now = dt.datetime.now(dt.timezone.utc)
-        start = now + dt.timedelta(hours=end_delta_h - 1)
-        end = now + dt.timedelta(hours=end_delta_h)
-        return db.run(
-            """INSERT INTO bookings (token, event_type_id, name, email, start_utc,
-                                     end_utc, status)
-               VALUES (?,?,?,?,?,?,?)""",
-            (
-                token,
-                eid,
-                "Lena",
-                "lena@x.com",
-                start.strftime("%Y-%m-%d %H:%M:%S"),
-                end.strftime("%Y-%m-%d %H:%M:%S"),
-                status,
-            ),
-        )
-
-    just_done = mk("PsDone1", -2)  # ended 2h ago → eligible
-    future = mk("PsFuture1", 5)  # hasn't happened yet
-    ancient = mk("PsAncient1", -48)  # outside the lookback window
-    cancelled = mk("PsCancel1", -2, status="cancelled")
-
-    armed = []
-    monkeypatch.setattr(hermes_arm, "is_enabled", lambda: True)
-    monkeypatch.setattr(hermes_arm, "arm", lambda key, text, when: armed.append(key) or True)
-
-    postshoot_reminders.sweep()
-    flag = lambda i: db.one("SELECT armed_postshoot a FROM bookings WHERE id=?", (i,))["a"]
-    assert armed == [f"postshoot:{just_done}"]
-    assert flag(just_done) == 1
-    assert flag(future) == 0 and flag(ancient) == 0 and flag(cancelled) == 0
-
-    # idempotent: a second sweep arms nothing new
-    armed.clear()
-    postshoot_reminders.sweep()
-    assert armed == []
-
-    # a down Hermes (arm returns False) leaves the flag unset → next sweep retries
-    armed.clear()
-    retry = mk("PsRetry1", -2)
-    monkeypatch.setattr(hermes_arm, "arm", lambda key, text, when: False)
-    postshoot_reminders.sweep()
-    assert flag(retry) == 0
-    monkeypatch.setattr(hermes_arm, "arm", lambda key, text, when: armed.append(key) or True)
-    postshoot_reminders.sweep()
-    assert armed == [f"postshoot:{retry}"] and flag(retry) == 1
-
-    # net unconfigured → whole sweep no-ops, sets no flags
-    armed.clear()
-    dormant = mk("PsDormant1", -2)
-    monkeypatch.setattr(hermes_arm, "is_enabled", lambda: False)
-    postshoot_reminders.sweep()
-    assert flag(dormant) == 0 and armed == []
-
-    db.run("DELETE FROM bookings WHERE event_type_id=?", (eid,))
-
-
-def test_hermes_arm_disabled_is_noop(monkeypatch):
-    # The arm client is dormant unless MISE_HERMES_ARM_URL is set: no URL → arm
-    # returns False and makes no HTTP call (no exception, no leak).
-    from app import hermes_arm
-
-    monkeypatch.setattr(config, "HERMES_ARM_URL", "")
-    assert hermes_arm.is_enabled() is False
-    assert hermes_arm.arm("k", "t", "2099-01-01T09:00:00-05:00") is False
+    for mod in ("app.hermes_arm", "app.postshoot_reminders"):
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(mod)
+    for key in ("HERMES_ARM_URL", "HERMES_ARM_TOKEN", "REVIEW_CHECK_DAYS", "POSTSHOOT_CULL_DAYS"):
+        assert not hasattr(config, key), f"config.{key} survived the cull"
+    assert not hasattr(features, "hermes_enabled")
+    assert not hasattr(scheduler, "postshoot_reminders")
+    assert not hasattr(notion_sync, "hermes_arm")
+    # and no arming card left on the read-only integrations grid
+    assert "Hermes" not in admin.get("/admin/settings").text
 
 
 def test_final_email_auto_advances_project(admin, monkeypatch):
@@ -1655,24 +1593,17 @@ def test_gallery_notion_writeback(admin, monkeypatch):
         )
     ]
 
-    # delivery also arms Hermes's +Nd "did the review land?" owner check (the gap
-    # Odysseus post_delivery leaves — it sends the ask but never verifies the outcome)
-    armed = []
-    monkeypatch.setattr(
-        notion_sync.hermes_arm,
-        "arm",
-        lambda key, text, when: armed.append((key, text, when)) or True,
-    )
+    # re-running the job is a plain re-patch — the delivery event has no other
+    # side effect (the old +Nd Hermes "did the review land?" arm is gone)
     calls.clear()
     notion_sync.sync_gallery(gid)
-    assert len(armed) == 1 and armed[0][0] == f"review-check:{gid}"
+    assert len(calls) == 1
 
-    # unpublishing later → clean skip, no HTTP and no arm
+    # unpublishing later → clean skip, no HTTP
     calls.clear()
-    armed.clear()
     db.run("UPDATE galleries SET published=0 WHERE id=?", (gid,))
     notion_sync.sync_gallery(gid)
-    assert not calls and not armed
+    assert not calls
 
     # tidy up this test's own rows (gallery, its notion_sync jobs, project, client)
     db.run("DELETE FROM jobs WHERE json_extract(payload,'$.gallery_id')=?", (gid,))

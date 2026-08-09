@@ -194,7 +194,7 @@ without breaking galleries, admin, contracts, invoices, Stripe, uploads, or SEO.
 ```sh
 cd /home/user/kleephotography && git checkout claude/klee-photography-refactor-y9tr5g
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt pytest ruff httpx
+pip install -r requirements.txt -r requirements-dev.txt
 apt-get update -q; apt-get install -y ffmpeg     # REQUIRED for video smoke tests
 ```
 

@@ -52,7 +52,7 @@ def _proof_status_for_visitor(gallery_id: int, visitor_id: int) -> dict | None:
 
 
 @router.get("/{slug}", response_class=HTMLResponse)
-async def view(request: Request, slug: str):
+def view(request: Request, slug: str):
     g = get_live_gallery(slug)
     if is_expired(g):
         return templates.TemplateResponse(request, "public/expired.html", {"g": g}, status_code=410)
@@ -165,7 +165,7 @@ def _view_drop(request: Request, g):
 
 
 @router.post("/{slug}/pin")
-async def check_pin(request: Request, slug: str, pin: str = Form(...)):
+def check_pin(request: Request, slug: str, pin: str = Form(...)):
     g = get_live_gallery(slug)
     if is_expired(g):
         raise HTTPException(status_code=410)
@@ -245,7 +245,7 @@ def _progress_oob(g, section_id: int | None, visitor_id: int) -> str:
 
 
 @router.post("/{slug}/fav/{asset_id}", response_class=HTMLResponse)
-async def toggle_fav(request: Request, slug: str, asset_id: int):
+def toggle_fav(request: Request, slug: str, asset_id: int):
     g = get_live_gallery(slug)
     # Once a gallery expires it 410s everywhere else; without this a visitor
     # holding a live cookie could keep changing their proofing picks after the
@@ -300,7 +300,7 @@ async def toggle_fav(request: Request, slug: str, asset_id: int):
 
 
 @router.get("/{slug}/rendition-tile/{rendition_id}", response_class=HTMLResponse)
-async def rendition_tile(request: Request, slug: str, rendition_id: int):
+def rendition_tile(request: Request, slug: str, rendition_id: int):
     """Self-updating REC tile on the premiere's reel row: polled via hx-get
     every 8s while a social cut renders, swapping to the download chip when the
     encode lands (same pattern as the ZIP wait). Script-free fragment; same
@@ -382,13 +382,13 @@ def _live_video_asset(request: Request, slug: str, asset_id: int):
 
 
 @router.get("/{slug}/comments/{asset_id}")
-async def list_comments(request: Request, slug: str, asset_id: int):
+def list_comments(request: Request, slug: str, asset_id: int):
     _live_video_asset(request, slug, asset_id)
     return JSONResponse(video_comment_thread(asset_id))
 
 
 @router.post("/{slug}/comments/{asset_id}")
-async def add_comment(
+def add_comment(
     request: Request,
     slug: str,
     asset_id: int,
