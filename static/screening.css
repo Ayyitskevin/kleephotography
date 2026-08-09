@@ -1696,6 +1696,43 @@ body.sr-admin .admin-shell, body.sr-admin {
 }
 
 /* ── toasts — window.miseToast(msg, kind) · kinds: ok / warn / danger ─────── */
+
+/* UNSCOPED ON PURPOSE — the one primitive that must survive without body.sr.
+   Every other shared component here is .sr-scoped so MISE_SCREENING_ROOM=false
+   really does fall back to the legacy look (ops/CSS-DUAL-STACK.md). A toast is
+   the exception because it is the FAILURE surface, not a look: base.html ships
+   the .sr-toasts live region on every page, but with no .sr ancestor the rules
+   below never applied — so on public/contract.html (extends base_cream.html,
+   body.cream-theme, and it stays that way: it is the e-sign document) a client
+   who clicked "Sign agreement" into a 500 got the message as unstyled text in
+   a static div below the whole agreement, i.e. saw nothing. Same site-wide
+   whenever the kill switch is off.
+   This block is deliberately the MINIMUM that makes an error legible —
+   position, stacking, and a neutral readable skin — and it touches only
+   properties the .sr block below also sets, so the cinema styling stays a
+   pure .sr enhancement and the SR surfaces render byte-identically (the .sr
+   selectors outrank these on specificity and come later in source).
+   Colors are literals, not --sr-* tokens, because every token is declared on
+   `body.sr` (screening-room-tokens.css) and resolves to nothing here — the one
+   spot the "sr-* tokens, never raw hex" convention cannot be met. z-index
+   clears mise.css's ceiling (.ns-pal is 200) so the kill-switch stack can't
+   bury an error; .sr keeps --sr-z-toast, which is correct inside SR. */
+.sr-toasts { position: fixed; right: 20px; bottom: 20px; z-index: 300;
+  display: flex; flex-direction: column; gap: 8px; max-width: min(360px, calc(100vw - 40px)); }
+.sr-toast { background: #17161a; border: 1px solid #34313a;
+  border-left: 2px solid #8a857a; padding: 12px 16px;
+  font-size: 15px; color: #f2efe9; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+.sr-toast--ok     { border-left-color: #4f8a5b; }
+.sr-toast--warn   { border-left-color: #b8862f; }
+.sr-toast--danger { border-left-color: #c25b52; }
+.sr-toast.is-out { opacity: 0; transition: opacity 0.2s; }
+@media (max-width: 700px) {
+  .sr-toasts { right: 12px; bottom: 12px; left: 12px; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sr-toast.is-out { transition: none; }
+}
+
 .sr .sr-toasts { position: fixed; right: 20px; bottom: 20px; z-index: var(--sr-z-toast);
   display: flex; flex-direction: column; gap: 8px; max-width: min(360px, calc(100vw - 40px)); }
 .sr .sr-toast { background: var(--sr-overlay); border: 1px solid var(--sr-line-strong);

@@ -109,6 +109,70 @@
     }, 4000);
   };
 
+  /* ── htmx failure surface: no silent dead click ──────────────────────────
+     htmx never swaps a non-2xx, and does nothing at all when the request
+     can't leave the browser — so without this a failed hx-post looks exactly
+     like a successful one: nothing moves and the visitor assumes it worked.
+     That bites hardest on the actions that matter most (signing a contract,
+     accepting a proposal), which carry no error path of their own.
+     Bound on window rather than document so it runs AFTER every scoped
+     listener — including ones registered mid-session, like the board-drag
+     guard below — and stands down when one of them claims the failure with
+     preventDefault() (the gallery's 403/410 reload, the drag re-sync). A
+     toast on top of a reload is noise, and would flash and vanish anyway. */
+
+  /* Background polls NEVER toast. Four regions poll themselves — public/
+     _invoice_status.html (every 5s), public/_rec_tile.html, public/
+     _portal_crops.html and admin/_delivery_check.html (every 8s) — and htmx
+     keeps polling straight through failures: it only cancels on HTTP 286, and
+     that check sits inside the swap branch a 4xx/5xx never reaches. Toasting
+     those would nag a client who just paid every 5s for the length of a
+     `systemctl restart mise`, and fire once per pending tile on a gallery.
+     Two properties of the bundled htmx 1.9.12 identify a poll, both read out
+     of static/htmx.min.js rather than assumed:
+       · every event gets detail.elt — the element the request came FROM —
+         injected by the trigger helper (`function ce(e,t,r){…r["elt"]=e;…}`).
+         The response detail literal itself carries only `target` (the swap
+         destination), so elt is the one reliable handle on the hx-trigger.
+       · the poll scheduler invokes the trigger handler with no event
+         (`function ot(e,t,r){…t(e)…}`), so issueAjaxRequest's 4th argument is
+         undefined and requestConfig.triggeringEvent is undefined; a real
+         click/submit passes the DOM event down that same path.
+     Requiring BOTH keeps a mixed "click, every 30s" spec honest — the click
+     still toasts, the poll still doesn't. */
+  var POLL_SPEC = /(^|[\s,])every(\s|$)/;
+
+  var backgroundPoll = function (ev) {
+    var detail = ev.detail || {};
+    var el = detail.elt || ev.target;
+    var spec =
+      el && el.getAttribute
+        ? el.getAttribute("hx-trigger") || el.getAttribute("data-hx-trigger") || ""
+        : "";
+    if (!POLL_SPEC.test(spec)) return false;
+    return !(detail.requestConfig && detail.requestConfig.triggeringEvent);
+  };
+
+  /* Wording stays true for reads as well as writes: this also fires on
+     hx-get step navigation (public/_book_card.html) and on refusals like the
+     409 contract-integrity check (app/public/docs.py), where "try again"
+     could never succeed — so a 4xx points at the page's real state instead. */
+  var htmxFailed = function (ev) {
+    if (ev.defaultPrevented || backgroundPoll(ev)) return;
+    var status = ev.detail && ev.detail.xhr ? ev.detail.xhr.status : 0;
+    var msg;
+    if (ev.type === "htmx:sendError") {
+      msg = "Couldn't reach the server — nothing went through. Check your connection and try again.";
+    } else if (status >= 400 && status < 500) {
+      msg = "That didn't go through — refresh the page to see where things stand.";
+    } else {
+      msg = "Something went wrong on our end — that didn't go through. Try again in a moment.";
+    }
+    miseToast(msg, "danger");
+  };
+  window.addEventListener("htmx:responseError", htmxFailed);
+  window.addEventListener("htmx:sendError", htmxFailed);
+
   document.addEventListener(
     "submit",
     function (ev) {
@@ -413,17 +477,25 @@
       location.reload();
     };
     if (target && window.htmx) {
-      /* htmx swaps the returned board fragment (server truth); a 4xx/5xx
-         leaves the optimistic move in place, so re-sync from the server. */
+      /* htmx swaps the returned board fragment (server truth); a 4xx/5xx —
+         or a request that never lands — leaves the optimistic move in place,
+         so re-sync from the server. preventDefault() claims the failure: this
+         move owns its error UX, so the global toast above stands down. */
+      var offErr = function () {
+        document.removeEventListener("htmx:responseError", onErr);
+        document.removeEventListener("htmx:sendError", onErr);
+      };
       var onErr = function (ev2) {
         if (ev2.detail && ev2.detail.pathInfo && ev2.detail.pathInfo.requestPath === url) {
-          document.removeEventListener("htmx:responseError", onErr);
+          offErr();
+          ev2.preventDefault();
           fail();
         }
       };
       document.addEventListener("htmx:responseError", onErr);
+      document.addEventListener("htmx:sendError", onErr);
       htmx.ajax("POST", url, { values: { status: newStage }, target: target, swap: "outerHTML" })
-        .then(function () { document.removeEventListener("htmx:responseError", onErr); })
+        .then(offErr)
         .catch(fail);
     } else {
       var fd = new FormData(); fd.append("status", newStage);
