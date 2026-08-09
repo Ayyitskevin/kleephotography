@@ -13,7 +13,9 @@ invented tax set-aside goals) are dropped: Mise has no data source for them.
 Deductible % and the IRS mileage rate are honest operator inputs.
 """
 
+import csv
 import datetime as dt
+import io
 import uuid
 from pathlib import Path
 
@@ -122,6 +124,7 @@ def _ledger(start: str, end: str) -> list[dict]:
                 "client": r["company"] or r["client"],
                 "inv": f"#{r['inv_id']:04d}",
                 "service": r["title"],
+                "cents": r["cents"],
                 "amount": _usd(r["cents"]),
                 "tax": "$0.00",
                 "fee": "—",
@@ -140,6 +143,7 @@ def _ledger(start: str, end: str) -> list[dict]:
                 "client": r["company"] or r["client"],
                 "inv": f"#{r['inv_id']:04d}",
                 "service": r["title"],
+                "cents": r["cents"],
                 "amount": _usd(r["cents"]),
                 "tax": "$0.00",
                 "fee": "—",
@@ -269,24 +273,31 @@ def income_csv(
         if (inc_paid and r["st"] == "paid") or (inc_out and r["st"] == "out")
     ]
 
-    if fmt == "summary":
-        paid = sum(1 for r in rows if r["st"] == "paid")
-        out_n = sum(1 for r in rows if r["st"] == "out")
-        paid_c = sum(_to_cents(r["amount"]) for r in rows if r["st"] == "paid")
-        out_c = sum(_to_cents(r["amount"]) for r in rows if r["st"] == "out")
-        return (
-            "category,count,amount_usd\n"
-            f"Paid,{paid},{paid_c / 100:.2f}\n"
-            f"Outstanding,{out_n},{out_c / 100:.2f}\n"
-        )
+    buf = io.StringIO()
+    w = csv.writer(buf)
 
-    out = ["date,client,invoice,service,amount_usd,sales_tax_usd,status"]
+    if fmt == "summary":
+        paid = [r for r in rows if r["st"] == "paid"]
+        outstanding = [r for r in rows if r["st"] == "out"]
+        w.writerow(["category", "count", "amount_usd"])
+        for label, group in (("Paid", paid), ("Outstanding", outstanding)):
+            w.writerow([label, len(group), f"{sum(r['cents'] for r in group) / 100:.2f}"])
+        return buf.getvalue()
+
+    w.writerow(["date", "client", "invoice", "service", "amount_usd", "sales_tax_usd", "status"])
     for r in rows:
-        amt = r["amount"].replace("$", "").replace(",", "")
-        client = '"' + r["client"].replace('"', '""') + '"'
-        service = '"' + (r["service"] or "").replace('"', '""') + '"'
-        out.append(f"{r['raw'][:10]},{client},{r['inv']},{service},{amt},0.00,{r['status']}")
-    return "\n".join(out) + "\n"
+        w.writerow(
+            [
+                r["raw"][:10],
+                r["client"],
+                r["inv"],
+                r["service"] or "",
+                f"{r['cents'] / 100:.2f}",
+                "0.00",
+                r["status"],
+            ]
+        )
+    return buf.getvalue()
 
 
 @router.get("/clients", response_class=HTMLResponse)
@@ -529,16 +540,24 @@ def expense_delete(expense_id: int):
 @router.get("/expenses.csv", response_class=PlainTextResponse)
 def expenses_csv():
     rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
-    out = ["date,vendor,category,amount_usd,deductible_pct,deductible_usd,notes"]
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(
+        ["date", "vendor", "category", "amount_usd", "deductible_pct", "deductible_usd", "notes"]
+    )
     for r in rows:
-        amt = f"{r['amount_cents'] / 100:.2f}"
-        ded = f"{_ded(r['amount_cents'], r['deductible_pct']) / 100:.2f}"
-        vendor = '"' + (r["vendor"] or "").replace('"', '""') + '"'
-        notes = '"' + (r["notes"] or "").replace('"', '""') + '"'
-        out.append(
-            f"{r['spent_on']},{vendor},{r['category']},{amt},{r['deductible_pct']},{ded},{notes}"
+        w.writerow(
+            [
+                r["spent_on"],
+                r["vendor"] or "",
+                r["category"],
+                f"{r['amount_cents'] / 100:.2f}",
+                r["deductible_pct"],
+                f"{_ded(r['amount_cents'], r['deductible_pct']) / 100:.2f}",
+                r["notes"] or "",
+            ]
         )
-    return "\n".join(out) + "\n"
+    return buf.getvalue()
 
 
 @router.get("/receipts", response_class=HTMLResponse)
@@ -744,12 +763,19 @@ def mileage_delete(trip_id: int):
 @router.get("/mileage.csv", response_class=PlainTextResponse)
 def mileage_csv():
     rows = db.all_("SELECT * FROM mileage ORDER BY drove_on DESC, id DESC")
-    out = ["date,from,to,purpose,miles,rate_usd,deduction_usd"]
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["date", "from", "to", "purpose", "miles", "rate_usd", "deduction_usd"])
     for r in rows:
-        rate = f"{r['rate_cents'] / 100:.2f}"
-        ded = f"{round(r['miles'] * r['rate_cents']) / 100:.2f}"
-        frm = '"' + (r["from_place"] or "").replace('"', '""') + '"'
-        to = '"' + (r["to_place"] or "").replace('"', '""') + '"'
-        purpose = '"' + (r["purpose"] or "").replace('"', '""') + '"'
-        out.append(f"{r['drove_on']},{frm},{to},{purpose},{r['miles']:.1f},{rate},{ded}")
-    return "\n".join(out) + "\n"
+        w.writerow(
+            [
+                r["drove_on"],
+                r["from_place"] or "",
+                r["to_place"] or "",
+                r["purpose"] or "",
+                f"{r['miles']:.1f}",
+                f"{r['rate_cents'] / 100:.2f}",
+                f"{round(r['miles'] * r['rate_cents']) / 100:.2f}",
+            ]
+        )
+    return buf.getvalue()

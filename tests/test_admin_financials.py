@@ -204,3 +204,60 @@ def test_month_reel_bar_lands_in_the_local_month(admin, new_york, monkeypatch):
         reel = _month_reel(admin.get("/admin/financials").text)
     assert reel["MAY"] == 100  # the payment set the scale, so its month is full height
     assert reel["JUN"] < 100
+
+
+# --- D5: operator text must not be able to break a row ----------------------
+
+_NASTY = 'Rent, "The" Loft\nunit 2'  # a comma, a quote pair and a newline in one value
+# A date stored verbatim from the form before it was normalized — the ledgers
+# still hold such rows, and the CSV columns they sit in were never escaped.
+_LEGACY_DATE = '6/15/2026, "evening"'
+
+
+def test_expenses_csv_survives_a_comma_quote_and_newline(admin):
+    """Hand-rolled escaping quoted only vendor/notes, so a comma in the date
+    column shifted every field after it onto the accountant's next column."""
+    eid = db.run(
+        """INSERT INTO expenses (spent_on, vendor, category, amount_cents,
+           deductible_pct, notes) VALUES (?,?,?,?,?,?)""",
+        (_LEGACY_DATE, _NASTY, "Equipment", 124000, 50, 'said "mint", boxed'),
+    )
+    try:
+        body = admin.get("/admin/financials/expenses.csv").text
+    finally:
+        db.run("DELETE FROM expenses WHERE id=?", (eid,))
+    rows = list(csv.reader(io.StringIO(body)))
+    assert all(len(r) == 7 for r in rows)
+    mine = [r for r in rows[1:] if r[1] == _NASTY]
+    assert mine == [
+        [_LEGACY_DATE, _NASTY, "Equipment", "1240.00", "50", "620.00", 'said "mint", boxed']
+    ]
+
+
+def test_mileage_csv_survives_a_comma_quote_and_newline(admin):
+    """Same structure guarantee for the trip log — the deduction column is what
+    the accountant totals, so a shifted field is a wrong number."""
+    tid = db.run(
+        """INSERT INTO mileage (drove_on, from_place, to_place, purpose, miles, rate_cents)
+           VALUES (?,?,?,?,?,?)""",
+        (_LEGACY_DATE, _NASTY, "Cúrate", 'menu shoot, "summer"', 8.4, 70),
+    )
+    try:
+        body = admin.get("/admin/financials/mileage.csv").text
+    finally:
+        db.run("DELETE FROM mileage WHERE id=?", (tid,))
+    rows = list(csv.reader(io.StringIO(body)))
+    assert all(len(r) == 7 for r in rows)
+    mine = [r for r in rows[1:] if r[1] == _NASTY]
+    assert mine == [[_LEGACY_DATE, _NASTY, "Cúrate", 'menu shoot, "summer"', "8.4", "0.70", "5.88"]]
+
+
+def test_income_csv_summary_totals_come_from_raw_cents(admin, ledger):
+    """The summary branch used to re-parse its own '$1,234.56' display strings;
+    the counts and totals must equal the seeded invoices exactly."""
+    body = admin.get("/admin/financials/income.csv?range=ytd&inc=1&inc_paid=on&fmt=summary").text
+    rows = {r[0]: r[1:] for r in csv.reader(io.StringIO(body))}
+    assert rows["category"] == ["count", "amount_usd"]
+    assert rows["Outstanding"] == ["0", "0.00"]
+    paid_n, paid_usd = rows["Paid"]
+    assert int(paid_n) >= 1 and float(paid_usd) >= 500.00  # the seeded $500 payment
