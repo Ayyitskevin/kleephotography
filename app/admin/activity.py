@@ -118,16 +118,17 @@ def home(request: Request):
            ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id DESC LIMIT 6"""
     )
 
-    leads = db.all_(
+    # Reply queue (v4 dashboard) — open inquiries as actionable rows with an
+    # honest waiting age and a channel-appropriate second action. Oldest first
+    # in SQL, not in Python: the ones that have waited longest are the point of
+    # the queue, so they must survive the LIMIT. The headline count is
+    # new_inquiries (all of them), never this six-row slice. No writes.
+    queue = []
+    for r in db.all_(
         """SELECT * FROM inquiries
            WHERE converted_at IS NULL AND dismissed_at IS NULL
-           ORDER BY created_at DESC LIMIT 6"""
-    )
-    # Reply queue (v4 dashboard) — the same open inquiries as actionable rows,
-    # oldest first, with an honest waiting age and a channel-appropriate second
-    # action. Pure reshaping of `leads`; no new state, no writes.
-    queue = []
-    for r in sorted(leads, key=lambda x: x["created_at"] or ""):
+           ORDER BY created_at ASC LIMIT 6"""
+    ):
         try:
             age_days = (dt.datetime.now() - dt.datetime.fromisoformat(r["created_at"][:19])).days
         except (ValueError, TypeError):
@@ -536,7 +537,6 @@ def home(request: Request):
             "overdue_inv": overdue_inv,
             "retainer_drafts": retainer_drafts,
             "open_tasks": open_tasks,
-            "leads": leads,
             "horizon_shoots": horizon_shoots,
             "open_invoices": open_invoices,
             "recent_paid": recent_paid,
