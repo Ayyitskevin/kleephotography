@@ -112,8 +112,12 @@
       <figure>
         {# Only aerial-tagged frames here — never a ground still dressed as drone work. #}
         {% if aerial_leads %}
-        <img src="/site/img/{{ aerial_leads[0].id }}?variant=web" loading="lazy" decoding="async"
-             sizes="(max-width: 1000px) 100vw, 820px" alt="{{ aerial_leads[0]|portfolio_alt }}">
+        {% set aerial_image = asset_images[aerial_leads[0].id] %}
+        <img src="{{ aerial_image.web.url }}" loading="lazy" decoding="async"
+             {% if aerial_image.srcset %}srcset="{{ aerial_image.srcset }}"
+             sizes="(max-width: 1000px) 100vw, 820px"{% endif %}
+             {% if aerial_image.web.width %}width="{{ aerial_image.web.width }}" height="{{ aerial_image.web.height }}"{% endif %}
+             alt="{{ aerial_leads[0]|portfolio_alt }}">
         {% endif %}
         <span class="sr-screen-scrim" aria-hidden="true"></span>
         <span class="sr-screenbadge">&#9650; The Aerial Pass</span>
@@ -145,9 +149,13 @@
   </div>
   <div class="sr-filmstrip">
     {% for a in photos[:6] %}
+    {% set image = asset_images[a.id] %}
     <figure class="tile{{ ' sr-frame-wide' if loop.index is odd else ' sr-frame-tall' }}" data-web="/site/img/{{ a.id }}">
-      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-           sizes="(max-width: 700px) 45vw, 300px" alt="{{ a|portfolio_alt }}">
+      <img src="{{ image.thumb.url }}" loading="lazy" decoding="async"
+           {% if image.srcset %}srcset="{{ image.srcset }}"
+           sizes="(max-width: 700px) 45vw, 300px"{% endif %}
+           {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
+           alt="{{ a|portfolio_alt }}">
       {% if a.portfolio_tag and "aerial" in a.portfolio_tag %}
       <span class="sr-filmchip sr-aerial" aria-hidden="true">&#9650; Aerial</span>
       {% endif %}
@@ -226,15 +234,21 @@
   </div>
   <div class="sr-sessions">
     {% for a in photos[:3] %}
+    {% set image = asset_images[a.id] %}
     <figure class="tile" data-web="/site/img/{{ a.id }}">
-      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-           sizes="(max-width: 700px) 45vw, 340px" alt="{{ a|portfolio_alt }}">
+      <img src="{{ image.thumb.url }}" loading="lazy" decoding="async"
+           {% if image.srcset %}srcset="{{ image.srcset }}"
+           sizes="(max-width: 700px) 45vw, 340px"{% endif %}
+           {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
+           alt="{{ a|portfolio_alt }}">
       <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
     </figure>
     {% if loop.index == 2 and hero_reel %}
+    {% set reel_image = asset_images[hero_reel.id] %}
     <figure class="tile" data-kind="video" data-web="/site/vid/{{ hero_reel.id }}" data-poster="/site/poster/{{ hero_reel.id }}">
-      <img src="/site/img/{{ hero_reel.id }}?variant=thumb" loading="lazy" decoding="async"
-           sizes="(max-width: 700px) 45vw, 420px" alt="{{ hero_reel|portfolio_alt }}">
+      <img src="{{ reel_image.thumb.url }}" loading="lazy" decoding="async"
+           {% if reel_image.thumb.width %}width="{{ reel_image.thumb.width }}" height="{{ reel_image.thumb.height }}"{% endif %}
+           alt="{{ hero_reel|portfolio_alt }}">
       <span class="sr-filmchip" aria-hidden="true">&#9654; Loop{% if hero_reel.duration and hero_reel.duration|hms %} &middot; {{ hero_reel.duration|hms }}{% endif %}</span>
       <span class="sr-frameno" aria-hidden="true">Motion, between the stills</span>
     </figure>
@@ -302,15 +316,21 @@
   </div>
   <div class="sr-appetite">
     {% for a in photos[:6] %}
+    {% set image = asset_images[a.id] %}
     <figure class="tile" data-web="/site/img/{{ a.id }}">
-      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-           sizes="(max-width: 700px) 45vw, 350px" alt="{{ a|portfolio_alt }}">
+      <img src="{{ image.thumb.url }}" loading="lazy" decoding="async"
+           {% if image.srcset %}srcset="{{ image.srcset }}"
+           sizes="(max-width: 700px) 45vw, 350px"{% endif %}
+           {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
+           alt="{{ a|portfolio_alt }}">
       <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
     </figure>
     {% if loop.index == 2 and reels %}
+    {% set reel_image = asset_images[reels[0].id] %}
     <figure class="tile" data-kind="video" data-web="/site/vid/{{ reels[0].id }}" data-poster="/site/poster/{{ reels[0].id }}">
-      <img src="/site/img/{{ reels[0].id }}?variant=thumb" loading="lazy" decoding="async"
-           sizes="(max-width: 700px) 45vw, 350px" alt="{{ reels[0]|portfolio_alt }}">
+      <img src="{{ reel_image.thumb.url }}" loading="lazy" decoding="async"
+           {% if reel_image.thumb.width %}width="{{ reel_image.thumb.width }}" height="{{ reel_image.thumb.height }}"{% endif %}
+           alt="{{ reels[0]|portfolio_alt }}">
       <span class="sr-filmchip" aria-hidden="true">&#9654;{% if reels[0].duration and reels[0].duration|hms %} {{ reels[0].duration|hms }} &mdash;{% endif %} {{ reels[0].portfolio_tag|tag_label if reels[0].portfolio_tag else 'The steam' }}</span>
     </figure>
     {% endif %}
@@ -376,8 +396,11 @@
       </div>
       <figure class="sr-card-media">
         {% if s.hero_id %}
-        <img src="/site/img/{{ s.hero_id }}?variant=thumb" loading="lazy" decoding="async"
-             sizes="(max-width: 700px) 92vw, 440px" alt="{{ s.cs_tagline or s.title }}">
+        <img src="{{ s.hero_image.thumb.url }}" loading="lazy" decoding="async"
+             {% if s.hero_image.srcset %}srcset="{{ s.hero_image.srcset }}"
+             sizes="(max-width: 700px) 92vw, 440px"{% endif %}
+             {% if s.hero_image.thumb.width %}width="{{ s.hero_image.thumb.width }}" height="{{ s.hero_image.thumb.height }}"{% endif %}
+             alt="{{ s.cs_tagline or s.title }}">
         {% endif %}
         <span class="sr-card-scrim" aria-hidden="true"></span>
         <span class="sr-card-title">
