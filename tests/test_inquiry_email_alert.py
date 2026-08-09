@@ -17,7 +17,7 @@ os.environ.setdefault("MISE_ENV_FILE", "/nonexistent")
 import pytest
 from fastapi.testclient import TestClient
 
-from app import alerts, config, db, jobs, mailer, security
+from app import alerts, config, db, jobs, mailer
 from app.main import app
 from tests.jobtest import freeze_job_pool
 
@@ -43,7 +43,6 @@ def admin_client(client):
 def _wipe(email: str = VISITOR_EMAIL) -> None:
     db.run("DELETE FROM jobs WHERE kind IN ('notion_sync_inquiry','inquiry_owner_email')")
     db.run("DELETE FROM inquiries WHERE email=?", (email,))
-    db.run("DELETE FROM pin_attempts WHERE gallery_id=?", (security.INQUIRY_BUCKET_CONTACT,))
 
 
 def _enable_ops(monkeypatch, sent: list[str]) -> None:

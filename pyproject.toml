@@ -1,4 +1,14 @@
+# Declares the supported Python only — Mise deploys from a git checkout and is
+# never built or published, so there is no [build-system] and the version is
+# nominal.
+[project]
+name = "mise"
+version = "0.1.0"
+requires-python = ">=3.12"
+
 [tool.ruff]
+# Oldest Python we support (matches requires-python). CI runs 3.14; ruff's
+# target-version is a floor for syntax/upgrade rules, not the runtime.
 target-version = "py312"
 line-length = 100
 
@@ -15,7 +25,3 @@ known-first-party = ["app"]
 [tool.ruff.lint.per-file-ignores]
 "tests/test_smoke.py" = ["E401", "UP017", "E731", "F401", "F841", "UP012"]
 "tests/smoke/*" = ["E401", "UP017", "E731", "F401", "F841", "UP012"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-q --tb=short"

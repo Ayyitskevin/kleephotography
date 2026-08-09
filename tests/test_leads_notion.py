@@ -297,10 +297,10 @@ def _last_inquiry_job():
 
 def _wipe(email: str) -> None:
     """Session db is shared with test_smoke's pristine-baseline assertions —
-    leave zero rows behind (inquiries, their jobs, throttle bookkeeping)."""
+    leave zero rows behind (inquiries and their jobs). Throttle bookkeeping is
+    reset for every test by conftest's _reset_attempt_buckets."""
     db.run("DELETE FROM jobs WHERE kind='notion_sync_inquiry'")
     db.run("DELETE FROM inquiries WHERE email=?", (email,))
-    db.run("DELETE FROM pin_attempts")
 
 
 def test_contact_post_enqueues_sync_job(client, monkeypatch):

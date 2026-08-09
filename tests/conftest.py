@@ -38,3 +38,29 @@ def _strip_showcase_seed():
         "cs_credits=NULL, cs_location=NULL"
     )
     yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_attempt_buckets(request):
+    """Clear the DB-backed lockout/throttle ledger before each test.
+
+    ``pin_attempts`` carries both PIN-lockout rows and the public inquiry
+    buckets (``security.INQUIRY_BUCKET_*``, 3 posts/hour/IP). The whole session
+    shares one ``MISE_DATA_DIR`` DB and every TestClient request presents as
+    ``ip=testclient``, so ``/contact`` posts accumulated across test FILES and a
+    plain ``pytest tests/`` run 429'd where the marker-partitioned CI steps —
+    three separate processes — did not. The existing autouse resets only clear
+    the in-memory ``ratelimit._hits``, never these rows.
+
+    This is test isolation only: the throttle itself is untouched, and the reset
+    is the same ``DELETE FROM pin_attempts`` the per-test helpers already use.
+
+    Not applied to tests/smoke: that suite is deliberately order-coupled on
+    accumulated DB state (see tests/smoke/conftest.py) and keeps owning its own
+    targeted cleanups.
+    """
+    if not request.node.get_closest_marker("smoke"):
+        from app import db
+
+        db.run("DELETE FROM pin_attempts")
+    yield

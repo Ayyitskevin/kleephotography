@@ -19,7 +19,7 @@ os.environ.setdefault("MISE_ENV_FILE", "/nonexistent")
 import pytest
 from fastapi.testclient import TestClient
 
-from app import config, db, jobs, mailer, notion_sync, scheduling, security
+from app import config, db, jobs, mailer, notion_sync, scheduling
 from app.gcal import FreeBusyQuery
 from app.main import app
 from tests.jobtest import freeze_job_pool
@@ -43,13 +43,10 @@ def admin_client(client):
 
 
 def _wipe_lead(email: str) -> None:
-    """Session DB is shared — leave zero lead/job/throttle residue."""
+    """Session DB is shared — leave zero lead/job residue. Throttle bookkeeping
+    is reset for every test by conftest's _reset_attempt_buckets."""
     db.run("DELETE FROM jobs WHERE kind IN ('notion_sync_inquiry','inquiry_owner_email')")
     db.run("DELETE FROM inquiries WHERE email=?", (email,))
-    db.run(
-        "DELETE FROM pin_attempts WHERE gallery_id=?",
-        (security.INQUIRY_BUCKET_CONTACT,),
-    )
 
 
 def _last_inquiry_job():

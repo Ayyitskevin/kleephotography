@@ -1,0 +1,6 @@
+# Test + lint toolchain, pinned like requirements.txt so a new ruff release
+# cannot turn `main` red with zero code change. Install alongside runtime deps:
+#   pip install -r requirements.txt -r requirements-dev.txt
+pytest==9.1.1
+httpx==0.28.1
+ruff==0.15.22

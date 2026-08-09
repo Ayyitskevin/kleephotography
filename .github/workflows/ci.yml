@@ -27,7 +27,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -40,7 +40,7 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/pip install --upgrade pip
-          .venv/bin/pip install -r requirements.txt pytest httpx ruff
+          .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run unit tests (fast feedback)
         run: |

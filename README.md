@@ -22,7 +22,7 @@ Ops runbooks live under [`ops/`](ops/).
 
 ```sh
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt pytest ruff httpx
+pip install -r requirements.txt -r requirements-dev.txt
 # ffmpeg required for video smoke tests
 cp .env.example .env   # set MISE_SECRET_KEY + MISE_ADMIN_PASSWORD at minimum
 uvicorn app.main:app --reload --port 8400
