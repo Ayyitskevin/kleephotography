@@ -458,6 +458,14 @@ def update_gallery(
     if not (pin.isdigit() and len(pin) == 4):
         raise HTTPException(status_code=400, detail="PIN must be 4 digits")
     new_exp = expires_at.strip() or None
+    if new_exp:
+        # Stored expiries are compared as plain strings against an ISO date
+        # (common.gallery_card, the expiry reminder sweep), so anything that
+        # isn't canonical YYYY-MM-DD silently never expires. Empty = no expiry.
+        try:
+            new_exp = dt.date.fromisoformat(new_exp).isoformat()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="bad expiry date")
     # Changing the expiry date re-arms the one-shot expiry reminder so the new
     # date re-reminds the client (see gallery_reminders); an unchanged date keeps it.
     reminded_expiry = 0 if new_exp != old["expires_at"] else old["reminded_expiry"]
@@ -627,9 +635,12 @@ async def bulk_star_tag(request: Request, gallery_id: int):
     form = await request.form()
     tag = (form.get("portfolio_tag") or "").strip()
     unstar = form.get("mode") == "unstar"
+    try:
+        asset_ids = [int(v) for v in form.getlist("asset_ids")]
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="bad asset id")
     with db.tx() as con:
-        for v in form.getlist("asset_ids"):
-            aid = int(v)
+        for aid in asset_ids:
             if unstar:
                 con.execute(
                     "UPDATE assets SET portfolio=0 WHERE id=? AND gallery_id=?",

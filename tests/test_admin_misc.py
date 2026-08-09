@@ -22,6 +22,17 @@ def admin_client():
         yield client
 
 
+@pytest.fixture
+def gallery():
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("MiscG01", "Misc gallery", "1234"),
+    )
+    yield gid
+    db.run("DELETE FROM assets WHERE gallery_id=?", (gid,))
+    db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
 @pytest.mark.integration
 def test_audit_csv_exports_past_the_viewer_window(admin_client):
     """The CSV is the dispute/accountant evidence file: it carries the whole
@@ -55,3 +66,53 @@ def test_audit_csv_exports_past_the_viewer_window(admin_client):
         assert page.text.count("audit-ic") <= 500
     finally:
         db.run("DELETE FROM audit_log WHERE entity_type=?", (marker,))
+
+
+@pytest.mark.integration
+def test_bulk_portfolio_rejects_a_non_numeric_asset_id(admin_client, gallery):
+    aid = db.run(
+        """INSERT INTO assets (gallery_id, kind, filename, stored, status)
+           VALUES (?, 'photo', 'hero.jpg', 'stored-hero.jpg', 'ready')""",
+        (gallery,),
+    )
+    response = admin_client.post(
+        f"/admin/galleries/{gallery}/assets/bulk-portfolio",
+        data={"asset_ids": [str(aid), "not-an-id"], "portfolio_tag": "food"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 400
+    row = db.one("SELECT portfolio, portfolio_tag FROM assets WHERE id=?", (aid,))
+    assert (row["portfolio"], row["portfolio_tag"]) == (0, None)
+
+
+@pytest.mark.integration
+def test_gallery_settings_rejects_a_non_iso_expiry_and_keeps_empty_as_never(admin_client, gallery):
+    db.run("UPDATE galleries SET expires_at=? WHERE id=?", ("2035-01-05", gallery))
+    form = {"title": "Misc gallery", "pin": "1234"}
+
+    response = admin_client.post(
+        f"/admin/galleries/{gallery}/settings",
+        data={**form, "expires_at": "next Friday"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 400
+    row = db.one("SELECT expires_at FROM galleries WHERE id=?", (gallery,))
+    assert row["expires_at"] == "2035-01-05"
+
+    response = admin_client.post(
+        f"/admin/galleries/{gallery}/settings",
+        data={**form, "expires_at": "20350106"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    row = db.one("SELECT expires_at FROM galleries WHERE id=?", (gallery,))
+    assert row["expires_at"] == "2035-01-06"
+
+    response = admin_client.post(
+        f"/admin/galleries/{gallery}/settings",
+        data={**form, "expires_at": "  "},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    row = db.one("SELECT expires_at FROM galleries WHERE id=?", (gallery,))
+    assert row["expires_at"] is None
