@@ -1,8 +1,15 @@
 """SQLite-backed job queue with a thread pool. Survives restarts:
-startup re-queues anything left 'running' by a crash, then drains the backlog."""
+startup re-queues anything left 'running' by a crash, then drains the backlog.
+Delivery is AT LEAST ONCE — a crashed attempt is retried, so handlers must be
+idempotent (contract: ops/AT-LEAST-ONCE.md). A failed attempt parks the row
+behind a backoff (next_attempt_at) and the queue's own sweeper thread re-offers
+it once the wait elapses; retry() is the operator's override for both a parked
+row and a dead one, and queue_health() is what /healthz and the ops heartbeat
+read so a parked or wedged queue is never invisible."""
 
 import json
 import logging
+import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -24,7 +31,20 @@ from . import (
 log = logging.getLogger("mise.jobs")
 
 _pool: ThreadPoolExecutor | None = None
+_sweeper: threading.Thread | None = None
+_sweeper_stop = threading.Event()
 MAX_ATTEMPTS = 3
+# Delay before the Nth retry, indexed by the attempt that just failed. Bounded and
+# modest on purpose — this is a solo-operator queue, not a distributed system. It
+# only has to outlive a vendor blip (a Notion 502, a Gmail hiccup); anything longer
+# is better surfaced as a failed job in the admin than retried silently for hours.
+# The sweeper thread is the clock that picks a parked job back up, so the honest
+# gap is "backoff, plus at most one JOB_SWEEP_TICK_SECONDS, minus up to a second
+# to SQLite's whole-second datetime()" — call it 59-120s, then 299-360s at the
+# defaults. That is why the queue does NOT ride the hourly recurring scheduler:
+# an hourly clock would round both steps to "within the hour" and the numbers
+# here would be a lie.
+RETRY_BACKOFF_SECONDS = (60, 300)
 PRIMARY_ASSET_JOB_KINDS = frozenset({"image_derivatives", "video_transcode"})
 
 
@@ -259,12 +279,30 @@ def enqueue(kind: str, payload: dict) -> int:
     return job_id
 
 
+def _retry_delay(attempts: int) -> str:
+    """SQLite datetime modifier for the wait after `attempts` failed tries."""
+    seconds = RETRY_BACKOFF_SECONDS[min(attempts, len(RETRY_BACKOFF_SECONDS)) - 1]
+    return f"+{seconds} seconds"
+
+
+def _due_job_ids() -> list[int]:
+    """Queued jobs runnable right now — fresh work plus retries past their backoff."""
+    rows = db.all_(
+        "SELECT id FROM jobs WHERE status='queued' "
+        "AND (next_attempt_at IS NULL OR next_attempt_at <= datetime('now')) ORDER BY id"
+    )
+    return [r["id"] for r in rows]
+
+
 def _claim(job_id: int) -> "db.sqlite3.Row | None":
     con = db.connect()
     try:
+        # The single queued->running gate: it also enforces the retry backoff, so
+        # no dispatch path (pool, sweep, restart backlog) can jump a job's wait.
         cur = con.execute(
             "UPDATE jobs SET status='running', attempts=attempts+1, "
-            "updated_at=datetime('now') WHERE id=? AND status='queued'",
+            "updated_at=datetime('now') WHERE id=? AND status='queued' "
+            "AND (next_attempt_at IS NULL OR next_attempt_at <= datetime('now'))",
             (job_id,),
         )
         con.commit()
@@ -283,32 +321,62 @@ def _execute(job_id: int) -> None:
     try:
         HANDLERS[job["kind"]](payload)
         db.run(
-            "UPDATE jobs SET status='done', error=NULL, updated_at=datetime('now') WHERE id=?",
+            "UPDATE jobs SET status='done', error=NULL, next_attempt_at=NULL, "
+            "updated_at=datetime('now') WHERE id=?",
             (job_id,),
         )
         log.info("job %s %s done", job_id, job["kind"])
     except Exception as e:
         status = "queued" if job["attempts"] < MAX_ATTEMPTS else "failed"
+        # Park the retry behind a backoff instead of resubmitting it here: an
+        # immediate resubmit burned every attempt inside a second, so a vendor
+        # blip looked identical to a permanent failure. The sweeper thread picks
+        # it back up once the wait elapses, and retry() can force it sooner.
+        # datetime('now', NULL) is NULL, so a terminal failure clears the column
+        # in the same statement.
+        retry_in = _retry_delay(job["attempts"]) if status == "queued" else None
         db.run(
-            "UPDATE jobs SET status=?, error=?, updated_at=datetime('now') WHERE id=?",
-            (status, str(e)[:500], job_id),
+            "UPDATE jobs SET status=?, error=?, updated_at=datetime('now'), "
+            "next_attempt_at=datetime('now', ?) WHERE id=?",
+            (status, str(e)[:500], retry_in, job_id),
         )
-        log.exception("job %s %s attempt %s -> %s", job_id, job["kind"], job["attempts"], status)
+        log.exception(
+            "job %s %s attempt %s -> %s%s",
+            job_id,
+            job["kind"],
+            job["attempts"],
+            status,
+            f" (retry {retry_in})" if retry_in else "",
+        )
         # Only primary ingest owns the canonical asset's readiness. Optional
         # derivatives (social crops/renditions) report their own job failure
         # without removing an already delivered asset from every reader.
         if status == "failed" and job["kind"] in PRIMARY_ASSET_JOB_KINDS and "asset_id" in payload:
             db.run("UPDATE assets SET status='failed' WHERE id=?", (payload["asset_id"],))
-        if status == "queued" and _pool:
-            _pool.submit(_execute, job_id)
 
 
 def retry(job_id: int) -> bool:
+    """Force a job to run NOW — the admin Jobs button, and the operator's only
+    hands-on control over a stuck queue.
+
+    It has to match TWO states, not just the terminal one. A failed attempt now
+    parks the row as queued-with-a-future-next_attempt_at, and _claim refuses a
+    parked row on purpose; if retry() only looked for status='failed', pressing
+    retry during a backoff window would 404 and Kevin would have no way to jump
+    the wait. Clearing next_attempt_at (and the attempt count) is exactly what
+    unparks it, so the same statement serves both cases.
+
+    A plain queued row with no next_attempt_at is deliberately NOT matched: it
+    has never failed, the pool or the next sweep already owns it, and there is
+    no button for it in the admin.
+    """
     con = db.connect()
     try:
         cur = con.execute(
             "UPDATE jobs SET status='queued', attempts=0, error=NULL, "
-            "updated_at=datetime('now') WHERE id=? AND status='failed'",
+            "next_attempt_at=NULL, updated_at=datetime('now') "
+            "WHERE id=? AND (status='failed' OR "
+            "(status='queued' AND next_attempt_at IS NOT NULL))",
             (job_id,),
         )
         con.commit()
@@ -322,6 +390,77 @@ def retry(job_id: int) -> bool:
     return True
 
 
+def queue_health() -> dict:
+    """The three numbers that tell you whether the queue is actually moving.
+
+    `failed` is the old signal (dead, awaiting a human). `waiting_retry` is the
+    limbo the backoff introduced — queued, but deliberately not runnable yet.
+    `stuck` is the one that means something is wrong: a retry whose
+    next_attempt_at passed over JOB_STUCK_AFTER_SECONDS ago and still has not
+    been claimed, so the sweeper thread or the pool is not doing its job (or the
+    timestamp itself is bad). Read by /healthz and by the ops heartbeat — a
+    parked or wedged queue must never be invisible.
+
+    Deliberately NOT counted as stuck: a never-attempted queued job, however
+    old. Two workers chewing through a batch of video transcodes leave fresh
+    work queued for an hour as a matter of course, and alerting on that would
+    cry wolf on a healthy queue — `jobs_pending` is the number for depth.
+    """
+    row = db.one(
+        "SELECT "
+        "SUM(status='failed') AS failed, "
+        "SUM(status='queued' AND next_attempt_at IS NOT NULL) AS waiting_retry, "
+        "SUM(status='queued' AND next_attempt_at IS NOT NULL "
+        "    AND next_attempt_at <= datetime('now', ?)) AS stuck "
+        "FROM jobs",
+        (f"-{config.JOB_STUCK_AFTER_SECONDS} seconds",),
+    )
+    return {k: int(row[k] or 0) for k in ("failed", "waiting_retry", "stuck")}
+
+
+def sweep() -> None:
+    """Re-offer every due queued job to the pool — the queue's only self-heal.
+
+    Two ways a durable row strands with the process still up: dispatch found no
+    pool (see dispatch()), or a failed attempt parked it behind its backoff.
+    Neither is re-drained by anything else short of a restart. Re-submitting a
+    job the pool already holds is harmless — _claim is the one queued->running
+    gate, so the duplicate just no-ops.
+    """
+    if not _pool:
+        return
+    due = _due_job_ids()
+    if due:
+        dispatch(due)
+        log.info("job sweep re-dispatched %d queued jobs", len(due))
+
+
+def _sweep_loop() -> None:
+    """The queue's clock. Reads the tick every pass so it can be tuned live."""
+    while not _sweeper_stop.wait(config.JOB_SWEEP_TICK_SECONDS):
+        try:
+            sweep()
+        except Exception:
+            log.exception("job sweep failed")
+
+
+def _start_sweeper() -> None:
+    global _sweeper
+    if _sweeper and _sweeper.is_alive():
+        return
+    _sweeper_stop.clear()
+    _sweeper = threading.Thread(target=_sweep_loop, name="mise-job-sweep", daemon=True)
+    _sweeper.start()
+
+
+def _stop_sweeper() -> None:
+    global _sweeper
+    _sweeper_stop.set()
+    if _sweeper:
+        _sweeper.join(timeout=2)
+        _sweeper = None
+
+
 def pending_count() -> int:
     row = db.one("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('queued','running')")
     return row["n"] if row else 0
@@ -331,15 +470,23 @@ def start() -> None:
     global _pool
     db.run("UPDATE jobs SET status='queued' WHERE status='running'")
     _pool = ThreadPoolExecutor(max_workers=config.JOB_WORKERS, thread_name_prefix="mise-job")
-    backlog = db.all_("SELECT id FROM jobs WHERE status='queued' ORDER BY id")
-    for row in backlog:
-        _pool.submit(_execute, row["id"])
+    backlog = _due_job_ids()
+    for job_id in backlog:
+        _pool.submit(_execute, job_id)
     if backlog:
         log.info("re-queued %d jobs from previous run", len(backlog))
+    # Anything not due yet (a retry parked mid-crash) is the sweeper's job.
+    _start_sweeper()
+    log.info(
+        "job queue up (%s workers, sweep every %ss)",
+        config.JOB_WORKERS,
+        config.JOB_SWEEP_TICK_SECONDS,
+    )
 
 
 def stop() -> None:
     global _pool
+    _stop_sweeper()
     if _pool:
         _pool.shutdown(wait=False, cancel_futures=True)
         _pool = None

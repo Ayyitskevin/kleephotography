@@ -26,6 +26,21 @@ def client():
 
 
 @pytest.mark.integration
+def test_boot_refuses_without_a_secret_key(monkeypatch):
+    """No signing key = refuse the boot, don't come up healthy and 500 later.
+
+    The check runs before db.migrate()/jobs.start(), so a failed startup here
+    leaves the module-shared job pool alone.
+    """
+    from app import config
+
+    monkeypatch.setattr(config, "SECRET_KEY", "")
+    with pytest.raises(RuntimeError, match="MISE_SECRET_KEY is not set"):
+        with TestClient(app):
+            pass
+
+
+@pytest.mark.integration
 def test_healthz(client):
     r = client.get("/healthz")
     body = r.json()

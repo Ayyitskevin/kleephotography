@@ -601,18 +601,31 @@ def nudge_dismiss(key: str = Form(...)):
 @router.get("/jobs", response_class=HTMLResponse)
 def jobs_view(request: Request):
     failed = db.all_("SELECT * FROM jobs WHERE status='failed' ORDER BY updated_at DESC LIMIT 50")
+    # Parked behind a retry backoff: queued, but jobs._claim won't run it yet.
+    # It needs its own table — it isn't failed, and buried in "Recent" it would
+    # read as ordinary pending work with no way to force it (the whole point of
+    # the retry button is that a human can always jump the wait).
+    waiting = db.all_(
+        "SELECT * FROM jobs WHERE status='queued' AND next_attempt_at IS NOT NULL "
+        "ORDER BY next_attempt_at LIMIT 50"
+    )
     recent = db.all_("SELECT * FROM jobs WHERE status!='failed' ORDER BY id DESC LIMIT 30")
     return templates.TemplateResponse(
         request,
         "admin/jobs.html",
-        {"failed": failed, "recent": recent, "pending": jobs.pending_count()},
+        {
+            "failed": failed,
+            "waiting": waiting,
+            "recent": recent,
+            "pending": jobs.pending_count(),
+        },
     )
 
 
 @router.post("/jobs/{job_id}/retry")
 def job_retry(job_id: int):
     if not jobs.retry(job_id):
-        raise HTTPException(status_code=404, detail="no failed job with that id")
+        raise HTTPException(status_code=404, detail="no retryable job with that id")
     return RedirectResponse("/admin/jobs", status_code=303)
 
 

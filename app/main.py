@@ -68,8 +68,28 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("mise.app")
 
 
+def _require_secret_key() -> None:
+    """Refuse to boot without a signing key.
+
+    An empty MISE_SECRET_KEY used to surface as a RuntimeError 500 on the first
+    cookie operation (app/security.py): the process came up looking healthy and
+    broke on the first real visitor. Fail here instead, before anything serves.
+
+    MISE_ADMIN_PASSWORD deliberately stays a runtime check — empty already fails
+    CLOSED in security.check_admin_password (every login rejected), which is a
+    legitimate posture for an admin-less deployment, not a reason to refuse boot.
+    """
+    if not config.SECRET_KEY:
+        raise RuntimeError(
+            "MISE_SECRET_KEY is not set — refusing to start. Set it in the .env the "
+            "service loads (MISE_ENV_FILE, default /opt/mise/.env; see .env.example) "
+            "or export it in the environment before uvicorn."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _require_secret_key()
     db.migrate()
     jobs.start()
     scheduler.start()
@@ -320,6 +340,11 @@ async def healthz():
         "db_connected": False,
         "jobs_pending": None,
         "jobs_failed": None,
+        # A job parked behind its retry backoff is queued but not runnable yet;
+        # jobs_stuck is one that stayed that way long past its turn, i.e. the
+        # queue is not draining. Without these two the limbo is invisible here.
+        "jobs_waiting_retry": None,
+        "jobs_stuck": None,
         "disk_free_gb": None,
         "disk_low": None,
         "backup_present": None,
@@ -334,7 +359,10 @@ async def healthz():
         db.one("SELECT 1 AS ok")
         payload["db_connected"] = True
         payload["jobs_pending"] = jobs.pending_count()
-        payload["jobs_failed"] = db.one("SELECT COUNT(*) AS n FROM jobs WHERE status='failed'")["n"]
+        health = jobs.queue_health()
+        payload["jobs_failed"] = health["failed"]
+        payload["jobs_waiting_retry"] = health["waiting_retry"]
+        payload["jobs_stuck"] = health["stuck"]
     except Exception:
         log.exception("healthz database check failed")
         payload["ok"] = False

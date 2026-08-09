@@ -17,6 +17,15 @@ def freeze_job_pool(monkeypatch) -> None:
     monkeypatch.setattr(jobs, "_pool", None)
 
 
+def elapse_backoff(job_id: int) -> None:
+    """Stand in for the sweeper thread waiting out a failed job's retry backoff.
+
+    jobs._claim refuses a queued job until next_attempt_at passes, so a test that
+    drives attempt after attempt back-to-back has to clear the wait each round.
+    """
+    db.run("UPDATE jobs SET next_attempt_at=NULL WHERE id=?", (job_id,))
+
+
 def owner_email_job(inquiry_id: int):
     return db.one(
         "SELECT * FROM jobs WHERE kind='inquiry_owner_email' "
@@ -35,6 +44,7 @@ def drain_job(job_id: int) -> None:
             "UPDATE jobs SET status='queued', attempts=0, error=NULL WHERE id=?",
             (job_id,),
         )
+    elapse_backoff(job_id)
     jobs._execute(job_id)
 
 

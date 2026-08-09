@@ -193,5 +193,6 @@ a human on the irreversible parts.
 - [`ops/`](ops/) — operator runbooks: [`DEPLOY.md`](ops/DEPLOY.md),
   [`BACKUP.md`](ops/BACKUP.md) (nightly local snapshot; off-host DR is a tracked open gap),
   [`MIGRATIONS.md`](ops/MIGRATIONS.md), [`CSS-DUAL-STACK.md`](ops/CSS-DUAL-STACK.md),
-  [`SPECIALTY-LAUNCH.md`](ops/SPECIALTY-LAUNCH.md).
+  [`SPECIALTY-LAUNCH.md`](ops/SPECIALTY-LAUNCH.md),
+  [`AT-LEAST-ONCE.md`](ops/AT-LEAST-ONCE.md) — jobs/reminders send-then-record contract.
 - [`HANDOFF.md`](HANDOFF.md) — historical refactor notes. Prefer AGENTS.md and this README.

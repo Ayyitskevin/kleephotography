@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 
 from app import alerts, config, db, inquiry_notify, jobs, mailer, notion_sync
 from app.main import app
-from tests.jobtest import freeze_job_pool
+from tests.jobtest import elapse_backoff, freeze_job_pool
 
 pytestmark = pytest.mark.integration
 
@@ -189,6 +189,7 @@ def test_max_attempt_job_fails_visible(monkeypatch):
     monkeypatch.setattr(mailer, "send", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
     jid = inquiry_notify.enqueue_owner_email(iid)
     for _ in range(jobs.MAX_ATTEMPTS):
+        elapse_backoff(jid)
         jobs._execute(jid)
     job = db.one("SELECT status, attempts FROM jobs WHERE id=?", (jid,))
     assert job["status"] == "failed"
@@ -348,6 +349,7 @@ def test_lead_survives_email_and_notion_failure(client, monkeypatch):
     nj = db.one("SELECT * FROM jobs WHERE kind='notion_sync_inquiry' ORDER BY id DESC LIMIT 1")
     assert nj
     for _ in range(jobs.MAX_ATTEMPTS):
+        elapse_backoff(nj["id"])
         try:
             jobs._execute(nj["id"])
         except Exception:

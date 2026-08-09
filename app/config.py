@@ -226,6 +226,22 @@ VIDEO_CRF = int(os.environ.get("MISE_VIDEO_CRF", "23"))
 
 JOB_WORKERS = int(os.environ.get("MISE_JOB_WORKERS", "2"))
 
+# The job queue's OWN clock (jobs._sweep_loop), deliberately separate from the
+# hourly recurring scheduler below: it is what re-offers a job parked behind its
+# retry backoff, so the tick has to be finer than the backoff or the backoff
+# becomes decorative. A failed job therefore retries between its backoff and its
+# backoff + one tick (60s → 60-120s). Raising this past RETRY_BACKOFF_SECONDS[0]
+# makes the first retry step meaningless; lower it, don't raise it.
+JOB_SWEEP_TICK_SECONDS = int(os.environ.get("MISE_JOB_SWEEP_TICK_SECONDS", "60"))
+
+# A RETRY still sitting there this long past its next_attempt_at is not waiting,
+# it is wedged (sweeper thread dead, pool never came back, a bad timestamp).
+# ops_monitor alerts on it and /healthz reports it. 15 min is ~15 missed sweep
+# ticks — long enough not to trip over a slow handler, short enough that Kevin
+# hears about a dead queue the same hour. Never-attempted work is excluded from
+# the count on purpose (jobs.queue_health); a deep backlog is normal.
+JOB_STUCK_AFTER_SECONDS = int(os.environ.get("MISE_JOB_STUCK_AFTER_SECONDS", "900"))
+
 # Recurring-plan scheduler: how often the in-process thread sweeps for due
 # retainer drafts. Generates DRAFTS only (never sends/charges). The sweep is
 # idempotent, so the only effect of the interval is how soon after a restart a
