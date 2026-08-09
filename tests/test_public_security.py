@@ -4,7 +4,12 @@ originals email gate, the zip_status visitor gate, and webhook body caps."""
 from __future__ import annotations
 
 import collections
+import hashlib
+import io
+import json
 import shutil
+import time
+import zipfile
 
 import pytest
 from fastapi.testclient import TestClient
@@ -119,6 +124,156 @@ def test_favorites_zip_refused_on_low_disk(client, monkeypatch):
         r = client.get("/g/favzip-low/download/favorites")
         assert r.status_code == 507
         assert list(config.ZIP_DIR.glob(f"g{gid}-*.zip")) == []
+    finally:
+        _cleanup(client, gid)
+
+
+# ── favorites / section ZIP: oversized bundles leave the request path ────────
+
+
+def _drain_zip_subset(client: TestClient, slug: str, name: str) -> dict:
+    for _ in range(100):
+        s = client.get(f"/g/{slug}/download/zip/status?name={name}").json()
+        if s["ready"] or s["failed"]:
+            return s
+        time.sleep(0.05)
+    return s
+
+
+def test_large_favorites_zip_is_queued_not_built_in_the_request(client):
+    """A client who favorites everything in a big gallery must not trigger a
+    full byte copy inside the (async, event-loop-blocking) request handler.
+    Past config.ZIP_INLINE_MAX_BYTES the bundle is enqueued and the visitor
+    gets the same wait/poll page the full-gallery ZIP has always used."""
+    gid = _seed_gallery("favbig-01")
+    ids = [_seed_asset(gid, f"big{i}.jpg") for i in range(3)]
+    ph = ",".join("?" * len(ids))
+    db.run(f"UPDATE assets SET bytes=? WHERE id IN ({ph})", (config.ZIP_INLINE_MAX_BYTES, *ids))
+    v1 = _visitor(gid, "favbig-t1", "big@x.test")
+    for aid in ids:
+        db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (v1, aid))
+    try:
+        _auth(client, gid, "favbig-t1")
+        r = client.get("/g/favbig-01/download/favorites")
+        assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+        assert "Packing your export" in r.text
+        job = db.one("SELECT payload FROM jobs WHERE kind='zip_subset' ORDER BY id DESC")
+        payload = json.loads(job["payload"])
+        assert payload["gallery_id"] == gid and payload["asset_ids"] == ids
+        # same content-keyed filename the inline branch would have written
+        key = hashlib.sha256(",".join(str(i) for i in ids).encode()).hexdigest()[:8]
+        assert payload["name"] == f"g{gid}-fav-{key}.zip"
+        assert payload["prune"] == f"g{gid}-fav-*.zip"
+        # the page polls the shared status endpoint, scoped to THIS bundle
+        assert f"/g/favbig-01/download/zip/status?name={payload['name']}" in r.text
+        assert _drain_zip_subset(client, "favbig-01", payload["name"]) == {
+            "ready": True,
+            "failed": False,
+        }
+        # built by the worker → the same URL now serves the file
+        r = client.get("/g/favbig-01/download/favorites")
+        assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+        assert sorted(zipfile.ZipFile(io.BytesIO(r.content)).namelist()) == [
+            f"big{i}.jpg" for i in range(3)
+        ]
+    finally:
+        db.run("DELETE FROM jobs WHERE kind='zip_subset'")
+        _cleanup(client, gid)
+
+
+def test_large_section_zip_is_queued_on_the_asset_count_backstop(client):
+    """assets.bytes can be NULL, so the count ceiling has to catch an unmetered
+    bundle on its own — and the section route takes the same branch."""
+    gid = _seed_gallery("secbig-01")
+    sid = db.run("INSERT INTO sections (gallery_id, name) VALUES (?,?)", (gid, "All"))
+    n = config.ZIP_INLINE_MAX_ASSETS + 1
+    for i in range(n):
+        aid = _seed_asset(gid, f"s{i}.jpg")
+        db.run("UPDATE assets SET section_id=?, bytes=NULL WHERE id=?", (sid, aid))
+    _visitor(gid, "secbig-t1", "sec@x.test")
+    try:
+        _auth(client, gid, "secbig-t1")
+        r = client.get(f"/g/secbig-01/download/section/{sid}")
+        assert r.status_code == 200 and "Packing your export" in r.text
+        job = db.one("SELECT payload FROM jobs WHERE kind='zip_subset' ORDER BY id DESC")
+        payload = json.loads(job["payload"])
+        assert payload["name"].startswith(f"g{gid}-s{sid}-") and len(payload["asset_ids"]) == n
+        assert _drain_zip_subset(client, "secbig-01", payload["name"])["ready"] is True
+    finally:
+        db.run("DELETE FROM jobs WHERE kind='zip_subset'")
+        db.run("DELETE FROM sections WHERE gallery_id=?", (gid,))
+        _cleanup(client, gid)
+
+
+def test_many_small_metered_favorites_still_download_inline(client):
+    """The count ceiling is a backstop for unmetered rows ONLY. A delivery
+    client favoriting well past it — the ordinary case, not an abusive one —
+    weighs almost nothing, so it must still come back as one immediate file
+    rather than being pushed onto the wait page for a sub-second zip."""
+    gid = _seed_gallery("favmany-01")
+    ids = [_seed_asset(gid, f"m{i}.jpg") for i in range(config.ZIP_INLINE_MAX_ASSETS + 5)]
+    ph = ",".join("?" * len(ids))
+    db.run(f"UPDATE assets SET bytes=? WHERE id IN ({ph})", (1024, *ids))
+    v1 = _visitor(gid, "favmany-t1", "many@x.test")
+    for aid in ids:
+        db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (v1, aid))
+    try:
+        _auth(client, gid, "favmany-t1")
+        r = client.get("/g/favmany-01/download/favorites")
+        assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+        assert len(zipfile.ZipFile(io.BytesIO(r.content)).namelist()) == len(ids)
+        assert db.one("SELECT 1 AS x FROM jobs WHERE kind='zip_subset'") is None
+    finally:
+        db.run("DELETE FROM jobs WHERE kind='zip_subset'")
+        _cleanup(client, gid)
+
+
+def test_a_superseded_failure_does_not_poison_the_next_subset_build(client):
+    """The bundle name is a content hash of the favorite set, so for a stable
+    set it never changes. One exhausted build must not make the wait page paint
+    the error screen on every later attempt while a fresh job is queued."""
+    gid = _seed_gallery("favstale-01")
+    name = f"g{gid}-fav-deadbeef.zip"
+    payload = json.dumps({"gallery_id": gid, "name": name})
+    _visitor(gid, "favstale-t1", "stale@x.test")
+    try:
+        _auth(client, gid, "favstale-t1")
+        db.run(
+            "INSERT INTO jobs (kind, payload, status) VALUES ('zip_subset', ?, 'failed')",
+            (payload,),
+        )
+        url = f"/g/favstale-01/download/zip/status?name={name}"
+        assert client.get(url).json() == {"ready": False, "failed": True}
+        # a fresh attempt for the same bundle supersedes the dead one
+        db.run(
+            "INSERT INTO jobs (kind, payload, status) VALUES ('zip_subset', ?, 'queued')",
+            (payload,),
+        )
+        assert client.get(url).json() == {"ready": False, "failed": False}
+    finally:
+        db.run("DELETE FROM jobs WHERE kind='zip_subset'")
+        _cleanup(client, gid)
+
+
+def test_zip_status_subset_name_is_scoped_to_the_gallery(client):
+    """?name= is server-minted; the endpoint must refuse anything that isn't
+    shaped like a bundle of the gallery the visitor just cleared the gate for
+    (and must still refuse a visitor-less caller outright)."""
+    gid = _seed_gallery("zipname-01")
+    mine = f"g{gid}-fav-0123abcd.zip"
+    try:
+        assert client.get(f"/g/zipname-01/download/zip/status?name={mine}").status_code == 403
+        _visitor(gid, "zipname-t1")
+        _auth(client, gid, "zipname-t1")
+        r = client.get(f"/g/zipname-01/download/zip/status?name={mine}")
+        assert r.status_code == 200 and r.json() == {"ready": False, "failed": False}
+        for bad in (f"g{gid + 1}-fav-0123abcd.zip", "../mise.db", "nope.zip", "g1-fav-zz.zip"):
+            assert client.get(f"/g/zipname-01/download/zip/status?name={bad}").status_code == 404
+        # no ?name at all is still the full-gallery answer, unchanged
+        assert client.get("/g/zipname-01/download/zip/status").json() == {
+            "ready": False,
+            "failed": False,
+        }
     finally:
         _cleanup(client, gid)
 

@@ -533,6 +533,19 @@
         var f = d.querySelector("input"); if (f) f.focus(); }
     }
   });
+  /* data-swap-focus — move focus onto a region htmx just swapped in. For an
+     outerHTML swap htmx fires htmx:afterSwap on the NEW element, so the mark
+     is read off the fresh content. Needed wherever the swap deletes the
+     control that had focus (the contract sign form, the proposal accept /
+     decline buttons): without it focus falls to <body>, the keyboard user
+     loses their place, and the screen reader announces nothing after the one
+     action that matters most. The region carries tabindex="-1". */
+  document.addEventListener("htmx:afterSwap", function (ev) {
+    var el = ev.target;
+    if (!el || !el.matches || !el.matches("[data-swap-focus]")) return;
+    if (el.focus) el.focus({ preventScroll: false });
+  });
+
   document.addEventListener("htmx:afterSwap", function (ev) {
     if (!ev.target || ev.target.id !== "studio-board") return;
     var sec = document.getElementById("projects");

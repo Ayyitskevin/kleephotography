@@ -156,14 +156,11 @@ def build_zip(out: Path, entries) -> None:
     tmp.rename(out)
 
 
-def _h_zip(p: dict) -> None:
-    """Full-gallery ZIP of originals — STORE (media doesn't deflate), atomic rename."""
-    gid, rev = p["gallery_id"], p["rev"]
-    final = zip_path(gid, rev)
-    if final.exists():
-        return
-    assets = db.all_("SELECT * FROM assets WHERE gallery_id=? AND status='ready'", (gid,))
-    src_dir = _gallery_dirs(gid)["original"]
+def zip_entries(gallery_id: int, assets) -> list:
+    """(source_path, archive_name) pairs for a gallery ZIP, de-duplicating the
+    archive names build_zip says callers own. Shared by the full-gallery job,
+    the favorites/section job, and the small inline builds in public/downloads."""
+    src_dir = _gallery_dirs(gallery_id)["original"]
     names: set[str] = set()
     entries = []
     for a in assets:
@@ -172,8 +169,41 @@ def _h_zip(p: dict) -> None:
             name = f"{Path(name).stem}_{a['id']}{Path(name).suffix}"
         names.add(name)
         entries.append((src_dir / a["stored"], name))
-    build_zip(final, entries)
+    return entries
+
+
+def _h_zip(p: dict) -> None:
+    """Full-gallery ZIP of originals — STORE (media doesn't deflate), atomic rename."""
+    gid, rev = p["gallery_id"], p["rev"]
+    final = zip_path(gid, rev)
+    if final.exists():
+        return
+    assets = db.all_("SELECT * FROM assets WHERE gallery_id=? AND status='ready'", (gid,))
+    build_zip(final, zip_entries(gid, assets))
     for old in config.ZIP_DIR.glob(f"g{gid}-r*.zip"):
+        if old != final:
+            old.unlink(missing_ok=True)
+
+
+def _h_zip_subset(p: dict) -> None:
+    """Favorites / section ZIP that was too big to build in the request path
+    (public/downloads._queue_or_build). Same STORED copy as the full-gallery
+    build, over the EXPLICIT asset-id list the route hashed the filename from —
+    re-querying could pick up a fav added since, and the file would no longer
+    match its own content key. `name`/`prune` are server-minted (gN-fav-<hash>
+    .zip, gN-sM-<hash>.zip), never client input."""
+    gid, ids = p["gallery_id"], p["asset_ids"]
+    final = config.ZIP_DIR / p["name"]
+    if final.exists() or not ids:
+        return
+    ph = ",".join("?" * len(ids))  # only ever "?,?,..." placeholders
+    rows = db.all_(
+        f"SELECT * FROM assets WHERE gallery_id=? AND status='ready' AND id IN ({ph})",
+        (gid, *ids),
+    )
+    order = {aid: n for n, aid in enumerate(ids)}
+    build_zip(final, zip_entries(gid, sorted(rows, key=lambda a: order[a["id"]])))
+    for old in config.ZIP_DIR.glob(p["prune"]):
         if old != final:
             old.unlink(missing_ok=True)
 
@@ -184,6 +214,7 @@ HANDLERS = {
     "video_transcode": _h_video,
     "video_renditions": _h_renditions,
     "zip_build": _h_zip,
+    "zip_subset": _h_zip_subset,
     "notion_sync_invoice": lambda p: notion_sync.sync_invoice(p["invoice_id"]),
     "notion_sync_gallery": lambda p: notion_sync.sync_gallery(p["gallery_id"]),
     "notion_sync_inquiry": lambda p: notion_sync.sync_inquiry(p["inquiry_id"]),

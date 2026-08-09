@@ -41,7 +41,14 @@ async def show_form(request: Request, slug: str):
     return templates.TemplateResponse(
         request,
         "site/form.html",
-        {"f": f, "fields": _fields(f["id"]), "sent": False, "error": None, "values": {}},
+        {
+            "f": f,
+            "fields": _fields(f["id"]),
+            "sent": False,
+            "error": None,
+            "error_fields": (),
+            "values": {},
+        },
     )
 
 
@@ -56,7 +63,14 @@ async def submit_form(request: Request, slug: str):
         return templates.TemplateResponse(
             request,
             "site/form.html",
-            {"f": f, "fields": fields, "sent": True, "error": None, "values": {}},
+            {
+                "f": f,
+                "fields": fields,
+                "sent": True,
+                "error": None,
+                "error_fields": (),
+                "values": {},
+            },
         )
 
     ip = security.client_ip(request)
@@ -71,6 +85,7 @@ async def submit_form(request: Request, slug: str):
                 "sent": False,
                 "error": "You've submitted a few times recently — give me a moment "
                 "before sending another.",
+                "error_fields": (),
                 "values": {},
             },
             status_code=429,
@@ -87,16 +102,23 @@ async def submit_form(request: Request, slug: str):
             values[key] = (posted.get(f"field_{fld['id']}") or "").strip()
 
     errors = []
+    # Field keys that came back bad, so the template can mark the individual
+    # controls aria-invalid instead of only printing one summary line.
+    bad: list[str] = []
     if not name:
         errors.append("your name")
+        bad.append("name")
     if not ("@" in email and "." in email.rsplit("@", 1)[-1]):
         errors.append("a valid email")
+        bad.append("email")
     for fld in fields:
         val = values[str(fld["id"])]
         if fld["required"] and not val:
             errors.append(fld["label"])
+            bad.append(str(fld["id"]))
         elif val and fld["ftype"] == "email" and not ("@" in val and "." in val.rsplit("@", 1)[-1]):
             errors.append(f'a valid email for "{fld["label"]}"')
+            bad.append(str(fld["id"]))
     if errors:
         return templates.TemplateResponse(
             request,
@@ -106,6 +128,7 @@ async def submit_form(request: Request, slug: str):
                 "fields": fields,
                 "sent": False,
                 "error": "Please fill in: " + ", ".join(errors) + ".",
+                "error_fields": tuple(bad),
                 "values": {"name": name, "email": email, **values},
             },
             status_code=400,
@@ -144,5 +167,12 @@ async def submit_form(request: Request, slug: str):
     return templates.TemplateResponse(
         request,
         "site/form.html",
-        {"f": f, "fields": fields, "sent": True, "error": None, "values": {}},
+        {
+            "f": f,
+            "fields": fields,
+            "sent": True,
+            "error": None,
+            "error_fields": (),
+            "values": {},
+        },
     )

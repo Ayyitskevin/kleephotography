@@ -10,13 +10,21 @@
      I'll be in touch about your shoot.{% endif %}</p>
   {% else %}
   {% if f.intro %}<p>{{ f.intro }}</p>{% endif %}
+  {# Per-field invalid state follows the established primitive (_book_card,
+     _ticket_gate, email_gate): the route hands back error_fields, each bad
+     control gets aria-invalid + aria-describedby pointing at the one error
+     line. Custom fields key off their field id (a string), exactly as the
+     form controls are named. #}
+  {% macro invalid(key) %}{% if key in error_fields %}aria-invalid="true" aria-describedby="form-error"{% endif %}{% endmacro %}
   <form method="post" action="/forms/{{ f.slug }}" class="stack-form">
-    <label>Name <input type="text" name="name" required value="{{ values.get('name', '') }}"></label>
-    <label>Email <input type="email" name="email" required value="{{ values.get('email', '') }}"></label>
+    <label>Name <input type="text" name="name" required value="{{ values.get('name', '') }}"
+             {{ invalid('name') }}></label>
+    <label>Email <input type="email" name="email" required value="{{ values.get('email', '') }}"
+             {{ invalid('email') }}></label>
     {% for fld in fields %}
     {% if fld.ftype == "checkbox" %}
     {% set sel = values.get(fld.id | string) or [] %}
-    <fieldset class="check-field">
+    <fieldset class="check-field" {{ invalid(fld.id | string) }}>
       <legend>{{ fld.label }}{% if fld.required %} <span class="req">*</span>{% endif %}</legend>
       {% for o in fld.opts %}
       <label class="check-opt"><input type="checkbox" name="field_{{ fld.id }}" value="{{ o }}" {% if o in sel %}checked{% endif %}> {{ o }}</label>
@@ -26,30 +34,30 @@
     {% set val = values.get(fld.id | string, "") %}
     <label>{{ fld.label }}{% if fld.required %} <span class="req">*</span>{% endif %}
       {% if fld.ftype == "long_text" %}
-        <textarea name="field_{{ fld.id }}" rows="4" {% if fld.required %}required{% endif %}>{{ val }}</textarea>
+        <textarea name="field_{{ fld.id }}" rows="4" {% if fld.required %}required{% endif %} {{ invalid(fld.id | string) }}>{{ val }}</textarea>
       {% elif fld.ftype == "dropdown" %}
-        <select name="field_{{ fld.id }}" {% if fld.required %}required{% endif %}>
+        <select name="field_{{ fld.id }}" {% if fld.required %}required{% endif %} {{ invalid(fld.id | string) }}>
           <option value="">— choose —</option>
           {% for o in fld.opts %}<option value="{{ o }}" {% if val == o %}selected{% endif %}>{{ o }}</option>{% endfor %}
         </select>
       {% elif fld.ftype == "yesno" %}
-        <select name="field_{{ fld.id }}" {% if fld.required %}required{% endif %}>
+        <select name="field_{{ fld.id }}" {% if fld.required %}required{% endif %} {{ invalid(fld.id | string) }}>
           <option value="">— choose —</option>
           <option value="Yes" {% if val == "Yes" %}selected{% endif %}>Yes</option>
           <option value="No" {% if val == "No" %}selected{% endif %}>No</option>
         </select>
       {% elif fld.ftype == "date" %}
-        <input type="date" name="field_{{ fld.id }}" value="{{ val }}" {% if fld.required %}required{% endif %}>
+        <input type="date" name="field_{{ fld.id }}" value="{{ val }}" {% if fld.required %}required{% endif %} {{ invalid(fld.id | string) }}>
       {% elif fld.ftype == "email" %}
-        <input type="email" name="field_{{ fld.id }}" value="{{ val }}" {% if fld.required %}required{% endif %}>
+        <input type="email" name="field_{{ fld.id }}" value="{{ val }}" {% if fld.required %}required{% endif %} {{ invalid(fld.id | string) }}>
       {% else %}
-        <input type="text" name="field_{{ fld.id }}" value="{{ val }}" {% if fld.required %}required{% endif %}>
+        <input type="text" name="field_{{ fld.id }}" value="{{ val }}" {% if fld.required %}required{% endif %} {{ invalid(fld.id | string) }}>
       {% endif %}
     </label>
     {% endif %}
     {% endfor %}
     <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
-    {% if error %}<p class="error" role="alert" aria-live="polite">{{ error }}</p>{% endif %}
+    {% if error %}<p class="error" role="alert" aria-live="polite" id="form-error">{{ error }}</p>{% endif %}
     <button type="submit">Submit</button>
   </form>
   {% endif %}

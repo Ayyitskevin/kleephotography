@@ -17,6 +17,10 @@ log = logging.getLogger("mise.public.downloads")
 router = APIRouter(prefix="/g")
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Server-minted subset-ZIP filenames (favorites / per-section). Only shape this
+# regex accepts may be polled through zip_status, and it must also carry the
+# caller's own gallery id — see zip_status.
+_SUBSET_ZIP = re.compile(r"^g\d+-(?:fav|s\d+)-[0-9a-f]{8}\.zip$")
 
 
 def _gate(request: Request, slug: str):
@@ -34,16 +38,56 @@ def _email_required(g) -> bool:
 
 
 def _store_zip(gallery_id: int, assets, out: Path) -> None:
-    src_dir = config.MEDIA_DIR / str(gallery_id) / "original"
-    names: set[str] = set()
-    entries = []
-    for a in assets:
-        name = a["filename"]
-        if name in names:
-            name = f"{Path(name).stem}_{a['id']}{Path(name).suffix}"
-        names.add(name)
-        entries.append((src_dir / a["stored"], name))
-    jobs.build_zip(out, entries)
+    jobs.build_zip(out, jobs.zip_entries(gallery_id, assets))
+
+
+def _queue_or_build(request: Request, g, assets, out: Path, prune: str):
+    """Build a favorites/section bundle. Small ones stay inline — one click,
+    one file, no wait screen, which is genuinely nicer for a handful of photos.
+    Past config.ZIP_INLINE_MAX_* the same copy would stall the event loop for
+    the whole gallery, so it goes to the queue and the client gets the SAME
+    wait/poll page the full-gallery ZIP uses. Returns that page, or None once
+    the file is on disk and the caller can serve it."""
+    total_bytes = sum(a["bytes"] or 0 for a in assets)
+    # The count ceiling is only a backstop for rows whose size we don't know:
+    # with real byte counts the size ceiling already says everything, and a
+    # client favouriting 30-60 frames off a delivery gallery is the ordinary
+    # case, not an abusive one — sending that to the wait page would trade an
+    # instant download for a spinner.
+    unmetered = any(a["bytes"] is None for a in assets)
+    if total_bytes <= config.ZIP_INLINE_MAX_BYTES and not (
+        unmetered and len(assets) > config.ZIP_INLINE_MAX_ASSETS
+    ):
+        _store_zip(g["id"], assets, out)
+        for old in config.ZIP_DIR.glob(prune):
+            if old != out:
+                old.unlink(missing_ok=True)
+        return None
+    pending = db.one(
+        """SELECT 1 AS x FROM jobs WHERE kind='zip_subset'
+                        AND status IN ('queued','running')
+                        AND json_extract(payload,'$.name')=?""",
+        (out.name,),
+    )
+    if not pending:
+        jobs.enqueue(
+            "zip_subset",
+            {
+                "gallery_id": g["id"],
+                "name": out.name,
+                "prune": prune,
+                "asset_ids": [a["id"] for a in assets],
+            },
+        )
+    return templates.TemplateResponse(
+        request,
+        "public/zip_wait.html",
+        {
+            "g": g,
+            "status_url": f"/g/{g['slug']}/download/zip/status?name={out.name}",
+            "download_url": request.url.path,
+        },
+    )
 
 
 def _target(
@@ -214,9 +258,9 @@ async def download_favorites(request: Request, slug: str):
     )
     if not assets:
         raise HTTPException(status_code=404, detail="no favorites yet")
-    # small subset of originals — built synchronously, keyed by the fav-set hash
-    # (not the visitor) so identical favorites share one file and stale cleanup
-    # bounds the gallery to a single favorites ZIP on disk
+    # Keyed by the fav-set hash (not the visitor) so identical favorites share
+    # one file and stale cleanup bounds the gallery to a single favorites ZIP on
+    # disk. Built inline while it's small, queued once it isn't (_queue_or_build).
     key = hashlib.sha256(",".join(str(a["id"]) for a in assets).encode()).hexdigest()[:8]
     out = config.ZIP_DIR / f"g{g['id']}-fav-{key}.zip"
     if not out.is_file():
@@ -224,10 +268,9 @@ async def download_favorites(request: Request, slug: str):
         # must not be able to force an unbounded ZIP build on a full disk.
         if shutil.disk_usage(config.DATA_DIR).free / 1e9 < config.MIN_FREE_GB:
             raise HTTPException(status_code=507, detail="low disk space — download refused")
-        _store_zip(g["id"], assets, out)
-        for old in config.ZIP_DIR.glob(f"g{g['id']}-fav-*.zip"):
-            if old != out:
-                old.unlink(missing_ok=True)
+        wait = _queue_or_build(request, g, assets, out, f"g{g['id']}-fav-*.zip")
+        if wait is not None:
+            return wait
     db.run(
         "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
         (g["id"], visitor["id"]),
@@ -254,10 +297,9 @@ async def download_section(request: Request, slug: str, section_id: int):
     key = hashlib.sha256(",".join(str(a["id"]) for a in assets).encode()).hexdigest()[:8]
     out = config.ZIP_DIR / f"g{g['id']}-s{section_id}-{key}.zip"
     if not out.is_file():
-        _store_zip(g["id"], assets, out)
-        for old in config.ZIP_DIR.glob(f"g{g['id']}-s{section_id}-*.zip"):
-            if old != out:
-                old.unlink(missing_ok=True)
+        wait = _queue_or_build(request, g, assets, out, f"g{g['id']}-s{section_id}-*.zip")
+        if wait is not None:
+            return wait
     db.run(
         "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
         (g["id"], visitor["id"]),
@@ -288,14 +330,47 @@ async def download_zip(request: Request, slug: str):
     )
     if not pending:
         jobs.enqueue("zip_build", {"gallery_id": g["id"], "rev": g["content_rev"]})
-    return templates.TemplateResponse(request, "public/zip_wait.html", {"g": g})
+    return templates.TemplateResponse(
+        request,
+        "public/zip_wait.html",
+        {
+            "g": g,
+            "status_url": f"/g/{slug}/download/zip/status",
+            "download_url": f"/g/{slug}/download/zip",
+        },
+    )
 
 
 @router.get("/{slug}/download/zip/status")
-async def zip_status(request: Request, slug: str):
+async def zip_status(request: Request, slug: str, name: str | None = None):
     # Same gates as the sibling download routes — without them this was an
     # unauthenticated status oracle for any known slug.
     g, _ = _gate(request, slug)
+    if name is not None:
+        # A queued favorites/section bundle (_queue_or_build). The filename is
+        # server-minted and namespaced by gallery id, so a visitor who cleared
+        # the gate above can only ever poll THIS gallery's bundles — same
+        # authorization as the full-gallery branch below, no new surface.
+        if not (_SUBSET_ZIP.match(name) and name.startswith(f"g{g['id']}-")):
+            raise HTTPException(status_code=404)
+        if (config.ZIP_DIR / name).is_file():
+            return {"ready": True, "failed": False}
+        # Only report a failure that nothing is superseding. A subset bundle is
+        # named by a content hash of the favourite/section set, so for a stable
+        # set the name never changes and one exhausted build would otherwise
+        # paint the error screen on every later attempt, forever — even while a
+        # fresh job for the same name is queued and running fine.
+        failed = db.one(
+            """SELECT 1 AS x FROM jobs WHERE kind='zip_subset' AND status='failed'
+                            AND json_extract(payload,'$.name')=?
+                            AND NOT EXISTS (
+                                SELECT 1 FROM jobs live
+                                 WHERE live.kind='zip_subset'
+                                   AND live.status IN ('queued','running')
+                                   AND json_extract(live.payload,'$.name')=?)""",
+            (name, name),
+        )
+        return {"ready": False, "failed": bool(failed)}
     if jobs.zip_path(g["id"], g["content_rev"]).is_file():
         return {"ready": True, "failed": False}
     # Surface a build that exhausted its retries so the wait page can stop

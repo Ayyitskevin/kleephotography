@@ -1,6 +1,11 @@
 {% extends "base_cream.html" %}
 {% block title %}Preparing download · {{ g.title }}{% endblock %}
 {% block bodyclass %}{% if sr_enabled() %}sr{% else %}cream-theme{% endif %}{% endblock %}
+{# Wait/poll screen for any ZIP built off the request path. The caller passes
+   status_url (polled for {ready, failed}) and download_url (where a ready
+   build is served AND where "Try again" re-enqueues): the full-gallery route
+   points both at /download/zip, the favorites/section routes at their own
+   path plus ?name=<bundle>. One machine, three entry points. #}
 {% block content %}
 <main class="center-card sr-statecard">
   <div data-zip-working>
@@ -17,7 +22,7 @@
     <p class="muted">Something went wrong packing your download. Please try again — or
        get in touch and I'll send it over directly.</p>
     <p class="sr-state-actions">
-      <a class="button sr-btn" href="/g/{{ g.slug }}/download/zip">Try again</a>
+      <a class="button sr-btn" href="{{ download_url }}">Try again</a>
       <a class="button-ghost sr-btn sr-btn--ghost" href="/contact">Get in touch</a>
     </p>
   </div>
@@ -32,10 +37,10 @@
   var MAX_TRIES = 100;
   function fail() { working.hidden = true; errBox.hidden = false; }
   (function poll() {
-    fetch("/g/{{ g.slug }}/download/zip/status")
+    fetch("{{ status_url }}")
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d.ready) { window.location = "/g/{{ g.slug }}/download/zip"; }
+        if (d.ready) { window.location = "{{ download_url }}"; }
         else if (d.failed || ++tries >= MAX_TRIES) { fail(); }
         else { setTimeout(poll, 3000); }
       })

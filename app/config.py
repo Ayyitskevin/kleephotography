@@ -294,6 +294,20 @@ TELEGRAM_CHAT_ID = os.environ.get("MISE_TELEGRAM_CHAT_ID", "")
 # Refuse uploads when free disk drops below this (GB) — fail loud, not full.
 MIN_FREE_GB = int(os.environ.get("MISE_MIN_FREE_GB", "10"))
 
+# Favorites / per-section ZIPs are built INLINE while the client waits — a
+# STORED copy, so it costs one read+write of every byte, and because the
+# download handlers are async that copy blocks the whole event loop, not just
+# the one request. Above either ceiling the bundle goes to the job queue and the
+# client gets the same wait/poll page the full-gallery ZIP has always used.
+#   bytes: 150 MB is ~1s of copying on a modest SSD (the longest stall worth
+#          taking in-request) and 3x the 50 MB at which the gallery export rail
+#          already starts warning the client about download size.
+#   count: a backstop that applies ONLY when some row's assets.bytes is NULL
+#          (nothing forces it), because then the byte ceiling can't see the
+#          real weight. With sizes known, count alone never queues a bundle.
+ZIP_INLINE_MAX_BYTES = int(os.environ.get("MISE_ZIP_INLINE_MAX_BYTES", str(150 * 1024 * 1024)))
+ZIP_INLINE_MAX_ASSETS = int(os.environ.get("MISE_ZIP_INLINE_MAX_ASSETS", "25"))
+
 # IRS standard mileage rate (cents per mile) stamped onto NEW trip rows. Frozen
 # per-row at creation so prior trips keep the rate they were logged at. 2026 = 70¢/mi.
 MILEAGE_RATE_CENTS = int(os.environ.get("MISE_MILEAGE_RATE_CENTS", "70"))

@@ -44,9 +44,13 @@
 </header>
 {% endif %}
 
+{# hx-sync this:drop — /fav is a TOGGLE, so a double-click used to fire two
+   POSTs whose responses could land out of order and paint the wrong state (and
+   bounce off the proofing cap twice). One in-flight toggle per button; the
+   second click is ignored until it settles. #}
 {% macro takebtn(a) %}
 <button class="sr-icon-btn sr-take-btn" hx-post="/g/{{ g.slug }}/fav/{{ a.id }}" hx-swap="innerHTML"
-        title="Circle this take" aria-label="Circle this take">
+        hx-sync="this:drop" title="Circle this take" aria-label="Circle this take">
   {% if a.id in favs %}<span id="take-{{ a.id }}" class="fav-btn faved sr-take is-circled">{{ fav_order.get(a.id, '&#10003;') }}</span>
   {% else %}<span id="take-{{ a.id }}" class="fav-btn sr-take">&#9675;</span>{% endif %}
 </button>

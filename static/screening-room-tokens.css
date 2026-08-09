@@ -31,8 +31,13 @@ body.sr {
   --sr-ink:          #b5afa2;   /* body                                       */
   --sr-ink-soft:     #9b968a;
   --sr-ink-mute:     #8a857a;
-  --sr-ink-faint:    #6b675e;
-  --sr-ink-ghost:    #5c584f;
+  /* faint + ghost carry real content at 9–11px (form labels, kickers, stats),
+     so both clear the 4.5:1 AA floor on every house ground — the darkest ink
+     the near-black surfaces can legally hold. Same warm 41–46° olive hue as
+     the rest of the ramp, marginally MORE saturated than the values they
+     replace (ghost 2.78:1 → 4.98:1, faint 3.49:1 → 5.86:1 on --sr-house). */
+  --sr-ink-faint:    #918c7e;
+  --sr-ink-ghost:    #85806f;
 
   /* signal + stocks */
   --sr-amber:        #e39a2d;   /* the one signal color — CTAs, REC, focus    */
@@ -70,7 +75,10 @@ body.sr {
   --sr-sheet:        #f2ead8;
   --sr-sheet-ink:    #262119;
   --sr-sheet-body:   #3c362c;
-  --sr-sheet-mute:   #8a7d5f;
+  /* the money sheet is where clients read totals and sign: mute goes DARKER on
+     the cream, not lighter, to clear AA (3.39:1 → 4.96:1 on --sr-sheet) while
+     keeping the brass saturation it had */
+  --sr-sheet-mute:   #6d634b;
   --sr-sheet-line:   #d8cbaa;
   --sr-sheet-gold:   #a3722d;
 

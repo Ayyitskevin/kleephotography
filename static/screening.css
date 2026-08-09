@@ -651,6 +651,12 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .book-meta li, .sr .book-rail-desc { color: var(--sr-ink-mute); }
 .sr .book-step-h { color: var(--sr-cream); text-transform: uppercase;
   letter-spacing: 0.05em; font-size: 15px; }
+/* picker loading state — htmx puts .htmx-request on the card (hx-indicator),
+   the shared sr-rec-bar primitive does the rest. visibility (not display)
+   keeps its 2px reserved so the calendar can't shift under the cursor. */
+.sr .book-main .book-busy { display: block; width: 100%; margin: 0 0 10px;
+  visibility: hidden; }
+.sr .book-card.htmx-request .book-busy { visibility: visible; }
 .sr .book-cal-nav strong { color: var(--sr-cream); }
 .sr .book-cal-nav a { color: var(--sr-amber); }
 .sr .book-grid th { font: 500 9px/1 var(--sr-mono); letter-spacing: 0.14em;
@@ -1646,6 +1652,9 @@ body.sr-admin .admin-shell, body.sr-admin {
   font-size: var(--sr-text-sm); color: var(--sr-danger); }
 .sr input[aria-invalid="true"], .sr select[aria-invalid="true"],
 .sr textarea[aria-invalid="true"] { border-color: var(--sr-danger); }
+/* a checkbox GROUP is invalid as a whole, so the fieldset carries the state —
+   sighted users get the same cue the single controls above already have */
+.sr fieldset[aria-invalid="true"] { border-color: var(--sr-danger); }
 .sr input[aria-invalid="true"]:focus-visible,
 .sr select[aria-invalid="true"]:focus-visible,
 .sr textarea[aria-invalid="true"]:focus-visible { border-color: var(--sr-danger);
@@ -1780,8 +1789,13 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr .tile-open img { display: block; width: 100%; }
 .sr .tile-open:focus-visible { outline: 2px solid var(--sr-amber); outline-offset: 2px; }
 
-/* visually-hidden but announced (live regions like .lb-live) */
-.sr .sr-only { position: absolute; width: 1px; height: 1px; padding: 0;
+/* visually-hidden but announced (live regions like .lb-live). Deliberately
+   UNSCOPED — the one exception to the body.sr scoping rule in this file. The
+   lightbox live region renders on the kill-switch path too (gallery.html falls
+   back to .cream-theme, no .sr), and a scoped rule left "Photo — 3 of 41"
+   painting as stray text on every arrow press. Hiding it is a11y plumbing, not
+   Screening Room styling, so it must hold in BOTH theme states. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0;
   margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ── "More" full-index sheet + rail sign-out (command deck) ─────────────────

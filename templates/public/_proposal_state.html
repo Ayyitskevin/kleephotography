@@ -3,13 +3,17 @@
    the client accepts/declines inline. Wrong-state HX posts (e.g. a double
    click) get this region back with a gentle error line and the true state,
    instead of a bare 400 page. The wrapper id lives HERE (not in the parent)
-   because hx-swap="outerHTML" replaces the whole target — it must regrow. #}
-<div id="doc-state">
+   because hx-swap="outerHTML" replaces the whole target — it must regrow, and
+   so must tabindex/data-swap-focus.
+   a11y: the accept/decline buttons hold focus and the swap deletes them —
+   without data-swap-focus (behaviors.js) focus fell to <body> and nothing was
+   announced. role="status" on the outcome line is the live-region half. #}
+<div id="doc-state" tabindex="-1" data-swap-focus>
 {% if error %}<p class="error" role="alert" aria-live="polite">{{ error }}</p>{% endif %}
 {% if d.status == 'accepted' %}
-<p class="client-doc-status is-ok">Accepted {{ d.accepted_at }}. Thank you. Contract and invoice will follow by email.</p>
+<p class="client-doc-status is-ok" role="status">Accepted {{ d.accepted_at }}. Thank you. Contract and invoice will follow by email.</p>
 {% elif d.status == 'declined' %}
-<p class="client-doc-status is-muted">This proposal was declined. Reply to the email thread if you would like to revisit it.</p>
+<p class="client-doc-status is-muted" role="status">This proposal was declined. Reply to the email thread if you would like to revisit it.</p>
 {% else %}
 <div class="client-doc-actions no-print client-doc-actions-split">
   <form method="post" action="/p/{{ d.slug }}/accept"

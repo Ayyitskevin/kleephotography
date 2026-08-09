@@ -5,7 +5,14 @@
    Picker links (month nav, days, slots, confirm-step Back) and the tz form
    carry hx-* so the card swaps in place with history (hx-push-url); without
    JS the same hrefs do a full GET — progressive enhancement, no fork. Cross-
-   page links ("All event types", "Back to booking") stay plain navigations. #}
+   page links ("All event types", "Back to booking") stay plain navigations.
+   Every picker request syncs on the card (hx-sync …:replace): month nav, days
+   and slots are DIFFERENT anchors all swapping .book-card by outerHTML, so
+   without a shared queue two in-flight GETs raced and the last RESPONSE won
+   regardless of click order. :replace aborts the older request, so the last
+   CLICK wins. The same requests light the card's .book-busy bar
+   (hx-indicator + the shared sr-rec-bar primitive) so a slow network shows
+   work in progress instead of a dead card. #}
 {% set tzq = '&tz=' ~ visitor_tz if visitor_tz else '' %}
 {% set tz_options = [
   ['America/New_York','Eastern Time — US & Canada'],
@@ -29,7 +36,7 @@
 {# resolve the selected slot's visitor-local label for the confirm step #}
 {% set ns = namespace(label=selected_slot_label) %}
 {% if sel_start and slots %}{% for s in slots %}{% if s.utc == sel_start %}{% set ns.label = s.label %}{% endif %}{% endfor %}{% endif %}
-{% macro hxswap(url) %}hx-get="{{ url }}" hx-target=".book-card" hx-swap="outerHTML" hx-push-url="true"{% endmacro %}
+{% macro hxswap(url) %}hx-get="{{ url }}" hx-target=".book-card" hx-swap="outerHTML" hx-push-url="true" hx-sync="closest .book-card:replace" hx-indicator="closest .book-card"{% endmacro %}
 <div class="book-card{% if sel_start %} book-card-confirm{% endif %}">
 
   <aside class="book-rail">
@@ -67,7 +74,8 @@
         <span class="book-meta-ic" aria-hidden="true"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-external"/></svg></span>
         <form method="get" action="{{ form_action }}" class="book-tzform"
               hx-get="{{ form_action }}" hx-trigger="change" hx-target=".book-card"
-              hx-swap="outerHTML" hx-push-url="true">
+              hx-swap="outerHTML" hx-push-url="true"
+              hx-sync="closest .book-card:replace" hx-indicator="closest .book-card">
           {% if sel_day %}<input type="hidden" name="year" value="{{ year }}">
           <input type="hidden" name="month" value="{{ month }}">
           <input type="hidden" name="day" value="{{ sel_day }}">{% endif %}
@@ -89,6 +97,7 @@
   </aside>
 
   <section class="book-main">
+    <i class="book-busy sr-rec-bar" aria-hidden="true"><b></b></i>
     {% if error %}<p class="error" role="alert" aria-live="polite" id="book-error">{{ error }}</p>{% endif %}
 
     {% if sel_start %}
