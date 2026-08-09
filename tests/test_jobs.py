@@ -156,6 +156,34 @@ def test_primary_processing_exhaustion_marks_asset_failed(monkeypatch, job_kind,
         _delete_fixture(gallery_id, job_id)
 
 
+def test_stale_zip_build_leaves_the_newer_archive_alone(monkeypatch, tmp_path):
+    """A late rev-N job must not rebuild itself over rev N+1's archive.
+
+    _h_zip prunes every g{id}-r*.zip but its own, so a job parked behind a
+    backoff (or queued behind a transcode batch) that finally runs after another
+    upload bumped content_rev would delete the archive clients are downloading.
+    """
+    freeze_job_pool(monkeypatch)
+    monkeypatch.setattr(config, "ZIP_DIR", tmp_path / "zips")
+    config.ZIP_DIR.mkdir()
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug, title, pin, content_rev) VALUES (?,?,?,?)",
+        ("stale-zip-rev", "Stale zip fixture", "1234", 2),
+    )
+    current = jobs.zip_path(gallery_id, 2)
+    current.write_bytes(b"newer archive")
+    job_id = None
+    try:
+        job_id = jobs.enqueue("zip_build", {"gallery_id": gallery_id, "rev": 1})
+        jobs._execute(job_id)
+
+        assert db.one("SELECT status FROM jobs WHERE id=?", (job_id,))["status"] == "done"
+        assert current.read_bytes() == b"newer archive"
+        assert not jobs.zip_path(gallery_id, 1).exists()
+    finally:
+        _delete_fixture(gallery_id, job_id)
+
+
 # ── retry backoff + stranded-job sweep ─────────────────────────────────────
 
 

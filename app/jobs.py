@@ -200,8 +200,18 @@ def zip_entries(gallery_id: int, assets) -> list:
 
 
 def _h_zip(p: dict) -> None:
-    """Full-gallery ZIP of originals — STORE (media doesn't deflate), atomic rename."""
+    """Full-gallery ZIP of originals — STORE (media doesn't deflate), atomic rename.
+
+    A job whose rev no longer matches the gallery is dropped, not rebuilt. This
+    one can execute long after it was staged (parked behind a backoff, or just
+    queued behind a deep transcode batch), and by then an upload may have bumped
+    content_rev and built the archive for it — the prune below deletes every
+    other rev, so rebuilding the old one would take the NEWER file with it.
+    """
     gid, rev = p["gallery_id"], p["rev"]
+    gal = db.one("SELECT content_rev FROM galleries WHERE id=?", (gid,))
+    if not gal or gal["content_rev"] != rev:
+        return
     final = zip_path(gid, rev)
     if final.exists():
         return
