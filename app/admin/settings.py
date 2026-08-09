@@ -34,7 +34,11 @@ def _integrations() -> list[dict]:
     if g["connected"]:
         google = {"status": "connected", "label": "Connected"}
     elif g["configured"]:
-        google = {"status": "ready", "label": "Connect", "href": "/admin/scheduling"}
+        google = {
+            "status": "ready",
+            "label": "Connect",
+            "href": "/admin/scheduling/google/connect",
+        }
     else:
         google = {"status": "off", "label": "Not set"}
 

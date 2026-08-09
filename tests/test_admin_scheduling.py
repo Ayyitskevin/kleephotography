@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app import db, scheduling
 from app.admin import scheduling as admin_scheduling
+from app.admin import settings as admin_settings
 from app.main import app
 
 
@@ -292,6 +293,14 @@ def test_google_card_renders_each_connection_state(admin_client, monkeypatch):
     assert "data-confirm=" in form
     # the stored UTC instant is rendered in the business timezone, never raw
     assert "2035-03-04 15:30:00" not in page
+
+
+@pytest.mark.integration
+def test_settings_google_tile_points_at_the_connect_route(admin_client, monkeypatch):
+    monkeypatch.setattr(admin_settings.gcal, "status", lambda: _gcal_status(configured=True))
+    page = admin_client.get("/admin/settings")
+    assert page.status_code == 200
+    assert 'href="/admin/scheduling/google/connect"' in page.text
 
 
 @pytest.mark.integration
