@@ -56,7 +56,10 @@
     </label>
     {% endif %}
     {% endfor %}
-    <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
+    {# Honeypot: aria-hidden on the wrapper, never on the control itself. #}
+    <span class="hp-field" aria-hidden="true">
+      <input type="text" name="website" tabindex="-1" autocomplete="off">
+    </span>
     {% if error %}<p class="error" role="alert" aria-live="polite" id="form-error">{{ error }}</p>{% endif %}
     <button type="submit">Submit</button>
   </form>

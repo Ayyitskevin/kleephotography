@@ -3,6 +3,7 @@ tile dimensions (CLS) and structured data."""
 
 from __future__ import annotations
 
+import json
 import re
 
 import pytest
@@ -11,6 +12,7 @@ from PIL import Image
 
 from app import config, db
 from app.main import app
+from app.render import ROOT
 
 pytestmark = pytest.mark.integration
 
@@ -268,3 +270,85 @@ def test_portal_crop_and_motion_tiles_carry_stored_dimensions(client, delivery):
     assert 'width="5000" height="4000"' in crop_tag
     (reel_tag,) = _tags_for(page.text, f"/portal/cls-portal/thumb/{reel}")
     assert 'width="1080" height="1920"' in reel_tag
+
+
+def _control(markup: str, name: str) -> str:
+    return re.search(rf'<(?:input|textarea)\b[^>]*name="{name}"[^>]*>', markup, re.S).group(0)
+
+
+def test_email_gate_input_is_labelled(client, delivery):
+    # A gallery (not a drop) email-gates its downloads — downloads._email_required.
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published, type) VALUES (?,?,?,1,'gallery')",
+        ("gate-label", "Gate Label", "1234"),
+    )
+    delivery["galleries"].append(gid)
+    _seed_delivery_asset(gid, "framed", "photo", (2000, 1500))
+
+    assert client.post("/g/gate-label/pin", data={"pin": "1234"}).status_code == 200
+    gate = client.get("/g/gate-label/download")
+    assert gate.status_code == 200
+    field = _control(gate.text, "email")
+    control_id = re.search(r'id="([^"]+)"', field).group(1)
+    assert f'<label class="sr-only" for="{control_id}">' in gate.text
+
+
+def test_contact_errors_mark_the_offending_control(client):
+    blank_name = client.post(
+        "/contact", data={"name": "  ", "email": "real@example.test", "message": "Hi"}
+    )
+    assert blank_name.status_code == 400
+    assert 'aria-invalid="true" aria-describedby="contact-error"' in _control(
+        blank_name.text, "name"
+    )
+    for field in ("email", "message"):
+        assert "aria-invalid" not in _control(blank_name.text, field)
+
+    bad_email = client.post(
+        "/contact", data={"name": "Real Person", "email": "nope", "message": "Hi"}
+    )
+    assert bad_email.status_code == 400
+    assert 'aria-invalid="true"' in _control(bad_email.text, "email")
+    assert "aria-invalid" not in _control(bad_email.text, "name")
+
+    # A throttle blames no field — the summary line carries it alone.
+    assert "aria-invalid" not in client.get("/contact").text
+
+
+def test_honeypots_hide_a_wrapper_not_the_control(client):
+    form_id = db.run(
+        "INSERT INTO forms (slug, title, kind, active) VALUES (?,?,'lead',1)",
+        ("hp-wrapper-form", "Honeypot Wrapper"),
+    )
+    try:
+        rendered = (client.get("/contact").text, client.get("/forms/hp-wrapper-form").text)
+    finally:
+        db.run("DELETE FROM forms WHERE id=?", (form_id,))
+    for markup in rendered:
+        assert '<span class="hp-field" aria-hidden="true">' in markup
+        assert "aria-hidden" not in _control(markup, "website")
+
+    # _book_card's honeypot rides a booking step that needs a live slot to
+    # render, so its contract is pinned at the source.
+    book_card = (ROOT / "templates/public/_book_card.html").read_text()
+    assert '<span class="hp-field" aria-hidden="true">' in book_card
+    assert "aria-hidden" not in _control(book_card, "website")
+
+
+def test_reels_video_schema_omits_a_missing_upload_date(client, portfolio):
+    dated = _seed_video(portfolio, "dated-reel", "fb/motion")
+    undated = _seed_video(portfolio, "undated-reel", "fb/motion")
+    # assets.created_at is NOT NULL but not non-empty — an absent date has to
+    # drop the property, never publish "uploadDate": "".
+    db.run("UPDATE assets SET created_at='' WHERE id=?", (undated,))
+
+    page = client.get("/reels")
+    assert page.status_code == 200
+    payload = json.loads(
+        re.search(
+            r'<script type="application/ld\+json">\s*(\[.*?\])\s*</script>', page.text, re.S
+        ).group(1)
+    )
+    by_url = {entry["contentUrl"].rsplit("/", 1)[-1]: entry for entry in payload}
+    assert by_url[str(dated)]["uploadDate"]
+    assert "uploadDate" not in by_url[str(undated)]

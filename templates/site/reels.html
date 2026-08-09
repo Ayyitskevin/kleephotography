@@ -95,8 +95,8 @@
   "name": {{ ((r.portfolio_tag|tag_label if r.portfolio_tag else 'Reel') ~ ' — ' ~ site_name)|tojson }},
   "description": {{ ('Short-form ' ~ (r.portfolio_tag|tag_label|lower if r.portfolio_tag else 'social') ~ ' video by ' ~ site_name ~ ', Asheville NC.')|tojson }},
   "contentUrl": {{ (base_url ~ '/site/vid/' ~ r.id)|tojson }},
-  "thumbnailUrl": {{ (base_url ~ '/site/poster/' ~ r.id)|tojson }},
-  "uploadDate": {{ (r.created_at or '')[:10]|tojson }}{% if r.duration %},
+  "thumbnailUrl": {{ (base_url ~ '/site/poster/' ~ r.id)|tojson }}{% if r.created_at %},
+  "uploadDate": {{ r.created_at[:10]|tojson }}{% endif %}{% if r.duration %},
   "duration": "PT{{ r.duration|round|int }}S"{% endif %}
 }{% if not loop.last %},{% endif %}
 {% endfor %}
