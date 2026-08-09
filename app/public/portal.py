@@ -5,6 +5,8 @@ import hashlib
 import logging
 import mimetypes
 import re
+import shutil
+import threading
 from pathlib import Path
 from urllib.parse import quote
 
@@ -320,6 +322,15 @@ def crop(request: Request, slug: str, asset_id: int, ratio: str):
     )
 
 
+# The crops archive is built in the request thread (there is no portal-wide job
+# kind to hand it to), and build_zip stages every archive through a `.part`
+# sibling of its destination. Two clicks on the same portal would therefore
+# write one temp file from two threads and hand a torn ZIP to whoever lost the
+# rename. One build at a time across the process — a portal crop pack is small
+# and this is a solo-operator install, so the queue behind the lock stays short.
+_zip_build_lock = threading.Lock()
+
+
 @router.get("/{slug}/crops.zip")
 def crops_zip(request: Request, slug: str):
     p = get_live_portal(slug)
@@ -346,19 +357,27 @@ def crops_zip(request: Request, slug: str):
     key = hashlib.sha256("|".join(f"{a['id']}:{r}" for a, r, _ in files).encode()).hexdigest()[:8]
     out = config.ZIP_DIR / f"p{p['id']}-{key}.zip"
     if not out.is_file():
-        seen: set[str] = set()
-        entries = []
-        for a, ratio, path in files:
-            arc = f"{Path(a['filename']).stem}_{ratio}.jpg"
-            if arc in seen:
-                arc = f"{Path(a['filename']).stem}_{ratio}_{a['id']}.jpg"
-            seen.add(arc)
-            entries.append((path, arc))
-        jobs.build_zip(out, entries)
-        for old in config.ZIP_DIR.glob(f"p{p['id']}-*.zip"):
-            if old != out:
-                old.unlink(missing_ok=True)
-        log.info("portal %s crops zip built: %d files", p["slug"], len(files))
+        # Same pre-write disk floor as the gallery bundles — a client click must
+        # not be able to force an unbounded ZIP build on a full disk.
+        if shutil.disk_usage(config.DATA_DIR).free / 1e9 < config.MIN_FREE_GB:
+            raise HTTPException(status_code=507, detail="low disk space — download refused")
+        with _zip_build_lock:
+            # Re-check under the lock: whoever built while we waited already
+            # produced this exact archive (the name is a hash of its contents).
+            if not out.is_file():
+                seen: set[str] = set()
+                entries = []
+                for a, ratio, path in files:
+                    arc = f"{Path(a['filename']).stem}_{ratio}.jpg"
+                    if arc in seen:
+                        arc = f"{Path(a['filename']).stem}_{ratio}_{a['id']}.jpg"
+                    seen.add(arc)
+                    entries.append((path, arc))
+                jobs.build_zip(out, entries)
+                for old in config.ZIP_DIR.glob(f"p{p['id']}-*.zip"):
+                    if old != out:
+                        old.unlink(missing_ok=True)
+                log.info("portal %s crops zip built: %d files", p["slug"], len(files))
 
     dl = re.sub(r"[^A-Za-z0-9._-]+", "_", f"{p['company'] or p['client_name']}-social-crops")
     return FileResponse(out, media_type="application/zip", filename=f"{dl}.zip")

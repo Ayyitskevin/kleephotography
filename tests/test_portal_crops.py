@@ -1,8 +1,12 @@
-"""Portal social crops — honesty about an encode that is never landing."""
+"""Portal social crops — honesty about an encode that is never landing, and the
+disk floor / in-flight guard on the crops archive."""
 
 from __future__ import annotations
 
+import collections
 import shutil
+import threading
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -40,7 +44,7 @@ def portal(client):
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (vid, aid))
     client.post("/portal/crop-snag/pin", data={"pin": "2468"}, follow_redirects=False)
     try:
-        yield {"client_id": cid, "gallery_id": gid, "asset_id": aid}
+        yield {"client_id": cid, "portal_id": pid, "gallery_id": gid, "asset_id": aid}
     finally:
         db.run("DELETE FROM jobs WHERE kind='social_crops'")
         db.run("DELETE FROM favorites WHERE visitor_id=?", (vid,))
@@ -101,3 +105,43 @@ def test_ready_crops_outlive_a_dead_job(client, portal):
     assert f"/portal/crop-snag/crop/{portal['asset_id']}/1x1" in page
     assert "hit a snag" not in page
     assert "hx-trigger" not in page
+
+
+def test_crops_zip_refused_on_low_disk(client, portal, monkeypatch):
+    """A client click must not be able to force an unbounded ZIP build onto a
+    full disk — same floor and same 507 the gallery favorites ZIP uses."""
+    _write_crops(portal["gallery_id"], "hero")
+    usage = collections.namedtuple("usage", "total used free")
+    monkeypatch.setattr(shutil, "disk_usage", lambda p: usage(0, 0, 0))
+    r = client.get("/portal/crop-snag/crops.zip")
+    assert r.status_code == 507
+    assert list(config.ZIP_DIR.glob(f"p{portal['portal_id']}-*.zip")) == []
+
+
+def test_crops_zip_builds_once_under_concurrent_clicks(client, portal, monkeypatch):
+    """Two clicks on one archive is one build. Without the in-flight guard both
+    requests copy the same files into the same .part temp at the same time and
+    the loser of the rename raises."""
+    _write_crops(portal["gallery_id"], "hero")
+    real_build = jobs.build_zip
+    calls = []
+
+    def slow_build(out, entries):
+        calls.append(out)
+        time.sleep(0.3)
+        real_build(out, entries)
+
+    monkeypatch.setattr(jobs, "build_zip", slow_build)
+    results: list[int] = []
+    threads = [
+        threading.Thread(
+            target=lambda: results.append(client.get("/portal/crop-snag/crops.zip").status_code)
+        )
+        for _ in range(2)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    assert results == [200, 200]
+    assert len(calls) == 1
