@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Specialty rsync slice → prod /opt/mise (restart). Legacy filename; prod host is
-# mickey (2026-07-25). Prefer ops/DEPLOY.md (git pull) for ordinary deploys.
-# Override with MISE_FLOW_HOST / MISE_FLOW_ROOT if needed.
+# Specialty rsync slice → prod /opt/mise (restart). Legacy filename; it deploys to
+# whatever host MISE_FLOW_HOST names. Prefer ops/DEPLOY.md (git pull) for ordinary
+# deploys. Set MISE_FLOW_HOST (required, no default so a typo can't ship to the
+# wrong box) and optionally MISE_FLOW_ROOT.
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
-FLOW_HOST="${MISE_FLOW_HOST:-mickey}"
+FLOW_HOST="${MISE_FLOW_HOST:?set MISE_FLOW_HOST to the prod SSH host}"
 FLOW_ROOT="${MISE_FLOW_ROOT:-/opt/mise}"
 
 echo "==> Rsync studio modules to ${FLOW_HOST}:${FLOW_ROOT}"
