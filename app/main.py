@@ -248,7 +248,13 @@ async def common_headers(request: Request, call_next):
     request.state.csp_nonce = nonce
     resp = await call_next(request)
     p = request.url.path
-    if not (p in site.INDEXABLE or p.startswith(("/site/img/", "/static/", "/work/"))):
+    # /site/vid/ and /site/poster/ ride the allowlist because the /reels
+    # VideoObject JSON-LD points contentUrl/thumbnailUrl at them — a noindexed
+    # target makes the rich result unindexable.
+    if not (
+        p in site.INDEXABLE
+        or p.startswith(("/site/img/", "/site/vid/", "/site/poster/", "/static/", "/work/"))
+    ):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
