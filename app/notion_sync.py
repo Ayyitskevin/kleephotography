@@ -9,7 +9,7 @@ import json
 import logging
 import urllib.request
 
-from . import config, db, hermes_arm
+from . import config, db
 
 log = logging.getLogger("mise.notion")
 
@@ -76,11 +76,9 @@ def sync_invoice(invoice_id: int) -> None:
 
 def sync_gallery(gallery_id: int) -> None:
     d = db.one(
-        """SELECT g.slug, g.published, p.title AS project_title,
-                         p.notion_page_id, c.name AS client_name, c.company
+        """SELECT g.slug, g.published, p.notion_page_id
                   FROM galleries g
                   JOIN projects p ON p.id=g.project_id
-                  LEFT JOIN clients c ON c.id=p.client_id
                   WHERE g.id=?""",
         (gallery_id,),
     )
@@ -108,20 +106,6 @@ def sync_gallery(gallery_id: int) -> None:
         },
     )
     log.info("notion session delivered + gallery URL set from gallery %s", gallery_id)
-    # Arm the +N day owner check that nothing else covers: Odysseus post_delivery
-    # SENDS the review request, but no automation verifies a review actually landed.
-    # Best-effort — the delivery above already succeeded, so a down Hermes must not
-    # fail this job; Hermes dedups by key, so a job retry can't double-arm.
-    who = d["company"] or d["client_name"] or d["project_title"]
-    hermes_arm.arm(
-        key=f"review-check:{gallery_id}",
-        text=(
-            f"Gallery for {who} was delivered {config.REVIEW_CHECK_DAYS}d ago — "
-            f"did the review land? If not, send a quick personal ask. "
-            f"{config.BASE_URL}/g/{d['slug']}"
-        ),
-        when=hermes_arm.at_9am(config.REVIEW_CHECK_DAYS),
-    )
 
 
 _INTAKE_FIELDS = [

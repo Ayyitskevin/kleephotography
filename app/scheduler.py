@@ -23,7 +23,6 @@ from . import (
     contract_reminders,
     gallery_reminders,
     ops_monitor,
-    postshoot_reminders,
 )
 from .admin import recurring
 
@@ -55,10 +54,6 @@ def _loop() -> None:
             ops_monitor.sweep()
         except Exception:
             log.exception("ops monitor sweep failed")
-        try:
-            postshoot_reminders.sweep()
-        except Exception:
-            log.exception("post-shoot reminder sweep failed")
 
 
 def start() -> None:

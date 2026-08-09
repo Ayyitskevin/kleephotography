@@ -35,10 +35,6 @@ def sms_enabled() -> bool:
     return bool(config.QUO_API_KEY and config.QUO_NUMBER)
 
 
-def hermes_enabled() -> bool:
-    return bool(config.HERMES_ARM_URL)
-
-
 def shots_api_enabled() -> bool:
     return bool(config.SHOTS_TOKEN)
 

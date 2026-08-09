@@ -119,14 +119,6 @@ def _integrations() -> list[dict]:
             **_badge(features.telegram_enabled()),
         },
         {
-            "name": "Hermes reminders",
-            "mark": "HR",
-            "icon_bg": "#1c241d",
-            "icon_color": "#5fae8a",
-            "desc": "Arms deferred owner nudges on delivery & post-shoot — outbound, one-way",
-            **_badge(features.hermes_enabled()),
-        },
-        {
             "name": "Shot-list API",
             "mark": "SL",
             "icon_bg": "#2b2413",
