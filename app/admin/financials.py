@@ -240,7 +240,11 @@ def income(request: Request, range: str = "quarter"):
 
 @router.get("/income.csv", response_class=PlainTextResponse)
 def income_csv(
-    range: str = "quarter", inc_paid: str = "", inc_out: str = "", fmt: str = "itemized"
+    range: str = "quarter",
+    inc_paid: str = "",
+    inc_out: str = "",
+    inc: str = "",
+    fmt: str = "itemized",
 ):
     """Collected cash + open AR in range — accountant-ready. Real data only;
     no fabricated tax or processing-fee columns (Mise stores neither). The
@@ -250,6 +254,12 @@ def income_csv(
         range = "quarter"
     if fmt not in ("itemized", "summary"):
         fmt = "itemized"
+    # HTML omits unchecked checkboxes, so absent Include params are ambiguous:
+    # the export panel always sends the `inc` marker (an unchecked box there
+    # really means exclude), while a bare link — the topbar's — carries neither
+    # and means "everything". Without this an unmarked link exports only headers.
+    if not inc and not inc_paid and not inc_out:
+        inc_paid = inc_out = "on"
     start, end = _range_bounds(range)
     rows = [
         r
