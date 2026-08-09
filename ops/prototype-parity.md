@@ -1,5 +1,13 @@
 # Claude Prototype Parity Ledger
 
+> **ARCHIVED — historical reference.** This ledger was superseded by the
+> Screening Room redesign, which re-styled these surfaces end to end against a
+> different handoff. Its scope rules below (forest/gold palette, the two admin
+> insignias) describe the pre-redesign look, not what ships today. It also keys
+> its screen list to `/tmp/mise-prototype-project`, a scratch path on a machine
+> that no longer exists — the prototype files it compares against are gone, so
+> the parity column cannot be re-derived. Kept for the route→template map only.
+
 This is the implementation contract for the 46-page Claude design parity pass.
 
 Scope rules:

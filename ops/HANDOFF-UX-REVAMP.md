@@ -1,5 +1,11 @@
 # HANDOFF — UX revamp final phase: commit + deploy the CSS excavation
 
+> **ARCHIVED — the work this file hands off is done.** The dead-CSS excavation
+> was committed as `68cace7` and is on `main`; `static/mise.css` is in-tree at its
+> post-prune size. Nothing below is an open action item — the "UNCOMMITTED in
+> `~/Repo/kleephotography`" state it describes no longer exists on any machine.
+> Kept for the prune log and the reasoning behind which classes went.
+>
 > **Host note (2026-07-25):** production moved to a dedicated always-on host
 > (`/opt/mise` there). Prefer [`ops/DEPLOY.md`](DEPLOY.md) over the older
 > deploy-from-the-dev-box commands below.
