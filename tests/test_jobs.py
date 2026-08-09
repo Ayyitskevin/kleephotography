@@ -1,4 +1,5 @@
 import threading
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -425,6 +426,37 @@ def test_parked_and_wedged_jobs_are_visible_to_healthz(client, monkeypatch):
         assert after["ok"] is True  # visibility, not a 503 — the site still serves
     finally:
         db.run("DELETE FROM jobs WHERE id IN (?,?,?)", (parked, wedged, backlog))
+
+
+def test_healthz_answers_fast_when_the_database_wedges(client, monkeypatch):
+    """The wedged-DB case is the one /healthz exists for — it must not join it.
+
+    db.one carries a 30s busy_timeout. Awaited inline on the event loop, a
+    wedged database took /healthz down with it AND froze every other in-flight
+    response for the same 30s, turning a degraded app into a dead one.
+    """
+    release = threading.Event()
+
+    def wedged(*args, **kwargs):
+        release.wait(30)
+        return {"ok": 1, "n": 0, "failed": 0, "waiting_retry": 0, "stuck": 0, "running_stale": 0}
+
+    monkeypatch.setattr(db, "one", wedged)
+    try:
+        started = time.monotonic()
+        r = client.get("/healthz")
+        elapsed = time.monotonic() - started
+
+        assert r.status_code == 503
+        body = r.json()
+        assert body["ok"] is False
+        assert body["db_probe"] == "timeout"
+        assert body["db_connected"] is False
+        # Storage facts still answered — only the DB half was abandoned.
+        assert body["disk_free_gb"] is not None
+        assert elapsed < 5, f"/healthz waited {elapsed:.1f}s on the wedged database"
+    finally:
+        release.set()
 
 
 def test_ops_heartbeat_alerts_on_a_wedged_queue(monkeypatch):
