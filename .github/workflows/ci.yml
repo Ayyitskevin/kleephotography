@@ -40,9 +40,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+          key: ${{ runner.os }}-pip-3.14-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-pip-3.14-
 
       - name: Install system dependencies (ffmpeg for video pipeline tests)
         run: |
