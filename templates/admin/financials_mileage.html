@@ -59,6 +59,15 @@
           </tbody>
         </table>
       </div>
+      {% if count > page_size %}
+      <p class="muted">
+        Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, count]|min }} of {{ count }}
+        {% if offset > 0 %} ·
+        <a href="/admin/financials/mileage?offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+        {% if offset + page_size < count %} ·
+        <a href="/admin/financials/mileage?offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
+      </p>
+      {% endif %}
     </section>
 
     <aside class="fin-rail">

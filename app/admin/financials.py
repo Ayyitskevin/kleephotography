@@ -698,7 +698,7 @@ def receipt_file(receipt_id: int):
 
 
 @router.get("/mileage", response_class=HTMLResponse)
-def mileage(request: Request):
+def mileage(request: Request, offset: int = 0):
     rows = db.all_("SELECT * FROM mileage ORDER BY drove_on DESC, id DESC")
     miles = sum(r["miles"] for r in rows)
     deduction = sum(round(r["miles"] * r["rate_cents"]) for r in rows)
@@ -728,6 +728,10 @@ def mileage(request: Request):
             "sub": "~30% bracket estimate",
         },
     ]
+    # The IRS wants every trip kept, so the log only grows: render one page of it
+    # while the cards and mileage.csv stay over every trip on file.
+    offset = max(0, offset)
+    page_size = 50
     table = [
         {
             "id": r["id"],
@@ -737,7 +741,7 @@ def mileage(request: Request):
             "miles": f"{r['miles']:,.1f}",
             "ded": _usd(round(r["miles"] * r["rate_cents"])),
         }
-        for r in rows
+        for r in rows[offset : offset + page_size]
     ]
     return templates.TemplateResponse(
         request,
@@ -749,6 +753,8 @@ def mileage(request: Request):
             "count": len(rows),
             "today": studio._today().isoformat(),
             "rate_cents": config.MILEAGE_RATE_CENTS,
+            "offset": offset,
+            "page_size": page_size,
         },
     )
 

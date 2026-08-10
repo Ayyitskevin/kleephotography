@@ -141,3 +141,52 @@ def test_receipt_page_link_keeps_the_linked_filter(admin, receipt_shoebox):
     page2 = admin.get(f"/admin/financials/receipts?filter=unlinked&offset={_RCPT_PAGE}").text
     assert receipt_shoebox["oldest"] in page2
     assert receipt_shoebox["newest"] not in page2
+
+
+# ── mileage log ──────────────────────────────────────────────────────────────
+
+_MILE_PAGE = 50
+
+
+@pytest.fixture
+def trip_log():
+    """51 trips dated out past anything else in the shared DB, oldest first."""
+    made = []
+    for i in range(51):
+        made.append(
+            db.run(
+                """INSERT INTO mileage (drove_on, from_place, to_place, purpose, miles, rate_cents)
+                   VALUES (?,?,?,?,?,70)""",
+                (
+                    f"2099-{1 + i // 28:02d}-{1 + i % 28:02d}",
+                    "Studio",
+                    f"TRIP-{i:03d}",
+                    "Shoot",
+                    10,
+                ),
+            )
+        )
+    try:
+        yield {"oldest": "TRIP-000", "newest": "TRIP-050"}
+    finally:
+        db.run(f"DELETE FROM mileage WHERE id IN ({','.join('?' * len(made))})", tuple(made))
+
+
+def test_trip_log_pages_instead_of_rendering_every_trip(admin, trip_log):
+    page1 = admin.get("/admin/financials/mileage").text
+    assert trip_log["newest"] in page1
+    assert trip_log["oldest"] not in page1
+    assert f"/admin/financials/mileage?offset={_MILE_PAGE}" in page1
+
+    page2 = admin.get(f"/admin/financials/mileage?offset={_MILE_PAGE}").text
+    assert trip_log["oldest"] in page2
+    assert trip_log["newest"] not in page2
+
+
+def test_mileage_cards_and_csv_stay_whole_log(admin, trip_log):
+    total = db.one("SELECT COUNT(*) AS n FROM mileage")["n"]
+    assert f"{total} trips" in admin.get("/admin/financials/mileage").text
+
+    csv_rows = admin.get("/admin/financials/mileage.csv").text.strip().splitlines()
+    assert len(csv_rows) == total + 1
+    assert any(trip_log["oldest"] in row for row in csv_rows)
