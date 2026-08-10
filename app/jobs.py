@@ -55,6 +55,10 @@ MAX_ATTEMPTS = 3
 # here would be a lie.
 RETRY_BACKOFF_SECONDS = (60, 300)
 PRIMARY_ASSET_JOB_KINDS = frozenset({"image_derivatives", "video_transcode"})
+# How long a finished job stays readable in the admin before the hourly
+# scheduler drops it. Long enough to answer "did that gallery ever build?" weeks
+# later, short enough that queue_health()'s table-wide aggregates stay cheap.
+DONE_JOB_RETENTION_DAYS = 30
 
 
 # ── handlers ───────────────────────────────────────────────────────────────
@@ -512,6 +516,36 @@ def queue_health() -> dict:
         (window, window),
     )
     return {k: int(row[k] or 0) for k in ("failed", "waiting_retry", "stuck", "running_stale")}
+
+
+def prune_done(days: int = DONE_JOB_RETENTION_DAYS) -> int:
+    """Drop finished jobs past the retention window; returns how many went.
+
+    Nothing else has ever pruned this table, and every done row is dead weight
+    under queue_health()'s table-wide aggregates and the admin Jobs listing.
+
+    ONLY status='done' is eligible, and age alone never qualifies anything else:
+    a 'failed' row is the operator's evidence that something still needs a human
+    (admin Jobs, the ops heartbeat), a 'running' row may be a live worker, and a
+    'queued' row is either backlog or a retry parked behind its backoff. Runs
+    off the hourly scheduler, so it must be cheap and never touch live work.
+
+    updated_at is NULL until a row is first claimed, so age falls back to
+    created_at rather than reading an unstamped row as infinitely old.
+    """
+    con = db.connect()
+    try:
+        cur = con.execute(
+            "DELETE FROM jobs WHERE status='done' "
+            "AND COALESCE(updated_at, created_at) < datetime('now', ?)",
+            (f"-{days} days",),
+        )
+        con.commit()
+    finally:
+        con.close()
+    if cur.rowcount:
+        log.info("pruned %d done jobs older than %d days", cur.rowcount, days)
+    return cur.rowcount
 
 
 def sweep() -> None:

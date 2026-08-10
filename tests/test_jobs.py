@@ -5,7 +5,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from app import config, db, jobs, ops_monitor
+from app import config, db, jobs, ops_monitor, scheduler
 from app.main import app
 from tests.jobtest import elapse_backoff, freeze_job_pool
 
@@ -578,3 +578,69 @@ def test_ops_heartbeat_alerts_on_a_wedged_queue(monkeypatch):
         assert "past its retry time" in stuck[0]
     finally:
         db.run("DELETE FROM jobs WHERE id=?", (job_id,))
+
+
+# ── retention: the jobs table used to grow forever ─────────────────────────
+
+
+def _aged_job(status: str, age_days: int, *, stamped: bool = True) -> int:
+    """A job row of `status` last touched `age_days` ago. stamped=False leaves
+    updated_at NULL, the shape of a row no worker ever claimed."""
+    job_id = db.run(
+        "INSERT INTO jobs (kind, payload, status) VALUES ('zip_build','{}',?)", (status,)
+    )
+    age = f"-{age_days} days"
+    db.run("UPDATE jobs SET created_at=datetime('now', ?) WHERE id=?", (age, job_id))
+    if stamped:
+        db.run("UPDATE jobs SET updated_at=datetime('now', ?) WHERE id=?", (age, job_id))
+    return job_id
+
+
+def test_retention_prunes_old_done_jobs_and_only_those(monkeypatch):
+    """Done rows are dead weight under queue_health's table-wide aggregates, but
+    every other status is either live work or a human's evidence: a failed job
+    is what tells Kevin something needs him, and age says nothing about a
+    running worker or a retry parked behind its backoff."""
+    freeze_job_pool(monkeypatch)
+    old_done = _aged_job("done", jobs.DONE_JOB_RETENTION_DAYS + 1)
+    unclaimed_done = _aged_job("done", jobs.DONE_JOB_RETENTION_DAYS + 1, stamped=False)
+    recent_done = _aged_job("done", jobs.DONE_JOB_RETENTION_DAYS - 1)
+    old_failed = _aged_job("failed", 400)
+    old_queued = _aged_job("queued", 400)
+    old_running = _aged_job("running", 400)
+    seeded = (old_done, unclaimed_done, recent_done, old_failed, old_queued, old_running)
+    try:
+        assert jobs.prune_done() >= 2
+        ph = ",".join("?" * len(seeded))
+        alive = {r["id"] for r in db.all_(f"SELECT id FROM jobs WHERE id IN ({ph})", seeded)}
+        assert alive == {recent_done, old_failed, old_queued, old_running}
+    finally:
+        db.run(f"DELETE FROM jobs WHERE id IN ({','.join('?' * len(seeded))})", seeded)
+
+
+def test_hourly_scheduler_runs_the_retention_sweep(monkeypatch):
+    """It rides the existing hourly loop — no cron, no second process — and a
+    sweep that never runs is the same unbounded table we started with."""
+    for module, name in (
+        (scheduler.recurring, "run_due_plans"),
+        (scheduler.booking_reminders, "sweep"),
+        (scheduler.gallery_reminders, "sweep"),
+        (scheduler.contract_reminders, "sweep"),
+        (scheduler.ops_monitor, "sweep"),
+    ):
+        monkeypatch.setattr(module, name, lambda: None)
+    pruned = []
+
+    def _prune() -> int:
+        pruned.append(True)
+        scheduler._stop.set()  # one pass is the whole assertion
+        return 0
+
+    monkeypatch.setattr(scheduler.jobs, "prune_done", _prune)
+    monkeypatch.setattr(config, "RECURRING_TICK_SECONDS", 0.01)
+    scheduler._stop.clear()
+    try:
+        scheduler._loop()
+    finally:
+        scheduler._stop.clear()
+    assert pruned == [True]
