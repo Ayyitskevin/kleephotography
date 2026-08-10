@@ -158,9 +158,9 @@ Matches CI (`.github/workflows/ci.yml`):
 ```sh
 source .venv/bin/activate
 # 1. unit — fast, pure logic
-python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m unit
+python -m pytest tests/ --ignore=tests/smoke -q -m unit
 # 2. integration — SQLite + TestClient seams
-python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m integration
+python -m pytest tests/ --ignore=tests/smoke -q -m integration
 # 3. full smoke — e2e against a throwaway DB (ffmpeg required for video tests)
 # Domain slices live under tests/smoke/ (ordered test_01_… → test_07_…).
 MISE_DATA_DIR=$(mktemp -d) MISE_SECRET_KEY=test MISE_ADMIN_PASSWORD=pw \
