@@ -11,7 +11,7 @@ import time
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app import db
+from app import config, db
 from app.main import app
 
 
@@ -180,6 +180,136 @@ def _seam_license_with_gallery(admin, name, company, slug):
         (gid, lic_id),
     )
     return c, gid, lic_id
+
+
+def _created_id(r) -> int:
+    """The id of the row a studio create route just made — its 303 target."""
+    assert r.status_code == 303, r.status_code
+    return int(r.headers["location"].rsplit("/", 1)[1])
+
+
+# The chain's proposal is priced $1000.00 + 2 × $75.50 = $1151.00 and its invoice
+# splits off a $500.00 deposit; the lifecycle tests assert those exact figures.
+_CHAIN_ITEMS = {
+    "item_label_0": "Half-day session",
+    "item_qty_0": "1",
+    "item_price_0": "1000",
+    "item_label_1": "Extra dishes",
+    "item_qty_1": "2",
+    "item_price_1": "75.50",
+}
+
+
+def _studio_chain(admin, title, *, through="project", monkeypatch=None):
+    """Build one studio lifecycle chain over the real routes; return its ids.
+
+    ``through`` picks how far to build, so a lifecycle test owns the rows it
+    reads instead of inheriting whichever client/project/invoice an earlier test
+    happened to leave newest:
+
+      "project"  → client + project (inquiry_received)
+      "proposal" → + a sent proposal the client accepted, total $1151.00
+      "invoice"  → + an invoice carrying a $500.00 deposit, sent and then paid in
+                   full through the Stripe webhook (which lands the project on
+                   retainer_paid and enqueues 3 notion_sync_invoice jobs)
+
+    ``monkeypatch`` is required for "invoice": the webhook 503s unless
+    config.STRIPE_WEBHOOK_SECRET is set.
+    """
+    assert through in ("project", "proposal", "invoice"), through
+    client_id = _created_id(
+        admin.post(
+            "/admin/studio/clients",
+            data={
+                "name": "Dana Chef",
+                "company": "Test Bistro",
+                "email": "dana@bistro.com",
+                "phone": "",
+            },
+            follow_redirects=False,
+        )
+    )
+    project_id = _created_id(
+        admin.post(
+            f"/admin/studio/clients/{client_id}/projects",
+            data={"title": title},
+            follow_redirects=False,
+        )
+    )
+    chain = {
+        "client_id": client_id,
+        "project_id": project_id,
+        "proposal_id": None,
+        "invoice_id": None,
+    }
+    if through == "project":
+        return chain
+
+    proposal_id = _created_id(
+        admin.post(
+            f"/admin/studio/projects/{project_id}/proposals",
+            data={"preset": "photo_starter"},
+            follow_redirects=False,
+        )
+    )
+    r = admin.post(
+        f"/admin/studio/proposals/{proposal_id}", data=_CHAIN_ITEMS, follow_redirects=False
+    )
+    assert r.status_code == 303
+    r = admin.post(f"/admin/studio/proposals/{proposal_id}/send", follow_redirects=False)
+    assert r.status_code == 303
+    slug = db.one("SELECT slug FROM proposals WHERE id=?", (proposal_id,))["slug"]
+    r = admin.post(f"/p/{slug}/accept", follow_redirects=False)
+    assert r.status_code == 303
+    d = db.one("SELECT status, total_cents FROM proposals WHERE id=?", (proposal_id,))
+    assert d["status"] == "accepted" and d["total_cents"] == 115100
+    chain["proposal_id"] = proposal_id
+    if through == "proposal":
+        return chain
+
+    invoice_id = _created_id(
+        admin.post(f"/admin/studio/projects/{project_id}/invoices", follow_redirects=False)
+    )
+    r = admin.post(
+        f"/admin/studio/invoices/{invoice_id}",
+        data={
+            "item_label_0": "Shoot package",
+            "item_qty_0": "1",
+            "item_price_0": "1151",
+            "deposit": "500",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    r = admin.post(f"/admin/studio/invoices/{invoice_id}/send", follow_redirects=False)
+    assert r.status_code == 303
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    for kind, cents in (("deposit", 50000), ("balance", 65100)):
+        body = _checkout_event(f"evt_chain_{kind}_{invoice_id}", invoice_id, kind, cents)
+        assert _post_signed(admin, body).status_code == 200
+    d = db.one("SELECT status, total_cents, deposit_cents FROM invoices WHERE id=?", (invoice_id,))
+    assert d["status"] == "paid" and d["total_cents"] == 115100 and d["deposit_cents"] == 50000
+    chain["invoice_id"] = invoice_id
+    return chain
+
+
+def _drop_studio_chain(admin, chain):
+    """Delete a chain's rows once its test is done. Sync jobs go first: a queued
+    one left pointing at a deleted invoice would fail and show up in the global
+    "N jobs failed" badge other files assert on. Projects, documents and payments
+    cascade off the client."""
+    if chain["invoice_id"]:
+        db.run(
+            """DELETE FROM jobs WHERE kind='notion_sync_invoice'
+                  AND json_extract(payload,'$.invoice_id')=?""",
+            (chain["invoice_id"],),
+        )
+    r = admin.post(
+        f"/admin/studio/clients/{chain['client_id']}/delete",
+        data={"force": "1"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
 
 
 def _quo_sig(secret_b64: str, raw: bytes, ts: str = "1700000000") -> str:
