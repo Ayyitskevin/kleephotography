@@ -441,6 +441,27 @@ def test_sel_deep_link_still_prepends_from_another_page(admin, archived_threads)
     assert archived_threads["oldest"] in page2
 
 
+def test_thread_link_carries_the_page_it_was_clicked_from(admin, archived_threads):
+    """`sel` alone always selected the right thread — inbox.py fetches an
+    out-of-window selection and prepends it — but it dropped the operator back
+    on page 1 to read it, losing their place in a list they had paged into.
+
+    Page 1 keeps the short link: the default offset does not belong in it."""
+    newest, oldest = archived_threads["ids"][100], archived_threads["ids"][0]
+
+    page1 = admin.get("/admin/inbox?tab=archived").text
+    assert f'href="/admin/inbox?tab=archived&sel={newest}"' in page1
+
+    page2 = admin.get(f"/admin/inbox?tab=archived&offset={_INBOX_PAGE}").text
+    assert f'href="/admin/inbox?tab=archived&sel={oldest}&offset={_INBOX_PAGE}"' in page2
+
+    # Following it lands back on page 2 with that thread open — and open once:
+    # it is inside this window, so the out-of-window prepend must not fire.
+    opened = admin.get(f"/admin/inbox?tab=archived&sel={oldest}&offset={_INBOX_PAGE}").text
+    assert opened.count(f'id="ib-row-{oldest}"') == 1
+    assert f'class="ib-row is-active" id="ib-row-{oldest}"' in opened
+
+
 # ── one pager across every surface ───────────────────────────────────────────
 
 
