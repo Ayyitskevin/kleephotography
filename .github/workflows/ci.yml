@@ -59,9 +59,13 @@ jobs:
         run: |
           .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m unit --tb=short
 
+      # Coverage starts here and is appended to by the smoke step below; the
+      # fail_under in pyproject applies to the union, so this partial run reports
+      # without gating.
       - name: Run integration tests
         run: |
-          .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m integration --tb=short
+          .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m integration --tb=short \
+            --cov=app --cov-report=term-missing:skip-covered --cov-fail-under=0
 
       - name: Lint and check format with ruff
         run: |
@@ -74,7 +78,8 @@ jobs:
           MISE_SECRET_KEY=test-secret \
           MISE_ADMIN_PASSWORD=test-pw \
           MISE_ENV_FILE=/nonexistent \
-            .venv/bin/python -m pytest tests/ -q -m smoke --tb=short
+            .venv/bin/python -m pytest tests/ -q -m smoke --tb=short \
+              --cov=app --cov-append --cov-report=term-missing:skip-covered
 
   # pyproject's requires-python, ruff's target-version and the README all claim
   # 3.12+, and nothing tested it. Unit + integration only: the smoke suite is the
