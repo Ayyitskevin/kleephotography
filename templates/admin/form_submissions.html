@@ -5,7 +5,7 @@
   <div class="pgtop-lead">
     <h1>{{ f.title }} — submissions</h1>
     <p class="pgtop-sub">
-      <b>{{ subs | length }}</b> total · {{ "lead form" if f.kind == "lead" else "questionnaire" }}
+      <b>{{ total }}</b> total · {{ "lead form" if f.kind == "lead" else "questionnaire" }}
     </p>
   </div>
   <div class="pgtop-actions">
@@ -47,6 +47,15 @@
     {% endfor %}
   </div>
   <p class="studio-empty" id="sub-empty" hidden>No submissions match.</p>
+  {% if total > page_size %}
+  <p class="muted">
+    Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, total]|min }} of {{ total }} &mdash; search filters this page
+    {% if offset > 0 %} ·
+    <a href="/admin/forms/{{ f.id }}/submissions?offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+    {% if offset + page_size < total %} ·
+    <a href="/admin/forms/{{ f.id }}/submissions?offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
+  </p>
+  {% endif %}
   <script nonce="{{ csp_nonce }}">
   (function () {
     var search = document.getElementById('sub-search');

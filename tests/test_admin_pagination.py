@@ -190,3 +190,40 @@ def test_mileage_cards_and_csv_stay_whole_log(admin, trip_log):
     csv_rows = admin.get("/admin/financials/mileage.csv").text.strip().splitlines()
     assert len(csv_rows) == total + 1
     assert any(trip_log["oldest"] in row for row in csv_rows)
+
+
+# ── form submissions ─────────────────────────────────────────────────────────
+
+_SUB_PAGE = 50
+
+
+@pytest.fixture
+def busy_form():
+    """A lead form with 51 submissions, each stamped a minute apart so the
+    newest-first order is not left to a same-second tie."""
+    form_id = db.run(
+        "INSERT INTO forms (slug, title, kind) VALUES (?,?,'lead')",
+        ("pager-form", "Pager Form"),
+    )
+    for i in range(51):
+        db.run(
+            "INSERT INTO form_submissions (form_id, name, data, created_at) VALUES (?,?,'{}',?)",
+            (form_id, f"SUB-{i:03d}", f"2099-01-01 {i // 60:02d}:{i % 60:02d}:00"),
+        )
+    try:
+        yield {"id": form_id, "oldest": "SUB-000", "newest": "SUB-050"}
+    finally:
+        db.run("DELETE FROM form_submissions WHERE form_id=?", (form_id,))
+        db.run("DELETE FROM forms WHERE id=?", (form_id,))
+
+
+def test_form_submissions_page_and_count_the_whole_inbox(admin, busy_form):
+    page1 = admin.get(f"/admin/forms/{busy_form['id']}/submissions").text
+    assert "<b>51</b> total" in page1
+    assert busy_form["newest"] in page1
+    assert busy_form["oldest"] not in page1
+    assert f"/admin/forms/{busy_form['id']}/submissions?offset={_SUB_PAGE}" in page1
+
+    page2 = admin.get(f"/admin/forms/{busy_form['id']}/submissions?offset={_SUB_PAGE}").text
+    assert busy_form["oldest"] in page2
+    assert busy_form["newest"] not in page2
