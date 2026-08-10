@@ -1,0 +1,19 @@
+{# Newer/Older pager for the offset-paginated admin ledgers.
+
+   A macro rather than an {% include %} because the call sites differ in path,
+   page size and query state — the same split _copy_link.html and _audit.html
+   sit on, while _inbox_row.html rides its caller's ambient context.
+
+   `qs` is the surface's live query state (tab / range / filter / sel), already
+   encoded and WITHOUT a leading "&": a page link that drops it silently resets
+   the filter the operator is reading through. `count` is the rows rendered on
+   THIS page, not the ledger total — a ledger's total counts rows the render
+   query can still drop (captured emails are counted before the galleries
+   join), so a full page is the only honest "there may be more" signal. #}
+{% macro pager(path, offset, page_size, count, qs="") %}
+  <p class="muted">
+    {% if offset > 0 %}<a href="{{ path }}?{% if qs %}{{ qs }}&{% endif %}offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+    {% if count == page_size %} ·
+    <a href="{{ path }}?{% if qs %}{{ qs }}&{% endif %}offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
+  </p>
+{% endmacro %}
