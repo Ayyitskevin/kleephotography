@@ -7,8 +7,10 @@ it once the wait elapses; retry() is the operator's override for both a parked
 row and a dead one, and queue_health() is what /healthz and the ops heartbeat
 read so a parked or wedged queue is never invisible."""
 
+import hashlib
 import json
 import logging
+import re
 import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -222,6 +224,56 @@ def _h_zip(p: dict) -> None:
             old.unlink(missing_ok=True)
 
 
+# gN-fav-<hash>.zip / gN-sM-<hash>.zip, as public/downloads mints them.
+_SUBSET_NAME = re.compile(r"\Ag\d+-(?:fav|s(\d+))-([0-9a-f]{8})\.zip\Z")
+
+
+def _subset_key(asset_ids) -> str:
+    """The content key a subset ZIP is named from. Must stay in step with
+    public/downloads.download_favorites/download_section, hash and asset order
+    both — deriving a different key here would read live bundles as stale."""
+    return hashlib.sha256(",".join(str(i) for i in asset_ids).encode()).hexdigest()[:8]
+
+
+def _subset_is_current(gallery_id: int, name: str) -> bool:
+    """Whether `name` is still the bundle the route would mint for this
+    gallery+kind, i.e. whether this job may build and prune.
+
+    The payload's asset-id list is frozen at request time, and a job parked
+    behind a retry backoff can outlive the selection that named it — the client
+    edits their favorites, the studio re-sorts the section. Since the handler
+    deletes every sibling in its family, a stale job that ran would rebuild the
+    old archive AND take out the one matching what the client actually picked.
+
+    A name shape this doesn't recognise counts as current: an in-flight job from
+    an older deploy must still build, and skipping real work is worse than the
+    prune this guards.
+    """
+    m = _SUBSET_NAME.match(name)
+    if not m:
+        return True
+    section, key = m.group(1), m.group(2)
+    if section is not None:
+        rows = db.all_(
+            "SELECT id FROM assets WHERE gallery_id=? AND section_id=? AND status='ready' "
+            "ORDER BY position, id",
+            (gallery_id, int(section)),
+        )
+        return key == _subset_key([r["id"] for r in rows])
+    # Favorites are per visitor and the name carries no visitor, so the bundle is
+    # still current while ANY visitor's live selection hashes to it.
+    rows = db.all_(
+        "SELECT f.visitor_id AS visitor_id, a.id AS id FROM favorites f "
+        "JOIN assets a ON a.id=f.asset_id "
+        "WHERE a.gallery_id=? AND a.status='ready' ORDER BY f.visitor_id, a.id",
+        (gallery_id,),
+    )
+    selections: dict[int, list[int]] = {}
+    for r in rows:
+        selections.setdefault(r["visitor_id"], []).append(r["id"])
+    return any(key == _subset_key(ids) for ids in selections.values())
+
+
 def _h_zip_subset(p: dict) -> None:
     """Favorites / section ZIP that was too big to build in the request path
     (public/downloads._queue_or_build). Same STORED copy as the full-gallery
@@ -232,6 +284,9 @@ def _h_zip_subset(p: dict) -> None:
     gid, ids = p["gallery_id"], p["asset_ids"]
     final = config.ZIP_DIR / p["name"]
     if final.exists() or not ids:
+        return
+    if not _subset_is_current(gid, p["name"]):
+        log.info("zip_subset %s superseded; nothing built, nothing pruned", p["name"])
         return
     ph = ",".join("?" * len(ids))  # only ever "?,?,..." placeholders
     rows = db.all_(

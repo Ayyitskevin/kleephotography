@@ -1,3 +1,4 @@
+import hashlib
 import threading
 import time
 
@@ -182,6 +183,72 @@ def test_stale_zip_build_leaves_the_newer_archive_alone(monkeypatch, tmp_path):
         assert not jobs.zip_path(gallery_id, 1).exists()
     finally:
         _delete_fixture(gallery_id, job_id)
+
+
+# ── subset ZIP: a parked job must not outlive its selection ────────────────
+
+
+def _fav_zip_name(gallery_id: int, asset_ids: list[int]) -> str:
+    """The name public/downloads.download_favorites mints for this fav set."""
+    key = hashlib.sha256(",".join(str(i) for i in asset_ids).encode()).hexdigest()[:8]
+    return f"g{gallery_id}-fav-{key}.zip"
+
+
+def test_stale_favorites_zip_job_leaves_the_current_bundle_alone(monkeypatch, tmp_path):
+    """A subset job parked behind a retry backoff can outlive the selection that
+    named it. Building it then prunes the sibling matching what the client
+    picked now — so they either download photos they dropped, or watch a ready
+    download vanish mid-poll."""
+    freeze_job_pool(monkeypatch)
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
+    monkeypatch.setattr(config, "ZIP_DIR", tmp_path / "zips")
+    config.ZIP_DIR.mkdir()
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("zip-subset-stale", "Subset fixture", "1234"),
+    )
+    try:
+        originals = config.MEDIA_DIR / str(gallery_id) / "original"
+        originals.mkdir(parents=True)
+        asset_ids = []
+        for filename in ("one.jpg", "two.jpg"):
+            (originals / filename).write_bytes(b"fixture bytes")
+            asset_ids.append(
+                db.run(
+                    "INSERT INTO assets (gallery_id, kind, filename, stored, status) "
+                    "VALUES (?,?,?,?,'ready')",
+                    (gallery_id, "photo", filename, filename),
+                )
+            )
+        visitor_id = db.run(
+            "INSERT INTO visitors (gallery_id, token) VALUES (?,?)",
+            (gallery_id, "zip-subset-stale-t1"),
+        )
+        for asset_id in asset_ids:
+            db.run(
+                "INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)",
+                (visitor_id, asset_id),
+            )
+
+        # On disk: the bundle for the client's live favorites. Queued earlier:
+        # the bundle for the single favorite they had before adding two.jpg.
+        current = config.ZIP_DIR / _fav_zip_name(gallery_id, asset_ids)
+        current.write_bytes(b"current bundle")
+        stale_name = _fav_zip_name(gallery_id, asset_ids[:1])
+
+        jobs._h_zip_subset(
+            {
+                "gallery_id": gallery_id,
+                "name": stale_name,
+                "prune": f"g{gallery_id}-fav-*.zip",
+                "asset_ids": asset_ids[:1],
+            }
+        )
+
+        assert current.read_bytes() == b"current bundle"
+        assert not (config.ZIP_DIR / stale_name).exists()
+    finally:
+        _delete_fixture(gallery_id, None)
 
 
 # ── retry backoff + stranded-job sweep ─────────────────────────────────────
