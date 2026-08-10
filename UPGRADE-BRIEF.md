@@ -1,5 +1,37 @@
 # UPGRADE BRIEF — full-codebase review → prioritized work queue (2026-08)
 
+> ## STATUS 2026-08-10 — workstreams A–F are implemented
+>
+> Everything green-light in this brief has landed on `claude/kleephotography-review-93yx8l`
+> (85 commits). Gates at completion: **236 unit / 378 integration / 187 smoke / ruff clean**,
+> 795 tests collected, up from 134/207/187 and 522.
+>
+> **Not done, and why — the honest remainder:**
+>
+> - **Workstream G in full.** Every item is red-light under `AGENTS.md` and needs Kevin.
+>   G1/G2 (media + off-host backup) are still the only existential risk in the project.
+> - **B6** (TTL-cache the per-render template globals). Skipped with evidence: a plain
+>   cross-render TTL breaks three smoke tests that pin an admin write reflecting
+>   immediately, and doing it safely needs write-side invalidation in the admin write
+>   paths. Correct as specified, wrong as scoped — needs a cross-cutting change.
+> - **C6** (version the font filenames for immutable caching) — deferred, not attempted.
+> - **C8** (raise the 8.5–9px caption floor) — deliberately left: it is a visual design
+>   change this brief said Kevin should eyeball, not an agent.
+> - **`inbox.html`'s own pager** stays hand-rolled: its inline gutter style is load-bearing
+>   under the `MISE_SCREENING_ROOM=false` stack, which must not learn `sr-*` names. A test
+>   asserts it is the *only* remaining exception, so a seventh copy cannot appear quietly.
+>
+> **New findings surfaced while implementing** (not in the original review):
+>
+> - `app/public/sms_webhook.py` calls `.get()` on a parsed webhook body before
+>   establishing it is a dict — the same defect class as the four fixed in `app/sms.py`.
+> - `app/admin/financials.py` `receipt_upload`, `app/admin/uploads.py` and
+>   `app/admin/common.py` still run blocking work on the event loop; the de-async sweep
+>   did not own those files.
+> - `app/admin/reports.py` `revenue_csv` holds a fourth copy of the month-bucketing SQL.
+>   Left alone deliberately: it is an unbounded all-time export, not a trailing-N series.
+
+
 **Audience:** the implementing agent (and Kevin, for the red-light PRs).
 **Produced by:** a five-dimension adversarial review (core backend, admin surface,
 public/frontend, tests/CI, ops/security) run 2026-08-09 against `main` @ `ff441fa`,
