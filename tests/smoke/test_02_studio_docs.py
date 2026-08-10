@@ -17,6 +17,8 @@ from tests.smoke._helpers import (
     _checkout_event,
     _cleanup_money_chain,
     _close,
+    _created_id,
+    _drop_studio_chain,
     _jpeg_bytes,
     _logo_png,
     _mp4_bytes,
@@ -28,6 +30,7 @@ from tests.smoke._helpers import (
     _seed_money_chain,
     _spark_rect_count,
     _stripe_sig,
+    _studio_chain,
 )
 
 pytestmark = pytest.mark.smoke
@@ -134,8 +137,8 @@ def test_client_activity_timeline(admin):
     assert 'class="timeline"' in page
     assert f"Proposal “{d['title']}” sent" in page
 
-    # Clean up: force-delete this client so the "latest client/project" rows the
-    # downstream studio lifecycle tests depend on revert to their fixtures.
+    # Clean up this test's own rows — force because the project blocks a plain
+    # delete; the project and its proposal cascade off the client.
     r = admin.post(
         f"/admin/studio/clients/{c['id']}/delete", data={"force": "1"}, follow_redirects=False
     )
@@ -144,17 +147,18 @@ def test_client_activity_timeline(admin):
 
 
 def test_proposal_lifecycle(admin):
-
-    p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
+    chain = _studio_chain(admin, "Spring menu shoot")
+    p = db.one("SELECT * FROM projects WHERE id=?", (chain["project_id"],))
 
     # create from preset
-    r = admin.post(
-        f"/admin/studio/projects/{p['id']}/proposals",
-        data={"preset": "photo_starter"},
-        follow_redirects=False,
+    did = _created_id(
+        admin.post(
+            f"/admin/studio/projects/{p['id']}/proposals",
+            data={"preset": "photo_starter"},
+            follow_redirects=False,
+        )
     )
-    assert r.status_code == 303
-    d = db.one("SELECT * FROM proposals ORDER BY id DESC LIMIT 1")
+    d = db.one("SELECT * FROM proposals WHERE id=?", (did,))
     assert d["status"] == "draft" and d["total_cents"] == 75000
     page = admin.get(f"/admin/studio/proposals/{d['id']}")
     assert page.status_code == 200
@@ -186,7 +190,6 @@ def test_proposal_lifecycle(admin):
     assert d["total_cents"] == 100000 + 15100
 
     # mark sent — locks editing, advances project
-    db.run("UPDATE projects SET status='inquiry_received' WHERE id=?", (p["id"],))
     r = admin.post(f"/admin/studio/proposals/{d['id']}/send", follow_redirects=False)
     assert r.status_code == 303
     d = db.one("SELECT * FROM proposals WHERE id=?", (d["id"],))
@@ -215,15 +218,19 @@ def test_proposal_lifecycle(admin):
         # accepted proposals can't be re-actioned
         assert pub.post(f"/p/{d['slug']}/decline", follow_redirects=False).status_code == 400
 
+    _drop_studio_chain(admin, chain)
+
 
 def test_contract_lifecycle(admin):
-
-    p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
+    # the chain's accepted proposal is what the merge fields read
+    chain = _studio_chain(admin, "Cellar dinner shoot", through="proposal")
+    p = db.one("SELECT * FROM projects WHERE id=?", (chain["project_id"],))
 
     # create — merge fields pull from project + accepted proposal total
-    r = admin.post(f"/admin/studio/projects/{p['id']}/contracts", follow_redirects=False)
-    assert r.status_code == 303
-    d = db.one("SELECT * FROM contracts ORDER BY id DESC LIMIT 1")
+    did = _created_id(
+        admin.post(f"/admin/studio/projects/{p['id']}/contracts", follow_redirects=False)
+    )
+    d = db.one("SELECT * FROM contracts WHERE id=?", (did,))
     assert d["status"] == "draft" and "Dana Chef" in d["body"]
     assert "$1151.00" in d["body"]  # accepted proposal total merged in
     page = admin.get(f"/admin/studio/contracts/{d['id']}")
@@ -300,15 +307,21 @@ def test_contract_lifecycle(admin):
             == 400
         )
 
+    _drop_studio_chain(admin, chain)
+
 
 def test_invoice_lifecycle(admin, monkeypatch):
-
-    p = db.one("SELECT * FROM projects ORDER BY id DESC LIMIT 1")
+    # This chain is deliberately left in the DB: test_03's pipeline dashboard
+    # reads exactly one project at Retainer Paid with nothing outstanding, and
+    # this fully-paid invoice is it.
+    chain = _studio_chain(admin, "Winter menu shoot", through="proposal")
+    p = db.one("SELECT * FROM projects WHERE id=?", (chain["project_id"],))
 
     # create — seeds items/total from the accepted proposal
-    r = admin.post(f"/admin/studio/projects/{p['id']}/invoices", follow_redirects=False)
-    assert r.status_code == 303
-    d = db.one("SELECT * FROM invoices ORDER BY id DESC LIMIT 1")
+    did = _created_id(
+        admin.post(f"/admin/studio/projects/{p['id']}/invoices", follow_redirects=False)
+    )
+    d = db.one("SELECT * FROM invoices WHERE id=?", (did,))
     assert d["status"] == "draft" and d["total_cents"] == 115100
     page = admin.get(f"/admin/studio/invoices/{d['id']}")
     assert page.status_code == 200
@@ -1037,10 +1050,11 @@ def test_testimonial_self_submit(admin):
 def test_email_send(admin, monkeypatch):
     from app import mailer
 
-    inv = db.one("SELECT * FROM invoices ORDER BY id DESC LIMIT 1")
+    chain = _studio_chain(admin, "Prix fixe shoot", through="invoice", monkeypatch=monkeypatch)
+    inv = db.one("SELECT * FROM invoices WHERE id=?", (chain["invoice_id"],))
     data = {
         "to": "dana@bistro.com",
-        "subject": "Invoice — Spring menu shoot",
+        "subject": "Invoice — Prix fixe shoot",
         "message": "Hi Dana, link inside.",
     }
 
@@ -1054,9 +1068,10 @@ def test_email_send(admin, monkeypatch):
     monkeypatch.setattr(mailer, "send", lambda to, subject, body: sent.append((to, subject, body)))
 
     # drafts can't be emailed (client link would 404)
-    r = admin.post(f"/admin/studio/projects/{inv['project_id']}/invoices", follow_redirects=False)
-    draft = db.one("SELECT * FROM invoices ORDER BY id DESC LIMIT 1")
-    r = admin.post(f"/admin/studio/invoices/{draft['id']}/email", data=data, follow_redirects=False)
+    draft = _created_id(
+        admin.post(f"/admin/studio/projects/{inv['project_id']}/invoices", follow_redirects=False)
+    )
+    r = admin.post(f"/admin/studio/invoices/{draft}/email", data=data, follow_redirects=False)
     assert r.status_code == 400 and not sent
 
     # real send is logged with project linkage
@@ -1088,19 +1103,23 @@ def test_email_send(admin, monkeypatch):
     assert r.status_code == 502
     assert db.one("SELECT COUNT(*) AS n FROM emails_log")["n"] == n_before
 
+    _drop_studio_chain(admin, chain)
 
-def test_notion_sync(monkeypatch):
+
+def test_notion_sync(admin, monkeypatch):
     from app import notion_sync
 
-    inv = db.one("""SELECT i.* FROM invoices i WHERE i.status='paid'
-                    ORDER BY i.id DESC LIMIT 1""")
-    assert inv, "earlier test left a paid invoice"
+    chain = _studio_chain(admin, "Chef's table shoot", through="invoice", monkeypatch=monkeypatch)
+    inv = db.one("SELECT * FROM invoices WHERE id=?", (chain["invoice_id"],))
 
-    # send + webhook enqueued sync jobs
+    # this invoice's own send + two payment webhooks enqueued one sync job each
     assert (
-        db.one("""SELECT COUNT(*) AS n FROM jobs
-                     WHERE kind='notion_sync_invoice'""")["n"]
-        >= 3
+        db.one(
+            """SELECT COUNT(*) AS n FROM jobs WHERE kind='notion_sync_invoice'
+                     AND json_extract(payload,'$.invoice_id')=?""",
+            (inv["id"],),
+        )["n"]
+        == 3
     )
 
     # no token / no page id → clean skip, no HTTP
@@ -1121,6 +1140,8 @@ def test_notion_sync(monkeypatch):
         "Invoice Paid": {"checkbox": True},
         "Deposit Paid": {"checkbox": True},
     }
+
+    _drop_studio_chain(admin, chain)
 
 
 def test_gallery_delivery_email(admin, monkeypatch):

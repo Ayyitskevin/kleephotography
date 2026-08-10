@@ -1,9 +1,11 @@
+import hashlib
 import threading
+import time
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app import config, db, jobs, ops_monitor
+from app import config, db, jobs, ops_monitor, scheduler
 from app.main import app
 from tests.jobtest import elapse_backoff, freeze_job_pool
 
@@ -155,6 +157,100 @@ def test_primary_processing_exhaustion_marks_asset_failed(monkeypatch, job_kind,
         _delete_fixture(gallery_id, job_id)
 
 
+def test_stale_zip_build_leaves_the_newer_archive_alone(monkeypatch, tmp_path):
+    """A late rev-N job must not rebuild itself over rev N+1's archive.
+
+    _h_zip prunes every g{id}-r*.zip but its own, so a job parked behind a
+    backoff (or queued behind a transcode batch) that finally runs after another
+    upload bumped content_rev would delete the archive clients are downloading.
+    """
+    freeze_job_pool(monkeypatch)
+    monkeypatch.setattr(config, "ZIP_DIR", tmp_path / "zips")
+    config.ZIP_DIR.mkdir()
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug, title, pin, content_rev) VALUES (?,?,?,?)",
+        ("stale-zip-rev", "Stale zip fixture", "1234", 2),
+    )
+    current = jobs.zip_path(gallery_id, 2)
+    current.write_bytes(b"newer archive")
+    job_id = None
+    try:
+        job_id = jobs.enqueue("zip_build", {"gallery_id": gallery_id, "rev": 1})
+        jobs._execute(job_id)
+
+        assert db.one("SELECT status FROM jobs WHERE id=?", (job_id,))["status"] == "done"
+        assert current.read_bytes() == b"newer archive"
+        assert not jobs.zip_path(gallery_id, 1).exists()
+    finally:
+        _delete_fixture(gallery_id, job_id)
+
+
+# ── subset ZIP: a parked job must not outlive its selection ────────────────
+
+
+def _fav_zip_name(gallery_id: int, asset_ids: list[int]) -> str:
+    """The name public/downloads.download_favorites mints for this fav set."""
+    key = hashlib.sha256(",".join(str(i) for i in asset_ids).encode()).hexdigest()[:8]
+    return f"g{gallery_id}-fav-{key}.zip"
+
+
+def test_stale_favorites_zip_job_leaves_the_current_bundle_alone(monkeypatch, tmp_path):
+    """A subset job parked behind a retry backoff can outlive the selection that
+    named it. Building it then prunes the sibling matching what the client
+    picked now — so they either download photos they dropped, or watch a ready
+    download vanish mid-poll."""
+    freeze_job_pool(monkeypatch)
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
+    monkeypatch.setattr(config, "ZIP_DIR", tmp_path / "zips")
+    config.ZIP_DIR.mkdir()
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("zip-subset-stale", "Subset fixture", "1234"),
+    )
+    try:
+        originals = config.MEDIA_DIR / str(gallery_id) / "original"
+        originals.mkdir(parents=True)
+        asset_ids = []
+        for filename in ("one.jpg", "two.jpg"):
+            (originals / filename).write_bytes(b"fixture bytes")
+            asset_ids.append(
+                db.run(
+                    "INSERT INTO assets (gallery_id, kind, filename, stored, status) "
+                    "VALUES (?,?,?,?,'ready')",
+                    (gallery_id, "photo", filename, filename),
+                )
+            )
+        visitor_id = db.run(
+            "INSERT INTO visitors (gallery_id, token) VALUES (?,?)",
+            (gallery_id, "zip-subset-stale-t1"),
+        )
+        for asset_id in asset_ids:
+            db.run(
+                "INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)",
+                (visitor_id, asset_id),
+            )
+
+        # On disk: the bundle for the client's live favorites. Queued earlier:
+        # the bundle for the single favorite they had before adding two.jpg.
+        current = config.ZIP_DIR / _fav_zip_name(gallery_id, asset_ids)
+        current.write_bytes(b"current bundle")
+        stale_name = _fav_zip_name(gallery_id, asset_ids[:1])
+
+        jobs._h_zip_subset(
+            {
+                "gallery_id": gallery_id,
+                "name": stale_name,
+                "prune": f"g{gallery_id}-fav-*.zip",
+                "asset_ids": asset_ids[:1],
+            }
+        )
+
+        assert current.read_bytes() == b"current bundle"
+        assert not (config.ZIP_DIR / stale_name).exists()
+    finally:
+        _delete_fixture(gallery_id, None)
+
+
 # ── retry backoff + stranded-job sweep ─────────────────────────────────────
 
 
@@ -215,6 +311,67 @@ class _RecordingPool:
         self.offered.append(job_id)
 
 
+def test_corrupt_payload_fails_the_job_instead_of_wedging_it(monkeypatch):
+    """A payload json can't parse must take the normal failure path.
+
+    Parsed outside the try, it raised past the recorder: the row stayed
+    'running' forever — queue_health summed only failed/queued, sweep re-offered
+    only queued, and the pool future's exception was never observed. Nothing
+    short of a restart moved it, and nothing anywhere said so.
+    """
+    freeze_job_pool(monkeypatch)
+    job_id = db.run("INSERT INTO jobs (kind, payload) VALUES (?,?)", ("zip_build", "{not json"))
+    try:
+        for attempt in range(1, jobs.MAX_ATTEMPTS + 1):
+            elapse_backoff(job_id)
+            jobs._execute(job_id)
+            job = db.one("SELECT status, attempts, error FROM jobs WHERE id=?", (job_id,))
+            assert job["status"] == ("failed" if attempt == jobs.MAX_ATTEMPTS else "queued")
+            assert job["attempts"] == attempt
+            assert job["error"]
+    finally:
+        db.run("DELETE FROM jobs WHERE id=?", (job_id,))
+
+
+def test_a_job_wedged_in_running_is_visible_to_healthz_and_the_heartbeat(client, monkeypatch):
+    """'running' is the one state no sweep re-offers, so it has to be reported."""
+    freeze_job_pool(monkeypatch)
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(ops_monitor.alerts, "is_enabled", lambda: True)
+    monkeypatch.setattr(ops_monitor.alerts, "ops_alert", lambda sig, msg: sent.append((sig, msg)))
+
+    before = client.get("/healthz").json()
+    working = db.run(
+        "INSERT INTO jobs (kind, payload, status, updated_at) "
+        "VALUES (?,?, 'running', datetime('now'))",
+        ("video_transcode", "{}"),
+    )
+    wedged = db.run(
+        "INSERT INTO jobs (kind, payload, status, updated_at) "
+        "VALUES (?,?, 'running', datetime('now'))",
+        ("zip_build", "{}"),
+    )
+    try:
+        ops_monitor.sweep()
+        assert not [s for s, _ in sent if s == "jobs_running_stale"]  # a worker mid-job is fine
+
+        db.run(
+            "UPDATE jobs SET updated_at=datetime('now', ?) WHERE id=?",
+            (f"-{config.JOB_STUCK_AFTER_SECONDS + 60} seconds", wedged),
+        )
+        after = client.get("/healthz").json()
+        assert after["jobs_running_stale"] == before["jobs_running_stale"] + 1  # not `working`
+        assert after["ok"] is True  # visibility, not a 503 — the site still serves
+
+        sent.clear()
+        ops_monitor.sweep()
+        alerted = [m for s, m in sent if s == "jobs_running_stale"]
+        assert len(alerted) == 1
+        assert "running for over" in alerted[0]
+    finally:
+        db.run("DELETE FROM jobs WHERE id IN (?,?)", (working, wedged))
+
+
 def test_sweep_redispatches_stranded_jobs_and_honors_backoff(monkeypatch):
     """The row a dead pool dropped, and the row a failure parked, both get re-offered."""
     freeze_job_pool(monkeypatch)
@@ -240,6 +397,35 @@ def test_sweep_redispatches_stranded_jobs_and_honors_backoff(monkeypatch):
         assert waiting in pool.offered
     finally:
         db.run("DELETE FROM jobs WHERE id IN (?,?)", (stranded, waiting))
+
+
+def test_sweep_does_not_re_offer_a_job_the_pool_already_holds(monkeypatch):
+    """Every tick used to re-submit the WHOLE due backlog.
+
+    200 transcodes behind 2 workers meant ~200 duplicate futures a minute, each
+    running _claim — a write transaction that no-ops — against the same lock the
+    request path needs, plus an executor deque that only grew.
+    """
+    freeze_job_pool(monkeypatch)
+    queued = [jobs.enqueue("zip_build", {"gallery_id": 0, "rev": n}) for n in range(3)]
+    try:
+        pool = _RecordingPool()
+        monkeypatch.setattr(jobs, "_pool", pool)
+
+        jobs.sweep()
+        assert [j for j in pool.offered if j in queued] == queued
+        jobs.sweep()
+        assert [j for j in pool.offered if j in queued] == queued  # N, not 2N
+
+        # The set is released by the worker, not left to expire: once a job has
+        # actually run, a later sweep is free to offer it again.
+        monkeypatch.setitem(jobs.HANDLERS, "zip_build", lambda p: None)
+        jobs._execute(queued[0])
+        assert queued[0] not in jobs._inflight
+    finally:
+        db.run("DELETE FROM jobs WHERE id IN (?,?,?)", tuple(queued))
+        with jobs._inflight_lock:
+            jobs._inflight.clear()
 
 
 def test_queue_runs_its_own_clock_fine_enough_to_honor_the_backoff(monkeypatch):
@@ -337,6 +523,37 @@ def test_parked_and_wedged_jobs_are_visible_to_healthz(client, monkeypatch):
         db.run("DELETE FROM jobs WHERE id IN (?,?,?)", (parked, wedged, backlog))
 
 
+def test_healthz_answers_fast_when_the_database_wedges(client, monkeypatch):
+    """The wedged-DB case is the one /healthz exists for — it must not join it.
+
+    db.one carries a 30s busy_timeout. Awaited inline on the event loop, a
+    wedged database took /healthz down with it AND froze every other in-flight
+    response for the same 30s, turning a degraded app into a dead one.
+    """
+    release = threading.Event()
+
+    def wedged(*args, **kwargs):
+        release.wait(30)
+        return {"ok": 1, "n": 0, "failed": 0, "waiting_retry": 0, "stuck": 0, "running_stale": 0}
+
+    monkeypatch.setattr(db, "one", wedged)
+    try:
+        started = time.monotonic()
+        r = client.get("/healthz")
+        elapsed = time.monotonic() - started
+
+        assert r.status_code == 503
+        body = r.json()
+        assert body["ok"] is False
+        assert body["db_probe"] == "timeout"
+        assert body["db_connected"] is False
+        # Storage facts still answered — only the DB half was abandoned.
+        assert body["disk_free_gb"] is not None
+        assert elapsed < 5, f"/healthz waited {elapsed:.1f}s on the wedged database"
+    finally:
+        release.set()
+
+
 def test_ops_heartbeat_alerts_on_a_wedged_queue(monkeypatch):
     """A queue that stopped draining pushes an alert; before, failed=0 read as fine."""
     freeze_job_pool(monkeypatch)
@@ -361,3 +578,69 @@ def test_ops_heartbeat_alerts_on_a_wedged_queue(monkeypatch):
         assert "past its retry time" in stuck[0]
     finally:
         db.run("DELETE FROM jobs WHERE id=?", (job_id,))
+
+
+# ── retention: the jobs table used to grow forever ─────────────────────────
+
+
+def _aged_job(status: str, age_days: int, *, stamped: bool = True) -> int:
+    """A job row of `status` last touched `age_days` ago. stamped=False leaves
+    updated_at NULL, the shape of a row no worker ever claimed."""
+    job_id = db.run(
+        "INSERT INTO jobs (kind, payload, status) VALUES ('zip_build','{}',?)", (status,)
+    )
+    age = f"-{age_days} days"
+    db.run("UPDATE jobs SET created_at=datetime('now', ?) WHERE id=?", (age, job_id))
+    if stamped:
+        db.run("UPDATE jobs SET updated_at=datetime('now', ?) WHERE id=?", (age, job_id))
+    return job_id
+
+
+def test_retention_prunes_old_done_jobs_and_only_those(monkeypatch):
+    """Done rows are dead weight under queue_health's table-wide aggregates, but
+    every other status is either live work or a human's evidence: a failed job
+    is what tells Kevin something needs him, and age says nothing about a
+    running worker or a retry parked behind its backoff."""
+    freeze_job_pool(monkeypatch)
+    old_done = _aged_job("done", jobs.DONE_JOB_RETENTION_DAYS + 1)
+    unclaimed_done = _aged_job("done", jobs.DONE_JOB_RETENTION_DAYS + 1, stamped=False)
+    recent_done = _aged_job("done", jobs.DONE_JOB_RETENTION_DAYS - 1)
+    old_failed = _aged_job("failed", 400)
+    old_queued = _aged_job("queued", 400)
+    old_running = _aged_job("running", 400)
+    seeded = (old_done, unclaimed_done, recent_done, old_failed, old_queued, old_running)
+    try:
+        assert jobs.prune_done() >= 2
+        ph = ",".join("?" * len(seeded))
+        alive = {r["id"] for r in db.all_(f"SELECT id FROM jobs WHERE id IN ({ph})", seeded)}
+        assert alive == {recent_done, old_failed, old_queued, old_running}
+    finally:
+        db.run(f"DELETE FROM jobs WHERE id IN ({','.join('?' * len(seeded))})", seeded)
+
+
+def test_hourly_scheduler_runs_the_retention_sweep(monkeypatch):
+    """It rides the existing hourly loop — no cron, no second process — and a
+    sweep that never runs is the same unbounded table we started with."""
+    for module, name in (
+        (scheduler.recurring, "run_due_plans"),
+        (scheduler.booking_reminders, "sweep"),
+        (scheduler.gallery_reminders, "sweep"),
+        (scheduler.contract_reminders, "sweep"),
+        (scheduler.ops_monitor, "sweep"),
+    ):
+        monkeypatch.setattr(module, name, lambda: None)
+    pruned = []
+
+    def _prune() -> int:
+        pruned.append(True)
+        scheduler._stop.set()  # one pass is the whole assertion
+        return 0
+
+    monkeypatch.setattr(scheduler.jobs, "prune_done", _prune)
+    monkeypatch.setattr(config, "RECURRING_TICK_SECONDS", 0.01)
+    scheduler._stop.clear()
+    try:
+        scheduler._loop()
+    finally:
+        scheduler._stop.clear()
+    assert pruned == [True]

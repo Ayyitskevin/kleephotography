@@ -8,6 +8,7 @@ import json
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 
 from .. import db, inquiry_notify, jobs, security
@@ -54,9 +55,17 @@ def show_form(request: Request, slug: str):
 
 @router.post("/forms/{slug}", response_class=HTMLResponse)
 async def submit_form(request: Request, slug: str):
-    f = _load_form(slug)
-    fields = _fields(f["id"])
+    # Async only because the form body has to be awaited. Every other step here
+    # blocks (SQLite with a 30s busy_timeout, the job enqueue, the template
+    # render), so it runs in the threadpool — on the loop it would stall every
+    # other response the process is writing. _submit_form must stay sync.
+    f = await run_in_threadpool(_load_form, slug)
     posted = await request.form()
+    return await run_in_threadpool(_submit_form, request, f, posted)
+
+
+def _submit_form(request: Request, f: "db.sqlite3.Row", posted):
+    fields = _fields(f["id"])
 
     # Honeypot: real visitors never see the "website" field — bots fill it.
     if (posted.get("website") or "").strip():

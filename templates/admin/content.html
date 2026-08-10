@@ -148,6 +148,9 @@
       </div>
       {% endfor %}
     </div>
+    {% if cap_total > captions|length %}
+    <p class="fin-note">Newest {{ captions|length }} of {{ cap_total }} — older packs stay on their retainer plan.</p>
+    {% endif %}
     <p class="fin-note">Captions are written and approved on the retainer plan. When AI assist
       is armed, drafts are produced by <b>Odysseus</b> across the tailnet and land here as a
       starting point — Mise never auto-posts a caption.</p>

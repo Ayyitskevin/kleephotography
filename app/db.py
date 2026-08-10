@@ -254,9 +254,23 @@ def tx():
 
     Use when multiple writes must land together (e.g. a soft-delete and its
     audit_log row). The caller runs statements on the yielded connection.
+
+    The transaction is BEGIN IMMEDIATE, not pysqlite's deferred one, so the whole
+    unit — its reads included — is serialized against other writers. Deferred, a
+    read-then-write unit takes the write lock only at its first write, and under
+    WAL the loser of that race either reads a value another transaction is about
+    to overwrite or gets SQLITE_BUSY_SNAPSHOT on the upgrade, which busy_timeout
+    does NOT wait out (it surfaces as an instant "database is locked"). Taking
+    the lock up front makes the loser wait instead — the same idiom the migration
+    runner and the booking claim already use.
+
+    Callers must NOT issue their own BEGIN on the yielded connection: this one is
+    already open, and a second one is a nested-transaction error.
     """
     con = connect()
+    con.isolation_level = None
     try:
+        con.execute("BEGIN IMMEDIATE")
         yield con
         con.commit()
     except Exception:

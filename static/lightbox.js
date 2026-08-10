@@ -243,6 +243,15 @@
   // (.pf-hidden or any display:none) are skipped, so arrows/swipe/slideshow
   // only visit what the visitor can currently see in the grid.
   function visibleTile(t) { return t.offsetParent !== null; }
+  // Announce a position the visitor can actually reach: with a filter on, the
+  // unfiltered index skips numbers (arrows hop over hidden tiles) and the total
+  // counts tiles that aren't on screen. A tile outside the visible set falls
+  // back to the whole grid rather than announcing "0 of N".
+  function livePosition(t) {
+    const shown = tiles.filter(visibleTile);
+    const at = shown.indexOf(t);
+    return at < 0 ? (idx + 1) + " of " + tiles.length : (at + 1) + " of " + shown.length;
+  }
   function step(dir) {
     let i = idx;
     for (let n = 0; n < tiles.length; n++) {
@@ -312,7 +321,7 @@
     // region arrow/slideshow navigation is silent to screen readers.
     if (live) {
       const kindFallback = t.dataset.kind === "video" ? "Video" : "Photo";
-      live.textContent = mediaName(t, kindFallback) + " — " + (idx + 1) + " of " + tiles.length;
+      live.textContent = mediaName(t, kindFallback) + " — " + livePosition(t);
     }
   }
 

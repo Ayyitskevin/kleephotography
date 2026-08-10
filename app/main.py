@@ -4,8 +4,10 @@ Mise — self-hosted F&B photography delivery · FastAPI + HTMX · port 8400
   uvicorn app.main:app --host 127.0.0.1 --port 8400
 """
 
+import asyncio
 import logging
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from urllib.parse import quote_from_bytes, urlsplit
 
@@ -246,7 +248,13 @@ async def common_headers(request: Request, call_next):
     request.state.csp_nonce = nonce
     resp = await call_next(request)
     p = request.url.path
-    if not (p in site.INDEXABLE or p.startswith(("/site/img/", "/static/", "/work/"))):
+    # /site/vid/ and /site/poster/ ride the allowlist because the /reels
+    # VideoObject JSON-LD points contentUrl/thumbnailUrl at them — a noindexed
+    # target makes the rich result unindexable.
+    if not (
+        p in site.INDEXABLE
+        or p.startswith(("/site/img/", "/site/vid/", "/site/poster/", "/static/", "/work/"))
+    ):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -326,6 +334,34 @@ async def unhandled_errors(request: Request, exc: Exception):
     return JSONResponse({"detail": "internal server error"}, status_code=500)
 
 
+# Its OWN thread, not an anyio worker: the anyio pool being saturated is one of
+# the things /healthz is asked about, so borrowing a slot from it would make the
+# probe queue behind exactly the problem it is reporting.
+_HEALTHZ_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mise-healthz")
+# Short enough that a monitor's own timeout never fires first; a healthy probe is
+# sub-millisecond, so anything past this is already the degraded answer.
+HEALTHZ_DB_TIMEOUT = 0.5
+
+
+def _healthz_db_probe() -> dict:
+    """The blocking half of /healthz — a stat and a few indexed counts.
+
+    Returns rather than mutating the response payload: after a timeout the
+    handler has already answered, and a thread still writing into that dict
+    would be reporting into nothing.
+    """
+    db.one("SELECT 1 AS ok")
+    health = jobs.queue_health()
+    return {
+        "db_connected": True,
+        "jobs_pending": jobs.pending_count(),
+        "jobs_failed": health["failed"],
+        "jobs_waiting_retry": health["waiting_retry"],
+        "jobs_stuck": health["stuck"],
+        "jobs_running_stale": health["running_stale"],
+    }
+
+
 @app.get("/healthz")
 async def healthz():
     # Deliberately stays on the event loop while the rest of the app moved to
@@ -343,8 +379,12 @@ async def healthz():
         # A job parked behind its retry backoff is queued but not runnable yet;
         # jobs_stuck is one that stayed that way long past its turn, i.e. the
         # queue is not draining. Without these two the limbo is invisible here.
+        # jobs_running_stale is the other silent state: claimed, then never
+        # finished or failed, which no sweep re-offers.
         "jobs_waiting_retry": None,
         "jobs_stuck": None,
+        "jobs_running_stale": None,
+        "db_probe": None,
         "disk_free_gb": None,
         "disk_low": None,
         "backup_present": None,
@@ -356,13 +396,23 @@ async def healthz():
     except Exception:
         log.exception("healthz storage check failed")
     try:
-        db.one("SELECT 1 AS ok")
-        payload["db_connected"] = True
-        payload["jobs_pending"] = jobs.pending_count()
-        health = jobs.queue_health()
-        payload["jobs_failed"] = health["failed"]
-        payload["jobs_waiting_retry"] = health["waiting_retry"]
-        payload["jobs_stuck"] = health["stuck"]
+        loop = asyncio.get_running_loop()
+        payload.update(
+            await asyncio.wait_for(
+                loop.run_in_executor(_HEALTHZ_POOL, _healthz_db_probe), HEALTHZ_DB_TIMEOUT
+            )
+        )
+    except TimeoutError:
+        # The scenario this endpoint exists for: SQLite wedged, every db call
+        # sitting on its 30s busy_timeout. Awaiting that inline would pin the
+        # loop for the full wait and freeze every other in-flight response, so
+        # the probe is abandoned and reported instead. Its thread keeps running
+        # to completion — the pool is size 1, so a still-wedged probe simply
+        # makes the next check time out too, which is the honest answer.
+        log.warning("healthz database probe timed out after %ss", HEALTHZ_DB_TIMEOUT)
+        payload["ok"] = False
+        payload["db_probe"] = "timeout"
+        return JSONResponse(payload, status_code=503)
     except Exception:
         log.exception("healthz database check failed")
         payload["ok"] = False

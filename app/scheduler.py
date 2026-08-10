@@ -22,6 +22,7 @@ from . import (
     config,
     contract_reminders,
     gallery_reminders,
+    jobs,
     ops_monitor,
 )
 from .admin import recurring
@@ -54,6 +55,10 @@ def _loop() -> None:
             ops_monitor.sweep()
         except Exception:
             log.exception("ops monitor sweep failed")
+        try:
+            jobs.prune_done()
+        except Exception:
+            log.exception("job retention sweep failed")
 
 
 def start() -> None:

@@ -137,6 +137,21 @@ def content(request: Request):
         (sel,) if sel else (),
     )
 
+    # The list above is windowed; the summary card must count the whole set or
+    # it freezes at the window size once a retainer passes it.
+    cap_totals = db.one(
+        f"""SELECT COUNT(*) AS n,
+                   SUM(rc.status = 'approved') AS n_approved
+              FROM retainer_captions rc
+              JOIN recurring_plans rp ON rp.id = rc.plan_id
+              JOIN projects pr ON pr.id = rp.project_id
+              JOIN clients c ON c.id = pr.client_id
+              {cwhere}""",
+        (sel,) if sel else (),
+    )
+    n_caps = cap_totals["n"]
+    n_appr = cap_totals["n_approved"] or 0
+
     def body_clip(b):
         return (b[:180] + "…") if b and len(b) > 180 else (b or "")
 
@@ -168,7 +183,6 @@ def content(request: Request):
         for p in presets_rows
     ]
 
-    n_appr = sum(1 for c in captions if c["approved"])
     cards = [
         {
             "label": "Brand kits",
@@ -184,9 +198,9 @@ def content(request: Request):
         },
         {
             "label": "Caption packs",
-            "value": str(len(captions)),
+            "value": str(n_caps),
             "tone": "ok",
-            "sub": f"{n_appr} approved · {len(captions) - n_appr} draft",
+            "sub": f"{n_appr} approved · {n_caps - n_appr} draft",
         },
         {
             "label": "Export presets",
@@ -209,6 +223,7 @@ def content(request: Request):
             "kits": kits,
             "assets": assets,
             "captions": captions,
+            "cap_total": n_caps,
             "presets": preset_cards,
             "switch": switch,
             "sel": sel,

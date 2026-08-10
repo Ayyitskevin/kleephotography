@@ -87,9 +87,7 @@ def inquiry_unconvert(inquiry_id: int, return_to: str = Form("")):
     again. INTENTIONALLY does NOT delete the spawned client/project — by the
     time Kevin clicks undo, those may already carry edits, brand assets, or
     proposals. This is a misclick fix, not a cascade delete."""
-    inq = db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
     db.run(
         """UPDATE inquiries SET converted_at=NULL,
               converted_client_id=NULL, converted_project_id=NULL
@@ -108,9 +106,7 @@ def inquiry_dismiss(inquiry_id: int, return_to: str = Form("")):
     leads list and the home 'new inquiries' count but stays in the Inquiries
     table with an undo. Refuses once converted (that anchors a real
     client/project history)."""
-    inq = db.one("SELECT id, converted_at FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    inq = db.get_or_404("SELECT id, converted_at FROM inquiries WHERE id=?", (inquiry_id,))
     if inq["converted_at"]:
         raise HTTPException(status_code=400, detail="converted inquiries cannot be dismissed")
     db.run("UPDATE inquiries SET dismissed_at=datetime('now') WHERE id=?", (inquiry_id,))
@@ -123,9 +119,7 @@ def inquiry_dismiss(inquiry_id: int, return_to: str = Form("")):
 def inquiry_undismiss(inquiry_id: int, return_to: str = Form("")):
     """Undo a dismiss — clears dismissed_at so the lead returns to the active
     pipeline."""
-    inq = db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
     db.run("UPDATE inquiries SET dismissed_at=NULL WHERE id=?", (inquiry_id,))
     jobs.enqueue("notion_sync_inquiry", {"inquiry_id": inquiry_id})
     log.info("inquiry %s undismissed (restored)", inquiry_id)
@@ -136,9 +130,7 @@ def _inquiry_and_client(inquiry_id: int) -> "tuple[db.sqlite3.Row, int]":
     """Load an inquiry (404 if gone) and find-or-create its client by email.
     Shared verbatim by the inquiry→client and inquiry→quote convert routes —
     one copy so the client-seeding fields can't drift between them."""
-    inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    inq = db.get_or_404("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
     existing = db.one("SELECT id FROM clients WHERE email=?", (inq["email"],))
     if existing:
         return inq, existing["id"]
@@ -541,9 +533,7 @@ def create_portal(client_id: int):
 
 @router.post("/clients/{client_id}/portal/publish")
 def toggle_portal(client_id: int, published: bool = Form(False)):
-    p = db.one("SELECT id FROM portals WHERE client_id=?", (client_id,))
-    if not p:
-        raise HTTPException(status_code=404)
+    p = db.get_or_404("SELECT id FROM portals WHERE client_id=?", (client_id,))
     db.run("UPDATE portals SET published=? WHERE id=?", (1 if published else 0, p["id"]))
     if published:
         _backfill_crops(client_id)
@@ -830,8 +820,7 @@ def update_testimonial(
     position: int = Form(0),
     published: bool = Form(False),
 ):
-    if not db.one("SELECT id FROM testimonials WHERE id=?", (tid,)):
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM testimonials WHERE id=?", (tid,))
     db.run(
         """UPDATE testimonials SET quote=?, attribution_name=?, business=?,
               gallery_id=?, position=?, published=? WHERE id=?""",

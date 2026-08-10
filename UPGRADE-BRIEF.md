@@ -1,5 +1,37 @@
 # UPGRADE BRIEF — full-codebase review → prioritized work queue (2026-08)
 
+> ## STATUS 2026-08-10 — workstreams A–F are implemented
+>
+> Everything green-light in this brief has landed on `claude/kleephotography-review-93yx8l`
+> (85 commits). Gates at completion: **236 unit / 378 integration / 187 smoke / ruff clean**,
+> 795 tests collected, up from 134/207/187 and 522.
+>
+> **Not done, and why — the honest remainder:**
+>
+> - **Workstream G in full.** Every item is red-light under `AGENTS.md` and needs Kevin.
+>   G1/G2 (media + off-host backup) are still the only existential risk in the project.
+> - **B6** (TTL-cache the per-render template globals). Skipped with evidence: a plain
+>   cross-render TTL breaks three smoke tests that pin an admin write reflecting
+>   immediately, and doing it safely needs write-side invalidation in the admin write
+>   paths. Correct as specified, wrong as scoped — needs a cross-cutting change.
+> - **C6** (version the font filenames for immutable caching) — deferred, not attempted.
+> - **C8** (raise the 8.5–9px caption floor) — deliberately left: it is a visual design
+>   change this brief said Kevin should eyeball, not an agent.
+> - **`inbox.html`'s own pager** stays hand-rolled: its inline gutter style is load-bearing
+>   under the `MISE_SCREENING_ROOM=false` stack, which must not learn `sr-*` names. A test
+>   asserts it is the *only* remaining exception, so a seventh copy cannot appear quietly.
+>
+> **New findings surfaced while implementing** (not in the original review):
+>
+> - `app/public/sms_webhook.py` calls `.get()` on a parsed webhook body before
+>   establishing it is a dict — the same defect class as the four fixed in `app/sms.py`.
+> - `app/admin/financials.py` `receipt_upload`, `app/admin/uploads.py` and
+>   `app/admin/common.py` still run blocking work on the event loop; the de-async sweep
+>   did not own those files.
+> - `app/admin/reports.py` `revenue_csv` holds a fourth copy of the month-bucketing SQL.
+>   Left alone deliberately: it is an unbounded all-time export, not a trailing-N series.
+
+
 **Audience:** the implementing agent (and Kevin, for the red-light PRs).
 **Produced by:** a five-dimension adversarial review (core backend, admin surface,
 public/frontend, tests/CI, ops/security) run 2026-08-09 against `main` @ `ff441fa`,
@@ -233,13 +265,15 @@ The D is the headline. Everything else is polish on a strong base.
   connections per render); TTL pattern already at `app/render.py:13-30`.
 - **Do:** TTL-cache both (60s is plenty).
 
-### B7. Rate limiter: only check `is_admin` when over limit — LOW
-- **Where:** `app/ratelimit.py:55-77` (`security.is_admin` DB read on the event loop
-  per rate-limited request).
-- **Do:** compute the window first; consult `is_admin` only in the would-block
-  branch. Pure reorder inside `ratelimit.check` — does not edit security.py.
-- **Accept:** existing rate-limit tests green; add one asserting an admin cookie
-  still bypasses at the limit boundary.
+### B7. Rate limiter: only check `is_admin` when over limit — LOW **[RED — see G9]**
+- **Misclassified here.** This brief filed B7 as green because the change is a pure
+  reorder inside `ratelimit.check` that never opens `security.py`. That reasoning is
+  wrong: `AGENTS.md` puts "rate-limit/lockout" in the red-light list by *subject*, not
+  by which file the diff lands in, and the repo's own tiebreak is "when unsure which
+  side a change sits on, treat it as red". Reordering when the admin bypass is
+  consulted changes who gets metered, which is exactly the class of change that rule
+  exists to gate.
+- Moved to Workstream G as **G9**; do not implement it in a green commit.
 
 ### B8. Retention sweeps — LOW
 - **Where:** new hourly task alongside `app/scheduler.py` consumers; `jobs` and
@@ -574,6 +608,19 @@ The D is the headline. Everything else is polish on a strong base.
 - `app/main.py:260-261` still `max-age=300` (the "temporary" value from July).
   After confirming cert coverage per `ops/TRUTHFUL-HTTPS.md`, raise to ≥15552000,
   no `includeSubDomains`/preload yet. Add a dated owner task so it can't idle again.
+
+### G9. Rate limiter: only check `is_admin` when over limit — LOW (moved from B7)
+- **Where:** `app/ratelimit.py:55-77` — `security.is_admin` does a DB read on the
+  event loop for every rate-limited request that carries an admin cookie, including
+  the overwhelming majority that are nowhere near the limit.
+- **Do:** compute the sliding window first; consult `is_admin` only in the branch that
+  would actually block. The DB read drops from per-request to per-429.
+- **Why it is red:** it changes when the admin bypass is evaluated, i.e. who gets
+  metered — `AGENTS.md` gates rate-limit/lockout by subject regardless of which file
+  the diff touches.
+- **Accept:** existing rate-limit tests green, plus one asserting an admin cookie
+  still bypasses at the limit boundary and one asserting an anonymous client is still
+  metered identically.
 
 ### G8. Money-path notes (flag only — Kevin decides)
 - **Stripe 409 retry storm:** `app/public/pay.py:216-232` answers settled/mismatch

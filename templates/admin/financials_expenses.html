@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_pager.html" import pager %}
 {# Expenses — REAL operator-entered ledger. No fabricated tax set-aside goal or
    1099 watch (Mise has no data for those); deductible % is a per-row input. #}
 {% block topbar %}
@@ -68,6 +69,8 @@
           </tbody>
         </table>
       </div>
+      {{ pager("/admin/financials/expenses", offset, page_size, rows|length,
+               "cat=" ~ cat|urlencode, total=total) }}
     </section>
 
     <aside class="fin-rail">

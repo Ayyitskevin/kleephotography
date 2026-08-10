@@ -10,6 +10,7 @@
     {% for a in crops %}
     <figure class="tile sr-skel">
       <img src="/portal/{{ p.slug }}/thumb/{{ a.id }}" loading="lazy"
+           {% if a.width and a.height %}width="{{ a.width }}" height="{{ a.height }}"{% endif %}
            alt="{{ a.gallery_title }} — frame {{ '%04d'|format(a.id) }}">
       <figcaption>
         <span class="muted">{{ a.gallery_title }}</span>
@@ -17,6 +18,8 @@
           {% for link in a.crop_links %}
           {% if link.ready %}
           <a href="/portal/{{ p.slug }}/crop/{{ a.id }}/{{ link.slug }}">{{ link.slug.replace('x', ':') }}</a>
+          {% elif link.stalled %}
+          <span class="muted crop-stalled">{{ link.slug.replace('x', ':') }} hit a snag &mdash; it's on my bench</span>
           {% else %}
           <span class="muted crop-pending">{{ link.slug.replace('x', ':') }} preparing…</span>
           {% endif %}

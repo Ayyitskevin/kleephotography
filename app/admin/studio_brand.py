@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, RedirectResponse
 
 from .. import config, db, security
@@ -27,13 +28,30 @@ KIT_POSITIONS = {"tl", "tc", "tr", "ml", "c", "mr", "bl", "bc", "br"}
 # ── Brand assets (Phase 2) ─────────────────────────────────────────────────
 
 
-@router.post("/clients/{client_id}/brand")
-async def upload_brand(client_id: int, files: list[UploadFile]):
+def _upload_guard(client_id: int) -> None:
+    """404 an unknown client and 507 a full disk before any bytes are written."""
     get_client(client_id)
     if shutil.disk_usage(config.DATA_DIR).free / 1e9 < config.MIN_FREE_GB:
         raise HTTPException(status_code=507, detail="low disk space — upload refused")
+
+
+def _brand_dir(client_id: int) -> Path:
     dest_dir = config.BRAND_DIR / str(client_id)
     dest_dir.mkdir(parents=True, exist_ok=True)
+    return dest_dir
+
+
+# Both upload handlers stay `async def` for common.save_upload, which streams the
+# body chunk by chunk. Everything they interleave with it blocks — SQLite carries
+# a 30s busy_timeout — so each of those segments takes a threadpool hop instead
+# of running on the event loop, which is what writes bytes to every other open
+# socket. _upload_guard and _brand_dir must stay sync.
+
+
+@router.post("/clients/{client_id}/brand")
+async def upload_brand(client_id: int, files: list[UploadFile]):
+    await run_in_threadpool(_upload_guard, client_id)
+    dest_dir = await run_in_threadpool(_brand_dir, client_id)
     rejected = []
     for f in files:
         name = _SAFE_NAME.sub("_", Path(f.filename or "upload").name)
@@ -43,7 +61,8 @@ async def upload_brand(client_id: int, files: list[UploadFile]):
             continue
         stored = f"{uuid.uuid4().hex}{ext}"
         size = await common.save_upload(f, dest_dir / stored)
-        db.run(
+        await run_in_threadpool(
+            db.run,
             "INSERT INTO brand_assets (client_id, filename, stored, bytes) VALUES (?,?,?,?)",
             (client_id, name, stored, size),
         )
@@ -54,9 +73,7 @@ async def upload_brand(client_id: int, files: list[UploadFile]):
 
 @router.get("/clients/{client_id}/brand/{ba_id}")
 def admin_brand_file(client_id: int, ba_id: int):
-    b = db.one("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, client_id))
-    if not b:
-        raise HTTPException(status_code=404)
+    b = db.get_or_404("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, client_id))
     path = config.BRAND_DIR / str(client_id) / b["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
@@ -88,9 +105,7 @@ async def upload_kit(
     scale_pct: int = Form(22),
     margin_pct: int = Form(4),
 ):
-    get_client(client_id)
-    if shutil.disk_usage(config.DATA_DIR).free / 1e9 < config.MIN_FREE_GB:
-        raise HTTPException(status_code=507, detail="low disk space — upload refused")
+    await run_in_threadpool(_upload_guard, client_id)
     name = _SAFE_NAME.sub("_", Path(logo.filename or "logo").name)
     ext = Path(name).suffix.lower()
     if ext not in KIT_EXTS:
@@ -99,11 +114,11 @@ async def upload_kit(
         )
     if position not in KIT_POSITIONS:
         raise HTTPException(status_code=422, detail="bad position")
-    dest_dir = config.BRAND_DIR / str(client_id)
-    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_dir = await run_in_threadpool(_brand_dir, client_id)
     stored = f"kit_{uuid.uuid4().hex}{ext}"
     size = await common.save_upload(logo, dest_dir / stored)
-    db.run(
+    await run_in_threadpool(
+        db.run,
         "INSERT INTO brand_kits (client_id, label, stored, bytes, position, "
         "opacity, scale_pct, margin_pct) VALUES (?,?,?,?,?,?,?,?)",
         (
@@ -131,9 +146,7 @@ def update_kit(
     margin_pct: int = Form(4),
     active: int = Form(0),
 ):
-    k = db.one("SELECT id FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
-    if not k:
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
     if position not in KIT_POSITIONS:
         raise HTTPException(status_code=422, detail="bad position")
     db.run(
@@ -154,9 +167,7 @@ def update_kit(
 
 @router.get("/clients/{client_id}/kits/{kit_id}/logo")
 def admin_kit_logo(client_id: int, kit_id: int):
-    k = db.one("SELECT * FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
-    if not k:
-        raise HTTPException(status_code=404)
+    k = db.get_or_404("SELECT * FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
     path = config.BRAND_DIR / str(client_id) / k["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)

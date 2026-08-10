@@ -2,7 +2,10 @@
    page, or standalone as the HX fragment after a per-tile action (cover /
    portfolio / tag / section / renditions), swapped outerHTML onto
    #asset-{{ a.id }}. Self-sufficient: is_drop and the comment-thread macro
-   live here so the fragment renders identically to the full page. The form
+   live here so the fragment renders identically to the full page. Reads g, a,
+   sections, hero_asset_ids, video_comments, renditions — the fragment path
+   (galleries._tile_context) carries exactly those, so a new key here needs
+   adding there too or it silently renders empty. The form
    action suffixes (/portfolio, /cover, /section select, /delete) and the
    #asset-{id} figure id are the keyboard-cull contract (behaviors.js
    data-cull) — do not rename. data-section/data-fav/data-filter-item feed

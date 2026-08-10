@@ -6,8 +6,8 @@ self-contained, writable environment instead of depending on the CI workflow to
 export them (the unit step did not, so app-dependent unit tests failed with
 ``MISE_SECRET_KEY is not set``).
 
-We only ``setdefault``: any value the caller already exported (e.g. the smoke
-step's explicit ``MISE_DATA_DIR=$(mktemp -d)``) still wins.
+The credential/env-file keys ``setdefault``, so a caller that exported them still
+wins. ``MISE_DATA_DIR`` deliberately does not — see below.
 """
 
 import os
@@ -18,7 +18,18 @@ import pytest
 os.environ.setdefault("MISE_SECRET_KEY", "test-secret")
 os.environ.setdefault("MISE_ADMIN_PASSWORD", "test-pw")
 os.environ.setdefault("MISE_ENV_FILE", "/nonexistent")
-os.environ.setdefault("MISE_DATA_DIR", tempfile.mkdtemp(prefix="mise-test-"))
+
+# Never inherit an ambient MISE_DATA_DIR. _strip_showcase_seed below migrates and
+# then DELETEs rows in whatever it points at, and the suite churns writes into it
+# for the rest of the run — so a developer who exports MISE_DATA_DIR to run the
+# app locally would lose real data by typing `pytest`. Overriding unconditionally
+# keeps the documented `MISE_DATA_DIR=$(mktemp -d) pytest -m smoke` gate working
+# (it asks for a throwaway dir and still gets one). MISE_TEST_DATA_DIR is the
+# explicit opt-in for pointing the suite somewhere specific — a large volume, say,
+# when /tmp is a small tmpfs.
+os.environ["MISE_DATA_DIR"] = os.environ.get("MISE_TEST_DATA_DIR") or tempfile.mkdtemp(
+    prefix="mise-test-"
+)
 
 
 @pytest.fixture(scope="session", autouse=True)

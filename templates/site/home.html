@@ -125,9 +125,13 @@
   </div>
   <div class="sr-filmstrip">
     {% for a in featured[:6] %}
+    {% set image = asset_images[a.id] %}
     <figure class="tile{{ ' sr-frame-wide' if loop.index is odd else ' sr-frame-tall' }}" data-web="/site/img/{{ a.id }}" data-reveal>
-      <img src="/site/img/{{ a.id }}?variant=thumb" loading="lazy" decoding="async"
-           sizes="(max-width: 700px) 45vw, 260px" alt="{{ a|portfolio_alt }}">
+      <img src="{{ image.thumb.url }}" loading="lazy" decoding="async"
+           {% if image.srcset %}srcset="{{ image.srcset }}"
+           sizes="(max-width: 700px) 45vw, 260px"{% endif %}
+           {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
+           alt="{{ a|portfolio_alt }}">
       <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
     </figure>
     {% endfor %}

@@ -52,9 +52,9 @@ def create_template(name: str = Form(...), subject: str = Form(...), body: str =
 def update_template(
     template_id: int, name: str = Form(...), subject: str = Form(...), body: str = Form(...)
 ):
-    d = db.one("SELECT id FROM email_templates WHERE id=? AND deleted_at IS NULL", (template_id,))
-    if not d:
-        raise HTTPException(status_code=404)
+    db.get_or_404(
+        "SELECT id FROM email_templates WHERE id=? AND deleted_at IS NULL", (template_id,)
+    )
     name, subject = name.strip(), subject.strip()
     if not (name and subject and body.strip()):
         raise HTTPException(status_code=400, detail="name, subject and body required")

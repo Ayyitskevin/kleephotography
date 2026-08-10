@@ -20,6 +20,9 @@ log = logging.getLogger("mise.admin.audit")
 router = APIRouter(prefix="/admin/audit", dependencies=[Depends(security.require_admin)])
 
 _LIMIT = 500  # newest N events — this is a trail viewer, not a full dump
+# SQLite reads a negative LIMIT as "no limit": the CSV is evidence, so it must
+# carry every row, not the viewer's window.
+_CSV_LIMIT = -1
 
 # entity_type -> one of the four prototype categories. Unknown types fall back
 # to "document" so a newly-audited entity still appears (under All + Documents)
@@ -97,13 +100,13 @@ def _detail(entity_type: str, entity_id, action: str, diff: dict | None) -> str:
     return base
 
 
-def _rows(category: str) -> list[dict]:
+def _rows(category: str, limit: int = _LIMIT) -> list[dict]:
     import json
 
     raw = db.all_(
         """SELECT entity_type, entity_id, action, actor, diff_json, created_at
            FROM audit_log ORDER BY created_at DESC, id DESC LIMIT ?""",
-        (_LIMIT,),
+        (limit,),
     )
     out = []
     for r in raw:
@@ -174,7 +177,7 @@ def audit_csv():
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["Time", "Event", "Detail", "Amount", "Actor"])
-    for e in _rows("all"):
+    for e in _rows("all", _CSV_LIMIT):
         w.writerow([_localtime(e["created_at"]), e["title"], e["detail"], e["amount"], e["actor"]])
     return PlainTextResponse(
         buf.getvalue(),

@@ -12,6 +12,7 @@ import logging
 import re
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, booking_notify, db, gcal, scheduling, security
@@ -300,6 +301,10 @@ async def save_availability(request: Request):
     The console renders one switch per day; clicking a switch posts the current
     state (hidden on_/start_/end_ per day) plus toggle=<wd> for the day to flip."""
     form = await request.form()
+    return await run_in_threadpool(_save_availability, form)
+
+
+def _save_availability(form):
     flip = (form.get("toggle") or "").strip()
     rows = []
     for wd in range(7):
@@ -490,8 +495,12 @@ def edit_event(request: Request, event_id: int):
 
 @router.post("/event/{event_id}")
 async def update_event(request: Request, event_id: int):
-    e = _get_event(event_id)
+    e = await run_in_threadpool(_get_event, event_id)
     form = await request.form()
+    return await run_in_threadpool(_update_event, e, form, event_id)
+
+
+def _update_event(e: "db.sqlite3.Row", form, event_id: int):
     name = (form.get("name") or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="name required")
@@ -553,19 +562,36 @@ def delete_event(event_id: int):
 
 
 @router.get("/bookings", response_class=HTMLResponse)
-def bookings(request: Request):
+def bookings(request: Request, past_offset: int = 0):
     upcoming = db.all_("""SELECT b.*, e.name AS event_name FROM bookings b
                           JOIN event_types e ON e.id=b.event_type_id
                           WHERE b.status='confirmed' AND b.start_utc >= datetime('now')
                           ORDER BY b.start_utc""")
-    past = db.all_("""SELECT b.*, e.name AS event_name FROM bookings b
-                      JOIN event_types e ON e.id=b.event_type_id
-                      WHERE b.status!='confirmed' OR b.start_utc < datetime('now')
-                      ORDER BY b.start_utc DESC LIMIT 100""")
+    # Upcoming is self-limiting; past and cancelled is every booking the studio
+    # has ever taken, so it pages instead of stopping dead at a fixed LIMIT.
+    past_offset = max(0, past_offset)
+    page_size = 100
+    past = db.all_(
+        """SELECT b.*, e.name AS event_name FROM bookings b
+           JOIN event_types e ON e.id=b.event_type_id
+           WHERE b.status!='confirmed' OR b.start_utc < datetime('now')
+           ORDER BY b.start_utc DESC LIMIT ? OFFSET ?""",
+        (page_size, past_offset),
+    )
+    past_total = db.one("""SELECT COUNT(*) AS n FROM bookings b
+                           JOIN event_types e ON e.id=b.event_type_id
+                           WHERE b.status!='confirmed' OR b.start_utc < datetime('now')""")["n"]
     return templates.TemplateResponse(
         request,
         "admin/scheduling_bookings.html",
-        {"upcoming": upcoming, "past": past, "tz": scheduling.config.TIMEZONE},
+        {
+            "upcoming": upcoming,
+            "past": past,
+            "past_total": past_total,
+            "past_offset": past_offset,
+            "page_size": page_size,
+            "tz": scheduling.config.TIMEZONE,
+        },
     )
 
 

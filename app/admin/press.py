@@ -17,6 +17,7 @@ import datetime as dt
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, db, security
@@ -153,10 +154,13 @@ def press_for_license(license_row) -> list[dict]:
 
 
 @router.get("/press", response_class=HTMLResponse)
-def press_list(request: Request):
+def press_list(request: Request, offset: int = 0):
     # All-time ordering (Q4): press is inherently dated, not period-scoped. Pending
     # (no publish_date yet) float to the top as the actionable ones, then published
-    # newest-first.
+    # newest-first. All-time also means the log only grows, so it renders a page at
+    # a time while the header counts stay all-time.
+    offset = max(0, offset)
+    page_size = 50
     rows = db.all_(
         """SELECT p.*, c.name AS client_name, c.company,
                   g.title AS gallery_title, pr.title AS project_title
@@ -165,7 +169,14 @@ def press_list(request: Request):
            LEFT JOIN galleries g ON g.id = p.gallery_id
            LEFT JOIN projects pr ON pr.id = p.project_id
            WHERE p.deleted_at IS NULL
-           ORDER BY p.publish_date IS NULL DESC, p.publish_date DESC, p.id DESC"""
+           ORDER BY p.publish_date IS NULL DESC, p.publish_date DESC, p.id DESC
+           LIMIT ? OFFSET ?""",
+        (page_size, offset),
+    )
+    tally = db.one(
+        """SELECT COUNT(*) AS total,
+                  COUNT(publish_date) AS published
+           FROM press WHERE deleted_at IS NULL"""
     )
     clients = db.clients_for_select()
     projects = db.all_(
@@ -182,13 +193,22 @@ def press_list(request: Request):
             "projects": projects,
             "galleries": galleries,
             "channels_vocab": CHANNELS,
+            "total": tally["total"],
+            "published": tally["published"],
+            "offset": offset,
+            "page_size": page_size,
         },
     )
 
 
 @router.post("/press")
 async def create_press(request: Request):
-    new = _parse_form(await request.form())
+    form = await request.form()
+    return await run_in_threadpool(_create_press, form)
+
+
+def _create_press(form):
+    new = _parse_form(form)
     with db.tx() as con:
         cur = con.execute(
             """INSERT INTO press (outlet, title, url, publish_date, channel, credit,
@@ -222,8 +242,13 @@ async def create_press(request: Request):
 
 @router.post("/press/{press_id}")
 async def update_press(request: Request, press_id: int):
-    d = get_press(press_id)
-    new = _parse_form(await request.form())
+    d = await run_in_threadpool(get_press, press_id)
+    form = await request.form()
+    return await run_in_threadpool(_update_press, d, form, press_id)
+
+
+def _update_press(d: "db.sqlite3.Row", form, press_id: int):
+    new = _parse_form(form)
     diff = {f: [d[f], new[f]] for f in _FIELDS if (d[f] or None) != (new[f] or None)}
     if not diff:
         return RedirectResponse("/admin/studio/press", status_code=303)

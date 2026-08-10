@@ -13,7 +13,9 @@ invented tax set-aside goals) are dropped: Mise has no data source for them.
 Deductible % and the IRS mileage rate are honest operator inputs.
 """
 
+import csv
 import datetime as dt
+import io
 import uuid
 from pathlib import Path
 
@@ -56,7 +58,12 @@ def _initials(name: str) -> str:
 
 
 def _range_bounds(key: str) -> tuple[str, str]:
-    """(start, end) ISO dates, end exclusive. Default quarter."""
+    """(start, end) ISO dates, end exclusive. Default quarter.
+
+    These come off the studio's wall clock, so every query that spends them
+    converts stored-UTC created_at with 'localtime' before comparing. Straight
+    string comparison would drop a payment taken late on the last evening of the
+    range — already tomorrow in UTC — out of the month it was collected in."""
     today = studio._today()
     if key == "month":
         start = today.replace(day=1)
@@ -78,16 +85,19 @@ def _range_bounds(key: str) -> tuple[str, str]:
 
 
 def _collected_rows(start: str, end: str):
-    """Real Stripe payment events in range, newest first."""
+    """Real Stripe payment events in range, newest first. `d` rides out on the
+    studio clock so the date a row prints is the date that selected it."""
     return db.all_(
-        """SELECT pm.created_at AS d, pm.amount_cents AS cents, pm.kind AS kind,
+        """SELECT datetime(pm.created_at, 'localtime') AS d,
+                  pm.amount_cents AS cents, pm.kind AS kind,
                   i.id AS inv_id, i.title AS title,
                   c.name AS client, c.company AS company
            FROM payments pm
            JOIN invoices i ON i.id = pm.invoice_id
            JOIN projects p ON p.id = i.project_id
            JOIN clients  c ON c.id = p.client_id
-           WHERE pm.created_at >= ? AND pm.created_at < ?
+           WHERE date(pm.created_at, 'localtime') >= ?
+             AND date(pm.created_at, 'localtime') < ?
            ORDER BY pm.created_at DESC""",
         (start, end),
     )
@@ -96,7 +106,7 @@ def _collected_rows(start: str, end: str):
 def _outstanding_rows(start: str, end: str):
     """Open invoices created in range — real AR, remaining balance owed."""
     return db.all_(
-        """SELECT i.created_at AS d, i.id AS inv_id, i.title AS title,
+        """SELECT datetime(i.created_at, 'localtime') AS d, i.id AS inv_id, i.title AS title,
                   i.status AS status,
                   CASE WHEN i.status='deposit_paid'
                        THEN i.total_cents - i.deposit_cents
@@ -106,7 +116,8 @@ def _outstanding_rows(start: str, end: str):
            JOIN projects p ON p.id = i.project_id
            JOIN clients  c ON c.id = p.client_id
            WHERE i.status IN ('sent','viewed','deposit_paid')
-             AND i.created_at >= ? AND i.created_at < ?
+             AND date(i.created_at, 'localtime') >= ?
+             AND date(i.created_at, 'localtime') < ?
            ORDER BY i.created_at DESC""",
         (start, end),
     )
@@ -122,6 +133,7 @@ def _ledger(start: str, end: str) -> list[dict]:
                 "client": r["company"] or r["client"],
                 "inv": f"#{r['inv_id']:04d}",
                 "service": r["title"],
+                "cents": r["cents"],
                 "amount": _usd(r["cents"]),
                 "tax": "$0.00",
                 "fee": "—",
@@ -140,6 +152,7 @@ def _ledger(start: str, end: str) -> list[dict]:
                 "client": r["company"] or r["client"],
                 "inv": f"#{r['inv_id']:04d}",
                 "service": r["title"],
+                "cents": r["cents"],
                 "amount": _usd(r["cents"]),
                 "tax": "$0.00",
                 "fee": "—",
@@ -162,7 +175,9 @@ def income(request: Request, range: str = "quarter"):
 
     collected = db.one(
         """SELECT COALESCE(SUM(amount_cents),0) AS cents, COUNT(*) AS n
-           FROM payments WHERE created_at >= ? AND created_at < ?""",
+           FROM payments
+           WHERE date(created_at, 'localtime') >= ?
+             AND date(created_at, 'localtime') < ?""",
         (start, end),
     )
     openv = common.open_invoice_balance()
@@ -195,32 +210,13 @@ def income(request: Request, range: str = "quarter"):
     ranges = [{"key": k, "label": lbl, "on": k == range} for k, lbl in _RANGES]
 
     # Month reel (Screening Room 3i): trailing six months of collected cash,
-    # heights proportional to the best month. Read-only.
-    first_of_month = studio._today().replace(day=1)
-    reel_months, cursor = [], first_of_month
-    # NB: the route's `range` query param shadows the builtin in this scope
-    for _ in (0, 1, 2, 3, 4, 5):
-        reel_months.append(cursor)
-        cursor = (cursor - dt.timedelta(days=1)).replace(day=1)
-    reel_months.reverse()
-    by_ym = {
-        r["ym"]: r["cents"]
-        for r in db.all_(
-            """SELECT strftime('%Y-%m', created_at) AS ym,
-                      COALESCE(SUM(amount_cents), 0) AS cents
-               FROM payments GROUP BY ym"""
-        )
-    }
-    reel_scale = max([by_ym.get(m.strftime("%Y-%m"), 0) for m in reel_months] + [1])
-    month_reel = [
-        {
-            "label": m.strftime("%b").upper(),
-            "cents": by_ym.get(m.strftime("%Y-%m"), 0),
-            "pct": max(4, round(by_ym.get(m.strftime("%Y-%m"), 0) * 100 / reel_scale)),
-            "current": m == first_of_month,
-        }
-        for m in reel_months
-    ]
+    # heights proportional to the best month. Read-only. No goal is passed —
+    # this reel scales to the months themselves, so a target Kevin sets can
+    # never shrink the bars here and make the same six months read differently
+    # than they do on Home.
+    month_reel, _reel_scale = common.month_money_series(
+        studio._today(), 6, lambda m: m.strftime("%b").upper()
+    )
 
     return templates.TemplateResponse(
         request,
@@ -240,7 +236,11 @@ def income(request: Request, range: str = "quarter"):
 
 @router.get("/income.csv", response_class=PlainTextResponse)
 def income_csv(
-    range: str = "quarter", inc_paid: str = "", inc_out: str = "", fmt: str = "itemized"
+    range: str = "quarter",
+    inc_paid: str = "",
+    inc_out: str = "",
+    inc: str = "",
+    fmt: str = "itemized",
 ):
     """Collected cash + open AR in range — accountant-ready. Real data only;
     no fabricated tax or processing-fee columns (Mise stores neither). The
@@ -250,6 +250,12 @@ def income_csv(
         range = "quarter"
     if fmt not in ("itemized", "summary"):
         fmt = "itemized"
+    # HTML omits unchecked checkboxes, so absent Include params are ambiguous:
+    # the export panel always sends the `inc` marker (an unchecked box there
+    # really means exclude), while a bare link — the topbar's — carries neither
+    # and means "everything". Without this an unmarked link exports only headers.
+    if not inc and not inc_paid and not inc_out:
+        inc_paid = inc_out = "on"
     start, end = _range_bounds(range)
     rows = [
         r
@@ -257,24 +263,31 @@ def income_csv(
         if (inc_paid and r["st"] == "paid") or (inc_out and r["st"] == "out")
     ]
 
-    if fmt == "summary":
-        paid = sum(1 for r in rows if r["st"] == "paid")
-        out_n = sum(1 for r in rows if r["st"] == "out")
-        paid_c = sum(_to_cents(r["amount"]) for r in rows if r["st"] == "paid")
-        out_c = sum(_to_cents(r["amount"]) for r in rows if r["st"] == "out")
-        return (
-            "category,count,amount_usd\n"
-            f"Paid,{paid},{paid_c / 100:.2f}\n"
-            f"Outstanding,{out_n},{out_c / 100:.2f}\n"
-        )
+    buf = io.StringIO()
+    w = csv.writer(buf)
 
-    out = ["date,client,invoice,service,amount_usd,sales_tax_usd,status"]
+    if fmt == "summary":
+        paid = [r for r in rows if r["st"] == "paid"]
+        outstanding = [r for r in rows if r["st"] == "out"]
+        w.writerow(["category", "count", "amount_usd"])
+        for label, group in (("Paid", paid), ("Outstanding", outstanding)):
+            w.writerow([label, len(group), f"{sum(r['cents'] for r in group) / 100:.2f}"])
+        return buf.getvalue()
+
+    w.writerow(["date", "client", "invoice", "service", "amount_usd", "sales_tax_usd", "status"])
     for r in rows:
-        amt = r["amount"].replace("$", "").replace(",", "")
-        client = '"' + r["client"].replace('"', '""') + '"'
-        service = '"' + (r["service"] or "").replace('"', '""') + '"'
-        out.append(f"{r['raw'][:10]},{client},{r['inv']},{service},{amt},0.00,{r['status']}")
-    return "\n".join(out) + "\n"
+        w.writerow(
+            [
+                r["raw"][:10],
+                r["client"],
+                r["inv"],
+                r["service"] or "",
+                f"{r['cents'] / 100:.2f}",
+                "0.00",
+                r["status"],
+            ]
+        )
+    return buf.getvalue()
 
 
 @router.get("/clients", response_class=HTMLResponse)
@@ -389,7 +402,7 @@ def _ded(amount_cents: int, pct: int) -> int:
 
 
 @router.get("/expenses", response_class=HTMLResponse)
-def expenses(request: Request, cat: str = "all"):
+def expenses(request: Request, cat: str = "all", offset: int = 0):
     all_rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
     if cat not in _EXP_CAT_COLOR:
         cat = "all"
@@ -441,6 +454,10 @@ def expenses(request: Request, cat: str = "all"):
             "sub": f"{len(all_rows) - n_receipts} missing" if all_rows else "none yet",
         },
     ]
+    # A bookkeeping ledger only grows, so the table renders one page of it. The
+    # summary cards, the category bars and expenses.csv stay whole-ledger.
+    offset = max(0, offset)
+    page_size = 50
     table = [
         {
             "id": r["id"],
@@ -453,7 +470,7 @@ def expenses(request: Request, cat: str = "all"):
             + (f" ({r['deductible_pct']}%)" if r["deductible_pct"] < 100 else ""),
             "has_receipt": r["id"] in with_receipt,
         }
-        for r in rows
+        for r in rows[offset : offset + page_size]
     ]
 
     # Ledger category filter pills — All + the categories actually in use.
@@ -474,6 +491,9 @@ def expenses(request: Request, cat: str = "all"):
             "today": studio._today().isoformat(),
             "pills": pills,
             "cat": cat,
+            "total": len(rows),
+            "offset": offset,
+            "page_size": page_size,
         },
     )
 
@@ -490,6 +510,12 @@ def expense_create(
     vendor = vendor.strip()
     if not vendor:
         raise HTTPException(status_code=400, detail="vendor required")
+    # ORDER BY spent_on is a string comparison — a non-ISO date sorts the row
+    # into the wrong place in the ledger and the CSV, silently.
+    try:
+        spent_on = dt.date.fromisoformat(spent_on).isoformat()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="bad date")
     try:
         cents = _to_cents(amount)
     except ValueError:
@@ -517,20 +543,28 @@ def expense_delete(expense_id: int):
 @router.get("/expenses.csv", response_class=PlainTextResponse)
 def expenses_csv():
     rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
-    out = ["date,vendor,category,amount_usd,deductible_pct,deductible_usd,notes"]
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(
+        ["date", "vendor", "category", "amount_usd", "deductible_pct", "deductible_usd", "notes"]
+    )
     for r in rows:
-        amt = f"{r['amount_cents'] / 100:.2f}"
-        ded = f"{_ded(r['amount_cents'], r['deductible_pct']) / 100:.2f}"
-        vendor = '"' + (r["vendor"] or "").replace('"', '""') + '"'
-        notes = '"' + (r["notes"] or "").replace('"', '""') + '"'
-        out.append(
-            f"{r['spent_on']},{vendor},{r['category']},{amt},{r['deductible_pct']},{ded},{notes}"
+        w.writerow(
+            [
+                r["spent_on"],
+                r["vendor"] or "",
+                r["category"],
+                f"{r['amount_cents'] / 100:.2f}",
+                r["deductible_pct"],
+                f"{_ded(r['amount_cents'], r['deductible_pct']) / 100:.2f}",
+                r["notes"] or "",
+            ]
         )
-    return "\n".join(out) + "\n"
+    return buf.getvalue()
 
 
 @router.get("/receipts", response_class=HTMLResponse)
-def receipts(request: Request, filter: str = "all"):
+def receipts(request: Request, filter: str = "all", offset: int = 0):
     if filter not in ("all", "linked", "unlinked"):
         filter = "all"
     all_rows = db.all_(
@@ -565,6 +599,10 @@ def receipts(request: Request, filter: str = "all"):
             "on": filter == "unlinked",
         },
     ]
+    # Scans accumulate for the life of the studio; the grid renders one page.
+    # The cards and the filter pill counts still speak for the whole shoebox.
+    offset = max(0, offset)
+    page_size = 50
     cells = [
         {
             "id": r["id"],
@@ -578,7 +616,7 @@ def receipts(request: Request, filter: str = "all"):
                 else (r["created_at"] or "")[:10] + " · unlinked"
             ),
         }
-        for r in rows
+        for r in rows[offset : offset + page_size]
     ]
     # open expenses to offer in the attach dropdown (newest first)
     exp_opts = [
@@ -601,6 +639,9 @@ def receipts(request: Request, filter: str = "all"):
             "expenses": exp_opts,
             "pills": pills,
             "filter": filter,
+            "total": len(rows),
+            "offset": offset,
+            "page_size": page_size,
         },
     )
 
@@ -647,7 +688,7 @@ def receipt_file(receipt_id: int):
 
 
 @router.get("/mileage", response_class=HTMLResponse)
-def mileage(request: Request):
+def mileage(request: Request, offset: int = 0):
     rows = db.all_("SELECT * FROM mileage ORDER BY drove_on DESC, id DESC")
     miles = sum(r["miles"] for r in rows)
     deduction = sum(round(r["miles"] * r["rate_cents"]) for r in rows)
@@ -677,6 +718,10 @@ def mileage(request: Request):
             "sub": "~30% bracket estimate",
         },
     ]
+    # The IRS wants every trip kept, so the log only grows: render one page of it
+    # while the cards and mileage.csv stay over every trip on file.
+    offset = max(0, offset)
+    page_size = 50
     table = [
         {
             "id": r["id"],
@@ -686,7 +731,7 @@ def mileage(request: Request):
             "miles": f"{r['miles']:,.1f}",
             "ded": _usd(round(r["miles"] * r["rate_cents"])),
         }
-        for r in rows
+        for r in rows[offset : offset + page_size]
     ]
     return templates.TemplateResponse(
         request,
@@ -698,6 +743,8 @@ def mileage(request: Request):
             "count": len(rows),
             "today": studio._today().isoformat(),
             "rate_cents": config.MILEAGE_RATE_CENTS,
+            "offset": offset,
+            "page_size": page_size,
         },
     )
 
@@ -713,6 +760,11 @@ def mileage_create(
     from_place, to_place = from_place.strip(), to_place.strip()
     if not from_place or not to_place:
         raise HTTPException(status_code=400, detail="from and to required")
+    # same string-ordered ledger as expenses: only ISO dates sort honestly
+    try:
+        drove_on = dt.date.fromisoformat(drove_on).isoformat()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="bad date")
     if miles <= 0:
         raise HTTPException(status_code=400, detail="miles must be positive")
     db.run(
@@ -732,12 +784,19 @@ def mileage_delete(trip_id: int):
 @router.get("/mileage.csv", response_class=PlainTextResponse)
 def mileage_csv():
     rows = db.all_("SELECT * FROM mileage ORDER BY drove_on DESC, id DESC")
-    out = ["date,from,to,purpose,miles,rate_usd,deduction_usd"]
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["date", "from", "to", "purpose", "miles", "rate_usd", "deduction_usd"])
     for r in rows:
-        rate = f"{r['rate_cents'] / 100:.2f}"
-        ded = f"{round(r['miles'] * r['rate_cents']) / 100:.2f}"
-        frm = '"' + (r["from_place"] or "").replace('"', '""') + '"'
-        to = '"' + (r["to_place"] or "").replace('"', '""') + '"'
-        purpose = '"' + (r["purpose"] or "").replace('"', '""') + '"'
-        out.append(f"{r['drove_on']},{frm},{to},{purpose},{r['miles']:.1f},{rate},{ded}")
-    return "\n".join(out) + "\n"
+        w.writerow(
+            [
+                r["drove_on"],
+                r["from_place"] or "",
+                r["to_place"] or "",
+                r["purpose"] or "",
+                f"{r['miles']:.1f}",
+                f"{r['rate_cents'] / 100:.2f}",
+                f"{round(r['miles'] * r['rate_cents']) / 100:.2f}",
+            ]
+        )
+    return buf.getvalue()

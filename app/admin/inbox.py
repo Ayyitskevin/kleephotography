@@ -351,16 +351,25 @@ def _active_ctx(inq) -> dict:
     }
 
 
-def _inbox_ctx(request: Request, tab: str, sel: int | None) -> dict:
+def _inbox_ctx(request: Request, tab: str, sel: int | None, offset: int = 0) -> dict:
     """Shared render context for the inbox GET and the HTMX fragment forks of
     its POST handlers — one assembler for the tab gating, 100-row window,
     counts, and active-thread selection, so a fragment can never drift from the
     page it re-renders parts of. `request` rides the signature for symmetry
-    with studio_context._studio_context(request); the queries don't need it."""
+    with studio_context._studio_context(request); the queries don't need it.
+
+    The window is a page of the tab, and the tab badge counts the whole tab: the
+    pager is what keeps those two from diverging once a tab outgrows one page.
+    A POST fork carries no offset — it doesn't need one, because the thread it
+    re-renders is fetched by id below whichever page it lives on."""
     if tab not in _TABS:
         tab = "all"
     where, order = _INBOX_FILTERS[tab]
-    rows = db.all_(f"SELECT * FROM inquiries WHERE {where} {order} LIMIT 100")
+    offset = max(0, offset)
+    page_size = 100
+    rows = db.all_(
+        f"SELECT * FROM inquiries WHERE {where} {order} LIMIT ? OFFSET ?", (page_size, offset)
+    )
 
     counts = {
         "all": db.one(
@@ -382,7 +391,7 @@ def _inbox_ctx(request: Request, tab: str, sel: int | None) -> dict:
         if chosen is None and sel is not None:
             chosen = db.one(f"SELECT * FROM inquiries WHERE id=? AND ({where})", (sel,))
             if chosen is not None:
-                rows = [chosen, *rows[:99]]
+                rows = [chosen, *rows[: page_size - 1]]
         if chosen is None:
             chosen = rows[0]
         active = _active_ctx(chosen)
@@ -392,14 +401,18 @@ def _inbox_ctx(request: Request, tab: str, sel: int | None) -> dict:
         "counts": counts,
         "threads": [_thread_row(r, active["id"] if active else None) for r in rows],
         "active": active,
+        "offset": offset,
+        "page_size": page_size,
         "mail_configured": mailer.configured(),
         "sms_configured": sms.configured(),
     }
 
 
 @router.get("", response_class=HTMLResponse)
-def inbox(request: Request, tab: str = "all", sel: int | None = None):
-    return templates.TemplateResponse(request, "admin/inbox.html", _inbox_ctx(request, tab, sel))
+def inbox(request: Request, tab: str = "all", sel: int | None = None, offset: int = 0):
+    return templates.TemplateResponse(
+        request, "admin/inbox.html", _inbox_ctx(request, tab, sel, offset)
+    )
 
 
 def _inbox_frag(request: Request, tab: str, inquiry_id: int):
@@ -426,9 +439,7 @@ def reply(
     bubble. Email goes via Gmail SMTP (subject required, recorded in emails_log);
     text goes via the Quo adapter (subject ignored). Nothing auto-sends — Kevin
     clicks Send. The outbound row lands in `messages` so it shows in the thread."""
-    inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    inq = db.get_or_404("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
     message = message.strip()
     if not message:
         raise HTTPException(status_code=400, detail="message required")
@@ -498,9 +509,7 @@ def reply(
 @router.post("/{inquiry_id}/retry-owner-email")
 def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("all")):
     """Re-queue idempotent owner notification. Safe under concurrency."""
-    inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    inq = db.get_or_404("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
     if inq["owner_email_delivered_at"] if "owner_email_delivered_at" in inq.keys() else None:
         if request.headers.get("hx-request") == "true":
             return _inbox_frag(request, tab, inquiry_id)
@@ -521,8 +530,7 @@ def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("all"))
 
 @router.post("/{inquiry_id}/notion-orphan/relink")
 def notion_orphan_relink(request: Request, inquiry_id: int, tab: str = Form("all")):
-    if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
     if not notion_sync.relink_notion_orphan(inquiry_id):
         raise HTTPException(status_code=400, detail="no open orphan to relink")
     if request.headers.get("hx-request") == "true":
@@ -534,8 +542,7 @@ def notion_orphan_relink(request: Request, inquiry_id: int, tab: str = Form("all
 
 @router.post("/{inquiry_id}/notion-orphan/dismiss")
 def notion_orphan_dismiss(request: Request, inquiry_id: int, tab: str = Form("all")):
-    if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
     if not notion_sync.dismiss_notion_orphan(inquiry_id):
         raise HTTPException(status_code=400, detail="no open orphan to dismiss")
     if request.headers.get("hx-request") == "true":

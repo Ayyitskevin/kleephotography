@@ -18,6 +18,7 @@ fails CLOSED, so a scheme mismatch rejects inbound (safe) rather than trusting i
 import base64
 import hashlib
 import hmac
+import http.client
 import json
 import logging
 import urllib.error
@@ -63,15 +64,29 @@ def send(to: str, body: str) -> str:
             payload = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         raise SmsError(f"Quo returned HTTP {e.code}")
-    except (urllib.error.URLError, TimeoutError) as e:
+    # urlopen() wraps connect-time failures in URLError, but reading the body is a
+    # raw socket read: it drops with a bare OSError or an http.client exception,
+    # neither of which is a URLError. Both are still "we never got an answer".
+    except (OSError, http.client.HTTPException) as e:
         raise SmsError(f"Quo unreachable: {e.reason if hasattr(e, 'reason') else e}")
     except (ValueError, json.JSONDecodeError):
         raise SmsError("Quo returned an unreadable response")
+    # A body that parses but is not a JSON object is not a Quo envelope at all — a
+    # proxy error page, a captive portal, a wrong API base — so nothing here confirms
+    # the text went out. Refuse rather than report a success we cannot substantiate.
+    if not isinstance(payload, dict):
+        raise SmsError(f"Quo returned an unexpected response shape ({type(payload).__name__})")
     # OpenPhone/Quo nests the created message under "data": {"id": ...}; tolerate a
     # flat {"id": ...} too. A missing id is non-fatal — the text went out — so fall
     # back to "" (the messages row simply carries no provider id).
-    msg = payload.get("data") if isinstance(payload.get("data"), dict) else payload
-    msg_id = (msg.get("id") or "").strip() if isinstance(msg, dict) else ""
+    msg = payload["data"] if isinstance(payload.get("data"), dict) else payload
+    # Quo ids are JSON strings, but sibling providers have shipped numbers here.
+    # Accept either; any other shape is not an id, so it takes the same empty path
+    # as an absent one instead of crashing on .strip(). bool is an int subclass —
+    # excluded so a stray `true` cannot be stored as the string "True".
+    raw_id = msg.get("id")
+    scalar_id = isinstance(raw_id, (str, int)) and not isinstance(raw_id, bool)
+    msg_id = str(raw_id).strip() if scalar_id and raw_id else ""
     log.info("sms sent via Quo to %s (%d chars, id=%s)", to, len(body), msg_id or "?")
     return msg_id
 
@@ -92,8 +107,11 @@ def verify_webhook(raw: bytes, signature_header: str) -> bool:
     _, _version, timestamp, provided = parts
     try:
         key = base64.b64decode(secret)
+        signed = timestamp.encode() + b"." + raw
+        # Both halves stay bytes: compare_digest rejects a non-ASCII str with
+        # TypeError, and every byte of this header is caller-controlled.
+        provided_sig = provided.encode()
     except (ValueError, TypeError):
         return False
-    signed = timestamp.encode() + b"." + raw
-    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
-    return hmac.compare_digest(expected, provided)
+    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest())
+    return hmac.compare_digest(expected, provided_sig)

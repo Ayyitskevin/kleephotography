@@ -19,6 +19,7 @@ import json
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 
 from .. import config, db, sms
 
@@ -178,9 +179,17 @@ async def quo_webhook(request: Request):
     if declared and declared.isdigit() and int(declared) > _MAX_BODY:
         raise HTTPException(status_code=413, detail="payload too large")
     raw = await request.body()
+    # Past the body read this handler is all blocking work — signature HMAC and
+    # then SQLite with a 30s busy_timeout. Quo retries on a slow reply, so the
+    # write path stays on the threadpool where a lock wait can't stall the loop.
+    # _dispatch must stay sync.
+    return await run_in_threadpool(_dispatch, raw, request.headers.get("openphone-signature", ""))
+
+
+def _dispatch(raw: bytes, signature: str) -> dict:
     if len(raw) > _MAX_BODY:
         raise HTTPException(status_code=413, detail="payload too large")
-    if not sms.verify_webhook(raw, request.headers.get("openphone-signature", "")):
+    if not sms.verify_webhook(raw, signature):
         raise HTTPException(status_code=400, detail="bad signature")
     try:
         event = json.loads(raw.decode())

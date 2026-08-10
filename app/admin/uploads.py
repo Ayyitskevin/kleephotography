@@ -27,9 +27,7 @@ def _cleanup_staged_uploads(originals: list[Path]) -> None:
 
 @router.post("/galleries/{gallery_id}/upload")
 async def upload(gallery_id: int, files: list[UploadFile], section_id: int | None = None):
-    g = db.one("SELECT id FROM galleries WHERE id=?", (gallery_id,))
-    if not g:
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM galleries WHERE id=?", (gallery_id,))
     # Preflight before creating media directories or copying upload bytes. The same
     # ownership check runs again inside the write transaction after all awaited
     # file saves, because a section id can be deleted and reused meanwhile.
@@ -82,7 +80,6 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
     if staged:
         try:
             with db.tx() as con:
-                con.execute("BEGIN IMMEDIATE")
                 if (
                     section_id is not None
                     and not con.execute(

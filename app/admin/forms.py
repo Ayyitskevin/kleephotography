@@ -219,15 +219,20 @@ def field_move(field_id: int, dir: str = Form(...)):
 
 
 @router.get("/{form_id}/submissions", response_class=HTMLResponse)
-def form_submissions(request: Request, form_id: int):
+def form_submissions(request: Request, form_id: int, offset: int = 0):
     f = get_form(form_id)
     fields = db.all_(
         "SELECT id, label FROM form_fields WHERE form_id=? ORDER BY sort_order, id", (form_id,)
     )
+    # A live form collects submissions indefinitely, and each card unpacks its own
+    # JSON answers — render one page, count them all.
+    offset = max(0, offset)
+    page_size = 50
+    total = db.one("SELECT COUNT(*) AS n FROM form_submissions WHERE form_id=?", (form_id,))["n"]
     rows = db.all_(
         """SELECT * FROM form_submissions WHERE form_id=?
-           ORDER BY created_at DESC""",
-        (form_id,),
+           ORDER BY created_at DESC LIMIT ? OFFSET ?""",
+        (form_id, page_size, offset),
     )
     subs = []
     for r in rows:
@@ -238,5 +243,14 @@ def form_submissions(request: Request, form_id: int):
             d["answers"] = {}
         subs.append(d)
     return templates.TemplateResponse(
-        request, "admin/form_submissions.html", {"f": f, "fields": fields, "subs": subs}
+        request,
+        "admin/form_submissions.html",
+        {
+            "f": f,
+            "fields": fields,
+            "subs": subs,
+            "total": total,
+            "offset": offset,
+            "page_size": page_size,
+        },
     )

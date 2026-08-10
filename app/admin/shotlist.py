@@ -17,6 +17,7 @@ the shot list has no standalone index; it lives inside project_detail.
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 
 from .. import audit, db, security
@@ -60,16 +61,18 @@ def _parse_form(form) -> dict:
 
 
 def _get_shot(shot_id: int) -> "db.sqlite3.Row":
-    s = db.one("SELECT * FROM shot_list WHERE id=? AND deleted_at IS NULL", (shot_id,))
-    if not s:
-        raise HTTPException(status_code=404)
-    return s
+    return db.get_or_404("SELECT * FROM shot_list WHERE id=? AND deleted_at IS NULL", (shot_id,))
 
 
 @router.post("/projects/{project_id}/shots")
 async def create_shot(request: Request, project_id: int):
-    get_project(project_id)  # 404 if the project doesn't exist
-    new = _parse_form(await request.form())
+    await run_in_threadpool(get_project, project_id)  # 404 if the project doesn't exist
+    form = await request.form()
+    return await run_in_threadpool(_create_shot, form, project_id)
+
+
+def _create_shot(form, project_id: int):
+    new = _parse_form(form)
     with db.tx() as con:
         cur = con.execute(
             """INSERT INTO shot_list (project_id, title, category, priority,
@@ -98,8 +101,13 @@ async def create_shot(request: Request, project_id: int):
 
 @router.post("/shots/{shot_id}")
 async def update_shot(request: Request, shot_id: int):
-    d = _get_shot(shot_id)
-    new = _parse_form(await request.form())
+    d = await run_in_threadpool(_get_shot, shot_id)
+    form = await request.form()
+    return await run_in_threadpool(_update_shot, d, form, shot_id)
+
+
+def _update_shot(d: "db.sqlite3.Row", form, shot_id: int):
+    new = _parse_form(form)
     diff = {f: [d[f], new[f]] for f in _FIELDS if (d[f] or None) != (new[f] or None)}
     if not diff:
         return RedirectResponse(f"/admin/studio/projects/{d['project_id']}", status_code=303)

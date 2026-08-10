@@ -132,24 +132,32 @@ def galleries(published: bool = True):
     }
 
 
+def _require_gallery(gallery_id: int) -> None:
+    if not db.one("SELECT 1 AS x FROM galleries WHERE id=?", (gallery_id,)):
+        raise HTTPException(status_code=404, detail="gallery not found")
+
+
+# Both callbacks stay `async def` only for `await request.json()`. Everything
+# else they touch blocks: the existence check and apply_callback are SQLite with
+# a 30s busy_timeout, and argus_analyze.apply_callback also fans out to
+# platekit.notify_argus_complete, a blocking urlopen (MISE_PLATEKIT_TIMEOUT,
+# default 10s). Run on the loop, any of it stalls every other response the
+# process is writing — so each blocking segment gets a threadpool hop, and the
+# functions behind those hops must stay sync.
+
+
 @router.post("/argus/callback", dependencies=[Depends(security.require_argus_token)])
 async def argus_callback(request: Request, gallery_id: int):
     """Argus job completion webhook — updates argus_last_* on the gallery row."""
     if gallery_id <= 0:
         raise HTTPException(status_code=400, detail="gallery_id required")
-    if not db.one("SELECT 1 AS x FROM galleries WHERE id=?", (gallery_id,)):
-        raise HTTPException(status_code=404, detail="gallery not found")
+    await run_in_threadpool(_require_gallery, gallery_id)
     try:
         payload = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="json body required")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="json object required")
-    # apply_callback fans out to platekit.notify_argus_complete, which makes a
-    # blocking urlopen (MISE_PLATEKIT_TIMEOUT, default 10s). This handler must stay
-    # async for `await request.json()`, so the blocking segment goes to the
-    # threadpool — otherwise a slow Platekit stalls the whole event loop.
-    # plutus_callback below needs no such wrap: its apply_callback is DB-only.
     await run_in_threadpool(argus_analyze.apply_callback, gallery_id, payload)
     return {"ok": True, "gallery_id": gallery_id}
 
@@ -159,13 +167,12 @@ async def plutus_callback(request: Request, gallery_id: int):
     """Argus/Plutus hand-off completion — updates plutus_last_* on the gallery row."""
     if gallery_id <= 0:
         raise HTTPException(status_code=400, detail="gallery_id required")
-    if not db.one("SELECT 1 AS x FROM galleries WHERE id=?", (gallery_id,)):
-        raise HTTPException(status_code=404, detail="gallery not found")
+    await run_in_threadpool(_require_gallery, gallery_id)
     try:
         payload = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="json body required")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="json object required")
-    plutus_recommend.apply_callback(gallery_id, payload)
+    await run_in_threadpool(plutus_recommend.apply_callback, gallery_id, payload)
     return {"ok": True, "gallery_id": gallery_id}

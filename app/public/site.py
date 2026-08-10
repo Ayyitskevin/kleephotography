@@ -492,6 +492,7 @@ def home(request: Request):
         "site/home.html",
         {
             "featured": featured,
+            "asset_images": {a["id"]: _public_photo_spec(a) for a in featured},
             "reels": reels,
             "hero_reel": hero_reel,
             "hero_image": hero_image,
@@ -609,6 +610,7 @@ def contact(request: Request):
         {
             "sent": False,
             "error": None,
+            "error_fields": (),
             "prefill": pf,
             "scope_label": scope_label,
             "scope_placeholder": scope_placeholder,
@@ -652,10 +654,13 @@ def submit_inquiry(
             },
         )
 
-    def _error(msg: str, status: int):
+    def _error(msg: str, status: int, error_fields: tuple[str, ...] = ()):
         # Re-render with an error AND every submitted value echoed back, so a
         # typo or throttle never wipes a visitor's typed quote request (the
-        # template reads these off `prefill`).
+        # template reads these off `prefill`). error_fields carries the control
+        # names that came back bad so the template can mark them individually
+        # (same contract as the custom forms in public/forms.py); a throttle
+        # blames no field and passes none.
         scope_label, scope_placeholder = _contact_scope(service.strip())
         featured = _portfolio_assets()[:1]
         return templates.TemplateResponse(
@@ -664,6 +669,7 @@ def submit_inquiry(
             {
                 "sent": False,
                 "error": msg,
+                "error_fields": error_fields,
                 "prefill": {
                     "name": name.strip(),
                     "email": email.strip(),
@@ -702,8 +708,15 @@ def submit_inquiry(
             429,
         )
     name, email, message = name.strip(), email.strip(), message.strip()
-    if not (name and message and "@" in email and "." in email.rsplit("@", 1)[-1]):
-        return _error("Please add your name, a valid email, and a short message.", 400)
+    bad = []
+    if not name:
+        bad.append("name")
+    if not ("@" in email and "." in email.rsplit("@", 1)[-1]):
+        bad.append("email")
+    if not message:
+        bad.append("message")
+    if bad:
+        return _error("Please add your name, a valid email, and a short message.", 400, tuple(bad))
     # Optional scope fields from the quote-request form. service + target date
     # get their own inquiry columns (so the inquiry→quote button can lift them
     # into a project without re-typing); the rest fold into the message + email
@@ -916,11 +929,12 @@ def _specialty_page(request: Request, key: str):
             "sp_key": key,
             "page": page,
             "photos": photos,
+            "asset_images": {a["id"]: _public_portfolio_tile_spec(a) for a in (*photos, *vids)},
             "reels": vids,
             "hero_reel": hero_reel,
             "hero_image": hero_image,
             "hero_poster": hero_poster,
-            "studies": studies[:4],
+            "studies": [_case_study_view(s) for s in studies[:4]],
             "testimonials": quotes[:3],
             "demo_gallery": _demo_gallery(),
             "book_url": book_url,

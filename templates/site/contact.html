@@ -58,13 +58,17 @@
     {% else %}
     {% set pf = prefill or {} %}
     {% set open_more = pf.shoot_date or pf.dish_count or pf.usage or pf.budget or pf.service %}
+    {# Same per-field invalid primitive as site/form.html: the route hands back
+       error_fields (control names), each bad control points at the one error
+       line. A throttle blames no field, so nothing gets marked. #}
+    {% macro invalid(key) %}{% if key in error_fields %}aria-invalid="true" aria-describedby="contact-error"{% endif %}{% endmacro %}
     <form method="post" action="/contact" class="stack-form contact-form">
       <label for="contact-name">Name
         <input id="contact-name" type="text" name="name" required autocomplete="name"
-               value="{{ pf.name if pf.name is defined else '' }}"></label>
+               value="{{ pf.name if pf.name is defined else '' }}" {{ invalid('name') }}></label>
       <label for="contact-email">Email
         <input id="contact-email" type="email" name="email" required autocomplete="email"
-               value="{{ pf.email if pf.email is defined else '' }}"></label>
+               value="{{ pf.email if pf.email is defined else '' }}" {{ invalid('email') }}></label>
       <label for="contact-phone">Phone <span class="muted">(optional)</span>
         <input id="contact-phone" type="tel" name="phone" autocomplete="tel"
                value="{{ pf.phone if pf.phone is defined else '' }}"></label>
@@ -88,7 +92,7 @@
         </select></label>
       <label for="contact-message">Message
         <textarea id="contact-message" name="message" rows="5" required
-                  placeholder="What are we shooting?">{{ pf.message if pf.message is defined else '' }}</textarea></label>
+                  placeholder="What are we shooting?" {{ invalid('message') }}>{{ pf.message if pf.message is defined else '' }}</textarea></label>
 
       <details class="contact-more"{% if open_more %} open{% endif %}>
         <summary>Project details <span class="muted">(optional — helps me quote faster)</span></summary>
@@ -118,8 +122,12 @@
         </div>
       </details>
 
-      <input type="text" name="website" class="hp-field" tabindex="-1"
-             autocomplete="off" aria-hidden="true">
+      {# Honeypot: aria-hidden belongs on the wrapper — a hidden-but-focusable
+         control is an ARIA violation and browse-mode readers land on it. The
+         field name, position and behaviour are anti-spam machinery (site.py). #}
+      <span class="hp-field" aria-hidden="true">
+        <input type="text" name="website" tabindex="-1" autocomplete="off">
+      </span>
       {% if error %}
       <p class="error" role="alert" aria-live="polite" id="contact-error">{{ error }}</p>
       {% endif %}

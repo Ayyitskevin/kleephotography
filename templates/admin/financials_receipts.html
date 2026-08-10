@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_pager.html" import pager %}
 {# Receipts — REAL uploaded scans (photo/PDF), manually linked to an expense.
    No email-ingest address and no AI auto-matching (the prototype's "forward to
    receipts@…, auto-matched" is fabricated) — linking is an explicit operator choice. #}
@@ -72,6 +73,9 @@
     <div class="fin-empty-row">No receipts uploaded yet.</div>
     {% endfor %}
   </section>
+
+  {{ pager("/admin/financials/receipts", offset, page_size, rows|length,
+           "filter=" ~ filter|urlencode, total=total) }}
 
   <p class="fin-note">Scans live on your own server, never a third party. Linking is
     manual and honest — an expense shows &ldquo;✓ Receipt&rdquo; once a scan points at it.

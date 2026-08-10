@@ -4,6 +4,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, jobs, security
@@ -56,10 +57,14 @@ def invoice_detail(request: Request, invoice_id: int):
 
 @router.post("/invoices/{invoice_id}")
 async def update_invoice(request: Request, invoice_id: int):
-    d = get_invoice(invoice_id)
+    d = await run_in_threadpool(get_invoice, invoice_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="sent invoices are locked")
     form = await request.form()
+    return await run_in_threadpool(_update_invoice, d, form, invoice_id)
+
+
+def _update_invoice(d: "db.sqlite3.Row", form, invoice_id: int):
     items_json, total = parse_items(form)
     try:
         deposit = common.parse_form_cents(form, "deposit")

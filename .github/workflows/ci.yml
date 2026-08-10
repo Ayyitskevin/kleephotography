@@ -6,9 +6,18 @@ on:
   pull_request:
     branches: [ main ]
 
+# One run per ref. Stacked pushes to the same branch supersede each other rather
+# than queueing redundant full suites behind the run in flight.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    # The smoke step polls job queues and shells out to ffmpeg; a wedged poll
+    # would otherwise hold a runner for the 6-hour default.
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v7
@@ -23,13 +32,17 @@ jobs:
         with:
           python-version: "3.14"
 
+      # Stdlib only, so it runs before the install and fails in seconds.
+      - name: Check migration numbering
+        run: python scripts/check-migration-numbering.py
+
       - name: Cache pip
         uses: actions/cache@v6
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+          key: ${{ runner.os }}-pip-3.14-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-pip-3.14-
 
       - name: Install system dependencies (ffmpeg for video pipeline tests)
         run: |
@@ -44,11 +57,15 @@ jobs:
 
       - name: Run unit tests (fast feedback)
         run: |
-          .venv/bin/python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m unit --tb=short
+          .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m unit --tb=short
 
+      # Coverage starts here and is appended to by the smoke step below; the
+      # fail_under in pyproject applies to the union, so this partial run reports
+      # without gating.
       - name: Run integration tests
         run: |
-          .venv/bin/python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m integration --tb=short
+          .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m integration --tb=short \
+            --cov=app --cov-report=term-missing:skip-covered --cov-fail-under=0
 
       - name: Lint and check format with ruff
         run: |
@@ -61,4 +78,49 @@ jobs:
           MISE_SECRET_KEY=test-secret \
           MISE_ADMIN_PASSWORD=test-pw \
           MISE_ENV_FILE=/nonexistent \
-            .venv/bin/python -m pytest tests/ -q -m smoke --tb=short
+            .venv/bin/python -m pytest tests/ -q -m smoke --tb=short \
+              --cov=app --cov-append --cov-report=term-missing:skip-covered
+
+  # pyproject's requires-python, ruff's target-version and the README all claim
+  # 3.12+, and nothing tested it. Unit + integration only: the smoke suite is the
+  # slow one and its ffmpeg/job-pool behaviour is not what a version floor is
+  # about. Node is here because the lightbox contract test shells out to it.
+  floor:
+    name: unit + integration on the oldest supported Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.12-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-3.12-
+
+      - name: Create venv and install deps
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run unit tests (fast feedback)
+        run: |
+          .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m unit --tb=short
+
+      - name: Run integration tests
+        run: |
+          .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m integration --tb=short

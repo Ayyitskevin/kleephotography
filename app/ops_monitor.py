@@ -79,7 +79,8 @@ def _check_failed_jobs() -> None:
     ever stops, that row waits forever while `failed` stays 0 — a silent stall.
     So we also assert the positive: no retry has been due-and-unclaimed for
     longer than JOB_STUCK_AFTER_SECONDS (never-attempted work is excluded on
-    purpose — see jobs.queue_health).
+    purpose — see jobs.queue_health), and nothing has been left mid-flight in
+    'running' for that long either — the one state no sweep ever re-offers.
     """
     health = jobs.queue_health()
     failed = health["failed"]
@@ -97,6 +98,15 @@ def _check_failed_jobs() -> None:
             f"time by over {config.JOB_STUCK_AFTER_SECONDS // 60} minutes — the queue may "
             "have stopped draining. Open Admin → Jobs, use 'run now', and check the "
             "service is up.",
+        )
+    running_stale = health["running_stale"]
+    if running_stale:
+        alerts.ops_alert(
+            "jobs_running_stale",
+            f"{running_stale} background job{'s have' if running_stale != 1 else ' has'} been "
+            f"running for over {config.JOB_STUCK_AFTER_SECONDS // 60} minutes. A very long "
+            "transcode looks the same, so check Admin → Jobs first; if nothing is really "
+            "working, restarting the service re-queues it.",
         )
 
 

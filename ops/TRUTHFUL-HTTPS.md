@@ -34,9 +34,11 @@ provider changes.
 
 2. Before editing `/opt/mise/.env`, preserve it outside the deploy tree in a
    timestamped, root-readable `0600` backup. Verify the backup exists without
-   printing its contents. Confirm the latest off-machine restore proof is fresh.
-   The current off-machine set does not include `receipts/`, so preserve that
-   directory separately until the durable-file backup fix lands.
+   printing its contents. There is **no off-machine restore proof to confirm** —
+   the two-machine chain was retired when production moved hosts and its
+   replacement is still an open gap ([`BACKUP.md`](BACKUP.md)). The nightly
+   snapshot covers `mise.db` and nothing else, so copy `receipts/` — and any
+   other durable directory this change could touch — off the host by hand first.
 
 3. Perform a read-only inventory before deciding what to change:
 
