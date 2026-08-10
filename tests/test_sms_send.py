@@ -167,6 +167,20 @@ def test_send_maps_a_non_json_body_to_smserror(armed, monkeypatch):
         sms.send("+15551234567", "hi")
 
 
+@pytest.mark.parametrize(
+    "body, shape",
+    [("[]", "list"), ("null", "NoneType"), ('"queued"', "str"), ("42", "int")],
+)
+def test_send_rejects_a_json_body_that_is_not_an_object(armed, monkeypatch, body, shape):
+    """Valid JSON that is not an object is not a Quo envelope — a proxy error page,
+    a wrong API base. Nothing in it confirms the send, so it must surface as
+    SmsError (the only exception the Inbox reply route catches) and name the shape
+    the vendor actually returned, not report success and not escape as AttributeError."""
+    _answers(monkeypatch, body)
+    with pytest.raises(sms.SmsError, match=f"unexpected response shape \\({shape}\\)"):
+        sms.send("+15551234567", "hi")
+
+
 # --- verify_webhook(): fails closed on everything it cannot verify -----------
 
 

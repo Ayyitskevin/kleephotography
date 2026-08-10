@@ -67,11 +67,16 @@ def send(to: str, body: str) -> str:
         raise SmsError(f"Quo unreachable: {e.reason if hasattr(e, 'reason') else e}")
     except (ValueError, json.JSONDecodeError):
         raise SmsError("Quo returned an unreadable response")
+    # A body that parses but is not a JSON object is not a Quo envelope at all — a
+    # proxy error page, a captive portal, a wrong API base — so nothing here confirms
+    # the text went out. Refuse rather than report a success we cannot substantiate.
+    if not isinstance(payload, dict):
+        raise SmsError(f"Quo returned an unexpected response shape ({type(payload).__name__})")
     # OpenPhone/Quo nests the created message under "data": {"id": ...}; tolerate a
     # flat {"id": ...} too. A missing id is non-fatal — the text went out — so fall
     # back to "" (the messages row simply carries no provider id).
-    msg = payload.get("data") if isinstance(payload.get("data"), dict) else payload
-    msg_id = (msg.get("id") or "").strip() if isinstance(msg, dict) else ""
+    msg = payload["data"] if isinstance(payload.get("data"), dict) else payload
+    msg_id = (msg.get("id") or "").strip()
     log.info("sms sent via Quo to %s (%d chars, id=%s)", to, len(body), msg_id or "?")
     return msg_id
 
