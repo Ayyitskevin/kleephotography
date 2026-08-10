@@ -439,9 +439,7 @@ def reply(
     bubble. Email goes via Gmail SMTP (subject required, recorded in emails_log);
     text goes via the Quo adapter (subject ignored). Nothing auto-sends — Kevin
     clicks Send. The outbound row lands in `messages` so it shows in the thread."""
-    inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    inq = db.get_or_404("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
     message = message.strip()
     if not message:
         raise HTTPException(status_code=400, detail="message required")
@@ -511,9 +509,7 @@ def reply(
 @router.post("/{inquiry_id}/retry-owner-email")
 def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("all")):
     """Re-queue idempotent owner notification. Safe under concurrency."""
-    inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    inq = db.get_or_404("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
     if inq["owner_email_delivered_at"] if "owner_email_delivered_at" in inq.keys() else None:
         if request.headers.get("hx-request") == "true":
             return _inbox_frag(request, tab, inquiry_id)
@@ -534,8 +530,7 @@ def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("all"))
 
 @router.post("/{inquiry_id}/notion-orphan/relink")
 def notion_orphan_relink(request: Request, inquiry_id: int, tab: str = Form("all")):
-    if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
     if not notion_sync.relink_notion_orphan(inquiry_id):
         raise HTTPException(status_code=400, detail="no open orphan to relink")
     if request.headers.get("hx-request") == "true":
@@ -547,8 +542,7 @@ def notion_orphan_relink(request: Request, inquiry_id: int, tab: str = Form("all
 
 @router.post("/{inquiry_id}/notion-orphan/dismiss")
 def notion_orphan_dismiss(request: Request, inquiry_id: int, tab: str = Form("all")):
-    if not db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,)):
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
     if not notion_sync.dismiss_notion_orphan(inquiry_id):
         raise HTTPException(status_code=400, detail="no open orphan to dismiss")
     if request.headers.get("hx-request") == "true":
