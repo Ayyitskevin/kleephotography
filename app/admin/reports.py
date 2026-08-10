@@ -1,4 +1,6 @@
+import csv
 import datetime as dt
+import io
 import logging
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -287,6 +289,9 @@ def revenue_csv():
                   COALESCE(SUM(amount_cents), 0) AS cents
            FROM payments GROUP BY month ORDER BY month"""
     )
-    lines = ["month,collected_usd"]
-    lines += [f"{r['month']},{r['cents'] / 100:.2f}" for r in rows]
-    return "\n".join(lines) + "\n"
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["month", "collected_usd"])
+    for r in rows:
+        w.writerow([r["month"], f"{r['cents'] / 100:.2f}"])
+    return buf.getvalue()

@@ -170,6 +170,16 @@ def test_revenue_csv_amounts_are_dollars_with_two_decimals(admin, collected):
     assert float(before[this_month]) >= _DOMINANT_CENTS / 100
 
 
+def test_revenue_csv_uses_the_same_line_endings_as_every_other_export(admin, collected):
+    """The audit log and the three financials exports all go out through
+    csv.writer, which terminates rows RFC-4180 style. An accountant opening two
+    of Kevin's exports in the same tool should not meet two dialects."""
+    body = admin.get("/admin/reports/revenue.csv").text
+    assert body.endswith("\r\n")
+    assert "\r\n" in body.split("\r\n")[0] + "\r\n"
+    assert len(body.split("\r\n")) == len(_revenue_rows(body)) + 1
+
+
 # --- one payment, three surfaces ---------------------------------------------
 
 
