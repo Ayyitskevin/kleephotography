@@ -5,8 +5,8 @@
   <div class="pgtop-lead">
     <h1>Press</h1>
     <p class="pgtop-sub">
-      {% if press %}<b>{{ press|length }}</b> hit{{ "s" if press|length != 1 }} ·
-        <b>{{ press|selectattr("publish_date")|list|length }}</b> published
+      {% if press %}<b>{{ total }}</b> hit{{ "s" if total != 1 }} ·
+        <b>{{ published }}</b> published
       {% else %}Evidenced record behind a license's published state{% endif %}
     </p>
   </div>
@@ -78,7 +78,7 @@
     <button type="submit">Log press hit</button>
   </form>
 
-  <h2>Logged ({{ press|length }})</h2>
+  <h2>Logged ({{ total }})</h2>
   {% if not press %}<p class="muted">No press logged yet.</p>{% endif %}
   {% for p in press %}
   <details class="press-row">
@@ -146,5 +146,15 @@
     </form>
   </details>
   {% endfor %}
+
+  {% if total > page_size %}
+  <p class="muted">
+    Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, total]|min }} of {{ total }}
+    {% if offset > 0 %} ·
+    <a href="/admin/studio/press?offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+    {% if offset + page_size < total %} ·
+    <a href="/admin/studio/press?offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
+  </p>
+  {% endif %}
 </main>
 {% endblock %}

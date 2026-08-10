@@ -153,10 +153,13 @@ def press_for_license(license_row) -> list[dict]:
 
 
 @router.get("/press", response_class=HTMLResponse)
-def press_list(request: Request):
+def press_list(request: Request, offset: int = 0):
     # All-time ordering (Q4): press is inherently dated, not period-scoped. Pending
     # (no publish_date yet) float to the top as the actionable ones, then published
-    # newest-first.
+    # newest-first. All-time also means the log only grows, so it renders a page at
+    # a time while the header counts stay all-time.
+    offset = max(0, offset)
+    page_size = 50
     rows = db.all_(
         """SELECT p.*, c.name AS client_name, c.company,
                   g.title AS gallery_title, pr.title AS project_title
@@ -165,7 +168,14 @@ def press_list(request: Request):
            LEFT JOIN galleries g ON g.id = p.gallery_id
            LEFT JOIN projects pr ON pr.id = p.project_id
            WHERE p.deleted_at IS NULL
-           ORDER BY p.publish_date IS NULL DESC, p.publish_date DESC, p.id DESC"""
+           ORDER BY p.publish_date IS NULL DESC, p.publish_date DESC, p.id DESC
+           LIMIT ? OFFSET ?""",
+        (page_size, offset),
+    )
+    tally = db.one(
+        """SELECT COUNT(*) AS total,
+                  COUNT(publish_date) AS published
+           FROM press WHERE deleted_at IS NULL"""
     )
     clients = db.clients_for_select()
     projects = db.all_(
@@ -182,6 +192,10 @@ def press_list(request: Request):
             "projects": projects,
             "galleries": galleries,
             "channels_vocab": CHANNELS,
+            "total": tally["total"],
+            "published": tally["published"],
+            "offset": offset,
+            "page_size": page_size,
         },
     )
 

@@ -227,3 +227,35 @@ def test_form_submissions_page_and_count_the_whole_inbox(admin, busy_form):
     page2 = admin.get(f"/admin/forms/{busy_form['id']}/submissions?offset={_SUB_PAGE}").text
     assert busy_form["oldest"] in page2
     assert busy_form["newest"] not in page2
+
+
+# ── press log ────────────────────────────────────────────────────────────────
+
+_PRESS_PAGE = 50
+
+
+@pytest.fixture
+def press_log():
+    """51 pending hits — pending floats to the top of the press order, so these
+    own page 1 whatever else the shared DB holds."""
+    made = []
+    for i in range(51):
+        made.append(db.run("INSERT INTO press (outlet) VALUES (?)", (f"PRESS-{i:03d}",)))
+    try:
+        yield {"oldest": "PRESS-000", "newest": "PRESS-050"}
+    finally:
+        db.run(f"DELETE FROM press WHERE id IN ({','.join('?' * len(made))})", tuple(made))
+
+
+def test_press_log_pages_and_keeps_an_all_time_header(admin, press_log):
+    page1 = admin.get("/admin/studio/press").text
+    total = db.one("SELECT COUNT(*) AS n FROM press WHERE deleted_at IS NULL")["n"]
+    assert page1.count('class="press-row"') == _PRESS_PAGE
+    assert f"<b>{total}</b> hit" in page1 and f"Logged ({total})" in page1
+    assert press_log["newest"] in page1
+    assert press_log["oldest"] not in page1
+    assert f"/admin/studio/press?offset={_PRESS_PAGE}" in page1
+
+    page2 = admin.get(f"/admin/studio/press?offset={_PRESS_PAGE}").text
+    assert press_log["oldest"] in page2
+    assert press_log["newest"] not in page2
