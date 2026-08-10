@@ -19,9 +19,9 @@ Worst seed chains (keep order or rewrite the consumer):
   - Nested ``with TestClient(app)`` stops the session job pool; later upload
     waits rely on a fresh lifespan (or freeze + ``jobs._execute``).
 
-Disk note: default MISE_DATA_DIR via mktemp often lands on a small /tmp
-tmpfs. If uploads return 507, put DATA_DIR on a large volume or set
-MISE_MIN_FREE_GB=1 for the run.
+Disk note: the per-run mkdtemp from tests/conftest.py often lands on a small
+/tmp tmpfs. If uploads return 507, point MISE_TEST_DATA_DIR at a large volume
+or set MISE_MIN_FREE_GB=1 for the run.
 """
 
 import os
