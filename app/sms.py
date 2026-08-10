@@ -107,8 +107,11 @@ def verify_webhook(raw: bytes, signature_header: str) -> bool:
     _, _version, timestamp, provided = parts
     try:
         key = base64.b64decode(secret)
+        signed = timestamp.encode() + b"." + raw
+        # Both halves stay bytes: compare_digest rejects a non-ASCII str with
+        # TypeError, and every byte of this header is caller-controlled.
+        provided_sig = provided.encode()
     except (ValueError, TypeError):
         return False
-    signed = timestamp.encode() + b"." + raw
-    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
-    return hmac.compare_digest(expected, provided)
+    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest())
+    return hmac.compare_digest(expected, provided_sig)

@@ -274,6 +274,25 @@ def test_verify_webhook_rejects_malformed_or_wrong_headers(monkeypatch, header):
     assert sms.verify_webhook(b'{"type":"message.received"}', header) is False
 
 
+@pytest.mark.parametrize(
+    "header",
+    [
+        "hmac;1;1700000000;é",
+        "hmac;1;1700000000;café",
+        "hmac;1;1700000000;\udcff",
+        "hmac;1;\udcff;c2ln",
+    ],
+    ids=["accent", "word", "lone-surrogate", "surrogate-timestamp"],
+)
+def test_verify_webhook_fails_closed_on_a_non_ascii_signature(monkeypatch, header):
+    """Every byte of this header comes from whoever POSTed to /webhooks/quo, and
+    hmac.compare_digest refuses non-ASCII str operands with TypeError. The
+    docstring promises False on ANY malformed header — raising instead turns an
+    unauthenticated request into a 500 where a 400 'bad signature' belongs."""
+    monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", SIGNING_SECRET)
+    assert sms.verify_webhook(b'{"type":"message.received"}', header) is False
+
+
 def test_verify_webhook_rejects_an_unusable_signing_secret(monkeypatch):
     monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", "not!valid!base64!")
     raw = b'{"type":"message.received"}'
