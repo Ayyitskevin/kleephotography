@@ -54,9 +54,7 @@ async def upload_brand(client_id: int, files: list[UploadFile]):
 
 @router.get("/clients/{client_id}/brand/{ba_id}")
 def admin_brand_file(client_id: int, ba_id: int):
-    b = db.one("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, client_id))
-    if not b:
-        raise HTTPException(status_code=404)
+    b = db.get_or_404("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, client_id))
     path = config.BRAND_DIR / str(client_id) / b["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
@@ -131,9 +129,7 @@ def update_kit(
     margin_pct: int = Form(4),
     active: int = Form(0),
 ):
-    k = db.one("SELECT id FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
-    if not k:
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
     if position not in KIT_POSITIONS:
         raise HTTPException(status_code=422, detail="bad position")
     db.run(
@@ -154,9 +150,7 @@ def update_kit(
 
 @router.get("/clients/{client_id}/kits/{kit_id}/logo")
 def admin_kit_logo(client_id: int, kit_id: int):
-    k = db.one("SELECT * FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
-    if not k:
-        raise HTTPException(status_code=404)
+    k = db.get_or_404("SELECT * FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
     path = config.BRAND_DIR / str(client_id) / k["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
