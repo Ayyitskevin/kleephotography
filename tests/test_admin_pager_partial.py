@@ -5,6 +5,9 @@ moving the markup into ``templates/admin/_pager.html`` is provably a rename and
 not a redesign. The macro-level tests cover what a *shared* pager can quietly
 break: dropping the surface's active query state (tab/range/filter/sel) on a
 page link, and the boundary pages where one arrow must not render.
+
+The inbox tests pin the neighbouring invariant: the deep-link that prepends an
+out-of-window `sel` must never show a thread the window already holds.
 """
 
 import re
@@ -99,6 +102,47 @@ def test_pager_walks_back_from_page_two_on_both_ledgers(admin_client, seeded_led
 
     assert 'href="/admin/emails?offset=0"' in emails
     assert 'href="/admin/sent?offset=0"' in sent
+
+
+@pytest.fixture
+def crowded_inbox():
+    """One old lead pushed out of the inbox window by 100 newer ones."""
+    with db.tx() as con:
+        target_id = con.execute(
+            """INSERT INTO inquiries (name, email, message, kind, created_at)
+               VALUES (?,?,?,'contact','2000-01-01 00:00:00')""",
+            ("Out Of Window", f"target@{MARKER}.test", "body"),
+        ).lastrowid
+        con.executemany(
+            """INSERT INTO inquiries (name, email, message, kind, created_at)
+               VALUES (?,?,'body','contact',?)""",
+            [(f"Decoy {i}", f"d{i}@{MARKER}.test", f"{FUTURE} 00:00:00") for i in range(100)],
+        )
+    in_window_id = db.one("SELECT id FROM inquiries WHERE email=?", (f"d50@{MARKER}.test",))["id"]
+    try:
+        yield target_id, in_window_id
+    finally:
+        db.run("DELETE FROM inquiries WHERE email LIKE ?", (f"%@{MARKER}.test",))
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("which", ["out_of_window", "in_window"])
+def test_deep_linked_thread_renders_exactly_once(admin_client, crowded_inbox, which):
+    """A thread link carries `sel`, and an out-of-window `sel` is fetched and
+    prepended to the list. Prepending a thread the window already holds would
+    show it twice — once at the top, once in its own place — so the window
+    lookup, not the caller, has to decide.
+    """
+    target_id, in_window_id = crowded_inbox
+    sel = target_id if which == "out_of_window" else in_window_id
+
+    page = admin_client.get(f"/admin/inbox?tab=all&sel={sel}")
+
+    assert page.status_code == 200
+    assert page.text.count(f'id="ib-row-{sel}"') == 1
+    assert page.text.count(f'href="/admin/inbox?tab=all&sel={sel}" class="ib-row is-active"') == 1
+    # The prepend must not grow the window either.
+    assert page.text.count('class="ib-row ') == 100
 
 
 @pytest.mark.unit
