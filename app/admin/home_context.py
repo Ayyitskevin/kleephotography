@@ -159,7 +159,13 @@ def _ctx_reply_queue() -> dict:
            ORDER BY created_at ASC LIMIT 6"""
     ):
         try:
-            age_days = (dt.datetime.now() - dt.datetime.fromisoformat(r["created_at"][:19])).days
+            # inquiries.created_at is SQLite datetime('now') — UTC. Comparing it
+            # against a naive local now subtracts the zone offset from every age,
+            # so a lead that has waited three days reads "2d" for part of each day.
+            age_days = (
+                dt.datetime.now(dt.UTC).replace(tzinfo=None)
+                - dt.datetime.fromisoformat(r["created_at"][:19])
+            ).days
         except (ValueError, TypeError):
             age_days = 0
         is_sms = bool(r["phone"]) and not r["email"]

@@ -473,6 +473,37 @@ def test_reply_queue_shows_the_oldest_leads_and_counts_all_of_them(admin_client)
 
 
 @pytest.mark.integration
+def test_reply_queue_ages_a_lead_against_the_same_clock_that_stamped_it(admin_client):
+    """inquiries.created_at is SQLite datetime('now'), i.e. UTC. Ageing it
+    against a naive local now subtracts the zone offset from every lead, so
+    west of Greenwich a lead that has waited three full days reports "2d" for
+    part of every day — the queue under-reports exactly the thing it exists to
+    escalate. Pins a real offset because CI runs UTC, where the bug is invisible.
+    """
+    prev = os.environ.get("TZ")
+    os.environ["TZ"] = "America/New_York"
+    time.tzset()
+    inquiry_id = None
+    try:
+        inquiry_id = db.run(
+            """INSERT INTO inquiries (name, email, message, created_at)
+               VALUES (?,?,?, datetime('now', '-3 days'))""",
+            ("Offset Lead", "offset-lead@example.com", "waiting on a reply"),
+        )
+        queue = admin_client.get("/admin/home").context["queue"]
+        row = next(q for q in queue if q["name"] == "Offset Lead")
+        assert row["age_days"] == 3
+    finally:
+        if inquiry_id is not None:
+            db.run("DELETE FROM inquiries WHERE id=?", (inquiry_id,))
+        if prev is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = prev
+        time.tzset()
+
+
+@pytest.mark.integration
 def test_home_collected_counts_a_deposit_on_a_still_open_invoice(admin_client):
     """A deposit paid against an invoice that is still open is collected cash.
     Home used to read invoices.total_cents stamped by paid_at, so it showed $0
