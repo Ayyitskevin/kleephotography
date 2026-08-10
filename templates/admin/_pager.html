@@ -6,17 +6,32 @@
 
    `qs` is the surface's live query state (tab / range / filter / sel), already
    encoded and WITHOUT a leading "&": a page link that drops it silently resets
-   the filter the operator is reading through. `count` is the rows rendered on
-   THIS page, not the ledger total — a ledger's total counts rows the render
-   query can still drop (captured emails are counted before the galleries
-   join), so a full page is the only honest "there may be more" signal.
+   the filter the operator is reading through. A value that can carry a literal
+   "&" (an expense category like "Props & supplies") must reach here urlencoded,
+   or the browser splits the pair and the filter is lost on the way back.
+
+   Two ways to know there is a next page, because the ledgers do not all know
+   the same thing. Pass `total` when the surface has counted the whole ledger:
+   the pager then prints the range it is showing and hides itself entirely on a
+   ledger that fits one page. Leave `total` unset when the count would lie — the
+   captured-emails total counts rows the render query can still drop (they are
+   counted before the galleries join) — and a full page becomes the only honest
+   "there may be more" signal. `count` is always the rows rendered on THIS page.
+
+   `offset_param` is the query key the surface pages on: bookings carries
+   `past_offset` because the page also holds an unpaginated upcoming list.
 
    `muted` rides alongside `sr-pager` because screening.css is body.sr-scoped:
    under MISE_SCREENING_ROOM=false it is the element's only colour source. #}
-{% macro pager(path, offset, page_size, count, qs="") %}
+{% macro pager(path, offset, page_size, count, qs="", total=none, note="", offset_param="offset") %}
+  {% set counted = total is not none %}
+  {% set has_older = (counted and offset + page_size < total) or (not counted and count == page_size) %}
+  {% if not counted or total > page_size %}
   <p class="sr-pager muted">
-    {% if offset > 0 %}<a href="{{ path }}?{% if qs %}{{ qs }}&{% endif %}offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
-    {% if count == page_size %} ·
-    <a href="{{ path }}?{% if qs %}{{ qs }}&{% endif %}offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
+    {% if counted %}Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, total]|min }} of {{ total }}{% if note %} {{ note }}{% endif %}
+    {% endif %}{% if offset > 0 %}{% if counted %}· {% endif %}<a href="{{ path }}?{% if qs %}{{ qs }}&amp;{% endif %}{{ offset_param }}={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+    {% if has_older %} ·
+    <a href="{{ path }}?{% if qs %}{{ qs }}&amp;{% endif %}{{ offset_param }}={{ offset + page_size }}">Older &rarr;</a>{% endif %}
   </p>
+  {% endif %}
 {% endmacro %}

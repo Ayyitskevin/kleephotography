@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_pager.html" import pager %}
 {% block title %}{{ f.title }} · Submissions · Mise{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
@@ -47,15 +48,8 @@
     {% endfor %}
   </div>
   <p class="studio-empty" id="sub-empty" hidden>No submissions match.</p>
-  {% if total > page_size %}
-  <p class="muted">
-    Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, total]|min }} of {{ total }} &mdash; search filters this page
-    {% if offset > 0 %} ·
-    <a href="/admin/forms/{{ f.id }}/submissions?offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
-    {% if offset + page_size < total %} ·
-    <a href="/admin/forms/{{ f.id }}/submissions?offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
-  </p>
-  {% endif %}
+  {{ pager("/admin/forms/" ~ f.id ~ "/submissions", offset, page_size, subs|length,
+           total=total, note="— search filters this page") }}
   <script nonce="{{ csp_nonce }}">
   (function () {
     var search = document.getElementById('sub-search');

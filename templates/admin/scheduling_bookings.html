@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_pager.html" import pager %}
 {% block title %}Bookings · Mise{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
@@ -74,15 +75,8 @@
       {% endfor %}
       </tbody>
     </table>
-    {% if past_total > page_size %}
-    <p class="muted">
-      Showing {{ past_offset + 1 }}&ndash;{{ [past_offset + page_size, past_total]|min }} of {{ past_total }}
-      {% if past_offset > 0 %} ·
-      <a href="/admin/scheduling/bookings?past_offset={{ [past_offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
-      {% if past_offset + page_size < past_total %} ·
-      <a href="/admin/scheduling/bookings?past_offset={{ past_offset + page_size }}">Older &rarr;</a>{% endif %}
-    </p>
-    {% endif %}
+    {{ pager("/admin/scheduling/bookings", past_offset, page_size, past|length,
+             total=past_total, offset_param="past_offset") }}
     {% else %}
     <p class="muted">Nothing here yet.</p>
     {% endif %}

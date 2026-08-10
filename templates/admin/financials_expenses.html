@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_pager.html" import pager %}
 {# Expenses — REAL operator-entered ledger. No fabricated tax set-aside goal or
    1099 watch (Mise has no data for those); deductible % is a per-row input. #}
 {% block topbar %}
@@ -68,15 +69,8 @@
           </tbody>
         </table>
       </div>
-      {% if total > page_size %}
-      <p class="muted">
-        Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, total]|min }} of {{ total }}
-        {% if offset > 0 %} ·
-        <a href="/admin/financials/expenses?cat={{ cat }}&amp;offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
-        {% if offset + page_size < total %} ·
-        <a href="/admin/financials/expenses?cat={{ cat }}&amp;offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
-      </p>
-      {% endif %}
+      {{ pager("/admin/financials/expenses", offset, page_size, rows|length,
+               "cat=" ~ cat|urlencode, total=total) }}
     </section>
 
     <aside class="fin-rail">

@@ -12,7 +12,9 @@ here exist to keep pagination from leaking into them.
 """
 
 import datetime as dt
+import html
 import os
+import re
 import time
 
 import pytest
@@ -82,6 +84,50 @@ def test_expense_page_link_keeps_the_category_filter(admin, expense_ledger):
     page2 = admin.get(f"/admin/financials/expenses?cat=Travel&offset={_EXP_PAGE}").text
     assert expense_ledger["oldest"] in page2
     assert "Meals" not in page2.split('<table class="fin-tbl">')[1].split("</table>")[0]
+
+
+@pytest.fixture
+def ampersand_category_ledger():
+    """51 expenses in "Props & supplies" — a real category whose name carries an
+    ampersand — plus one Equipment row dated last, so it is exactly what an
+    unfiltered page 2 would pick up."""
+    made = []
+    for i in range(51):
+        made.append(
+            db.run(
+                """INSERT INTO expenses (spent_on, vendor, category, amount_cents,
+                                         deductible_pct)
+                   VALUES (?,?,'Props & supplies',?,100)""",
+                (f"2098-{1 + i // 28:02d}-{2 + i % 28:02d}", f"PAMP-{i:03d}", 1000 + i),
+            )
+        )
+    made.append(
+        db.run(
+            """INSERT INTO expenses (spent_on, vendor, category, amount_cents, deductible_pct)
+               VALUES ('2098-01-01',?,'Equipment',999,100)""",
+            ("PCTL-000",),
+        )
+    )
+    try:
+        yield {"oldest": "PAMP-000", "other_category": "PCTL-000"}
+    finally:
+        db.run(f"DELETE FROM expenses WHERE id IN ({','.join('?' * len(made))})", tuple(made))
+
+
+def test_expense_page_link_survives_a_category_name_with_an_ampersand(
+    admin, ampersand_category_ledger
+):
+    """ "Props & supplies" spelled into the href raw ends the `cat` pair at its
+    own ampersand: the browser sends `cat=Props `, no category matches, and the
+    operator lands back in the whole ledger one page down. Following the link
+    the page actually renders is the only way to catch that."""
+    page1 = admin.get("/admin/financials/expenses?cat=Props+%26+supplies").text
+    href = re.search(r'href="([^"]*expenses\?cat=[^"]*offset=50)"', page1).group(1)
+
+    # what a browser sends when it follows that link
+    page2 = admin.get(html.unescape(href)).text
+    assert ampersand_category_ledger["oldest"] in page2
+    assert ampersand_category_ledger["other_category"] not in page2
 
 
 def test_expense_summary_and_csv_stay_whole_ledger(admin, expense_ledger):
@@ -393,6 +439,45 @@ def test_sel_deep_link_still_prepends_from_another_page(admin, archived_threads)
     page2 = admin.get(f"/admin/inbox?tab=archived&offset={_INBOX_PAGE}&sel={sel}").text
     assert f'class="ib-row is-active" id="ib-row-{sel}"' in page2
     assert archived_threads["oldest"] in page2
+
+
+# ── one pager across every surface ───────────────────────────────────────────
+
+
+def _pager_shape(page: str, surface: str) -> str:
+    """The rendered pager with hrefs and numbers blanked — what is left is the
+    markup and wording every paginated surface is supposed to share."""
+    match = re.search(r"<p [^>]*>(?:(?!</p>).)*?offset=(?:(?!</p>).)*</p>", page, re.S)
+    assert match, f"no pager rendered on {surface}"
+    shape = " ".join(match.group(0).split())
+    return re.sub(r"\d+", "#", re.sub(r'href="[^"]*"', 'href="?"', shape))
+
+
+def test_every_paginated_ledger_renders_the_same_pager(
+    admin, expense_ledger, receipt_shoebox, trip_log, busy_form, press_log, past_bookings
+):
+    """Six surfaces grew their own copy of the Newer/Older block and drifted —
+    different classes, one with an inline style. They now share one macro, so
+    page 1 of every one of them is the same markup with a different href."""
+    shapes = {
+        surface: _pager_shape(admin.get(url).text, surface)
+        for surface, url in (
+            ("expenses", "/admin/financials/expenses"),
+            ("receipts", "/admin/financials/receipts"),
+            ("mileage", "/admin/financials/mileage"),
+            ("press", "/admin/studio/press"),
+            ("bookings", "/admin/scheduling/bookings"),
+            ("submissions", f"/admin/forms/{busy_form['id']}/submissions"),
+        )
+    }
+    # Submissions is the one surface that qualifies its own count, because its
+    # search box filters the page rather than the ledger.
+    note = "— search filters this page"
+    shapes["submissions"] = shapes["submissions"].replace(f" {note}", "")
+
+    assert len(set(shapes.values())) == 1, shapes
+    assert 'class="sr-pager muted"' in next(iter(shapes.values()))
+    assert "style=" not in next(iter(shapes.values()))
 
 
 # ── financial range windows read the studio clock, not UTC ───────────────────

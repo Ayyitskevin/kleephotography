@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_pager.html" import pager %}
 {% block title %}Press · Studio · Mise{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
@@ -147,14 +148,6 @@
   </details>
   {% endfor %}
 
-  {% if total > page_size %}
-  <p class="muted">
-    Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, total]|min }} of {{ total }}
-    {% if offset > 0 %} ·
-    <a href="/admin/studio/press?offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
-    {% if offset + page_size < total %} ·
-    <a href="/admin/studio/press?offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
-  </p>
-  {% endif %}
+  {{ pager("/admin/studio/press", offset, page_size, press|length, total=total) }}
 </main>
 {% endblock %}

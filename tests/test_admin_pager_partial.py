@@ -196,6 +196,28 @@ def test_pager_owns_a_class_and_keeps_the_kill_switch_one():
 
 
 @pytest.mark.unit
+def test_only_the_shared_pager_spells_out_a_page_link():
+    """One pager, one place. Every offset-paginated admin surface calls the
+    macro; a template that grows its own Newer/Older block is how the six
+    copy-pasted ones happened, and how they drifted apart.
+
+    inbox.html is the one holdout: its pager sits between two panes of the
+    three-pane layout and carries its gutter as an inline `style`, which has no
+    home in either stylesheet — screening.css is body.sr-scoped (the macro's
+    own class lives there) and mise-admin.css is the kill-switch stack that
+    must not learn `sr-*` names. Converting it would silently drop the gutter
+    under MISE_SCREENING_ROOM=false."""
+    admin_templates = ROOT / "templates" / "admin"
+    hand_rolled = sorted(
+        path.name
+        for path in admin_templates.glob("*.html")
+        if path.name != "_pager.html" and "Older &rarr;" in path.read_text()
+    )
+
+    assert hand_rolled == ["inbox.html"]
+
+
+@pytest.mark.unit
 def test_pager_styling_cannot_reach_the_kill_switch_stack():
     """screening.css always loads, so an unscoped .sr-pager rule would restyle
     the MISE_SCREENING_ROOM=false admin, which has no body.sr to opt in with."""
@@ -213,3 +235,69 @@ def test_newer_link_never_walks_past_the_first_page():
     html = _macro()("/admin/sent", 20, 50, 20)
 
     assert 'href="/admin/sent?offset=0"' in html
+
+
+# ── the counted surfaces (`total`) ───────────────────────────────────────────
+#
+# The ledgers that CAN count themselves say so, and get a range line and an
+# exact "is there a next page". The two email ledgers cannot — their total is
+# taken before a join that can still drop rows — so they stay on the full-page
+# heuristic. One macro, both answers.
+
+
+@pytest.mark.unit
+def test_a_counted_pager_prints_the_window_it_is_showing():
+    html = _macro()("/admin/studio/press", 50, 50, 1, total=51)
+
+    assert "Showing 51&ndash;51 of 51" in html
+    assert 'href="/admin/studio/press?offset=0"' in html
+
+
+@pytest.mark.unit
+def test_a_counted_ledger_that_fits_one_page_renders_no_pager_at_all():
+    """The hand-rolled blocks each hid themselves behind `total > page_size`;
+    losing that would put a dead pager under every short ledger."""
+    assert _macro()("/admin/studio/press", 0, 50, 12, total=12).strip() == ""
+
+
+@pytest.mark.unit
+def test_a_counted_pager_trusts_the_total_over_a_full_page():
+    """The last page of a ledger that divides exactly by the page size is full.
+    The uncounted heuristic has to offer Older there; a counted surface knows
+    better and must not send the operator to an empty page."""
+    counted = _macro()("/admin/studio/press", 50, 50, 50, total=100)
+    uncounted = _macro()("/admin/emails", 50, 50, 50)
+
+    assert "Older" not in counted
+    assert "Older" in uncounted
+
+
+@pytest.mark.unit
+def test_a_surface_can_name_the_query_key_it_pages_on():
+    """Bookings pages the past list with `past_offset` — the page also holds an
+    unpaginated upcoming list, so `offset` alone would be ambiguous."""
+    html = _macro()(
+        "/admin/scheduling/bookings", 100, 100, 1, total=101, offset_param="past_offset"
+    )
+
+    assert 'href="/admin/scheduling/bookings?past_offset=0"' in html
+    assert "?offset=" not in html
+
+
+@pytest.mark.unit
+def test_a_counted_pager_can_qualify_its_own_count():
+    html = _macro()(
+        "/admin/forms/3/submissions", 0, 50, 50, total=51, note="— search filters this page"
+    )
+
+    assert "of 51 — search filters this page" in html
+
+
+@pytest.mark.unit
+def test_a_query_value_carrying_an_ampersand_survives_the_page_link():
+    """ "Props & supplies" is a real expense category. Spelled into the href raw
+    it ends the `cat` pair early, and the filter is gone on the way back."""
+    html = _macro()("/admin/financials/expenses", 0, 50, 50, "cat=Props%20%26%20supplies", total=99)
+
+    href = re.search(r'href="([^"]*)"', html).group(1)
+    assert href == "/admin/financials/expenses?cat=Props%20%26%20supplies&amp;offset=50"
