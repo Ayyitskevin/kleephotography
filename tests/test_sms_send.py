@@ -11,6 +11,7 @@ must likewise stay total: it returns a bool and fails closed, never raises.
 import base64
 import hashlib
 import hmac
+import http.client
 import json
 import urllib.error
 
@@ -67,6 +68,17 @@ def _answers(monkeypatch, body, captured=None):
         return _Resp(body if isinstance(body, bytes) else body.encode())
 
     monkeypatch.setattr(sms.urllib.request, "urlopen", fake_urlopen)
+
+
+def _drops_mid_read(monkeypatch, exc):
+    """Connect, then fail while reading the body — where a raw socket error
+    surfaces, outside urlopen()'s URLError wrapping."""
+
+    class _Dropped(_Resp):
+        def read(self):
+            raise exc
+
+    monkeypatch.setattr(sms.urllib.request, "urlopen", lambda req, timeout: _Dropped(b""))
 
 
 def _never_called(monkeypatch):
@@ -178,6 +190,24 @@ def test_send_maps_an_unreachable_host_to_smserror(armed, monkeypatch):
 def test_send_maps_a_timeout_to_smserror(armed, monkeypatch):
     _answers(monkeypatch, TimeoutError("timed out"))
     with pytest.raises(sms.SmsError, match="Quo unreachable: timed out"):
+        sms.send("+15551234567", "hi")
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        http.client.IncompleteRead(b"half an env"),
+        ConnectionResetError("connection reset by peer"),
+        http.client.RemoteDisconnected("remote end closed connection"),
+    ],
+    ids=["incomplete-read", "reset", "remote-disconnected"],
+)
+def test_send_maps_a_connection_dropped_mid_read_to_smserror(armed, monkeypatch, exc):
+    """The body read happens inside the context manager, past urlopen()'s URLError
+    wrapping — a drop there is a plain OSError or an http.client exception, and it
+    must still reach the caller as SmsError rather than as itself."""
+    _drops_mid_read(monkeypatch, exc)
+    with pytest.raises(sms.SmsError, match="Quo unreachable"):
         sms.send("+15551234567", "hi")
 
 

@@ -18,6 +18,7 @@ fails CLOSED, so a scheme mismatch rejects inbound (safe) rather than trusting i
 import base64
 import hashlib
 import hmac
+import http.client
 import json
 import logging
 import urllib.error
@@ -63,7 +64,10 @@ def send(to: str, body: str) -> str:
             payload = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         raise SmsError(f"Quo returned HTTP {e.code}")
-    except (urllib.error.URLError, TimeoutError) as e:
+    # urlopen() wraps connect-time failures in URLError, but reading the body is a
+    # raw socket read: it drops with a bare OSError or an http.client exception,
+    # neither of which is a URLError. Both are still "we never got an answer".
+    except (OSError, http.client.HTTPException) as e:
         raise SmsError(f"Quo unreachable: {e.reason if hasattr(e, 'reason') else e}")
     except (ValueError, json.JSONDecodeError):
         raise SmsError("Quo returned an unreadable response")
