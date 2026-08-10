@@ -173,9 +173,10 @@ def dashboard(request: Request):
                     ORDER BY g.created_at DESC""")
     today = studio._today()
     failed_jobs = db.one("SELECT COUNT(*) AS n FROM jobs WHERE status='failed'")["n"]
-    # Total media bytes feed only the summary strip; per-card sizes were dropped
-    # from the template, so don't build/pass per-gallery dicts.
-    sizes_b = {g["id"]: common.dir_size(config.MEDIA_DIR / str(g["id"])) for g in gs}
+    # Originals only — the strip sums assets.bytes and the template says
+    # "originals" next to it (see common.original_bytes_by_gallery). Per-card
+    # sizes were dropped from the template, so only the total is used here.
+    sizes_b = common.original_bytes_by_gallery("gallery")
     today_iso = today.isoformat()
     # Library roll-up for the summary strip (display-only).
     totals = {
@@ -304,8 +305,12 @@ def transfers(request: Request):
     today = dt.date.today()
     today_iso = today.isoformat()
     soon_iso = (today + dt.timedelta(days=3)).isoformat()
-    sizes_b = {g["id"]: common.dir_size(config.MEDIA_DIR / str(g["id"])) for g in ds}
-    cards = [_transfer_card(g, common.fmt_size(sizes_b[g["id"]]), today_iso, soon_iso) for g in ds]
+    # A transfer card's size is what the recipient downloads, and the ZIP is
+    # built from the originals — so assets.bytes is the honest figure there.
+    sizes_b = common.original_bytes_by_gallery("drop")
+    cards = [
+        _transfer_card(g, common.fmt_size(sizes_b.get(g["id"], 0)), today_iso, soon_iso) for g in ds
+    ]
     month_start = today.replace(day=1).isoformat()
     dl_month = db.one(
         """SELECT COUNT(*) AS n FROM downloads d
@@ -318,7 +323,10 @@ def transfers(request: Request):
         "active": sum(1 for c in cards if c["status"] in ("Active", "Downloaded")),
         "live": sum(1 for g in ds if not (g["expires_at"] and g["expires_at"] < today_iso)),
         "expired": sum(1 for c in cards if c["status"] == "Expired"),
-        "stored": common.fmt_size(sum(sizes_b.values())),
+        # transfers.html renders this verbatim next to the word "stored", which
+        # reads as disk usage — so the qualifier travels with the value rather
+        # than being left implied. Don't repeat it in the template.
+        "stored": f"{common.fmt_size(sum(sizes_b.values()))} of originals",
         "dl_month": dl_month,
     }
     return templates.TemplateResponse(

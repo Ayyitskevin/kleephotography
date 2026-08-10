@@ -54,6 +54,25 @@ def dir_size(path: Path) -> int:
     return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
 
 
+def original_bytes_by_gallery(gallery_type: str) -> dict[int, int]:
+    """Per-gallery SUM of assets.bytes for one gallery type, in one grouped query.
+
+    assets.bytes is the ORIGINAL upload size, and nothing records the size of a
+    derivative (web, thumb, crops, renditions). So this is the size of what a
+    client actually downloads — the ZIP is built from the originals — and NOT
+    on-disk usage: the library strips that show it say "originals" for that
+    reason. A gallery with no assets is absent from the mapping."""
+    return {
+        r["gallery_id"]: r["bytes"]
+        for r in db.all_(
+            """SELECT a.gallery_id AS gallery_id, COALESCE(SUM(a.bytes), 0) AS bytes
+               FROM assets a JOIN galleries g ON g.id = a.gallery_id
+               WHERE g.type = ? GROUP BY a.gallery_id""",
+            (gallery_type,),
+        )
+    }
+
+
 def fmt_size(n: int) -> str:
     if n <= 0:
         return "—"
