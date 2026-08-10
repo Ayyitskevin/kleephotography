@@ -9,18 +9,20 @@ socket. One long lock wait on the loop stalls responses the threadpool already
 finished computing.
 
 So each of those handlers hands its post-parse work to `run_in_threadpool`. This
-module holds that line from both ends: one live test that a slow write on one
-route leaves the loop free to answer another, and a structural check that no
-async handler in the converted modules reaches the database on the loop.
+module holds that line: a live test that a slow write on one route leaves the
+loop free to answer another, plus output pins for the converted handlers the
+rest of the suite never reached.
 """
 
 import asyncio
+import json
 import time
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
-from app import db
+from app import config, db
 from app.main import app
 
 # Long enough that a blocked loop is unmistakable, short enough to stay cheap.
@@ -84,3 +86,145 @@ def test_slow_form_write_does_not_stall_the_event_loop(probe_form, monkeypatch):
     assert elapsed < PROBE_AFTER_SEC + SLOW_WRITE_SEC / 2, (
         f"/healthz answered {elapsed:.2f}s in — the form write blocked the event loop"
     )
+
+
+# ── Output pins for the handlers the sweep touched that nothing else covers ──
+# The rest of the converted routes are exercised by the smoke suite, which is
+# what proves the threadpool hop changed nothing. These three had no test at
+# all, so they get one against their behaviour as it stands.
+
+
+@pytest.fixture
+def admin_client():
+    with TestClient(app) as client:
+        response = client.post("/admin/login", data={"password": "test-pw"}, follow_redirects=False)
+        assert response.status_code == 303
+        yield client
+
+
+@pytest.mark.integration
+def test_save_availability_replaces_the_global_week(admin_client):
+    """POST /admin/scheduling/availability rewrites every global rule in one go.
+
+    toggle=<wd> flips the day whose switch was clicked; the other six keep the
+    state the hidden inputs posted. Days that end up off contribute no row.
+    """
+    kept = db.all_(
+        "SELECT weekday, start_min, end_min FROM availability_rules WHERE event_type_id IS NULL"
+    )
+    try:
+        data = {f"on_{wd}": "1" for wd in (1, 2, 3)}
+        data.update({f"start_{wd}": "10:00" for wd in (1, 2, 3)})
+        data.update({f"end_{wd}": "16:30" for wd in (1, 2, 3)})
+        # Wednesday's switch was the one clicked, so it inverts to off. Friday
+        # posts off and is not the toggled day, so it stays off.
+        data["toggle"] = "3"
+        data["on_5"] = ""
+        response = admin_client.post(
+            "/admin/scheduling/availability", data=data, follow_redirects=False
+        )
+        assert response.status_code == 303
+
+        rows = db.all_(
+            "SELECT weekday, start_min, end_min FROM availability_rules "
+            "WHERE event_type_id IS NULL ORDER BY weekday"
+        )
+        assert [tuple(r) for r in rows] == [(1, 600, 990), (2, 600, 990)]
+
+        audit_row = db.one(
+            "SELECT action, diff_json FROM audit_log "
+            "WHERE entity_type='availability' ORDER BY id DESC LIMIT 1"
+        )
+        assert audit_row["action"] == "set_global"
+        assert json.loads(audit_row["diff_json"]) == {"days": ["Tue", "Wed"]}
+    finally:
+        db.run("DELETE FROM availability_rules WHERE event_type_id IS NULL")
+        for row in kept:
+            db.run(
+                "INSERT INTO availability_rules (event_type_id, weekday, start_min, end_min) "
+                "VALUES (NULL,?,?,?)",
+                (row["weekday"], row["start_min"], row["end_min"]),
+            )
+
+
+@pytest.mark.integration
+def test_update_event_writes_the_whitelisted_columns_and_audits_the_diff(admin_client):
+    event_id = db.run(
+        "INSERT INTO event_types (slug, name, duration_min) VALUES (?,?,?)",
+        ("deasync-evt", "Before", 30),
+    )
+    try:
+        response = admin_client.post(
+            f"/admin/scheduling/event/{event_id}",
+            data={
+                "name": "After",
+                "description": "  trimmed  ",
+                "duration_min": "45",
+                "location": "Studio",
+                "color": "#123456",
+                "buffer_before_min": "10",
+                "max_per_day": "3",
+                "creates_notion_session": "1",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        row = db.one("SELECT * FROM event_types WHERE id=?", (event_id,))
+        assert row["name"] == "After"
+        assert row["description"] == "trimmed"
+        assert (row["duration_min"], row["location"], row["color"]) == (45, "Studio", "#123456")
+        assert (row["buffer_before_min"], row["max_per_day"]) == (10, 3)
+        assert row["creates_notion_session"] == 1
+        # min_notice_hours/booking_window_days carry their own defaults when the
+        # form omits them — blank does not mean zero for those two.
+        assert (row["min_notice_hours"], row["booking_window_days"]) == (12, 60)
+
+        audit_row = db.one(
+            "SELECT entity_id, action FROM audit_log "
+            "WHERE entity_type='event_type' ORDER BY id DESC LIMIT 1"
+        )
+        assert (audit_row["entity_id"], audit_row["action"]) == (event_id, "update")
+
+        blank = admin_client.post(
+            f"/admin/scheduling/event/{event_id}", data={"name": " "}, follow_redirects=False
+        )
+        assert blank.status_code == 400
+        assert db.one("SELECT name FROM event_types WHERE id=?", (event_id,))["name"] == "After"
+    finally:
+        db.run("DELETE FROM event_types WHERE id=?", (event_id,))
+
+
+@pytest.mark.integration
+def test_plutus_callback_records_the_handoff_result(monkeypatch):
+    monkeypatch.setattr(config, "ARGUS_TOKEN", "argus-test-token")
+    auth = {"Authorization": "Bearer argus-test-token"}
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug, title, pin, published) VALUES (?,?,?,1)",
+        ("DeasyncPlutus", "Plutus probe", "4321"),
+    )
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/api/plutus/callback?gallery_id={gallery_id}",
+                json={"status": "done", "run_id": 7, "review_url": "https://plutus/r/7"},
+                headers=auth,
+            )
+            assert response.status_code == 200
+            assert response.json() == {"ok": True, "gallery_id": gallery_id}
+            row = db.one(
+                "SELECT plutus_last_run_id, plutus_last_status, plutus_last_offer_url "
+                "FROM galleries WHERE id=?",
+                (gallery_id,),
+            )
+            assert tuple(row) == (7, "done", "https://plutus/r/7")
+
+            # The gallery check runs before the body is read, so an unknown id is
+            # a 404 whatever the payload looks like.
+            missing = client.post("/api/plutus/callback?gallery_id=99999999", json={}, headers=auth)
+            assert missing.status_code == 404
+            not_an_object = client.post(
+                f"/api/plutus/callback?gallery_id={gallery_id}", json=[1, 2], headers=auth
+            )
+            assert not_an_object.status_code == 400
+    finally:
+        db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
