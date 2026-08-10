@@ -259,3 +259,69 @@ def test_press_log_pages_and_keeps_an_all_time_header(admin, press_log):
     page2 = admin.get(f"/admin/studio/press?offset={_PRESS_PAGE}").text
     assert press_log["oldest"] in page2
     assert press_log["newest"] not in page2
+
+
+# ── past & cancelled bookings ────────────────────────────────────────────────
+
+_BOOK_PAGE = 100
+
+
+@pytest.fixture
+def past_bookings():
+    """101 cancelled bookings — one more than the window that used to be the end
+    of the road."""
+    event_id = db.run(
+        "INSERT INTO event_types (slug, name, duration_min) VALUES (?,?,30)",
+        ("pager-shoot", "Pager Shoot"),
+    )
+    made = []
+    for i in range(101):
+        made.append(
+            db.run(
+                """INSERT INTO bookings (token, event_type_id, name, email, start_utc,
+                                         end_utc, status)
+                   VALUES (?,?,?,?,?,?,'cancelled')""",
+                (
+                    f"pager-token-{i:03d}",
+                    event_id,
+                    f"BOOK-{i:03d}",
+                    "past@example.com",
+                    f"2020-01-01 {i // 60:02d}:{i % 60:02d}:00",
+                    f"2020-01-01 {i // 60:02d}:{i % 60:02d}:30",
+                ),
+            )
+        )
+    try:
+        yield {"event_id": event_id, "names": {f"BOOK-{i:03d}" for i in range(101)}}
+    finally:
+        db.run(f"DELETE FROM bookings WHERE id IN ({','.join('?' * len(made))})", tuple(made))
+        db.run("DELETE FROM event_types WHERE id=?", (event_id,))
+
+
+def test_past_bookings_reach_beyond_the_first_window(admin, past_bookings):
+    """The old query stopped at 100 rows with no pager — booking 101 existed and
+    could not be seen from the admin at all."""
+    total = db.one(
+        """SELECT COUNT(*) AS n FROM bookings b JOIN event_types e ON e.id=b.event_type_id
+           WHERE b.status!='confirmed' OR b.start_utc < datetime('now')"""
+    )["n"]
+    assert total <= 2 * _BOOK_PAGE  # both pages together must cover the seeded set
+
+    page1 = admin.get("/admin/scheduling/bookings").text
+    assert f"<b>{total}</b> past" in page1
+    assert f"/admin/scheduling/bookings?past_offset={_BOOK_PAGE}" in page1
+
+    page2 = admin.get(f"/admin/scheduling/bookings?past_offset={_BOOK_PAGE}").text
+    seen1 = {n for n in past_bookings["names"] if n in page1}
+    seen2 = {n for n in past_bookings["names"] if n in page2}
+    assert seen1 != past_bookings["names"]  # page 1 really is a window
+    assert seen1 | seen2 == past_bookings["names"]
+
+
+def test_past_booking_page_opens_on_the_past_pane(admin, past_bookings):
+    """The pager lives in a pane the toggle hides by default — following it must
+    not dump the operator back on Upcoming."""
+    page2 = admin.get(f"/admin/scheduling/bookings?past_offset={_BOOK_PAGE}").text
+    assert '<section class="sched-block" data-bview-pane="past">' in page2
+    assert '<section class="sched-block" data-bview-pane="upcoming" hidden>' in page2
+    assert 'data-bview="past" class="is-active"' in page2

@@ -553,19 +553,36 @@ def delete_event(event_id: int):
 
 
 @router.get("/bookings", response_class=HTMLResponse)
-def bookings(request: Request):
+def bookings(request: Request, past_offset: int = 0):
     upcoming = db.all_("""SELECT b.*, e.name AS event_name FROM bookings b
                           JOIN event_types e ON e.id=b.event_type_id
                           WHERE b.status='confirmed' AND b.start_utc >= datetime('now')
                           ORDER BY b.start_utc""")
-    past = db.all_("""SELECT b.*, e.name AS event_name FROM bookings b
-                      JOIN event_types e ON e.id=b.event_type_id
-                      WHERE b.status!='confirmed' OR b.start_utc < datetime('now')
-                      ORDER BY b.start_utc DESC LIMIT 100""")
+    # Upcoming is self-limiting; past and cancelled is every booking the studio
+    # has ever taken, so it pages instead of stopping dead at a fixed LIMIT.
+    past_offset = max(0, past_offset)
+    page_size = 100
+    past = db.all_(
+        """SELECT b.*, e.name AS event_name FROM bookings b
+           JOIN event_types e ON e.id=b.event_type_id
+           WHERE b.status!='confirmed' OR b.start_utc < datetime('now')
+           ORDER BY b.start_utc DESC LIMIT ? OFFSET ?""",
+        (page_size, past_offset),
+    )
+    past_total = db.one("""SELECT COUNT(*) AS n FROM bookings b
+                           JOIN event_types e ON e.id=b.event_type_id
+                           WHERE b.status!='confirmed' OR b.start_utc < datetime('now')""")["n"]
     return templates.TemplateResponse(
         request,
         "admin/scheduling_bookings.html",
-        {"upcoming": upcoming, "past": past, "tz": scheduling.config.TIMEZONE},
+        {
+            "upcoming": upcoming,
+            "past": past,
+            "past_total": past_total,
+            "past_offset": past_offset,
+            "page_size": page_size,
+            "tz": scheduling.config.TIMEZONE,
+        },
     )
 
 

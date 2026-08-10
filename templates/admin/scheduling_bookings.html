@@ -5,7 +5,7 @@
   <div class="pgtop-lead">
     <h1>Bookings</h1>
     <p class="pgtop-sub">
-      <b>{{ upcoming|length }}</b> upcoming · <b>{{ past|length }}</b> past &amp; cancelled · times in {{ tz }}
+      <b>{{ upcoming|length }}</b> upcoming · <b>{{ past_total }}</b> past &amp; cancelled · times in {{ tz }}
     </p>
   </div>
   <div class="pgtop-actions">
@@ -18,12 +18,16 @@
 <main class="admin-main">
   <div class="cal-nav">
     <div class="studio-view-toggle book-viewtoggle" role="group" aria-label="View">
-      <button type="button" data-bview="upcoming" class="is-active" aria-pressed="true">Upcoming</button>
-      <button type="button" data-bview="past" aria-pressed="false">Past &amp; cancelled</button>
+      {# A past-page link lands here with the past pane already open — otherwise
+         the pager would bounce the operator back to Upcoming every click. #}
+      <button type="button" data-bview="upcoming" class="{{ '' if past_offset else 'is-active' }}"
+              aria-pressed="{{ 'false' if past_offset else 'true' }}">Upcoming</button>
+      <button type="button" data-bview="past" class="{{ 'is-active' if past_offset }}"
+              aria-pressed="{{ 'true' if past_offset else 'false' }}">Past &amp; cancelled</button>
     </div>
   </div>
 
-  <section class="sched-block" data-bview-pane="upcoming">
+  <section class="sched-block" data-bview-pane="upcoming"{% if past_offset %} hidden{% endif %}>
     <h2>Upcoming</h2>
     {% if upcoming %}
     <table class="sched-table">
@@ -54,7 +58,7 @@
     {% endif %}
   </section>
 
-  <section class="sched-block" data-bview-pane="past" hidden>
+  <section class="sched-block" data-bview-pane="past"{% if not past_offset %} hidden{% endif %}>
     <h2>Past &amp; cancelled</h2>
     {% if past %}
     <table class="sched-table sched-past">
@@ -70,6 +74,15 @@
       {% endfor %}
       </tbody>
     </table>
+    {% if past_total > page_size %}
+    <p class="muted">
+      Showing {{ past_offset + 1 }}&ndash;{{ [past_offset + page_size, past_total]|min }} of {{ past_total }}
+      {% if past_offset > 0 %} ·
+      <a href="/admin/scheduling/bookings?past_offset={{ [past_offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+      {% if past_offset + page_size < past_total %} ·
+      <a href="/admin/scheduling/bookings?past_offset={{ past_offset + page_size }}">Older &rarr;</a>{% endif %}
+    </p>
+    {% endif %}
     {% else %}
     <p class="muted">Nothing here yet.</p>
     {% endif %}
