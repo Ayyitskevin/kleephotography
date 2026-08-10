@@ -75,3 +75,47 @@ jobs:
           MISE_ADMIN_PASSWORD=test-pw \
           MISE_ENV_FILE=/nonexistent \
             .venv/bin/python -m pytest tests/ -q -m smoke --tb=short
+
+  # pyproject's requires-python, ruff's target-version and the README all claim
+  # 3.12+, and nothing tested it. Unit + integration only: the smoke suite is the
+  # slow one and its ffmpeg/job-pool behaviour is not what a version floor is
+  # about. Node is here because the lightbox contract test shells out to it.
+  floor:
+    name: unit + integration on the oldest supported Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.12-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-3.12-
+
+      - name: Create venv and install deps
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run unit tests (fast feedback)
+        run: |
+          .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m unit --tb=short
+
+      - name: Run integration tests
+        run: |
+          .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m integration --tb=short

@@ -5,7 +5,7 @@ PIN-gated client galleries, content delivery, proposals → contracts → Stripe
 and the public marketing site — one FastAPI + HTMX app on SQLite/WAL, with no ORM and no
 JavaScript build step.
 
-Live: **<https://kleephotography.com>** · Python 3.12+ (CI on 3.14) · 522 tests · no bundler, no broker, no ORM
+Live: **<https://kleephotography.com>** · Python 3.12+ (CI on 3.12 and 3.14) · 522 tests · no bundler, no broker, no ORM
 
 ---
 
@@ -127,8 +127,9 @@ re-run its `ALTER`s against a database that already has them. Policy:
 one slow suite: 134 unit (pure logic, no DB), 207 integration (SQLite + `TestClient` seams),
 187 smoke (end-to-end against a throwaway DB, ffmpeg required for the video path) — six
 tests carry both the unit and integration markers, which is why those add up to more than
-the 335 non-smoke total. CI runs all three plus ruff on every push to `main` and every
-pull request.
+the non-smoke total. CI runs all three plus ruff on every push to `main` and every pull
+request, and a second job re-runs unit + integration on 3.12 so the supported floor above
+is tested rather than asserted.
 
 ## Local setup
 
