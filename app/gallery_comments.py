@@ -5,16 +5,33 @@ from fastapi import HTTPException
 from . import db
 
 
+def video_comment_threads(asset_ids) -> dict[int, list[dict]]:
+    """Visible comments for several videos at once, grouped by asset id.
+
+    The admin bench renders one thread per video asset, so asking per asset cost
+    a query per video. Same visibility rule and ordering as the single-asset
+    call — that one delegates here, so the rule cannot fork. Every requested id
+    gets an entry, empty list included."""
+    ids = list(asset_ids)
+    if not ids:
+        return {}
+    grouped: dict[int, list[dict]] = {asset_id: [] for asset_id in ids}
+    rows = db.all_(
+        f"""SELECT id, parent_id, asset_id, timecode, body, author_role, status, created_at
+           FROM video_comments
+           WHERE asset_id IN ({",".join("?" * len(ids))}) AND deleted_at IS NULL
+           ORDER BY asset_id, timecode, created_at, id""",
+        tuple(ids),
+    )
+    for row in rows:
+        comment = dict(row)
+        grouped[comment.pop("asset_id")].append(comment)
+    return grouped
+
+
 def video_comment_thread(asset_id: int) -> list[dict]:
     """Visible comments for one video, ordered for both client and admin views."""
-    rows = db.all_(
-        """SELECT id, parent_id, timecode, body, author_role, status, created_at
-           FROM video_comments
-           WHERE asset_id=? AND deleted_at IS NULL
-           ORDER BY timecode, created_at, id""",
-        (asset_id,),
-    )
-    return [dict(row) for row in rows]
+    return video_comment_threads([asset_id])[asset_id]
 
 
 def cascade_status(con, root_id: int, status: str) -> None:
