@@ -9,13 +9,16 @@ socket. One long lock wait on the loop stalls responses the threadpool already
 finished computing.
 
 So each of those handlers hands its post-parse work to `run_in_threadpool`. This
-module holds that line: a live test that a slow write on one route leaves the
-loop free to answer another, plus output pins for the converted handlers the
-rest of the suite never reached.
+module holds that line from three sides: a live test that a slow write on one
+route leaves the loop free to answer another, output pins for the converted
+handlers the rest of the suite never reached, and a structural fence that fails
+the moment an async handler in a swept module calls back into the app directly.
 """
 
+import ast
 import asyncio
 import json
+import pathlib
 import time
 
 import httpx
@@ -228,3 +231,120 @@ def test_plutus_callback_records_the_handoff_result(monkeypatch):
             assert not_an_object.status_code == 400
     finally:
         db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
+
+
+# ── Structural fence ────────────────────────────────────────────────────────
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+# Every module whose async handlers were swept. app/main.py is out by design
+# (/healthz and the error handler are degradation paths that must answer while
+# the threadpool is saturated), and so are app/public/pay.py, app/admin/
+# financials.py and app/admin/uploads.py, which still carry the defect and are
+# owned elsewhere. Adding a module here is how the fence grows to cover them.
+SWEPT = (
+    "app/public/forms.py",
+    "app/public/sms_webhook.py",
+    "app/service_api.py",
+    "app/admin/galleries.py",
+    "app/admin/gallery_sections.py",
+    "app/admin/invoices.py",
+    "app/admin/licenses.py",
+    "app/admin/presets.py",
+    "app/admin/press.py",
+    "app/admin/proposals.py",
+    "app/admin/recurring.py",
+    "app/admin/scheduling.py",
+    "app/admin/shotlist.py",
+    "app/admin/studio_brand.py",
+)
+
+# The only app-level calls an async handler may make on the loop. save_upload is
+# the streaming read itself — it cannot move, it IS the await.
+LOOP_SAFE_CALLS = frozenset({"common.save_upload"})
+
+
+def _route_decorated(node) -> bool:
+    return any(
+        isinstance(d, ast.Call)
+        and isinstance(d.func, ast.Attribute)
+        and isinstance(d.func.value, ast.Name)
+        and d.func.value.id == "router"
+        for d in node.decorator_list
+    )
+
+
+def _app_bound_names(tree: ast.Module) -> set[str]:
+    """Names in this module that reach app code — imported from the package, or
+    defined here. A call through any of them can block; a call through `int`,
+    `HTTPException` or a method on a local cannot be spotted this way and does
+    not need to be, because none of them touch the database."""
+    names = {
+        node.name for node in tree.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level:  # relative == in-package
+            names.update(alias.asname or alias.name for alias in node.names)
+    return names
+
+
+def _called_names(node) -> list[str]:
+    """Dotted head of every call in this function body: `db.run(...)` -> 'db.run',
+    `get_invoice(...)` -> 'get_invoice', `x.strip()` -> 'x.strip'."""
+    out = []
+    for sub in ast.walk(node):
+        if not isinstance(sub, ast.Call):
+            continue
+        if isinstance(sub.func, ast.Name):
+            out.append(sub.func.id)
+        elif isinstance(sub.func, ast.Attribute) and isinstance(sub.func.value, ast.Name):
+            out.append(f"{sub.func.value.id}.{sub.func.attr}")
+    return out
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("module_path", SWEPT)
+def test_async_handlers_reach_app_code_only_through_a_threadpool_hop(module_path):
+    """No async route handler in a swept module may call app code on the loop.
+
+    A `db.` prefix alone would not have caught the original defect: most of these
+    handlers reached the database through a lookup helper (`get_invoice`,
+    `_get_event`) rather than through `db` directly. So the fence is drawn wider
+    — any name that is defined in the module or imported from inside the package
+    is app code, and app code only runs behind `run_in_threadpool`.
+    """
+    tree = ast.parse((ROOT / module_path).read_text())
+    app_names = _app_bound_names(tree)
+
+    offenders = []
+    for node in tree.body:
+        if not isinstance(node, ast.AsyncFunctionDef) or not _route_decorated(node):
+            continue
+        for call in _called_names(node):
+            head = call.split(".")[0]
+            if head in app_names and call not in LOOP_SAFE_CALLS:
+                offenders.append(f"{node.name} calls {call}")
+
+    assert offenders == [], f"{module_path}: app code on the event loop — {'; '.join(offenders)}"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("module_path", SWEPT)
+def test_threadpool_targets_in_swept_modules_are_sync(module_path):
+    """run_in_threadpool runs its target with no loop under it, so an `async def`
+    there would hand back an un-awaited coroutine and silently do nothing."""
+    tree = ast.parse((ROOT / module_path).read_text())
+    async_defs = {node.name for node in tree.body if isinstance(node, ast.AsyncFunctionDef)}
+
+    targets = []
+    for call in ast.walk(tree):
+        if (
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Name)
+            and call.func.id == "run_in_threadpool"
+            and call.args
+            and isinstance(call.args[0], ast.Name)
+        ):
+            targets.append(call.args[0].id)
+
+    assert [t for t in targets if t in async_defs] == []
