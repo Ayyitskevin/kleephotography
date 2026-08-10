@@ -6,9 +6,18 @@ on:
   pull_request:
     branches: [ main ]
 
+# One run per ref. Stacked pushes to the same branch supersede each other rather
+# than queueing redundant full suites behind the run in flight.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    # The smoke step polls job queues and shells out to ffmpeg; a wedged poll
+    # would otherwise hold a runner for the 6-hour default.
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v7
