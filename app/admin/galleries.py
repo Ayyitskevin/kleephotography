@@ -693,9 +693,9 @@ def email_gallery(
 
 @router.get("/thumb/{gallery_id}/{asset_id}")
 def admin_thumb(gallery_id: int, asset_id: int):
-    a = db.one("SELECT stored FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
-    if not a:
-        raise HTTPException(status_code=404)
+    a = db.get_or_404(
+        "SELECT stored FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id)
+    )
     path = config.MEDIA_DIR / str(gallery_id) / "thumb" / f"{Path(a['stored']).stem}.jpg"
     if not path.is_file():
         raise HTTPException(status_code=404)
@@ -745,9 +745,9 @@ async def bulk_star_tag(request: Request, gallery_id: int):
 def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: str = Form(...)):
     if dir not in ("left", "right"):
         raise HTTPException(status_code=400, detail="dir must be left or right")
-    a = db.one("SELECT section_id FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
-    if not a:
-        raise HTTPException(status_code=404)
+    a = db.get_or_404(
+        "SELECT section_id FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id)
+    )
     siblings = db.all_(
         """SELECT id FROM assets WHERE gallery_id=? AND section_id IS ?
                           ORDER BY position, id""",
@@ -770,11 +770,9 @@ def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: str = F
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/cover")
 def set_cover(request: Request, gallery_id: int, asset_id: int):
     g = get_gallery(gallery_id)
-    a = db.one(
+    db.get_or_404(
         "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='photo'", (asset_id, gallery_id)
     )
-    if not a:
-        raise HTTPException(status_code=404)
     new = None if g["cover_asset_id"] == asset_id else asset_id
     db.run("UPDATE galleries SET cover_asset_id=? WHERE id=?", (new, gallery_id))
     if request.headers.get("hx-request") == "true":
@@ -788,13 +786,11 @@ def build_renditions(request: Request, gallery_id: int, asset_id: int):
     INSERT OR IGNORE per preset; failed rows re-queue as pending so the button
     doubles as a retry. Encoding happens in the job pool off-request."""
     get_gallery(gallery_id)
-    a = db.one(
+    a = db.get_or_404(
         """SELECT * FROM assets WHERE id=? AND gallery_id=?
            AND kind='video' AND status='ready'""",
         (asset_id, gallery_id),
     )
-    if not a:
-        raise HTTPException(status_code=404)
     stem = Path(a["stored"]).stem
     for preset in video.RENDITION_PRESETS:
         db.run(
@@ -928,11 +924,9 @@ def admin_add_comment(
     """Studio-side author path. Admin comments are author_role='admin',
     visitor_id NULL; a reply inherits its parent's timecode."""
     get_gallery(gallery_id)
-    a = db.one(
+    db.get_or_404(
         "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='video'", (asset_id, gallery_id)
     )
-    if not a:
-        raise HTTPException(status_code=404)
     body = body.strip()
     if not body:
         raise HTTPException(status_code=400, detail="comment body required")
@@ -952,11 +946,9 @@ def admin_hide_comment(comment_id: int):
     """Moderation: soft-delete a comment AND its descendant replies in one
     recursive UPDATE (so no reply dangles under a hidden parent). This is the
     one auditable human act in this slice — logged to audit_log."""
-    c = db.one(
+    c = db.get_or_404(
         "SELECT id, asset_id, gallery_id, author_role FROM video_comments WHERE id=?", (comment_id,)
     )
-    if not c:
-        raise HTTPException(status_code=404)
     with db.tx() as con:
         con.execute(
             """WITH RECURSIVE sub(id) AS (
