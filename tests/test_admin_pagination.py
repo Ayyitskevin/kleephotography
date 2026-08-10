@@ -89,3 +89,55 @@ def test_expense_summary_and_csv_stay_whole_ledger(admin, expense_ledger):
     csv_rows = admin.get("/admin/financials/expenses.csv").text.strip().splitlines()
     assert len(csv_rows) == total + 1
     assert any(expense_ledger["oldest"] in row for row in csv_rows)
+
+
+# ── receipt inbox ────────────────────────────────────────────────────────────
+
+_RCPT_PAGE = 50
+
+
+@pytest.fixture
+def receipt_shoebox():
+    """52 scans, newest last: RCPT-051 is linked to an expense, the rest are not,
+    so the unlinked filter still has one more than a page."""
+    exp_id = db.run(
+        """INSERT INTO expenses (spent_on, vendor, category, amount_cents, deductible_pct)
+           VALUES ('2099-06-01','Shoebox Co','Other',4200,100)"""
+    )
+    made = []
+    for i in range(52):
+        made.append(
+            db.run(
+                """INSERT INTO receipts (filename, stored, content_type, size_bytes, expense_id)
+                   VALUES (?,?,?,?,?)""",
+                (f"RCPT-{i:03d}.pdf", f"rcpt-{i:03d}.pdf", "application/pdf", 10, exp_id)
+                if i == 51
+                else (f"RCPT-{i:03d}.pdf", f"rcpt-{i:03d}.pdf", "application/pdf", 10, None),
+            )
+        )
+    try:
+        yield {"oldest": "RCPT-000.pdf", "newest": "RCPT-051.pdf"}
+    finally:
+        db.run(f"DELETE FROM receipts WHERE id IN ({','.join('?' * len(made))})", tuple(made))
+        db.run("DELETE FROM expenses WHERE id=?", (exp_id,))
+
+
+def test_receipt_grid_pages_instead_of_rendering_every_scan(admin, receipt_shoebox):
+    page1 = admin.get("/admin/financials/receipts").text
+    assert receipt_shoebox["newest"] in page1
+    assert receipt_shoebox["oldest"] not in page1
+    assert f"/admin/financials/receipts?filter=all&amp;offset={_RCPT_PAGE}" in page1
+
+    page2 = admin.get(f"/admin/financials/receipts?offset={_RCPT_PAGE}").text
+    assert receipt_shoebox["oldest"] in page2
+    assert receipt_shoebox["newest"] not in page2
+
+
+def test_receipt_page_link_keeps_the_linked_filter(admin, receipt_shoebox):
+    page1 = admin.get("/admin/financials/receipts?filter=unlinked").text
+    assert f"/admin/financials/receipts?filter=unlinked&amp;offset={_RCPT_PAGE}" in page1
+    assert receipt_shoebox["oldest"] not in page1
+
+    page2 = admin.get(f"/admin/financials/receipts?filter=unlinked&offset={_RCPT_PAGE}").text
+    assert receipt_shoebox["oldest"] in page2
+    assert receipt_shoebox["newest"] not in page2

@@ -574,7 +574,7 @@ def expenses_csv():
 
 
 @router.get("/receipts", response_class=HTMLResponse)
-def receipts(request: Request, filter: str = "all"):
+def receipts(request: Request, filter: str = "all", offset: int = 0):
     if filter not in ("all", "linked", "unlinked"):
         filter = "all"
     all_rows = db.all_(
@@ -609,6 +609,10 @@ def receipts(request: Request, filter: str = "all"):
             "on": filter == "unlinked",
         },
     ]
+    # Scans accumulate for the life of the studio; the grid renders one page.
+    # The cards and the filter pill counts still speak for the whole shoebox.
+    offset = max(0, offset)
+    page_size = 50
     cells = [
         {
             "id": r["id"],
@@ -622,7 +626,7 @@ def receipts(request: Request, filter: str = "all"):
                 else (r["created_at"] or "")[:10] + " · unlinked"
             ),
         }
-        for r in rows
+        for r in rows[offset : offset + page_size]
     ]
     # open expenses to offer in the attach dropdown (newest first)
     exp_opts = [
@@ -645,6 +649,9 @@ def receipts(request: Request, filter: str = "all"):
             "expenses": exp_opts,
             "pills": pills,
             "filter": filter,
+            "total": len(rows),
+            "offset": offset,
+            "page_size": page_size,
         },
     )
 

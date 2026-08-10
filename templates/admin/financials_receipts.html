@@ -73,6 +73,16 @@
     {% endfor %}
   </section>
 
+  {% if total > page_size %}
+  <p class="muted">
+    Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, total]|min }} of {{ total }}
+    {% if offset > 0 %} ·
+    <a href="/admin/financials/receipts?filter={{ filter }}&amp;offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+    {% if offset + page_size < total %} ·
+    <a href="/admin/financials/receipts?filter={{ filter }}&amp;offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
+  </p>
+  {% endif %}
+
   <p class="fin-note">Scans live on your own server, never a third party. Linking is
     manual and honest — an expense shows &ldquo;✓ Receipt&rdquo; once a scan points at it.
     Deleting an expense leaves its receipt here (unlinked) rather than destroying the scan.</p>
