@@ -325,3 +325,66 @@ def test_past_booking_page_opens_on_the_past_pane(admin, past_bookings):
     assert '<section class="sched-block" data-bview-pane="past">' in page2
     assert '<section class="sched-block" data-bview-pane="upcoming" hidden>' in page2
     assert 'data-bview="past" class="is-active"' in page2
+
+
+# ── inbox threads ────────────────────────────────────────────────────────────
+
+_INBOX_PAGE = 100
+
+
+@pytest.fixture
+def archived_threads():
+    """101 archived inquiries, dismissed on distinct far-future stamps so they
+    own the top of the archived tab's ordering."""
+    made = []
+    for i in range(101):
+        made.append(
+            db.run(
+                """INSERT INTO inquiries (name, email, message, dismissed_at)
+                   VALUES (?,?,?,?)""",
+                (
+                    f"LEAD-{i:03d}",
+                    f"lead{i:03d}@example.com",
+                    "Archived thread",
+                    f"2099-01-01 {i // 60:02d}:{i % 60:02d}:00",
+                ),
+            )
+        )
+    try:
+        yield {"ids": made, "oldest": "LEAD-000", "newest": "LEAD-100"}
+    finally:
+        db.run(f"DELETE FROM inquiries WHERE id IN ({','.join('?' * len(made))})", tuple(made))
+
+
+def test_archived_tab_badge_and_list_stay_reachable(admin, archived_threads):
+    """The badge always counted every archived thread; the list stopped at 100,
+    so past that the two disagreed permanently with no way to page down."""
+    archived = db.one(
+        "SELECT COUNT(*) AS n FROM inquiries "
+        "WHERE converted_at IS NOT NULL OR dismissed_at IS NOT NULL"
+    )["n"]
+    page1 = admin.get("/admin/inbox?tab=archived").text
+    assert f'<span class="ib-tab-n">{archived}</span>' in page1
+    assert archived_threads["newest"] in page1
+    assert archived_threads["oldest"] not in page1
+    assert f"/admin/inbox?tab=archived&amp;offset={_INBOX_PAGE}" in page1
+
+    page2 = admin.get(f"/admin/inbox?tab=archived&offset={_INBOX_PAGE}").text
+    assert archived_threads["oldest"] in page2
+    assert archived_threads["newest"] not in page2
+
+
+def test_inbox_page_link_keeps_the_tab(admin, archived_threads):
+    """A pager that dropped ?tab would land the operator back in All."""
+    page2 = admin.get(f"/admin/inbox?tab=archived&offset={_INBOX_PAGE}").text
+    assert '/admin/inbox?tab=archived&amp;offset=0"' in page2
+    assert 'class="ib-tab is-active">Archived' in page2
+
+
+def test_sel_deep_link_still_prepends_from_another_page(admin, archived_threads):
+    """The ?sel fix — a selected thread outside the window is fetched separately
+    and prepended — has to keep working now that the window can be page 2."""
+    sel = archived_threads["ids"][50]  # LEAD-050 lives on page 1
+    page2 = admin.get(f"/admin/inbox?tab=archived&offset={_INBOX_PAGE}&sel={sel}").text
+    assert f'class="ib-row is-active" id="ib-row-{sel}"' in page2
+    assert archived_threads["oldest"] in page2

@@ -351,16 +351,25 @@ def _active_ctx(inq) -> dict:
     }
 
 
-def _inbox_ctx(request: Request, tab: str, sel: int | None) -> dict:
+def _inbox_ctx(request: Request, tab: str, sel: int | None, offset: int = 0) -> dict:
     """Shared render context for the inbox GET and the HTMX fragment forks of
     its POST handlers — one assembler for the tab gating, 100-row window,
     counts, and active-thread selection, so a fragment can never drift from the
     page it re-renders parts of. `request` rides the signature for symmetry
-    with studio_context._studio_context(request); the queries don't need it."""
+    with studio_context._studio_context(request); the queries don't need it.
+
+    The window is a page of the tab, and the tab badge counts the whole tab: the
+    pager is what keeps those two from diverging once a tab outgrows one page.
+    A POST fork carries no offset — it doesn't need one, because the thread it
+    re-renders is fetched by id below whichever page it lives on."""
     if tab not in _TABS:
         tab = "all"
     where, order = _INBOX_FILTERS[tab]
-    rows = db.all_(f"SELECT * FROM inquiries WHERE {where} {order} LIMIT 100")
+    offset = max(0, offset)
+    page_size = 100
+    rows = db.all_(
+        f"SELECT * FROM inquiries WHERE {where} {order} LIMIT ? OFFSET ?", (page_size, offset)
+    )
 
     counts = {
         "all": db.one(
@@ -382,7 +391,7 @@ def _inbox_ctx(request: Request, tab: str, sel: int | None) -> dict:
         if chosen is None and sel is not None:
             chosen = db.one(f"SELECT * FROM inquiries WHERE id=? AND ({where})", (sel,))
             if chosen is not None:
-                rows = [chosen, *rows[:99]]
+                rows = [chosen, *rows[: page_size - 1]]
         if chosen is None:
             chosen = rows[0]
         active = _active_ctx(chosen)
@@ -392,14 +401,18 @@ def _inbox_ctx(request: Request, tab: str, sel: int | None) -> dict:
         "counts": counts,
         "threads": [_thread_row(r, active["id"] if active else None) for r in rows],
         "active": active,
+        "offset": offset,
+        "page_size": page_size,
         "mail_configured": mailer.configured(),
         "sms_configured": sms.configured(),
     }
 
 
 @router.get("", response_class=HTMLResponse)
-def inbox(request: Request, tab: str = "all", sel: int | None = None):
-    return templates.TemplateResponse(request, "admin/inbox.html", _inbox_ctx(request, tab, sel))
+def inbox(request: Request, tab: str = "all", sel: int | None = None, offset: int = 0):
+    return templates.TemplateResponse(
+        request, "admin/inbox.html", _inbox_ctx(request, tab, sel, offset)
+    )
 
 
 def _inbox_frag(request: Request, tab: str, inquiry_id: int):
