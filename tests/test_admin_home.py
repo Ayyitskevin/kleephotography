@@ -12,7 +12,8 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from app import db
+from app import config, db
+from app.admin import activity
 from app.main import app
 
 
@@ -67,6 +68,246 @@ def _drop_client(client_id: int) -> None:
     )
     db.run("DELETE FROM projects WHERE client_id=?", (client_id,))
     db.run("DELETE FROM clients WHERE id=?", (client_id,))
+
+
+# --- context surface ---------------------------------------------------------
+#
+# Jinja renders an undefined name as the empty string instead of raising, so a
+# context key that stops being produced is an invisible hole in the live
+# dashboard, not a red test. These pins name every key the handler returns —
+# and the keys inside the nested dicts and row lists — so dropping one fails
+# here loudly rather than blanking a panel in production.
+
+# Supplied by the framework, not by the handler: `request` from
+# TemplateResponse, the other two from render.templates' context processor.
+_FRAMEWORK_KEYS = {"request", "csp_nonce", "static_rev"}
+
+_HOME_KEYS = {
+    "action_items",
+    "activity_24h",
+    "base_url",
+    "docs_in_flight",
+    "greeting",
+    "horizon_shoots",
+    "kpi",
+    "link_clients",
+    "mini_cal",
+    "new_inquiries",
+    "next_steps",
+    "oldest_wait_days",
+    "on_deck",
+    "open_invoices",
+    "open_tasks",
+    "orphans",
+    "outstanding",
+    "overdue_inv",
+    "pipeline",
+    "queue",
+    "recent_galleries",
+    "recent_paid",
+    "retainer_drafts",
+    "revenue",
+    "revenue_months",
+    "today_str",
+    "upcoming_n",
+}
+
+# Column sets of the raw-row lists, spelled out so a dropped SELECT column is a
+# failure here rather than a blank cell on the dashboard.
+_ROW_KEYS = {
+    "orphans": {"id", "slug", "title"},
+    "link_clients": {"id", "name", "company"},
+    "open_tasks": {"id", "title", "due_date", "project_id", "project_title", "overdue"},
+    "horizon_shoots": {
+        "id",
+        "title",
+        "client_name",
+        "company",
+        "days_out",
+        "day",
+        "mon",
+        "aerial",
+    },
+    "open_invoices": {
+        "id",
+        "title",
+        "total_cents",
+        "deposit_cents",
+        "status",
+        "due_date",
+        "client_name",
+        "company",
+        "overdue",
+    },
+    "recent_paid": {"id", "title", "total_cents", "paid_at", "client_name", "company"},
+    "activity_24h": {"kind", "who", "detail", "ts"},
+    "docs_in_flight": {"kind", "status", "title", "client_name", "company", "ts", "url"},
+    "recent_galleries": {
+        "id",
+        "title",
+        "published",
+        "client_id",
+        "client_company",
+        "client_name",
+        "cover_id",
+        "n_assets",
+    },
+    "queue": {"id", "name", "initials", "age_days", "context", "second"},
+    "revenue_months": {"label", "cents", "pct", "current"},
+    "pipeline": {"key", "label", "n", "projects"},
+    "next_steps": {"tone", "key", "text", "url"},
+    "on_deck": {"lane", "stock", "title", "meta", "url", "action", "badge", "key", "second"},
+}
+
+_NESTED_KEYS = {
+    "kpi": {"inquiries_delta", "bookings_delta", "collected_7d_cents"},
+    "revenue": {
+        "paid_cents",
+        "paid_n",
+        "outstanding_cents",
+        "goal_cents",
+        "goal_pct",
+        "month_label",
+    },
+    "mini_cal": {"weeks", "shoot_days", "today_day", "month_label"},
+    "outstanding": {"n", "cents"},
+}
+
+
+@pytest.fixture
+def seeded_dashboard():
+    """Enough studio to light up every panel at once.
+
+    The row-shape pins are only real if no list is empty, so this seeds one of
+    each: a stale lead, an overdue invoice, a paid invoice, a draft gallery with
+    an asset, an orphaned published gallery, a task, a shoot inside the horizon,
+    a payment, a proposal in flight and a project awaiting its retainer. The
+    ages are deliberately extreme so the seeded rows survive each panel's
+    ORDER BY … LIMIT against whatever else the shared suite database holds.
+    """
+    client_id = db.run(
+        "INSERT INTO clients (name, company) VALUES (?,?)", ("Context Pin", "Context Pin LLC")
+    )
+    project_id = db.run(
+        """INSERT INTO projects (client_id, title, status, shoot_date, stage_changed_at)
+           VALUES (?,?, 'contract_signed', date('now', 'localtime', '+2 days'),
+                   datetime('now', '-30 days'))""",
+        (client_id, "Context Pin Shoot"),
+    )
+    overdue_id = db.run(
+        """INSERT INTO invoices (project_id, slug, title, total_cents, status, due_date, sent_at)
+           VALUES (?,?,?,?, 'sent', date('now', 'localtime', '-500 days'),
+                   datetime('now', '-500 days'))""",
+        (project_id, "ctx-pin-overdue", "Context Pin overdue", 250_000),
+    )
+    paid_id = db.run(
+        """INSERT INTO invoices (project_id, slug, title, total_cents, status, paid_at)
+           VALUES (?,?,?,?, 'paid', datetime('now'))""",
+        (project_id, "ctx-pin-paid", "Context Pin paid", 120_000),
+    )
+    db.run(
+        """INSERT INTO payments (invoice_id, stripe_event_id, amount_cents, kind)
+           VALUES (?,?,?, 'full')""",
+        (paid_id, "evt_ctx_pin", 120_000),
+    )
+    db.run(
+        """INSERT INTO proposals (project_id, slug, title, total_cents, status, sent_at)
+           VALUES (?,?,?,?, 'sent', datetime('now'))""",
+        (project_id, "ctx-pin-proposal", "Context Pin proposal", 300_000),
+    )
+    task_id = db.run(
+        "INSERT INTO tasks (title, due_date, project_id) VALUES (?, date('now','-400 days'), ?)",
+        ("Context Pin task", project_id),
+    )
+    draft_gallery = db.run(
+        """INSERT INTO galleries (slug, title, pin, published, type, client_id)
+           VALUES (?,?, '0000', 0, 'gallery', ?)""",
+        ("ctx-pin-draft", "Context Pin draft", client_id),
+    )
+    db.run(
+        """INSERT INTO assets (gallery_id, kind, filename, stored, status)
+           VALUES (?, 'photo', 'ctx-pin.jpg', 'ctx-pin.jpg', 'ready')""",
+        (draft_gallery,),
+    )
+    orphan_gallery = db.run(
+        """INSERT INTO galleries (slug, title, pin, published, type, client_id)
+           VALUES (?,?, '0000', 1, 'gallery', NULL)""",
+        ("ctx-pin-orphan", "Context Pin orphan"),
+    )
+    stale_lead = db.run(
+        """INSERT INTO inquiries (name, email, business, message, service, created_at)
+           VALUES (?,?,?,?,?, datetime('now', '-2000 days'))""",
+        ("Context Pin Lead", "ctx-pin@example.com", "Pin Diner", "hello?", "Menu shoot"),
+    )
+    fresh_lead = db.run(
+        """INSERT INTO inquiries (name, email, business, message)
+           VALUES (?,?,?,?)""",
+        ("Context Pin Fresh", "ctx-pin-fresh@example.com", "Pin Cafe", "just now"),
+    )
+    try:
+        yield {"client_id": client_id, "project_id": project_id}
+    finally:
+        db.run("DELETE FROM inquiries WHERE id IN (?,?)", (stale_lead, fresh_lead))
+        db.run("DELETE FROM assets WHERE gallery_id=?", (draft_gallery,))
+        db.run("DELETE FROM galleries WHERE id IN (?,?)", (draft_gallery, orphan_gallery))
+        db.run("DELETE FROM tasks WHERE id=?", (task_id,))
+        db.run("DELETE FROM proposals WHERE project_id=?", (project_id,))
+        db.run("DELETE FROM payments WHERE invoice_id IN (?,?)", (overdue_id, paid_id))
+        db.run("DELETE FROM invoices WHERE id IN (?,?)", (overdue_id, paid_id))
+        db.run("DELETE FROM projects WHERE id=?", (project_id,))
+        db.run("DELETE FROM clients WHERE id=?", (client_id,))
+
+
+@pytest.mark.integration
+def test_home_publishes_exactly_this_set_of_context_keys(admin_client, seeded_dashboard):
+    """The whole context surface, named. Anything added or dropped fails here."""
+    ctx = admin_client.get("/admin/home").context
+    assert set(ctx) - _FRAMEWORK_KEYS == _HOME_KEYS
+
+
+@pytest.mark.integration
+def test_home_row_lists_are_populated_and_keep_their_columns(admin_client, seeded_dashboard):
+    """Every list panel has rows, and every row carries exactly its columns."""
+    ctx = admin_client.get("/admin/home").context
+    for name, expected in _ROW_KEYS.items():
+        rows = ctx[name]
+        assert rows, f"{name} is empty — the shape pin below would not bite"
+        for row in rows:
+            assert set(row.keys()) == expected, name
+
+
+@pytest.mark.integration
+def test_home_nested_dicts_keep_their_keys(admin_client, seeded_dashboard):
+    """The four composed dicts, whose keys templates read as `revenue.goal_pct`
+    and friends — a dropped one renders blank rather than raising."""
+    ctx = admin_client.get("/admin/home").context
+    for name, expected in _NESTED_KEYS.items():
+        assert set(ctx[name].keys()) == expected, name
+
+
+@pytest.mark.integration
+def test_home_scalar_values_keep_their_types(admin_client, seeded_dashboard):
+    """Cheap value pins for the keys with no rows of their own — enough that a
+    key surviving as the wrong thing (None, a stray string) still fails."""
+    ctx = admin_client.get("/admin/home").context
+
+    assert ctx["greeting"] in ("Good morning", "Good afternoon", "Good evening")
+    assert ctx["today_str"] == dt.date.today().strftime("%A, %B %-d")
+    assert ctx["base_url"] == config.BASE_URL
+    for name in ("new_inquiries", "upcoming_n", "overdue_inv", "retainer_drafts", "action_items"):
+        assert isinstance(ctx[name], int), name
+    assert ctx["action_items"] == ctx["overdue_inv"] + ctx["retainer_drafts"] + _tasks_due()
+    assert ctx["oldest_wait_days"] == ctx["queue"][0]["age_days"]
+    assert len(ctx["revenue_months"]) == 6
+    assert [s["key"] for s in ctx["pipeline"]] == [k for k, _ in activity.PIPELINE_STAGES]
+    assert ctx["mini_cal"]["today_day"] == dt.date.today().day
+
+
+def _tasks_due() -> int:
+    return db.one(
+        "SELECT COUNT(*) AS n FROM tasks WHERE done=0 AND due_date IS NOT NULL "
+        "AND due_date <= date('now', 'localtime')"
+    )["n"]
 
 
 @pytest.mark.integration
