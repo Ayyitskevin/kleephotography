@@ -113,6 +113,26 @@ def test_send_reports_success_with_no_id_when_the_envelope_omits_one(armed, monk
     assert sms.send("+15551234567", "hi") == ""
 
 
+@pytest.mark.parametrize(
+    "raw_id, expected",
+    [
+        (12345, "12345"),  # a numeric id is still an id — keep it
+        (["AC-1"], ""),  # everything below is not an id: same path as an absent one
+        ({"id": "AC-1"}, ""),
+        (True, ""),
+        (1.5, ""),
+        (0, ""),
+        (None, ""),
+    ],
+)
+def test_send_survives_a_provider_id_that_is_not_a_string(armed, monkeypatch, raw_id, expected):
+    """The envelope is well-formed and the vendor answered 2xx, so the text went
+    out — an id of an unexpected type must not become SmsError, and must not
+    escape as AttributeError from .strip() either."""
+    _answers(monkeypatch, json.dumps({"data": {"id": raw_id}}))
+    assert sms.send("+15551234567", "hi") == expected
+
+
 # --- send(): refusals that never touch the network ---------------------------
 
 

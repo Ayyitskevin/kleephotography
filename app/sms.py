@@ -76,7 +76,13 @@ def send(to: str, body: str) -> str:
     # flat {"id": ...} too. A missing id is non-fatal — the text went out — so fall
     # back to "" (the messages row simply carries no provider id).
     msg = payload["data"] if isinstance(payload.get("data"), dict) else payload
-    msg_id = (msg.get("id") or "").strip()
+    # Quo ids are JSON strings, but sibling providers have shipped numbers here.
+    # Accept either; any other shape is not an id, so it takes the same empty path
+    # as an absent one instead of crashing on .strip(). bool is an int subclass —
+    # excluded so a stray `true` cannot be stored as the string "True".
+    raw_id = msg.get("id")
+    scalar_id = isinstance(raw_id, (str, int)) and not isinstance(raw_id, bool)
+    msg_id = str(raw_id).strip() if scalar_id and raw_id else ""
     log.info("sms sent via Quo to %s (%d chars, id=%s)", to, len(body), msg_id or "?")
     return msg_id
 
