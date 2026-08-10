@@ -11,10 +11,15 @@ Full CSV exports are the accountant's path and stay whole; the CSV assertions
 here exist to keep pagination from leaking into them.
 """
 
+import datetime as dt
+import os
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import config, db
+from app.admin import studio
 from app.main import app
 
 pytestmark = pytest.mark.integration
@@ -388,3 +393,75 @@ def test_sel_deep_link_still_prepends_from_another_page(admin, archived_threads)
     page2 = admin.get(f"/admin/inbox?tab=archived&offset={_INBOX_PAGE}&sel={sel}").text
     assert f'class="ib-row is-active" id="ib-row-{sel}"' in page2
     assert archived_threads["oldest"] in page2
+
+
+# ── financial range windows read the studio clock, not UTC ───────────────────
+
+
+@pytest.fixture
+def new_york():
+    """Pins the process TZ so SQLite's 'localtime' means something, and dates a
+    payment 23:30 on 31 May 2026 — already 1 June in UTC."""
+    prev = os.environ.get("TZ")
+    os.environ["TZ"] = "America/New_York"
+    time.tzset()
+    created_utc = dt.datetime(2026, 5, 31, 23, 30).astimezone(dt.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    assert created_utc == "2026-06-01 03:30:00"  # the TZ really took
+    try:
+        yield created_utc
+    finally:
+        if prev is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = prev
+        time.tzset()
+
+
+@pytest.fixture
+def late_payment(new_york):
+    cid = db.run("INSERT INTO clients (name) VALUES (?)", ("Boundary Co",))
+    pid = db.run("INSERT INTO projects (client_id, title) VALUES (?,?)", (cid, "Late Job"))
+    iid = db.run(
+        """INSERT INTO invoices (project_id, slug, title, line_items, total_cents, status)
+           VALUES (?,?,?,?,?,'paid')""",
+        (pid, "range-late", "Late Job", "[]", 41_500),
+    )
+    db.run(
+        """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
+           amount_cents, kind, created_at) VALUES (?,?,?,?,'full',?)""",
+        (iid, "evt_range", "cs_range", 41_500, new_york),
+    )
+    try:
+        yield {"client": "Boundary Co", "amount": "$415.00"}
+    finally:
+        db.run("DELETE FROM payments WHERE invoice_id=?", (iid,))
+        db.run("DELETE FROM invoices WHERE id=?", (iid,))
+        db.run("DELETE FROM projects WHERE id=?", (pid,))
+        db.run("DELETE FROM clients WHERE id=?", (cid,))
+
+
+def test_range_window_keeps_a_late_payment_in_its_local_month(admin, late_payment, monkeypatch):
+    """23:30 on the last of May is 1 June in UTC. Compared as raw strings it fell
+    out of May's window entirely — off the page and out of the export the
+    accountant reconciles May against."""
+    monkeypatch.setattr(studio, "_today", lambda: dt.date(2026, 5, 15))
+
+    page = admin.get("/admin/financials?range=month").text
+    assert late_payment["client"] in page
+    assert "1 payment · this month" in page
+
+    csv_body = admin.get("/admin/financials/income.csv?range=month&inc_paid=on").text
+    row = next(r for r in csv_body.splitlines() if late_payment["client"] in r)
+    assert row.startswith("2026-05-31")  # the row prints the date that selected it
+    assert row.endswith(",415.00,0.00,Paid")
+
+
+def test_range_window_does_not_lend_a_late_payment_to_the_next_month(
+    admin, late_payment, monkeypatch
+):
+    """The other half of the same boundary: June must not claim May's cash."""
+    monkeypatch.setattr(studio, "_today", lambda: dt.date(2026, 6, 15))
+
+    assert late_payment["client"] not in admin.get("/admin/financials?range=month").text
+    csv_body = admin.get("/admin/financials/income.csv?range=month&inc_paid=on").text
+    assert late_payment["client"] not in csv_body

@@ -58,7 +58,12 @@ def _initials(name: str) -> str:
 
 
 def _range_bounds(key: str) -> tuple[str, str]:
-    """(start, end) ISO dates, end exclusive. Default quarter."""
+    """(start, end) ISO dates, end exclusive. Default quarter.
+
+    These come off the studio's wall clock, so every query that spends them
+    converts stored-UTC created_at with 'localtime' before comparing. Straight
+    string comparison would drop a payment taken late on the last evening of the
+    range — already tomorrow in UTC — out of the month it was collected in."""
     today = studio._today()
     if key == "month":
         start = today.replace(day=1)
@@ -80,16 +85,19 @@ def _range_bounds(key: str) -> tuple[str, str]:
 
 
 def _collected_rows(start: str, end: str):
-    """Real Stripe payment events in range, newest first."""
+    """Real Stripe payment events in range, newest first. `d` rides out on the
+    studio clock so the date a row prints is the date that selected it."""
     return db.all_(
-        """SELECT pm.created_at AS d, pm.amount_cents AS cents, pm.kind AS kind,
+        """SELECT datetime(pm.created_at, 'localtime') AS d,
+                  pm.amount_cents AS cents, pm.kind AS kind,
                   i.id AS inv_id, i.title AS title,
                   c.name AS client, c.company AS company
            FROM payments pm
            JOIN invoices i ON i.id = pm.invoice_id
            JOIN projects p ON p.id = i.project_id
            JOIN clients  c ON c.id = p.client_id
-           WHERE pm.created_at >= ? AND pm.created_at < ?
+           WHERE date(pm.created_at, 'localtime') >= ?
+             AND date(pm.created_at, 'localtime') < ?
            ORDER BY pm.created_at DESC""",
         (start, end),
     )
@@ -98,7 +106,7 @@ def _collected_rows(start: str, end: str):
 def _outstanding_rows(start: str, end: str):
     """Open invoices created in range — real AR, remaining balance owed."""
     return db.all_(
-        """SELECT i.created_at AS d, i.id AS inv_id, i.title AS title,
+        """SELECT datetime(i.created_at, 'localtime') AS d, i.id AS inv_id, i.title AS title,
                   i.status AS status,
                   CASE WHEN i.status='deposit_paid'
                        THEN i.total_cents - i.deposit_cents
@@ -108,7 +116,8 @@ def _outstanding_rows(start: str, end: str):
            JOIN projects p ON p.id = i.project_id
            JOIN clients  c ON c.id = p.client_id
            WHERE i.status IN ('sent','viewed','deposit_paid')
-             AND i.created_at >= ? AND i.created_at < ?
+             AND date(i.created_at, 'localtime') >= ?
+             AND date(i.created_at, 'localtime') < ?
            ORDER BY i.created_at DESC""",
         (start, end),
     )
@@ -166,7 +175,9 @@ def income(request: Request, range: str = "quarter"):
 
     collected = db.one(
         """SELECT COALESCE(SUM(amount_cents),0) AS cents, COUNT(*) AS n
-           FROM payments WHERE created_at >= ? AND created_at < ?""",
+           FROM payments
+           WHERE date(created_at, 'localtime') >= ?
+             AND date(created_at, 'localtime') < ?""",
         (start, end),
     )
     openv = common.open_invoice_balance()
