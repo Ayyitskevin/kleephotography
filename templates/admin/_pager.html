@@ -9,9 +9,12 @@
    the filter the operator is reading through. `count` is the rows rendered on
    THIS page, not the ledger total — a ledger's total counts rows the render
    query can still drop (captured emails are counted before the galleries
-   join), so a full page is the only honest "there may be more" signal. #}
+   join), so a full page is the only honest "there may be more" signal.
+
+   `muted` rides alongside `sr-pager` because screening.css is body.sr-scoped:
+   under MISE_SCREENING_ROOM=false it is the element's only colour source. #}
 {% macro pager(path, offset, page_size, count, qs="") %}
-  <p class="muted">
+  <p class="sr-pager muted">
     {% if offset > 0 %}<a href="{{ path }}?{% if qs %}{{ qs }}&{% endif %}offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
     {% if count == page_size %} ·
     <a href="{{ path }}?{% if qs %}{{ qs }}&{% endif %}offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}

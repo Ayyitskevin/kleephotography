@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from app import db
 from app.main import app
-from app.render import templates
+from app.render import ROOT, templates
 
 MARKER = "pager-partial-test"
 # Both ledgers sort newest-first, so future timestamps pin the seeded rows to
@@ -142,6 +142,25 @@ def test_short_page_offers_no_older_link():
 
     assert "Older" not in html
     assert 'href="/admin/sent?offset=0"' in html
+
+
+@pytest.mark.unit
+def test_pager_owns_a_class_and_keeps_the_kill_switch_one():
+    html = _macro()("/admin/sent", 0, 50, 50)
+
+    assert 'class="sr-pager muted"' in html
+
+
+@pytest.mark.unit
+def test_pager_styling_cannot_reach_the_kill_switch_stack():
+    """screening.css always loads, so an unscoped .sr-pager rule would restyle
+    the MISE_SCREENING_ROOM=false admin, which has no body.sr to opt in with."""
+    css = (ROOT / "static" / "screening.css").read_text()
+    rules = [line for line in css.splitlines() if ".sr-pager" in line]
+
+    assert rules
+    for rule in rules:
+        assert rule.startswith(".sr-admin .sr-pager"), rule
 
 
 @pytest.mark.unit

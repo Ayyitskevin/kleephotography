@@ -1188,6 +1188,13 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr-admin table td { color: var(--sr-ink); border-top: 1px solid #141311; }
 .sr-admin .admin-main { background: none; }
 .sr-admin .muted { color: var(--sr-ink-faint); }
+/* Offset pager (Newer/Older) under the paginated ledgers. Every rule stays
+   .sr-admin-scoped so MISE_SCREENING_ROOM=false renders exactly as before —
+   that stack sees no body.sr, so the markup keeps `muted` as the only colour
+   mise.css can give this element (ops/CSS-DUAL-STACK.md). */
+.sr-admin .sr-pager { margin: 14px 0 0; color: var(--sr-ink-ghost);
+  font-family: var(--sr-mono); font-size: 11px; letter-spacing: 0.1em; }
+.sr-admin .sr-pager a { color: var(--sr-amber); }
 
 /* ⌘K palette on the house */
 .sr-admin .ns-pal { background: rgba(4, 4, 5, 0.7); }
