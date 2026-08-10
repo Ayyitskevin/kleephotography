@@ -32,6 +32,10 @@ jobs:
         with:
           python-version: "3.14"
 
+      # Stdlib only, so it runs before the install and fails in seconds.
+      - name: Check migration numbering
+        run: python scripts/check-migration-numbering.py
+
       - name: Cache pip
         uses: actions/cache@v6
         with:
