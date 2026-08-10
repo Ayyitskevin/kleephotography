@@ -232,7 +232,10 @@ def test_star_toggle_cost_does_not_scale_with_the_bench(admin_client, monkeypatc
     assert body.count('hx-swap-oob="outerHTML"') == 2
     assert "All <span>20</span>" in body
     assert "Hero Dishes <span>20</span>" in body
-    assert '<span class="gd-stat-n">20</span>' in body
+    # The stat tile names the two kinds separately — the section pills count
+    # every asset, the tile must not call the 3 films photos.
+    assert '<span class="gd-stat-n">17</span>' in body
+    assert "3 films" in body
 
 
 @pytest.mark.integration
@@ -277,4 +280,5 @@ def test_delete_fragment_reswaps_the_counts_without_rebuilding_the_bench(admin_c
     body = response.text
     assert body.count('hx-swap-oob="outerHTML"') == 2
     assert "All <span>7</span>" in body  # 5 photos + 2 videos left
-    assert '<span class="gd-stat-n">7</span>' in body
+    assert '<span class="gd-stat-n">5</span>' in body
+    assert "2 films" in body
