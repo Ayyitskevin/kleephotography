@@ -18,7 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import config, db
-from app.admin import reports, studio
+from app.admin import common, studio
 from app.main import app
 
 pytestmark = pytest.mark.integration
@@ -177,10 +177,11 @@ def test_revenue_csv_counts_a_late_payment_in_the_local_month(admin, new_york):
 
 
 def test_reports_chart_buckets_a_late_payment_in_the_local_month(admin, new_york):
-    """The 12-month revenue chart reads the same buckets as the CSV."""
-    before = reports._collected_by_month()
+    """The 12-month revenue chart reads the same buckets as the CSV — and since
+    all three month series now share this bucketing, so do the two reels."""
+    before = common.collected_by_month()
     with _payment_at(new_york["created_utc"], _LATE_CENTS):
-        after = reports._collected_by_month()
+        after = common.collected_by_month()
     assert after[new_york["local"]] - before.get(new_york["local"], 0) == _LATE_CENTS
     assert after.get(new_york["utc"], 0) == before.get(new_york["utc"], 0)
 

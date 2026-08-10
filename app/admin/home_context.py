@@ -206,38 +206,15 @@ def _ctx_revenue_months(today: dt.date) -> list:
     if it's higher, so the dashed goal silhouette stays the tallest thing).
 
     Home is the only one of the three trailing-month reels that scales against
-    the goal; Financials and Reports scale to their own best month."""
-    rev_months = []
-    first_of_month = today.replace(day=1)
-    cursor = first_of_month
-    for _ in range(6):
-        rev_months.append(cursor)
-        cursor = (cursor - dt.timedelta(days=1)).replace(day=1)
-    rev_months.reverse()
-    # Bucket in local time (like _spark_series): payments are stored UTC, so an
-    # evening payment on the last of the month is already tomorrow — and next
-    # month — by UTC. Kevin's month ends when his day does.
-    month_cents = {
-        r["ym"]: r["cents"]
-        for r in db.all_(
-            """SELECT strftime('%Y-%m', created_at, 'localtime') AS ym,
-                      COALESCE(SUM(amount_cents), 0) AS cents
-               FROM payments GROUP BY ym"""
-        )
-    }
-    scale = max(
-        [month_cents.get(m.strftime("%Y-%m"), 0) for m in rev_months]
-        + [config.MONTHLY_GOAL_CENTS or 0, 1]
+    the goal; Financials and Reports scale to their own best month. The goal is
+    read per render so a config change lands without a restart."""
+    series, _scale = common.month_money_series(
+        today,
+        6,
+        lambda m: m.strftime("%b").upper(),
+        goal_cents=config.MONTHLY_GOAL_CENTS,
     )
-    return [
-        {
-            "label": m.strftime("%b").upper(),
-            "cents": month_cents.get(m.strftime("%Y-%m"), 0),
-            "pct": max(4, round(month_cents.get(m.strftime("%Y-%m"), 0) * 100 / scale)),
-            "current": m == first_of_month,
-        }
-        for m in rev_months
-    ]
+    return series
 
 
 def _ctx_horizon_shoots() -> list:

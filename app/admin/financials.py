@@ -210,34 +210,13 @@ def income(request: Request, range: str = "quarter"):
     ranges = [{"key": k, "label": lbl, "on": k == range} for k, lbl in _RANGES]
 
     # Month reel (Screening Room 3i): trailing six months of collected cash,
-    # heights proportional to the best month. Read-only. Buckets convert to
-    # 'localtime' because created_at is UTC while the window comes from the
-    # studio clock — a 9 PM payment belongs to the month the operator lived it.
-    first_of_month = studio._today().replace(day=1)
-    reel_months, cursor = [], first_of_month
-    # NB: the route's `range` query param shadows the builtin in this scope
-    for _ in (0, 1, 2, 3, 4, 5):
-        reel_months.append(cursor)
-        cursor = (cursor - dt.timedelta(days=1)).replace(day=1)
-    reel_months.reverse()
-    by_ym = {
-        r["ym"]: r["cents"]
-        for r in db.all_(
-            """SELECT strftime('%Y-%m', created_at, 'localtime') AS ym,
-                      COALESCE(SUM(amount_cents), 0) AS cents
-               FROM payments GROUP BY ym"""
-        )
-    }
-    reel_scale = max([by_ym.get(m.strftime("%Y-%m"), 0) for m in reel_months] + [1])
-    month_reel = [
-        {
-            "label": m.strftime("%b").upper(),
-            "cents": by_ym.get(m.strftime("%Y-%m"), 0),
-            "pct": max(4, round(by_ym.get(m.strftime("%Y-%m"), 0) * 100 / reel_scale)),
-            "current": m == first_of_month,
-        }
-        for m in reel_months
-    ]
+    # heights proportional to the best month. Read-only. No goal is passed —
+    # this reel scales to the months themselves, so a target Kevin sets can
+    # never shrink the bars here and make the same six months read differently
+    # than they do on Home.
+    month_reel, _reel_scale = common.month_money_series(
+        studio._today(), 6, lambda m: m.strftime("%b").upper()
+    )
 
     return templates.TemplateResponse(
         request,

@@ -16,20 +16,6 @@ log = logging.getLogger("mise.admin.reports")
 router = APIRouter(prefix="/admin/reports", dependencies=[Depends(security.require_admin)])
 
 
-def _months_back(n=12):
-    """List of (YYYY-MM, 'Mon YY') from oldest to newest, ending this month."""
-    today = studio._today().replace(day=1)
-    out = []
-    y, m = today.year, today.month
-    for _ in range(n):
-        out.append((f"{y:04d}-{m:02d}", dt.date(y, m, 1).strftime("%b %y")))
-        m -= 1
-        if m == 0:
-            y, m = y - 1, 12
-    out.reverse()
-    return out
-
-
 def _prior_bounds(key: str) -> tuple[str, str]:
     """(start, end) of the period immediately before the current one, for
     'vs prior' trend deltas. Mirrors financials._range_bounds shape."""
@@ -64,18 +50,6 @@ def _trend(cur: int, prior: int) -> dict:
     if pct < 0:
         return {"text": f"▼ {abs(pct)}%", "tone": "down"}
     return {"text": "▬ 0%", "tone": "flat"}
-
-
-def _collected_by_month():
-    """Cash collected per YYYY-MM from Stripe payment events (source of truth).
-    created_at is UTC; the month is decided on the studio's wall clock, so a
-    late-evening payment counts in the month the operator collected it."""
-    rows = db.all_(
-        """SELECT strftime('%Y-%m', created_at, 'localtime') AS ym,
-                  COALESCE(SUM(amount_cents), 0) AS cents
-           FROM payments GROUP BY ym"""
-    )
-    return {r["ym"]: r["cents"] for r in rows}
 
 
 @router.get("", response_class=HTMLResponse)
@@ -149,11 +123,13 @@ def reports(request: Request, period: str = Query("ytd", alias="range")):
         },
     ]
 
-    # rolling 12-month collected revenue (Python buckets so empty months show 0)
-    by_month = _collected_by_month()
-    months = _months_back(12)
-    chart = [{"label": lbl, "cents": by_month.get(ym, 0)} for ym, lbl in months]
-    chart_max = max((m["cents"] for m in chart), default=0) or 1
+    # rolling 12-month collected revenue (Python buckets so empty months show 0).
+    # Twelve months wrap the calendar, so the label carries the year the two
+    # six-month reels can leave off. The template sizes the bars from chart_max,
+    # so no per-month percentage is asked for here — one bar-height rule.
+    chart, chart_max = common.month_money_series(
+        studio._today(), 12, lambda m: m.strftime("%b %y"), bars=False
+    )
 
     # pipeline: projects by status with booked (non-draft) invoice value, plus
     # the longest-sitting project per stage. stage_changed_at (migration 032) is
