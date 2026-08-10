@@ -68,6 +68,15 @@
           </tbody>
         </table>
       </div>
+      {% if total > page_size %}
+      <p class="muted">
+        Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, total]|min }} of {{ total }}
+        {% if offset > 0 %} ·
+        <a href="/admin/financials/expenses?cat={{ cat }}&amp;offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+        {% if offset + page_size < total %} ·
+        <a href="/admin/financials/expenses?cat={{ cat }}&amp;offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
+      </p>
+      {% endif %}
     </section>
 
     <aside class="fin-rail">

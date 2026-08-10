@@ -412,7 +412,7 @@ def _ded(amount_cents: int, pct: int) -> int:
 
 
 @router.get("/expenses", response_class=HTMLResponse)
-def expenses(request: Request, cat: str = "all"):
+def expenses(request: Request, cat: str = "all", offset: int = 0):
     all_rows = db.all_("SELECT * FROM expenses ORDER BY spent_on DESC, id DESC")
     if cat not in _EXP_CAT_COLOR:
         cat = "all"
@@ -464,6 +464,10 @@ def expenses(request: Request, cat: str = "all"):
             "sub": f"{len(all_rows) - n_receipts} missing" if all_rows else "none yet",
         },
     ]
+    # A bookkeeping ledger only grows, so the table renders one page of it. The
+    # summary cards, the category bars and expenses.csv stay whole-ledger.
+    offset = max(0, offset)
+    page_size = 50
     table = [
         {
             "id": r["id"],
@@ -476,7 +480,7 @@ def expenses(request: Request, cat: str = "all"):
             + (f" ({r['deductible_pct']}%)" if r["deductible_pct"] < 100 else ""),
             "has_receipt": r["id"] in with_receipt,
         }
-        for r in rows
+        for r in rows[offset : offset + page_size]
     ]
 
     # Ledger category filter pills — All + the categories actually in use.
@@ -497,6 +501,9 @@ def expenses(request: Request, cat: str = "all"):
             "today": studio._today().isoformat(),
             "pills": pills,
             "cat": cat,
+            "total": len(rows),
+            "offset": offset,
+            "page_size": page_size,
         },
     )
 
