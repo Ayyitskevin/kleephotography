@@ -1,4 +1,4 @@
-"""Home dashboard rollups (app/admin/activity.home).
+"""Home dashboard rollups (app/admin/home_context, rendered by activity.home).
 
 The dashboard is read-only, but it is the page Kevin acts from, so the numbers
 have to be honest: the reply queue must surface the longest-waiting leads, and
@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import config, db
-from app.admin import activity
+from app.admin import home_context
 from app.main import app
 
 
@@ -299,7 +299,7 @@ def test_home_scalar_values_keep_their_types(admin_client, seeded_dashboard):
     assert ctx["action_items"] == ctx["overdue_inv"] + ctx["retainer_drafts"] + _tasks_due()
     assert ctx["oldest_wait_days"] == ctx["queue"][0]["age_days"]
     assert len(ctx["revenue_months"]) == 6
-    assert [s["key"] for s in ctx["pipeline"]] == [k for k, _ in activity.PIPELINE_STAGES]
+    assert [s["key"] for s in ctx["pipeline"]] == [k for k, _ in home_context.PIPELINE_STAGES]
     assert ctx["mini_cal"]["today_day"] == dt.date.today().day
 
 
