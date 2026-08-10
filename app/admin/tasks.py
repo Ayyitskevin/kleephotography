@@ -129,9 +129,7 @@ def task_create(title: str = Form(...), due_date: str = Form(""), project_id: st
 
 @router.post("/tasks/{task_id}/toggle")
 def task_toggle(task_id: int):
-    t = db.one("SELECT done FROM tasks WHERE id=?", (task_id,))
-    if not t:
-        raise HTTPException(status_code=404, detail="no such task")
+    t = db.get_or_404("SELECT done FROM tasks WHERE id=?", (task_id,), detail="no such task")
     if t["done"]:
         db.run("UPDATE tasks SET done=0, done_at=NULL WHERE id=?", (task_id,))
     else:
@@ -142,8 +140,7 @@ def task_toggle(task_id: int):
 
 @router.post("/tasks/{task_id}/delete")
 def task_delete(task_id: int):
-    if not db.one("SELECT 1 FROM tasks WHERE id=?", (task_id,)):
-        raise HTTPException(status_code=404, detail="no such task")
+    db.get_or_404("SELECT 1 FROM tasks WHERE id=?", (task_id,), detail="no such task")
     db.run("DELETE FROM tasks WHERE id=?", (task_id,))
     log.info("task %s deleted", task_id)
     return RedirectResponse("/admin/tasks", status_code=303)

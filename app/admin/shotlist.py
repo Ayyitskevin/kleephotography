@@ -60,10 +60,7 @@ def _parse_form(form) -> dict:
 
 
 def _get_shot(shot_id: int) -> "db.sqlite3.Row":
-    s = db.one("SELECT * FROM shot_list WHERE id=? AND deleted_at IS NULL", (shot_id,))
-    if not s:
-        raise HTTPException(status_code=404)
-    return s
+    return db.get_or_404("SELECT * FROM shot_list WHERE id=? AND deleted_at IS NULL", (shot_id,))
 
 
 @router.post("/projects/{project_id}/shots")

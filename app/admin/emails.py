@@ -19,9 +19,7 @@ def email_doc(
 ):
     if kind not in KINDS:
         raise HTTPException(status_code=404)
-    d = db.one(f"SELECT * FROM {db.ident(kind, KINDS)} WHERE id=?", (doc_id,))
-    if not d:
-        raise HTTPException(status_code=404)
+    d = db.get_or_404(f"SELECT * FROM {db.ident(kind, KINDS)} WHERE id=?", (doc_id,))
     if d["status"] == "draft":
         raise HTTPException(
             status_code=400,

@@ -535,9 +535,9 @@ def draft_caption(plan_id: int, caption_id: int, replace: str = Form("")):
     The mesh call is expected to fail sometimes; on any failure we write nothing and
     surface the message. Odysseus owns model selection — Mise only passes context."""
     d = get_plan(plan_id)
-    cap = db.one("SELECT * FROM retainer_captions WHERE id=? AND plan_id=?", (caption_id, plan_id))
-    if not cap:
-        raise HTTPException(status_code=404)
+    cap = db.get_or_404(
+        "SELECT * FROM retainer_captions WHERE id=? AND plan_id=?", (caption_id, plan_id)
+    )
 
     def _back(error: str = "") -> RedirectResponse:
         url = f"/admin/studio/recurring/{plan_id}"
