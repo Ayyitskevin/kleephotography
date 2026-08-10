@@ -5,6 +5,7 @@ have to be honest: the reply queue must surface the longest-waiting leads, and
 every "collected" figure must agree with Financials/Reports.
 """
 
+import calendar as cal
 import datetime as dt
 import os
 import time
@@ -13,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import config, db
-from app.admin import home_context
+from app.admin import home_context, studio
 from app.main import app
 
 
@@ -308,6 +309,123 @@ def _tasks_due() -> int:
         "SELECT COUNT(*) AS n FROM tasks WHERE done=0 AND due_date IS NOT NULL "
         "AND due_date <= date('now', 'localtime')"
     )["n"]
+
+
+# --- one financial clock ------------------------------------------------------
+#
+# Home used to read dt.date.today() and SQLite's own date('now','localtime'),
+# neither of which a test can pin, so nothing below could be asserted at all.
+# Both are now the one monkeypatchable studio wall-clock, studio._today().
+
+_PINNED = dt.date(2027, 4, 15)
+
+
+@pytest.fixture
+def pinned_clock(monkeypatch):
+    """The studio clock frozen far from any real 'now', so a panel that quietly
+    kept its own clock reads a different month, not merely a different second."""
+    assert _PINNED != dt.date.today(), "the pin must not coincide with the real day"
+    monkeypatch.setattr(studio, "_today", lambda: _PINNED)
+    return _PINNED
+
+
+@pytest.fixture
+def clock_boundary_rows():
+    """One row on each side of every date boundary Home judges, dated relative
+    to the pinned day — far enough from the real day that the real clock puts
+    all of them on the same (wrong) side."""
+    client_id = db.run("INSERT INTO clients (name) VALUES (?)", ("Clock Pin Co",))
+    project_id = db.run(
+        "INSERT INTO projects (client_id, title, status, shoot_date) VALUES (?,?, 'session_planning', ?)",
+        (client_id, "Clock Pin Shoot", (_PINNED + dt.timedelta(days=3)).isoformat()),
+    )
+    late_id = db.run(
+        """INSERT INTO invoices (project_id, slug, title, total_cents, status, due_date)
+           VALUES (?,?,?,?, 'sent', ?)""",
+        (
+            project_id,
+            "clock-pin-late",
+            "Clock Pin late",
+            90_000,
+            (_PINNED - dt.timedelta(days=1)).isoformat(),
+        ),
+    )
+    early_id = db.run(
+        """INSERT INTO invoices (project_id, slug, title, total_cents, status, due_date)
+           VALUES (?,?,?,?, 'sent', ?)""",
+        (
+            project_id,
+            "clock-pin-early",
+            "Clock Pin early",
+            80_000,
+            (_PINNED + dt.timedelta(days=1)).isoformat(),
+        ),
+    )
+    overdue_task = db.run(
+        "INSERT INTO tasks (title, due_date, project_id) VALUES (?,?,?)",
+        ("Clock Pin overdue task", (_PINNED - dt.timedelta(days=1)).isoformat(), project_id),
+    )
+    future_task = db.run(
+        "INSERT INTO tasks (title, due_date, project_id) VALUES (?,?,?)",
+        ("Clock Pin future task", (_PINNED + dt.timedelta(days=1)).isoformat(), project_id),
+    )
+    try:
+        yield {"project_id": project_id, "late": late_id, "early": early_id}
+    finally:
+        db.run("DELETE FROM tasks WHERE id IN (?,?)", (overdue_task, future_task))
+        db.run("DELETE FROM invoices WHERE id IN (?,?)", (late_id, early_id))
+        db.run("DELETE FROM projects WHERE id=?", (project_id,))
+        db.run("DELETE FROM clients WHERE id=?", (client_id,))
+
+
+@pytest.mark.integration
+def test_every_dated_home_panel_reads_the_pinned_studio_clock(admin_client, pinned_clock):
+    """The greeting, the revenue reel, the month-to-date snapshot and the mini
+    calendar all print the pinned day. Any one of them still reading its own
+    clock would print the real month here."""
+    ctx = admin_client.get("/admin/home").context
+
+    assert ctx["today_str"] == "Thursday, April 15"
+    assert [m["label"] for m in ctx["revenue_months"]] == ["NOV", "DEC", "JAN", "FEB", "MAR", "APR"]
+    assert ctx["revenue"]["month_label"] == "April"
+    assert ctx["mini_cal"]["month_label"] == "April 2027"
+    assert ctx["mini_cal"]["today_day"] == 15
+    assert ctx["mini_cal"]["weeks"] == cal.Calendar(firstweekday=6).monthdayscalendar(2027, 4)
+
+
+@pytest.mark.integration
+def test_home_row_boundaries_are_judged_on_the_pinned_studio_clock(
+    admin_client, pinned_clock, clock_boundary_rows
+):
+    """The boundaries that decide what a row SAYS, not just what a label reads:
+    days-out on the horizon, LATE on an invoice, red on a task. Each is asserted
+    on both sides so a boundary stuck on the real clock fails rather than
+    happening to agree."""
+    ctx = admin_client.get("/admin/home").context
+
+    shoot = next(s for s in ctx["horizon_shoots"] if s["title"] == "Clock Pin Shoot")
+    assert shoot["days_out"] == 3
+    assert ctx["upcoming_n"] >= 1
+
+    by_title = {i["title"]: i for i in ctx["open_invoices"]}
+    assert by_title["Clock Pin late"]["overdue"]
+    assert not by_title["Clock Pin early"]["overdue"]
+
+    tasks = {t["title"]: t for t in ctx["open_tasks"]}
+    assert tasks["Clock Pin overdue task"]["overdue"]
+    assert not tasks["Clock Pin future task"]["overdue"]
+
+
+@pytest.mark.integration
+def test_mini_calendar_dots_come_from_the_month_it_draws(
+    admin_client, pinned_clock, clock_boundary_rows
+):
+    """The grid and the dots on it are one panel: a shoot in the pinned month
+    dots the pinned grid. Selecting dots by SQLite's own month would leave the
+    April 2027 grid wearing whatever the real month's shoots were."""
+    ctx = admin_client.get("/admin/home").context
+
+    assert (_PINNED + dt.timedelta(days=3)).day in ctx["mini_cal"]["shoot_days"]
 
 
 @pytest.mark.integration

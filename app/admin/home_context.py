@@ -4,7 +4,7 @@ import calendar as cal
 import datetime as dt
 
 from .. import config, db
-from . import common
+from . import common, studio
 
 # Active sales-funnel stages for the Home pipeline strip (archived is terminal,
 # shown only in the deep Studio view). Mirrors the projects.status CHECK
@@ -49,11 +49,11 @@ def _ctx_orphans() -> dict:
     return {"orphans": orphans, "link_clients": db.clients_for_select() if orphans else []}
 
 
-def _ctx_headline_counts() -> dict:
+def _ctx_headline_counts(today_iso: str) -> dict:
     """The headline stat tiles, plus the action-items backlog they roll up into.
 
-    Every date boundary compares against date('now','localtime') — the operator's
-    wall clock — so a shoot or a due date never flips a day early in the evening
+    Every date boundary compares against the studio's wall-clock day, passed as a
+    bound param — so a shoot or a due date never flips a day early in the evening
     once UTC has rolled past midnight. `outstanding` is the shared AR figure and
     is read once here; the revenue snapshot reuses it rather than re-querying."""
     new_inquiries = db.one(
@@ -63,13 +63,15 @@ def _ctx_headline_counts() -> dict:
     upcoming_n = db.one(
         """SELECT COUNT(*) AS n FROM projects
            WHERE status != 'archived' AND shoot_date IS NOT NULL
-             AND shoot_date >= date('now', 'localtime')
-             AND shoot_date <= date('now', 'localtime', '+14 days')"""
+             AND shoot_date >= ?
+             AND shoot_date <= date(?, '+14 days')""",
+        (today_iso, today_iso),
     )["n"]
     overdue_inv = db.one(
         """SELECT COUNT(*) AS n FROM invoices
            WHERE status IN ('sent','viewed','deposit_paid')
-             AND due_date IS NOT NULL AND due_date < date('now', 'localtime')"""
+             AND due_date IS NOT NULL AND due_date < ?""",
+        (today_iso,),
     )["n"]
     retainer_drafts = db.one(
         """SELECT COUNT(*) AS n FROM invoices
@@ -78,7 +80,8 @@ def _ctx_headline_counts() -> dict:
     tasks_due = db.one(
         """SELECT COUNT(*) AS n FROM tasks
            WHERE done=0 AND due_date IS NOT NULL
-             AND due_date <= date('now', 'localtime')"""
+             AND due_date <= ?""",
+        (today_iso,),
     )["n"]
     return {
         "new_inquiries": new_inquiries,
@@ -129,16 +132,17 @@ def _ctx_kpi() -> dict:
     }
 
 
-def _ctx_open_tasks() -> list:
+def _ctx_open_tasks(today_iso: str) -> list:
     """Undone tasks, soonest due first, undated last. Overdue is judged on the
     wall clock so a task doesn't turn red an evening early."""
     return db.all_(
         """SELECT t.id, t.title, t.due_date, t.project_id, p.title AS project_title,
-                  (t.due_date IS NOT NULL AND t.due_date < date('now', 'localtime'))
+                  (t.due_date IS NOT NULL AND t.due_date < ?)
                     AS overdue
            FROM tasks t LEFT JOIN projects p ON p.id=t.project_id
            WHERE t.done=0
-           ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id DESC LIMIT 6"""
+           ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id DESC LIMIT 6""",
+        (today_iso,),
     )
 
 
@@ -217,14 +221,14 @@ def _ctx_revenue_months(today: dt.date) -> list:
     return series
 
 
-def _ctx_horizon_shoots() -> list:
+def _ctx_horizon_shoots(today_iso: str) -> list:
     """The next seven days of shoots as day-strip cards. The aerial flag rides
     bookings.notes (zero-schema, see public/scheduling.py) so a shoot card can
     carry its preflight cue without a column for it."""
     return db.all_(
         """SELECT p.id, p.title, c.name AS client_name, c.company,
                   CAST(julianday(p.shoot_date) -
-                       julianday(date('now', 'localtime')) AS INTEGER) AS days_out,
+                       julianday(?) AS INTEGER) AS days_out,
                   CAST(strftime('%d', p.shoot_date) AS INTEGER) AS day,
                   CASE strftime('%m', p.shoot_date)
                     WHEN '01' THEN 'Jan' WHEN '02' THEN 'Feb' WHEN '03' THEN 'Mar'
@@ -236,26 +240,28 @@ def _ctx_horizon_shoots() -> list:
                          AND b.notes LIKE '%AERIAL PASS%') AS aerial
            FROM projects p JOIN clients c ON c.id=p.client_id
            WHERE p.status != 'archived' AND p.shoot_date IS NOT NULL
-             AND p.shoot_date >= date('now', 'localtime')
-             AND p.shoot_date <= date('now', 'localtime', '+7 days')
-           ORDER BY p.shoot_date ASC"""
+             AND p.shoot_date >= ?
+             AND p.shoot_date <= date(?, '+7 days')
+           ORDER BY p.shoot_date ASC""",
+        (today_iso, today_iso, today_iso),
     )
 
 
-def _ctx_invoices() -> dict:
+def _ctx_invoices(today_iso: str) -> dict:
     """The two invoice strips: what's still owed (soonest due first, undated
     last) and what recently settled. Overdue is judged on the wall clock — an
     invoice must not read LATE hours before the client's day is over."""
     open_invoices = db.all_(
         """SELECT i.id, i.title, i.total_cents, i.deposit_cents, i.status,
                   i.due_date, c.name AS client_name, c.company,
-                  (i.due_date IS NOT NULL AND i.due_date < date('now', 'localtime'))
+                  (i.due_date IS NOT NULL AND i.due_date < ?)
                     AS overdue
            FROM invoices i
            JOIN projects p ON p.id=i.project_id
            JOIN clients c ON c.id=p.client_id
            WHERE i.status IN ('sent','viewed','deposit_paid')
-           ORDER BY (i.due_date IS NULL), i.due_date ASC LIMIT 6"""
+           ORDER BY (i.due_date IS NULL), i.due_date ASC LIMIT 6""",
+        (today_iso,),
     )
     recent_paid = db.all_(
         """SELECT i.id, i.title, i.total_cents, i.paid_at,
@@ -308,20 +314,22 @@ def _ctx_pipeline() -> list:
     ]
 
 
-def _ctx_dismissed_today() -> set:
+def _ctx_dismissed_today(today_iso: str) -> set:
     """Nudge keys the operator has already cleared today. A dismissal only
     suppresses for the current local day, so the nudge returns tomorrow if the
-    underlying condition still holds."""
+    underlying condition still holds. dismissed_at is stored UTC, so it converts
+    to localtime before it can be compared with the studio's wall-clock day."""
     return {
         row["nudge_key"]
         for row in db.all_(
             """SELECT nudge_key FROM dismissed_nudges
-           WHERE date(dismissed_at, 'localtime') = date('now', 'localtime')"""
+           WHERE date(dismissed_at, 'localtime') = ?""",
+            (today_iso,),
         )
     }
 
 
-def _ctx_next_steps(dismissed_today: set) -> list:
+def _ctx_next_steps(dismissed_today: set, today_iso: str) -> list:
     """Derived nudges — display-only, NEVER auto-send. Cleared nudges are
     dropped, then the list is sliced: filtering BEFORE the slice is what keeps
     up to 8 LIVE nudges on screen instead of letting dismissed ones eat the
@@ -332,8 +340,9 @@ def _ctx_next_steps(dismissed_today: set) -> list:
            FROM invoices i JOIN projects p ON p.id=i.project_id
            JOIN clients c ON c.id=p.client_id
            WHERE i.status IN ('sent','viewed','deposit_paid')
-             AND i.due_date IS NOT NULL AND i.due_date < date('now', 'localtime')
-           ORDER BY i.due_date ASC LIMIT 5"""
+             AND i.due_date IS NOT NULL AND i.due_date < ?
+           ORDER BY i.due_date ASC LIMIT 5""",
+        (today_iso,),
     ):
         who = r["company"] or r["client_name"]
         next_steps.append(
@@ -539,14 +548,16 @@ def _ctx_docs_in_flight() -> list:
 
 def _ctx_revenue(outstanding, today: dt.date) -> dict:
     """Revenue snapshot: collected this month vs goal (display-only). The
-    month-to-date window is the operator's calendar month — both sides of the
-    comparison convert to localtime — so an evening payment on the last of the
-    month lands in the month Kevin collected it, not the next one by UTC."""
+    month-to-date window is the operator's calendar month — stored-UTC
+    created_at converts to localtime before it is bucketed — so an evening
+    payment on the last of the month lands in the month Kevin collected it, not
+    the next one by UTC. The month being asked about is `today`'s, the same
+    date the label beneath the figure is printed from."""
     paid_mtd = db.one(
         """SELECT COALESCE(SUM(amount_cents), 0) AS cents, COUNT(*) AS n
            FROM payments
-           WHERE strftime('%Y-%m', created_at, 'localtime')
-                 = strftime('%Y-%m', 'now', 'localtime')"""
+           WHERE strftime('%Y-%m', created_at, 'localtime') = ?""",
+        (today.strftime("%Y-%m"),),
     )
     goal_cents = config.MONTHLY_GOAL_CENTS
     return {
@@ -561,12 +572,15 @@ def _ctx_revenue(outstanding, today: dt.date) -> dict:
 
 def _ctx_mini_cal(today: dt.date) -> dict:
     """Mini month calendar with a dot on every day that hosts a live shoot.
-    Weeks start Sunday to match the paper calendar Kevin reads beside it."""
+    Weeks start Sunday to match the paper calendar Kevin reads beside it. The
+    dots are selected by `today`'s month, the same month the grid is drawn for —
+    a grid and a dot set chosen by two different clocks could disagree."""
     shoot_days = set()
     for r in db.all_(
         """SELECT shoot_date FROM projects
            WHERE status != 'archived' AND shoot_date IS NOT NULL
-             AND strftime('%Y-%m', shoot_date) = strftime('%Y-%m', 'now', 'localtime')"""
+             AND strftime('%Y-%m', shoot_date) = ?""",
+        (today.strftime("%Y-%m"),),
     ):
         try:
             shoot_days.add(dt.date.fromisoformat(r["shoot_date"][:10]).day)
@@ -585,30 +599,41 @@ def _home_context() -> dict:
     rollups — each panel is one _ctx_* helper. Kept as one assembler so the
     headline tiles and the strips they link to can never drift out of sync.
 
-    One clock: the greeting line, the revenue reel, the month-to-date snapshot
-    and the mini calendar all read a single `today`, so a render that straddles
-    midnight cannot date one panel to yesterday and the next to today.
+    One clock: every studio date boundary on this page — the greeting line, the
+    headline tiles, the overdue judgements, the seven-day horizon, the revenue
+    reel, the month-to-date snapshot and the mini calendar — is built from a
+    single `today` read from studio._today(), the monkeypatchable canonical
+    studio wall-clock, and spent as a bound param. A render that straddles
+    midnight therefore cannot date one panel to yesterday and the next to today,
+    and a pinned clock moves the whole page coherently instead of letting a
+    panel fall back to an unpinnable dt.date.today() or SQLite's own 'now'.
+
+    The rolling windows that are NOT date boundaries keep their own clock: the
+    KPI 7d/14d deltas, the 24-hour wire and the inquiry-age nudges are spans of
+    elapsed time measured against stored-UTC timestamps, not questions about
+    which calendar day it is, so they stay on SQLite's UTC datetime('now').
 
     Order matters in one place only: On Deck is merged from the already-fetched
     invoice, reply-queue and gallery strips plus the surviving nudges, so those
     four are computed first and handed in rather than re-queried."""
-    today = dt.date.today()
-    counts = _ctx_headline_counts()
+    today = studio._today()
+    today_iso = today.isoformat()
+    counts = _ctx_headline_counts(today_iso)
     queue = _ctx_reply_queue()
-    invoices = _ctx_invoices()
+    invoices = _ctx_invoices(today_iso)
     recent_galleries = _ctx_recent_galleries()
-    dismissed_today = _ctx_dismissed_today()
-    next_steps = _ctx_next_steps(dismissed_today)
+    dismissed_today = _ctx_dismissed_today(today_iso)
+    next_steps = _ctx_next_steps(dismissed_today, today_iso)
     return {
         **_ctx_greeting(today),
         **_ctx_orphans(),
         **counts,
         "kpi": _ctx_kpi(),
-        "open_tasks": _ctx_open_tasks(),
+        "open_tasks": _ctx_open_tasks(today_iso),
         **queue,
         "recent_galleries": recent_galleries,
         "revenue_months": _ctx_revenue_months(today),
-        "horizon_shoots": _ctx_horizon_shoots(),
+        "horizon_shoots": _ctx_horizon_shoots(today_iso),
         **invoices,
         "activity_24h": _ctx_activity_24h(),
         "pipeline": _ctx_pipeline(),
