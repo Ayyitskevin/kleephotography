@@ -4,6 +4,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, security, specialties
@@ -362,10 +363,14 @@ def proposal_detail(request: Request, proposal_id: int):
 
 @router.post("/proposals/{proposal_id}")
 async def update_proposal(request: Request, proposal_id: int):
-    d = get_proposal(proposal_id)
+    d = await run_in_threadpool(get_proposal, proposal_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="sent proposals are locked")
     form = await request.form()
+    return await run_in_threadpool(_update_proposal, d, form, proposal_id)
+
+
+def _update_proposal(d: "db.sqlite3.Row", form, proposal_id: int):
     items_json, total = parse_items(form)
     db.run(
         "UPDATE proposals SET title=?, intro=?, line_items=?, total_cents=? WHERE id=?",

@@ -17,6 +17,7 @@ import datetime as dt
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, db, security
@@ -202,7 +203,12 @@ def press_list(request: Request, offset: int = 0):
 
 @router.post("/press")
 async def create_press(request: Request):
-    new = _parse_form(await request.form())
+    form = await request.form()
+    return await run_in_threadpool(_create_press, form)
+
+
+def _create_press(form):
+    new = _parse_form(form)
     with db.tx() as con:
         cur = con.execute(
             """INSERT INTO press (outlet, title, url, publish_date, channel, credit,
@@ -236,8 +242,13 @@ async def create_press(request: Request):
 
 @router.post("/press/{press_id}")
 async def update_press(request: Request, press_id: int):
-    d = get_press(press_id)
-    new = _parse_form(await request.form())
+    d = await run_in_threadpool(get_press, press_id)
+    form = await request.form()
+    return await run_in_threadpool(_update_press, d, form, press_id)
+
+
+def _update_press(d: "db.sqlite3.Row", form, press_id: int):
+    new = _parse_form(form)
     diff = {f: [d[f], new[f]] for f in _FIELDS if (d[f] or None) != (new[f] or None)}
     if not diff:
         return RedirectResponse("/admin/studio/press", status_code=303)

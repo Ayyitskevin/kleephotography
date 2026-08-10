@@ -16,6 +16,7 @@ import re
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, caption_ai, config, db, security
@@ -177,8 +178,12 @@ def plan_detail(request: Request, plan_id: int):
 
 @router.post("/recurring/{plan_id}")
 async def update_plan(request: Request, plan_id: int):
-    d = get_plan(plan_id)
+    d = await run_in_threadpool(get_plan, plan_id)
     form = await request.form()
+    return await run_in_threadpool(_update_plan, d, form, plan_id)
+
+
+def _update_plan(d: "db.sqlite3.Row", form, plan_id: int):
     items_json, total = parse_items(form)
     try:
         anchor = int(form.get("anchor_day") or "1")

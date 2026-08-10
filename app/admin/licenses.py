@@ -11,6 +11,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, clients, config, db, pricing, security
@@ -299,8 +300,12 @@ def license_detail(request: Request, license_id: int):
 
 @router.post("/licenses/{license_id}")
 async def update_license(request: Request, license_id: int):
-    d = get_license(license_id)
+    d = await run_in_threadpool(get_license, license_id)
     form = await request.form()
+    return await run_in_threadpool(_update_license, d, form, license_id)
+
+
+def _update_license(d: "db.sqlite3.Row", form, license_id: int):
     new = _parse_form(form)
     if not new["title"]:
         raise HTTPException(status_code=400, detail="title required")

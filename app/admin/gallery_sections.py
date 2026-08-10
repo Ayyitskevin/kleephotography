@@ -6,6 +6,7 @@ Split from galleries.py so the gallery detail router stays thinner.
 import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 
 from .. import db, security
@@ -118,8 +119,12 @@ def move_asset(
 
 @router.post("/galleries/{gallery_id}/assets/bulk-section")
 async def bulk_move_assets(request: Request, gallery_id: int):
-    get_gallery(gallery_id)
+    await run_in_threadpool(get_gallery, gallery_id)
     form = await request.form()
+    return await run_in_threadpool(_bulk_move_assets, request, form, gallery_id)
+
+
+def _bulk_move_assets(request: Request, form, gallery_id: int):
     raw = form.get("section_id") or ""
     section_id = int(raw) if raw else None
     with db.tx() as con:

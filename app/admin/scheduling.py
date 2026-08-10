@@ -12,6 +12,7 @@ import logging
 import re
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, booking_notify, db, gcal, scheduling, security
@@ -300,6 +301,10 @@ async def save_availability(request: Request):
     The console renders one switch per day; clicking a switch posts the current
     state (hidden on_/start_/end_ per day) plus toggle=<wd> for the day to flip."""
     form = await request.form()
+    return await run_in_threadpool(_save_availability, form)
+
+
+def _save_availability(form):
     flip = (form.get("toggle") or "").strip()
     rows = []
     for wd in range(7):
@@ -490,8 +495,12 @@ def edit_event(request: Request, event_id: int):
 
 @router.post("/event/{event_id}")
 async def update_event(request: Request, event_id: int):
-    e = _get_event(event_id)
+    e = await run_in_threadpool(_get_event, event_id)
     form = await request.form()
+    return await run_in_threadpool(_update_event, e, form, event_id)
+
+
+def _update_event(e: "db.sqlite3.Row", form, event_id: int):
     name = (form.get("name") or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="name required")

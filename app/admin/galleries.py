@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from .. import (
@@ -709,8 +710,12 @@ async def bulk_star_tag(request: Request, gallery_id: int):
     tagging the archive per specialty — one checkbox sweep per batch instead
     of a per-asset gear-menu round trip. Same kind guard as the single-asset
     endpoints; an empty tag leaves existing tags untouched."""
-    get_gallery(gallery_id)
+    await run_in_threadpool(get_gallery, gallery_id)
     form = await request.form()
+    return await run_in_threadpool(_bulk_star_tag, request, form, gallery_id)
+
+
+def _bulk_star_tag(request: Request, form, gallery_id: int):
     tag = (form.get("portfolio_tag") or "").strip()
     unstar = form.get("mode") == "unstar"
     try:
