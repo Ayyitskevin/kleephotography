@@ -284,6 +284,37 @@ def require_argus_token(request: Request) -> None:
         raise HTTPException(status_code=401, detail="bad token")
 
 
+def healthz_detail_authorized(request: Request) -> bool:
+    """Whether this caller may see the full /healthz payload.
+
+    /healthz has to stay publicly reachable — an uptime monitor cannot
+    authenticate, and the whole point is that it answers when things are going
+    wrong. But the full payload is an ops feed: free disk, backup age, and queue
+    depth tell an unauthenticated reader how close the box is to falling over
+    and whether anyone is watching. That is reconnaissance, and under a
+    resource-exhaustion attempt it is a live progress meter.
+
+    So the gate is on the BODY, not the endpoint. No Authorization header is the
+    monitor's normal path and gets the public shape rather than a 401.
+
+    Deliberately NOT a loopback check, which is what the plan originally called
+    for: uvicorn listens on 127.0.0.1 and public traffic arrives through
+    cloudflared on the same host (ops/DEPLOY.md), so request.client.host is
+    127.0.0.1 for EVERY internet request — see client_ip() above, which exists
+    precisely because of that. A peer-address gate here would have published the
+    ops feed to the world while reading like it locked it down.
+    """
+    header = request.headers.get("Authorization", "")
+    if not header:
+        return False
+    if not features.healthz_detail_enabled():
+        raise HTTPException(status_code=503, detail="healthz detail disarmed")
+    expected = f"Bearer {config.HEALTHZ_TOKEN}"
+    if not secrets.compare_digest(header, expected):
+        raise HTTPException(status_code=401, detail="bad token")
+    return True
+
+
 def require_shots_token(request: Request) -> None:
     """Bearer gate for the shot-list read API (config.SHOTS_TOKEN).
 

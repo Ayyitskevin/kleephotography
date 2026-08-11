@@ -45,7 +45,9 @@ Status (select), Mise ID (number). Share it with the Mise integration, set
 Unset = fully dormant: store + email keep working, mirror is skipped and logged.
 
 **How to check it's alive.**
-- `curl -s localhost:8400/healthz` — service up, `jobs_pending` should be 0.
+- `curl -s -H "Authorization: Bearer $MISE_HEALTHZ_TOKEN" localhost:8400/healthz`
+  — service up, `jobs_pending` should be 0. The counters need the bearer now
+  (ops/MONITORING.md); without it the body is `{"ok": true}` only.
 - `journalctl -u mise | grep 'notion lead'` — one `mirrored as page` line per
   new inquiry, `status patched` on triage, `skipped (token=…)` if dormant.
 - Failures are loud: the job retries 3×, then the jobs row is marked `failed`

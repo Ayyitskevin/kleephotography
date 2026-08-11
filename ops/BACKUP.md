@@ -37,6 +37,10 @@ anywhere until this stage existed.
 - Warns every night if the destination shares a filesystem with `/opt/mise/data` —
   that arrangement survives a wrong delete but **not** the disk dying.
 
+The run also pings a dead-man's switch on success when `MISE_BACKUP_PING_URL` is
+set, so a timer that silently stops announces itself through a channel that does
+not share this host's fate — see [`MONITORING.md`](MONITORING.md).
+
 Check the last run with `journalctl -u mise-backup.service`. The app also watches for
 staleness (`app/ops_monitor.py`, threshold `MISE_BACKUP_STALE_HOURS`) and fires a
 throttled ops alert, so a silently dead timer announces itself instead of being

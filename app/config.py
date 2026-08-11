@@ -295,6 +295,16 @@ RATE_LIMITS = {
 TELEGRAM_TOKEN = os.environ.get("MISE_TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("MISE_TELEGRAM_CHAT_ID", "")
 
+# Bearer that unlocks the FULL /healthz payload. Unset -> the detail is simply
+# unreachable over HTTP and the endpoint answers the public shape to everyone;
+# the same facts stay visible to Kevin in Admin -> Settings. See ops/MONITORING.md.
+HEALTHZ_TOKEN = os.environ.get("MISE_HEALTHZ_TOKEN", "")
+
+# Dead-man's switch: an external URL pinged once per scheduler tick. Unset ->
+# dormant. This is the only alarm that survives the host itself dying, so it is
+# deliberately not gated on Telegram — see ops/MONITORING.md.
+HEARTBEAT_PING_URL = os.environ.get("MISE_HEARTBEAT_PING_URL", "")
+
 # Refuse uploads when free disk drops below this (GB) — fail loud, not full.
 MIN_FREE_GB = int(os.environ.get("MISE_MIN_FREE_GB", "10"))
 

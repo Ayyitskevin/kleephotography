@@ -16,7 +16,31 @@
 # Off-host DR is still pending — see ops/BACKUP.md.
 set -euo pipefail
 DATA="${MISE_DATA_DIR:-/opt/mise/data}"
+
+# Dead-man's switch. Every other alarm here originates on this host, so a dead
+# timer, a dead host, or a backup that silently stopped produces no message at
+# all. Pinging an external URL on success inverts that: the monitoring service
+# alerts on the ABSENCE of a ping, through a channel that does not share this
+# box's fate. Never fails the run — a monitoring outage must not turn a good
+# backup into a failed unit, and the missing ping is itself the alarm.
+ping_deadman() {
+  [ -n "${MISE_BACKUP_PING_URL:-}" ] || return 0
+  curl -fsS --max-time 10 --retry 3 --retry-delay 2 -o /dev/null \
+    "$MISE_BACKUP_PING_URL" \
+    || echo "ping FAILED (the backup itself succeeded): $MISE_BACKUP_PING_URL" >&2
+}
 OUT="$DATA/backups"
+
+# sqlite3 CREATES an empty database when the file is absent, so a wrong
+# MISE_DATA_DIR or an unmounted disk would not fail here — it would produce a
+# perfectly valid, perfectly empty snapshot, pass integrity_check, ping the
+# dead-man's switch as healthy, and quietly rotate away all fourteen real ones
+# inside two weeks. Refuse instead: the source has to already exist.
+if [ ! -f "$DATA/mise.db" ]; then
+  echo "BACKUP FAILED: no database at $DATA/mise.db — wrong MISE_DATA_DIR, or the disk is not mounted" >&2
+  exit 1
+fi
+
 mkdir -p "$OUT"
 STAMP=$(date +%F-%H%M)
 TMP="$OUT/.mise-$STAMP.db.tmp"
@@ -51,6 +75,9 @@ echo "stage1 ok: mise-$STAMP.db.gz ($(du -h "$OUT/mise-$STAMP.db.gz" | cut -f1))
 FILE_DEST="${MISE_FILE_BACKUP_DIR:-}"
 if [ -z "$FILE_DEST" ]; then
   echo "stage2 SKIPPED: MISE_FILE_BACKUP_DIR unset — media/, brand/ and receipts/ are NOT backed up (ops/BACKUP.md)" >&2
+  # Stage 1 succeeded, so the backup job did run: ping, or a host that simply
+  # has no file destination configured would look identical to a dead timer.
+  ping_deadman
   exit 0
 fi
 if ! command -v rsync >/dev/null 2>&1; then
@@ -104,3 +131,4 @@ find "$SNAP_ROOT" -maxdepth 1 -type d -name '20*' -printf '%f\n' \
   | sort | head -n -14 | while read -r old; do rm -rf "${SNAP_ROOT:?}/$old"; done
 
 echo "stage2 ok: files/$STAMP ($(du -sh "$TARGET" | cut -f1), $(du -sh --exclude=latest "$SNAP_ROOT" | cut -f1) for all snapshots)"
+ping_deadman

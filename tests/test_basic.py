@@ -16,6 +16,7 @@ from datetime import UTC
 import pytest
 from fastapi.testclient import TestClient
 
+from app import config
 from app.main import app
 
 
@@ -40,9 +41,32 @@ def test_boot_refuses_without_a_secret_key(monkeypatch):
             pass
 
 
+# The full payload now needs a bearer; see security.healthz_detail_authorized.
+_HZ_TOKEN = "healthz-test-token"
+
+
+def _hz_auth(monkeypatch):
+    monkeypatch.setattr(config, "HEALTHZ_TOKEN", _HZ_TOKEN)
+    return {"Authorization": f"Bearer {_HZ_TOKEN}"}
+
+
 @pytest.mark.integration
-def test_healthz(client):
+def test_healthz_public_body_is_minimal(client):
+    """Unauthenticated callers get liveness and nothing else.
+
+    Free disk, backup age and queue depth told any anonymous reader how close
+    the box was to falling over — reconnaissance, and a live progress meter
+    during a resource-exhaustion attempt.
+    """
     r = client.get("/healthz")
+    body = r.json()
+    assert r.status_code == 200 and body["ok"] is True
+    assert set(body) == {"ok"}, f"public /healthz leaked keys: {sorted(set(body) - {'ok'})}"
+
+
+@pytest.mark.integration
+def test_healthz_full_payload_with_bearer(client, monkeypatch):
+    r = client.get("/healthz", headers=_hz_auth(monkeypatch))
     body = r.json()
     assert r.status_code == 200 and body["ok"] is True
     assert body["db_connected"] is True
@@ -51,6 +75,29 @@ def test_healthz(client):
     assert isinstance(body["disk_free_gb"], float)
     assert isinstance(body["backup_present"], bool)
     assert "backup_age_hours" in body
+
+
+@pytest.mark.integration
+def test_healthz_rejects_wrong_bearer(client, monkeypatch):
+    monkeypatch.setattr(config, "HEALTHZ_TOKEN", _HZ_TOKEN)
+    r = client.get("/healthz", headers={"Authorization": "Bearer wrong"})
+    assert r.status_code == 401
+    assert "disk_free_gb" not in r.json()
+
+
+@pytest.mark.integration
+def test_healthz_detail_disarmed_when_token_unset(client, monkeypatch):
+    """Presenting a bearer at a host with no token reads as disarmed, not denied.
+
+    Same doctrine as the other bearer gates: an arming caller needs to tell
+    "not provisioned yet" apart from "wrong token".
+    """
+    monkeypatch.setattr(config, "HEALTHZ_TOKEN", "")
+    r = client.get("/healthz", headers={"Authorization": "Bearer anything"})
+    assert r.status_code == 503
+    assert "disk_free_gb" not in r.json()
+    # ...while the monitor's unauthenticated path still works on that same host.
+    assert client.get("/healthz").json() == {"ok": True}
 
 
 @pytest.mark.integration
@@ -65,7 +112,14 @@ def test_healthz_returns_503_only_for_database_failure(client, monkeypatch):
         return real_one(sql, params)
 
     monkeypatch.setattr(db, "one", fail_probe)
+    # Public path: the monitor must still see the failure in the STATUS CODE,
+    # which is the whole contract MONITORING.md tells it to assert on. Gating
+    # the body must never gate the check that produces it.
     r = client.get("/healthz")
+    assert r.status_code == 503
+    assert r.json() == {"ok": False}
+    # Authorized path keeps the diagnosis.
+    r = client.get("/healthz", headers=_hz_auth(monkeypatch))
     assert r.status_code == 503
     assert r.json()["ok"] is False
     assert r.json()["db_connected"] is False
@@ -86,10 +140,13 @@ def test_healthz_reports_storage_warning_without_failing(client, monkeypatch):
             "backup_stale": True,
         },
     )
-    r = client.get("/healthz")
+    r = client.get("/healthz", headers=_hz_auth(monkeypatch))
     assert r.status_code == 200 and r.json()["ok"] is True
     assert r.json()["disk_low"] is True
     assert r.json()["backup_stale"] is True
+    # A degraded box still looks plainly "ok" to the public — storage warnings
+    # were never meant to fail the endpoint, and now they do not leak either.
+    assert client.get("/healthz").json() == {"ok": True}
 
 
 @pytest.mark.integration
