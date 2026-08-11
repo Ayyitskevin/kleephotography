@@ -26,6 +26,7 @@ from . import (
     ops_monitor,
     ratelimit,
     scheduler,
+    security,
     service_api,
 )
 from .admin import (
@@ -362,8 +363,21 @@ def _healthz_db_probe() -> dict:
     }
 
 
+# The public shape. Everything else in the payload — free disk, backup age,
+# queue depth — is an ops feed and a resource-exhaustion progress meter for an
+# unauthenticated reader, so it is gated behind a bearer (security.py). What
+# stays public is exactly what an uptime monitor needs and no more: a truthful
+# 200/503 and a boolean, which is why MONITORING.md tells the monitor to assert
+# on the status code plus this key.
+def _healthz_public(payload: dict) -> dict:
+    return {"ok": payload["ok"]}
+
+
 @app.get("/healthz")
-async def healthz():
+async def healthz(request: Request):
+    # Resolved before any work: a bad or disarmed bearer should answer as such
+    # rather than run a database probe first.
+    detail = security.healthz_detail_authorized(request)
     # Deliberately stays on the event loop while the rest of the app moved to
     # the threadpool. Its whole job is to answer when things are going wrong,
     # and a sync handler queues behind the same 40 worker slots it is trying to
@@ -412,12 +426,14 @@ async def healthz():
         log.warning("healthz database probe timed out after %ss", HEALTHZ_DB_TIMEOUT)
         payload["ok"] = False
         payload["db_probe"] = "timeout"
-        return JSONResponse(payload, status_code=503)
+        return JSONResponse(payload if detail else _healthz_public(payload), status_code=503)
     except Exception:
         log.exception("healthz database check failed")
         payload["ok"] = False
-        return JSONResponse(payload, status_code=503)
-    return payload
+        return JSONResponse(payload if detail else _healthz_public(payload), status_code=503)
+    # The probe still ran for everyone: the 503-when-wedged signal is what the
+    # external monitor keys on, so gating the BODY must not gate the check.
+    return payload if detail else _healthz_public(payload)
 
 
 for r in (

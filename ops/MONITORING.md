@@ -31,10 +31,24 @@ be your outage alarm. **Neither replaces the other; run both.**
 Point any external uptime service at `https://kleephotography.com/healthz` every
 1–5 minutes.
 
-**Assert on HTTP 200, not on the response body.** The public payload is slated to
-shrink to `{"ok": true}` (workstream G4 — it currently publishes disk, backup age
-and queue depth to anyone who asks). A monitor that greps for `disk_free_gb`
-would start failing the day that lands.
+**Assert on HTTP 200 and on the body being exactly `{"ok": true}`.** That is the
+whole public contract now and it is stable — the endpoint answers 503 with
+`{"ok": false}` when the database probe fails or times out. Asserting the body
+too is worth the extra line: it catches DNS or proxy misrouting to some *other*
+service that also happens to answer 200 on `/healthz`.
+
+Do not build a monitor around `disk_free_gb`, `backup_age_hours` or the queue
+counters. Those moved behind a bearer (`MISE_HEALTHZ_TOKEN`) — they told any
+anonymous reader how close the box was to falling over, which is reconnaissance
+and, during a resource-exhaustion attempt, a live progress meter. Read them with:
+
+```sh
+curl -fsS -H "Authorization: Bearer $MISE_HEALTHZ_TOKEN" \
+  https://kleephotography.com/healthz | python3 -m json.tool
+```
+
+Leave `MISE_HEALTHZ_TOKEN` unset and the detail is simply unreachable over HTTP,
+which is the safe default; the same facts stay visible in Admin → Settings.
 
 Send its notifications somewhere that is *not* this host and not the same
 Telegram bot the app uses — email or SMS is fine. A monitor that alerts through

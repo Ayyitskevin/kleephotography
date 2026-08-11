@@ -333,6 +333,16 @@ def test_corrupt_payload_fails_the_job_instead_of_wedging_it(monkeypatch):
         db.run("DELETE FROM jobs WHERE id=?", (job_id,))
 
 
+# The detailed /healthz payload is bearer-gated (security.healthz_detail_authorized);
+# these tests are about what the queue surfaces there, so they arm the token.
+_HZ = "healthz-jobs-token"
+
+
+def _hz(monkeypatch):
+    monkeypatch.setattr(config, "HEALTHZ_TOKEN", _HZ)
+    return {"Authorization": f"Bearer {_HZ}"}
+
+
 def test_a_job_wedged_in_running_is_visible_to_healthz_and_the_heartbeat(client, monkeypatch):
     """'running' is the one state no sweep re-offers, so it has to be reported."""
     freeze_job_pool(monkeypatch)
@@ -340,7 +350,7 @@ def test_a_job_wedged_in_running_is_visible_to_healthz_and_the_heartbeat(client,
     monkeypatch.setattr(ops_monitor.alerts, "is_enabled", lambda: True)
     monkeypatch.setattr(ops_monitor.alerts, "ops_alert", lambda sig, msg: sent.append((sig, msg)))
 
-    before = client.get("/healthz").json()
+    before = client.get("/healthz", headers=_hz(monkeypatch)).json()
     working = db.run(
         "INSERT INTO jobs (kind, payload, status, updated_at) "
         "VALUES (?,?, 'running', datetime('now'))",
@@ -359,7 +369,7 @@ def test_a_job_wedged_in_running_is_visible_to_healthz_and_the_heartbeat(client,
             "UPDATE jobs SET updated_at=datetime('now', ?) WHERE id=?",
             (f"-{config.JOB_STUCK_AFTER_SECONDS + 60} seconds", wedged),
         )
-        after = client.get("/healthz").json()
+        after = client.get("/healthz", headers=_hz(monkeypatch)).json()
         assert after["jobs_running_stale"] == before["jobs_running_stale"] + 1  # not `working`
         assert after["ok"] is True  # visibility, not a 503 — the site still serves
 
@@ -498,7 +508,7 @@ def test_admin_can_force_a_job_parked_behind_its_backoff(admin_client, monkeypat
 def test_parked_and_wedged_jobs_are_visible_to_healthz(client, monkeypatch):
     """The limbo the backoff created must be reportable, not silent (R12)."""
     freeze_job_pool(monkeypatch)
-    before = client.get("/healthz").json()
+    before = client.get("/healthz", headers=_hz(monkeypatch)).json()
     parked = jobs.enqueue("zip_build", {"gallery_id": 0, "rev": 0})
     wedged = jobs.enqueue("zip_build", {"gallery_id": 0, "rev": 1})
     # A never-attempted job, however old, is queue DEPTH, not breakage: two
@@ -514,7 +524,7 @@ def test_parked_and_wedged_jobs_are_visible_to_healthz(client, monkeypatch):
         )
         db.run("UPDATE jobs SET created_at=datetime('now', '-1 day') WHERE id=?", (backlog,))
 
-        after = client.get("/healthz").json()
+        after = client.get("/healthz", headers=_hz(monkeypatch)).json()
         assert after["jobs_waiting_retry"] == before["jobs_waiting_retry"] + 2
         assert after["jobs_stuck"] == before["jobs_stuck"] + 1  # only the wedged retry
         assert after["jobs_pending"] == before["jobs_pending"] + 3
@@ -539,7 +549,7 @@ def test_healthz_answers_fast_when_the_database_wedges(client, monkeypatch):
     monkeypatch.setattr(db, "one", wedged)
     try:
         started = time.monotonic()
-        r = client.get("/healthz")
+        r = client.get("/healthz", headers=_hz(monkeypatch))
         elapsed = time.monotonic() - started
 
         assert r.status_code == 503

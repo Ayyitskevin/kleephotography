@@ -57,7 +57,9 @@ Operator overrides, both of which clear `next_attempt_at`:
 
 `jobs.queue_health()` is the single reader for this, surfaced two ways:
 
-- `/healthz` → `jobs_failed`, `jobs_waiting_retry`, `jobs_stuck`.
+- `/healthz` → `jobs_failed`, `jobs_waiting_retry`, `jobs_stuck` — **bearer-gated**
+  (`Authorization: Bearer $MISE_HEALTHZ_TOKEN`); the public body is `{"ok": …}`
+  only. See [`MONITORING.md`](MONITORING.md).
 - `ops_monitor._check_failed_jobs` → Telegram `jobs_failed` and `jobs_stuck`.
 
 `stuck` means a **retry** is more than `MISE_JOB_STUCK_AFTER_SECONDS` (default

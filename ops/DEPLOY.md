@@ -46,7 +46,10 @@ ssh <prod-host> 'set -euo pipefail
 
 ### Post-deploy spot checks
 
-- `curl -fsS https://kleephotography.com/healthz`
+- `curl -fsS https://kleephotography.com/healthz` → `{"ok": true}`. For the
+  detail (disk, backup age, queue depth) add
+  `-H "Authorization: Bearer $MISE_HEALTHZ_TOKEN"` — see
+  [`MONITORING.md`](MONITORING.md).
 - Home, one specialty spoke, `/portfolio`, `/admin` → login
 - One gallery PIN page; browser console clear of CSP `Refused to execute…`
 - Rollback look only: `MISE_SCREENING_ROOM=false` in the prod `/opt/mise/.env` +
