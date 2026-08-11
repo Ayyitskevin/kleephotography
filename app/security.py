@@ -1,5 +1,6 @@
 """Cookies, PIN lockout, slugs, client IP resolution."""
 
+import hashlib
 import logging
 import secrets
 import string
@@ -33,9 +34,13 @@ def sign(value: str) -> str:
     return _serializer().dumps(value)
 
 
-def unsign(token: str) -> str | None:
+def unsign(token: str, max_age: int | None = None) -> str | None:
+    """Verify a signed cookie value. `max_age` defaults to the client lifetime;
+    admin callers pass the shorter ADMIN_SESSION_MAX_AGE."""
     try:
-        return _serializer().loads(token, max_age=config.SESSION_MAX_AGE)
+        return _serializer().loads(
+            token, max_age=config.SESSION_MAX_AGE if max_age is None else max_age
+        )
     except BadSignature:
         return None
 
@@ -46,6 +51,25 @@ def client_ip(request: Request) -> str:
     if peer in ("127.0.0.1", "::1"):
         return request.headers.get("cf-connecting-ip", peer)
     return peer
+
+
+def pin_matches(supplied: str, expected: str | None) -> bool:
+    """Constant-time PIN compare.
+
+    The three PIN gates used `!=`, whose early exit leaks how many leading
+    characters were right. Over many tries that is a per-character oracle,
+    recovering a short numeric PIN in roughly 10*len guesses instead of 10**len.
+    The lockout in this module is the main defence and it caps the attempt rate,
+    but the compare should not be the weak half of that pair — and this is the
+    one place the compare-digest doctrine used elsewhere was not applied.
+
+    Bytes, not str: secrets.compare_digest raises TypeError on non-ASCII str,
+    which would 500 on a pasted PIN with a stray unicode character (see
+    check_admin_password). A missing expected PIN never matches.
+    """
+    if expected is None:
+        return False
+    return secrets.compare_digest(supplied.strip().encode("utf-8"), expected.encode("utf-8"))
 
 
 # ── PIN lockout ────────────────────────────────────────────────────────────
@@ -216,15 +240,25 @@ def delete_session_cookie(response: Response, name: str, *, path: str = "/") -> 
 ADMIN_COOKIE = "mise_admin"
 
 
+def _admin_token_hash(token: str) -> str:
+    """sha256 of a session token, hex. See migrations/071 for why not a slow KDF:
+    the token is 24 random bytes, so there is no dictionary to defend against and
+    a KDF would tax every authenticated admin request for nothing."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def create_admin_session() -> str:
     """Mint a server-side admin session; return its opaque token to sign into the
     cookie. This row is what makes the session real — deleting it (logout / kill
     switch) revokes the cookie immediately, without rotating MISE_SECRET_KEY. Also
-    prunes sessions past SESSION_MAX_AGE so the table stays small (the cookie
-    signature expires at the same age, so those rows are already dead)."""
+    prunes sessions past ADMIN_SESSION_MAX_AGE so the table stays small (the
+    cookie signature expires at the same age, so those rows are already dead)."""
     token = secrets.token_urlsafe(24)
-    db.run("INSERT INTO admin_sessions (token) VALUES (?)", (token,))
-    cutoff = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(time.time() - config.SESSION_MAX_AGE))
+    # Only the hash is stored; the raw token exists solely in the response cookie.
+    db.run("INSERT INTO admin_sessions (token_hash) VALUES (?)", (_admin_token_hash(token),))
+    cutoff = time.strftime(
+        "%Y-%m-%d %H:%M:%S", time.gmtime(time.time() - config.ADMIN_SESSION_MAX_AGE)
+    )
     db.run("DELETE FROM admin_sessions WHERE created_at < ?", (cutoff,))
     return token
 
@@ -233,10 +267,14 @@ def is_admin(request: Request) -> bool:
     raw = request.cookies.get(ADMIN_COOKIE)
     if not raw:
         return False  # no cookie → public traffic never touches the DB
-    token = unsign(raw)  # None on a bad/expired signature (enforces SESSION_MAX_AGE)
+    # Admin cookies expire on their own, shorter clock than client galleries.
+    token = unsign(raw, max_age=config.ADMIN_SESSION_MAX_AGE)
     if not token:
         return False
-    return db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (token,)) is not None
+    return (
+        db.one("SELECT 1 AS x FROM admin_sessions WHERE token_hash=?", (_admin_token_hash(token),))
+        is not None
+    )
 
 
 def destroy_admin_session(request: Request) -> None:
@@ -245,9 +283,9 @@ def destroy_admin_session(request: Request) -> None:
     raw = request.cookies.get(ADMIN_COOKIE)
     if not raw:
         return
-    token = unsign(raw)
+    token = unsign(raw, max_age=config.ADMIN_SESSION_MAX_AGE)
     if token:
-        db.run("DELETE FROM admin_sessions WHERE token=?", (token,))
+        db.run("DELETE FROM admin_sessions WHERE token_hash=?", (_admin_token_hash(token),))
 
 
 def destroy_all_admin_sessions() -> None:

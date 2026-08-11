@@ -1,0 +1,23 @@
+-- Store admin session tokens HASHED, not in the clear.
+--
+-- 065 made admin sessions real (server-side rows, revocable at logout). But the
+-- row held the token verbatim, and that token is a bearer credential: anything
+-- that can read this table can mint an admin cookie. "Anything" is broader than
+-- it looks — every nightly snapshot in /opt/mise/data/backups carried live
+-- admin tokens in the clear, and the file backup added in G1 makes further
+-- copies of those snapshots. A stolen backup was a stolen admin session for the
+-- full cookie lifetime, with no login and nothing in the logs.
+--
+-- The token is 24 bytes from secrets.token_urlsafe, so it is high-entropy and
+-- unguessable. sha256 is therefore the right primitive rather than a slow
+-- password KDF: there is no dictionary to defend against, and bcrypt/argon2
+-- would add work to every authenticated admin request for no gain.
+--
+-- Existing rows CANNOT be migrated: they hold plaintext and SQLite has no
+-- sha256, so there is nothing to hash them with here. They are deleted instead,
+-- which also purges the plaintext this migration exists to remove. Effect: every
+-- admin session is invalidated and Kevin logs in once more. That is the point,
+-- not a side effect — any session minted before this ran had its token stored
+-- in the clear and should not survive.
+ALTER TABLE admin_sessions RENAME COLUMN token TO token_hash;
+DELETE FROM admin_sessions;

@@ -333,6 +333,12 @@ MONTHLY_GOAL_CENTS = int(os.environ.get("MISE_MONTHLY_GOAL", "0")) * 100
 
 SESSION_MAX_AGE = int(os.environ.get("MISE_SESSION_MAX_AGE", str(60 * 60 * 24 * 90)))
 
+# Admin sessions expire far sooner than client ones. 90 days suits a client who
+# should not have to re-enter a PIN to look at their own photos; applied to the
+# admin cookie it meant a single stolen laptop session stayed valid for a
+# quarter. These are different risks and no longer share a number.
+ADMIN_SESSION_MAX_AGE = int(os.environ.get("MISE_ADMIN_SESSION_MAX_AGE", str(60 * 60 * 24 * 14)))
+
 
 def _cookie_secure_default(base_url: str) -> str:
     """Default Secure cookies on for a normalized HTTPS public origin."""

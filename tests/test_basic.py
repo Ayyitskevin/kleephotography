@@ -225,12 +225,24 @@ def test_admin_logout_revokes_session(client):
     assert r.status_code == 303
     raw = r.cookies.get(security.ADMIN_COOKIE)
     token = security.unsign(raw)
-    assert token and db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (token,))
+    assert token and db.one(
+        "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+        (security._admin_token_hash(token),),
+    )
+    # the raw token must exist ONLY in the cookie — never at rest, because the
+    # nightly snapshot copies whatever is at rest (migrations/071)
+    assert db.one("SELECT COUNT(*) n FROM admin_sessions WHERE token_hash=?", (token,))["n"] == 0
     # authenticated request passes the require_admin gate
     assert client.get("/admin/home", follow_redirects=False).status_code == 200
     # logout deletes the server-side row → real revocation
     assert client.post("/admin/logout", follow_redirects=False).status_code == 303
-    assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (token,)) is None
+    assert (
+        db.one(
+            "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+            (security._admin_token_hash(token),),
+        )
+        is None
+    )
     # replaying the OLD signed cookie is now dead — bounced to login, not admitted
     client.cookies.clear()
     client.cookies.set(security.ADMIN_COOKIE, raw)
@@ -251,9 +263,14 @@ def test_admin_sign_out_everywhere_requires_auth(client):
         assert r.status_code == 303
         assert r.headers["location"] == "/admin/login"
         assert db.one("SELECT COUNT(*) AS n FROM admin_sessions")["n"] == before
-        assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (other,))
+        assert db.one(
+            "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+            (security._admin_token_hash(other),),
+        )
     finally:
-        db.run("DELETE FROM admin_sessions WHERE token=?", (other,))
+        db.run(
+            "DELETE FROM admin_sessions WHERE token_hash=?", (security._admin_token_hash(other),)
+        )
 
 
 @pytest.mark.integration
@@ -269,7 +286,13 @@ def test_admin_sign_out_everywhere_kills_all_sessions(client):
     r = client.post("/admin/logout", data={"everywhere": "1"}, follow_redirects=False)
     assert r.status_code == 303
     assert db.one("SELECT COUNT(*) AS n FROM admin_sessions")["n"] == 0
-    assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (other,)) is None
+    assert (
+        db.one(
+            "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+            (security._admin_token_hash(other),),
+        )
+        is None
+    )
     client.cookies.clear()
 
 
@@ -360,8 +383,16 @@ def test_csp_header(client):
     # pervasive and style injection is a far weaker vector than script)
     style_src = next(d for d in csp.split("; ") if d.startswith("style-src "))
     assert "'unsafe-inline'" in style_src
-    # analytics is the only off-origin asset, allowed for script + connect
-    assert "https://plausible.io" in csp
+    # Analytics is the only off-origin asset, and now allowed ONLY when it is
+    # actually configured — asserted in full by
+    # test_csp_allows_plausible_only_when_analytics_is_on. Here the header is
+    # read from a live response, whose CSP was built at import from whatever
+    # PLAUSIBLE_DOMAIN the environment had, so this pins the invariant that
+    # holds either way: no off-origin destination beyond plausible.io.
+    for directive in ("script-src", "connect-src"):
+        d = next(x for x in csp.split("; ") if x.startswith(directive + " "))
+        offsite = [t for t in d.split() if t.startswith("http")]
+        assert offsite in ([], ["https://plausible.io"]), (directive, offsite)
     # indexable marketing pages carry the policy too
     assert "content-security-policy" in client.get("/").headers
 
@@ -546,8 +577,18 @@ def test_access_routes_use_shared_session_cookie_policy(client, monkeypatch):
     assert admin.status_code == 303
     # the admin cookie now carries a per-login server-side session token (not a
     # signed constant); it must resolve to a live row in admin_sessions
-    admin_token = security.unsign(assert_session_cookie(admin, security.ADMIN_COOKIE).value)
-    assert admin_token and db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (admin_token,))
+    # The admin cookie deliberately carries a SHORTER lifetime than client
+    # cookies: 90 days suits a client browsing their own photos, but applied to
+    # admin it meant one stolen laptop session stayed valid for a quarter.
+    admin_morsel = assert_session_cookie(
+        admin, security.ADMIN_COOKIE, max_age=config.ADMIN_SESSION_MAX_AGE
+    )
+    assert config.ADMIN_SESSION_MAX_AGE < config.SESSION_MAX_AGE
+    admin_token = security.unsign(admin_morsel.value, max_age=config.ADMIN_SESSION_MAX_AGE)
+    assert admin_token and db.one(
+        "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+        (security._admin_token_hash(admin_token),),
+    )
 
     db.run(
         "INSERT INTO galleries (slug,title,pin,published) VALUES (?,?,?,1)",

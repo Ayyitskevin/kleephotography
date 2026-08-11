@@ -177,7 +177,7 @@ def check_pin(request: Request, slug: str, pin: str = Form(...)):
             {"g": g, "error": f"Too many tries — wait {config.PIN_LOCKOUT_MIN} minutes."},
             status_code=429,
         )
-    if pin.strip() != g["pin"]:
+    if not security.pin_matches(pin, g["pin"]):
         security.pin_fail(ip, g["id"])
         return templates.TemplateResponse(
             request, "public/pin.html", {"g": g, "error": "Wrong PIN."}, status_code=401
