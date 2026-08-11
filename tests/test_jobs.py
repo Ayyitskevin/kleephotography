@@ -1,6 +1,7 @@
 import hashlib
 import threading
 import time
+from concurrent.futures import Future
 
 import pytest
 from fastapi.testclient import TestClient
@@ -307,8 +308,16 @@ class _RecordingPool:
     def __init__(self) -> None:
         self.offered: list[int] = []
 
-    def submit(self, fn, job_id: int) -> None:
+    def submit(self, fn, job_id: int) -> Future:
         self.offered.append(job_id)
+        # A real ThreadPoolExecutor.submit always returns a Future, and dispatch
+        # now tracks them so stop(wait=True) can drain. Hand back a COMPLETED
+        # one: this pool executes nothing, so there is no worker to wait for,
+        # and a pending future here would make every later stop(wait=True) block
+        # until its timeout.
+        done: Future = Future()
+        done.set_result(None)
+        return done
 
 
 def test_corrupt_payload_fails_the_job_instead_of_wedging_it(monkeypatch):
