@@ -17,6 +17,8 @@ the moment an async handler in a swept module calls back into the app directly.
 
 import ast
 import asyncio
+import hashlib
+import hmac
 import json
 import pathlib
 import time
@@ -89,6 +91,72 @@ def test_slow_form_write_does_not_stall_the_event_loop(probe_form, monkeypatch):
     assert elapsed < PROBE_AFTER_SEC + SLOW_WRITE_SEC / 2, (
         f"/healthz answered {elapsed:.2f}s in — the form write blocked the event loop"
     )
+
+
+@pytest.mark.integration
+def test_slow_stripe_webhook_does_not_stall_the_event_loop(monkeypatch):
+    """Same proof as the form write, for the money route.
+
+    This is the one handler whose caller is a machine that retries. Blocking the
+    loop here means every other in-flight request stalls while Stripe is already
+    redelivering into a server that is struggling — the failure feeding itself.
+
+    The invoice lookup stands in for any of the handler's ~6 round-trips; a WAL
+    checkpoint or a fat transaction from a job thread makes a real one this slow.
+    """
+    real_one = db.one
+
+    def slow_one(sql, params=()):
+        if "FROM invoices" in sql:
+            time.sleep(SLOW_WRITE_SEC)
+        return real_one(sql, params)
+
+    monkeypatch.setattr(db, "one", slow_one)
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_probe")
+
+    body = json.dumps(
+        {
+            "id": "evt_loop_probe",
+            "object": "event",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_loop_probe",
+                    "object": "checkout.session",
+                    "payment_status": "paid",
+                    "amount_total": 1000,
+                    "metadata": {"invoice_id": "99123457", "kind": "full"},
+                }
+            },
+        }
+    )
+    ts = str(int(time.time()))
+    sig = hmac.new(b"whsec_probe", f"{ts}.{body}".encode(), hashlib.sha256).hexdigest()
+
+    async def drive():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://probe") as c:
+            started = time.perf_counter()
+            hook = asyncio.create_task(
+                c.post(
+                    "/webhooks/stripe",
+                    content=body,
+                    headers={"stripe-signature": f"t={ts},v1={sig}"},
+                )
+            )
+            await asyncio.sleep(PROBE_AFTER_SEC)
+            health = await c.get("/healthz")
+            elapsed = time.perf_counter() - started
+            return elapsed, health, await hook
+
+    elapsed, health, hooked = asyncio.run(drive())
+
+    assert hooked.status_code == 200  # unknown invoice → acknowledged, not retried
+    assert health.status_code == 200
+    assert elapsed < PROBE_AFTER_SEC + SLOW_WRITE_SEC / 2, (
+        f"/healthz answered {elapsed:.2f}s in — the Stripe webhook blocked the event loop"
+    )
+    db.run("DELETE FROM audit_log WHERE entity_type='invoice' AND entity_id=99123457")
 
 
 # ── Output pins for the handlers the sweep touched that nothing else covers ──
@@ -239,11 +307,13 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # Every module whose async handlers were swept. app/main.py is out by design
 # (/healthz and the error handler are degradation paths that must answer while
-# the threadpool is saturated), and so are app/public/pay.py, app/admin/
-# financials.py and app/admin/uploads.py, which still carry the defect and are
-# owned elsewhere. Adding a module here is how the fence grows to cover them.
+# the threadpool is saturated), and so are app/admin/financials.py and
+# app/admin/uploads.py, which still carry the defect and are owned elsewhere.
+# Adding a module here is how the fence grows to cover them — app/public/pay.py
+# joined when the Stripe webhook was split.
 SWEPT = (
     "app/public/forms.py",
+    "app/public/pay.py",
     "app/public/sms_webhook.py",
     "app/service_api.py",
     "app/admin/galleries.py",
