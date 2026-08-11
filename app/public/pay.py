@@ -7,7 +7,7 @@ import stripe
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import alerts, config, db, features, jobs, security
+from .. import alerts, audit, config, db, features, jobs, security
 from ..render import templates
 from . import telemetry
 
@@ -162,6 +162,34 @@ def pay_invoice(request: Request, slug: str):
     return RedirectResponse(session.url, status_code=303)
 
 
+def _ack_unapplied(event_id: str, invoice_id, code: str, detail: str, diff: dict) -> dict:
+    """Acknowledge a webhook that can never be applied, instead of 4xx-ing it.
+
+    Stripe treats ANY non-2xx as a failed delivery, retries for ~3 days, and
+    counts the failures toward auto-disabling the endpoint — after which real
+    payment events stop arriving and the first symptom is missing money. The
+    conditions below are permanent: retrying cannot un-settle an invoice, cannot
+    change what a stale Checkout session charged, and cannot conjure an invoice
+    row. So the 409/404 bought nothing — none of these record a payment either
+    way — while spending the endpoint's health and firing one unthrottled alert
+    per delivery for three days.
+
+    Stripe's retries were also the only thing keeping such an anomaly persistent,
+    so acknowledging moves the record somewhere durable: an append-only audit row
+    that outlives the process and survives Telegram being unconfigured. The alert
+    is best-effort on top of that, not the system of record.
+    """
+    try:
+        with db.tx() as con:
+            audit.log(con, "invoice", invoice_id, f"stripe_{code}", diff=diff, actor="stripe")
+    except Exception:
+        # The audit row is the durable half, but failing to write it must not
+        # resurrect the retry storm — log loudly and still acknowledge.
+        log.exception("could not audit stripe anomaly invoice=%s event=%s", invoice_id, event_id)
+    alerts.payment_anomaly(invoice_id, event_id, code, detail)
+    return {"ok": True, "unapplied": code}
+
+
 @router.post("/webhooks/stripe")
 async def stripe_webhook(request: Request):
     if not features.stripe_webhook_enabled():
@@ -200,8 +228,13 @@ async def stripe_webhook(request: Request):
     kind = metadata["kind"] if "kind" in metadata else None
     d = db.one("SELECT * FROM invoices WHERE id=?", (invoice_id,))
     if not d:
-        log.error("stripe webhook for unknown invoice %s", invoice_id)
-        raise HTTPException(status_code=404)
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "unknown_invoice",
+            f"session {session['id']} names invoice {invoice_id}, which does not exist",
+            {"session_id": session["id"], "amount_total": int(session["amount_total"] or 0)},
+        )
     # Stripe retries the same event_id after a 5xx / timeout. Honor idempotency
     # BEFORE amount/kind checks — a successful deposit changes what is "owed",
     # so a retry would otherwise look like a mismatch and 409 forever.
@@ -213,23 +246,28 @@ async def stripe_webhook(request: Request):
     owed_cents, owed_kind = next_payment(d)
     amount_total = int(session["amount_total"] or 0)
     if not owed_cents:
-        log.error("stripe webhook for settled invoice %s (event %s)", invoice_id, event["id"])
-        alerts.security_alert(f"Stripe webhook for already-settled invoice {invoice_id}")
-        raise HTTPException(status_code=409, detail="invoice already settled")
-    if kind != owed_kind or amount_total != owed_cents:
-        log.error(
-            "stripe webhook mismatch invoice %s: got kind=%s amount=%s; owed kind=%s amount=%s",
+        return _ack_unapplied(
+            event["id"],
             invoice_id,
-            kind,
-            amount_total,
-            owed_kind,
-            owed_cents,
+            "already_settled",
+            f"invoice is fully settled but a payment of {amount_total} cents arrived",
+            {"amount_total": amount_total, "kind": kind, "session_id": session["id"]},
         )
-        alerts.security_alert(
-            f"Stripe webhook amount/kind mismatch on invoice {invoice_id}: "
-            f"got {kind}/{amount_total}, owed {owed_kind}/{owed_cents}"
+    if kind != owed_kind or amount_total != owed_cents:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "amount_mismatch",
+            f"got {kind}/{amount_total} cents, owed {owed_kind}/{owed_cents} cents "
+            f"(usually a stale Checkout link paid after the invoice changed)",
+            {
+                "got_kind": kind,
+                "got_amount": amount_total,
+                "owed_kind": owed_kind,
+                "owed_amount": owed_cents,
+                "session_id": session["id"],
+            },
         )
-        raise HTTPException(status_code=409, detail="payment does not match amount owed")
     # Record the payment and advance invoice + project state as one atomic unit:
     # a crash between these writes would otherwise leave the payment logged but the
     # invoice unpaid, and Stripe's retry would short-circuit on the duplicate event
