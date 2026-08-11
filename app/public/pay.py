@@ -297,9 +297,22 @@ async def stripe_webhook(request: Request):
                                      'proposal_sent','contract_signed')""",
                 (d["project_id"],),
             )
+            # Staged INSIDE the transaction, not enqueued after it. jobs.enqueue
+            # writes its own row in a separate transaction, so a crash, a restart,
+            # or a killed worker between the commit above and that call left the
+            # payment recorded with no sync job and nothing to notice it: Stripe's
+            # retry short-circuits on the duplicate event id, the sweeper only
+            # re-offers rows that exist, and Notion stays silently stale. Staging
+            # makes the job as durable as the payment — they commit together or
+            # not at all, which is the pattern uploads.py already uses for work
+            # far less important than this.
+            notion_job = jobs.stage(con, "notion_sync_invoice", {"invoice_id": invoice_id})
     except db.sqlite3.IntegrityError:
         return {"ok": True, "duplicate": True}  # Stripe retries — idempotent by event id
-    jobs.enqueue("notion_sync_invoice", {"invoice_id": invoice_id})
+    # Offer it to the pool only after the commit: a durable row means a lost
+    # dispatch is recoverable (the sweeper picks it up), while dispatching a row
+    # that might still roll back is not.
+    jobs.dispatch([notion_job])
     log.info(
         "invoice %s payment recorded: %s %s cents (event %s)",
         invoice_id,
