@@ -62,20 +62,28 @@ exposed: Stripe redelivers unacknowledged webhooks, so payment state re-converge
 on its own; a contract signature or a form submission in that window would need
 redoing.
 
-## Off-host DR — a known open gap
+## Off-host DR — stage 3
 
-**This chain is host-local, both stages.** Snapshots protect against the failure modes
-that actually happen most — a bad migration, a wrong delete, a corrupted table, a dead
-disk if the file destination is a genuinely separate one — and they do not constitute
-disaster recovery. Fire, theft, or the host being lost still takes everything. A replacement off-host sink (second machine or
+**Stages 1 and 2 are host-local.** They protect against the failure modes that
+actually happen most — a bad migration, a wrong delete, a corrupted table, a dead
+disk if the file destination is a genuinely separate one — and on their own they do
+not constitute disaster recovery: fire, theft, or the host being lost takes
+everything.
+
+**Stage 3 closes that**: a nightly client-side-encrypted push to an off-host
+repository, plus a monthly restore-verify that proves the data actually comes
+back. Runbook: [`DR.md`](DR.md). It is opt-in like stage 2 — until
+`RESTIC_REPOSITORY` is set, the job skips loudly and this host has no off-host
+copy. A replacement off-host sink (second machine or
 object store) plus an automated restore-verify is **pending and tracked**; until it
 lands, treat "we have backups" as "we can undo a mistake," not "we can survive losing
 the host."
 
 An earlier two-machine pull-and-verify chain existed and was retired when production
-moved hosts (verifying a frozen copy protects nothing). The lesson worth keeping: the
+moved hosts (verifying a frozen copy protects nothing). The lesson worth keeping — the
 off-host sink has to be a *different* box from the origin of truth, and the copy is
-only real once a scripted restore has proven it.
+only real once a scripted restore has proven it — is why stage 3 ships with
+`restore-verify.sh` rather than trusting `restic check` alone.
 
 Because the gap is open, the red-light rules in [`AGENTS.md`](../AGENTS.md) do real
 work: a nightly snapshot is not a license to run an unreviewed migration or a live

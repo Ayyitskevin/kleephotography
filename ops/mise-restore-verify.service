@@ -1,0 +1,10 @@
+[Unit]
+Description=Mise monthly restore-verify — prove the off-host backup comes back
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mise
+EnvironmentFile=-/opt/mise/.env
+ExecStart=/opt/mise/ops/restore-verify.sh

@@ -1,0 +1,10 @@
+[Unit]
+Description=Mise monthly restore-verify (1st of the month, 04:30)
+
+[Timer]
+OnCalendar=*-*-01 04:30:00
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target
