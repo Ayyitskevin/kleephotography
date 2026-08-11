@@ -349,6 +349,16 @@ VISITOR_LAST_SEEN_DEBOUNCE_SECONDS = int(
 # accepted — OFF is a footgun with no use here. See ops/BACKUP.md.
 SQLITE_SYNCHRONOUS = os.environ.get("MISE_SQLITE_SYNCHRONOUS", "NORMAL").strip().upper()
 
+# HSTS lifetime, seconds. Sent only when COOKIE_SECURE (i.e. we know we are on
+# TLS). 300 was July's deliberately reversible starting value and then sat there;
+# 15552000 (180 days) is the normal production figure and what preload lists
+# expect. Configurable because ratcheting HSTS is the one header you cannot take
+# back quickly: a browser that has cached a long max-age will refuse to reach the
+# site in plaintext for that long, so if TLS ever breaks the lockout lasts as
+# long as this number. Keep includeSubDomains/preload OFF until a subdomain TLS
+# inventory exists — see ops/TRUTHFUL-HTTPS.md.
+HSTS_MAX_AGE = int(os.environ.get("MISE_HSTS_MAX_AGE", "15552000"))
+
 # Admin sessions expire far sooner than client ones. 90 days suits a client who
 # should not have to re-enter a PIN to look at their own photos; applied to the
 # admin cookie it meant a single stolen laptop session stayed valid for a

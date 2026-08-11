@@ -194,11 +194,14 @@ def test_hsts_tracks_cookie_secure(monkeypatch):
 
     # HSTS ships only when the site knows it's on TLS (same signal as Secure
     # cookies) — never for a plain-http dev origin, which would pin localhost.
-    # Keep the first production rollout short and root-only so it is reversible.
+    # Root-only: includeSubDomains and preload both need a subdomain TLS
+    # inventory, and preload is materially harder to undo than max-age.
     monkeypatch.setattr(config, "COOKIE_SECURE", True)
     with TestClient(app) as c:
         h = c.get("/healthz").headers["strict-transport-security"]
-        assert h == "max-age=300"
+        assert h == f"max-age={config.HSTS_MAX_AGE}"
+        assert config.HSTS_MAX_AGE >= 15552000, "HSTS ratcheted back below 180 days"
+        assert "includeSubDomains" not in h and "preload" not in h
     monkeypatch.setattr(config, "COOKIE_SECURE", False)
     with TestClient(app) as c:
         assert "strict-transport-security" not in c.get("/healthz").headers
