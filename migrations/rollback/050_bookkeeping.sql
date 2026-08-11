@@ -1,0 +1,14 @@
+-- Rollback for 050_bookkeeping.sql — DELIBERATELY NOT EXECUTABLE.
+--
+-- 050 creates expenses, mileage and receipts: operator-entered bookkeeping, the
+-- kind of data that is reconstructed from paperwork rather than regenerated.
+-- DROP TABLE would delete the expense ledger and the mileage log outright.
+--
+-- receipts is worse than it looks: the rows are the INDEX of files living in
+-- DATA_DIR/receipts. Dropping the table leaves every scan on disk with nothing
+-- pointing at it — the files survive the backup (stage 2, ops/BACKUP.md) and
+-- become unattributable, which for tax records is close to losing them.
+--
+-- The real rollback is restoring a snapshot: see "Rolling back a money
+-- migration" in ops/MIGRATIONS.md.
+SELECT 1;
