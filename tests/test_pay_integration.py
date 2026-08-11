@@ -181,7 +181,7 @@ def test_webhook_acks_amount_mismatch_without_applying_it(client, monkeypatch):
     health for nothing. What must not change: no payment row, no status move.
     """
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
     cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
     r = _post_signed(client, _checkout_event("evt_bad_amt", iid, "full", 1))
@@ -203,7 +203,7 @@ def test_webhook_acks_amount_mismatch_without_applying_it(client, monkeypatch):
 
 def test_webhook_acks_kind_mismatch_without_applying_it(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
     cid, pid, iid = _seed_money_chain(
         project_status="proposal_sent", total=90000, deposit=30000, inv_status="sent"
@@ -218,7 +218,7 @@ def test_webhook_acks_kind_mismatch_without_applying_it(client, monkeypatch):
 def test_webhook_retry_same_event_is_duplicate_after_deposit(client, monkeypatch):
     """Stripe retries must stay idempotent even after owed kind flips to balance."""
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     monkeypatch.setattr(pay.alerts, "security_alert", lambda *a, **k: None)
     cid, pid, iid = _seed_money_chain(
         project_status="proposal_sent", total=90000, deposit=30000, inv_status="sent"
@@ -236,7 +236,7 @@ def test_webhook_retry_same_event_is_duplicate_after_deposit(client, monkeypatch
 def test_webhook_acks_settled_invoice_and_still_alerts(client, monkeypatch):
     """Money may really have been taken here, so acknowledging must not go quiet."""
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     fired = []
     monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: fired.append((a, k)))
     cid, pid, iid = _seed_money_chain(
@@ -254,7 +254,7 @@ def test_webhook_acks_settled_invoice_and_still_alerts(client, monkeypatch):
 
 def test_webhook_deposit_then_balance_settles(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     monkeypatch.setattr(pay.alerts, "security_alert", lambda *a, **k: None)
     cid, pid, iid = _seed_money_chain(
         project_status="proposal_sent", total=90000, deposit=30000, inv_status="sent"
@@ -273,7 +273,7 @@ def test_webhook_deposit_then_balance_settles(client, monkeypatch):
 
 def test_webhook_async_payment_succeeded_settles_ach(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
     pending = _post_signed(
         client, _checkout_event("evt_ach_pend", iid, "full", 90000, payment_status="unpaid")
@@ -298,7 +298,7 @@ def test_webhook_async_payment_succeeded_settles_ach(client, monkeypatch):
 
 def test_webhook_payment_advances_project_to_retainer_paid(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
     r = _post_signed(client, _checkout_event("evt_adv_pay", iid, "full", 90000))
     assert r.status_code == 200 and r.json() == {"ok": True}
@@ -309,7 +309,7 @@ def test_webhook_payment_advances_project_to_retainer_paid(client, monkeypatch):
 
 def test_webhook_does_not_rewind_a_later_stage_project(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     cid, pid, iid = _seed_money_chain(project_status="session_planning", total=90000)
     r = _post_signed(client, _checkout_event("evt_norewind_pay", iid, "full", 90000))
     assert r.status_code == 200 and r.json() == {"ok": True}
@@ -320,7 +320,7 @@ def test_webhook_does_not_rewind_a_later_stage_project(client, monkeypatch):
 
 def test_webhook_ach_pending_records_nothing(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
     r = _post_signed(
         client, _checkout_event("evt_ach_pend2", iid, "full", 90000, payment_status="unpaid")
@@ -391,7 +391,7 @@ def test_webhook_acks_unknown_invoice(client, monkeypatch):
     endpoint's auto-disable budget.
     """
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     fired = []
     monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: fired.append(a))
     missing = 99_123_456
@@ -428,11 +428,77 @@ def test_webhook_still_rejects_a_bad_signature(client, monkeypatch):
 def test_webhook_applies_a_legitimate_payment_unchanged(client, monkeypatch):
     """Guard against over-acking: the happy path must still record money."""
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
-    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
     cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
     r = _post_signed(client, _checkout_event("evt_good_full", iid, "full", 90000))
     assert r.status_code == 200 and "unapplied" not in r.json()
     assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 1
     assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "paid"
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_stages_notion_sync_inside_the_payment_transaction(client, monkeypatch):
+    """The sync job must be as durable as the payment itself.
+
+    jobs.enqueue writes its own row in a separate transaction, so a crash between
+    the payment commit and that call left the payment recorded with no sync job —
+    and nothing to notice: Stripe's retry short-circuits on the duplicate event
+    id, the sweeper only re-offers rows that exist, and Notion stays silently
+    stale. Staging commits the job with the payment.
+    """
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
+    dispatched = []
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: dispatched.extend(ids))
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    watermark = db.one("SELECT COALESCE(MAX(id), 0) AS m FROM jobs")["m"]
+    r = _post_signed(client, _checkout_event("evt_notion_stage", iid, "full", 90000))
+    assert r.status_code == 200
+
+    job = db.one(
+        "SELECT id, kind, payload, status FROM jobs WHERE kind='notion_sync_invoice' "
+        "AND id > ? ORDER BY id DESC LIMIT 1",
+        (watermark,),
+    )
+    assert job is not None, "payment committed without a durable sync job"
+    assert job["status"] == "queued"
+    assert f'"invoice_id": {iid}' in job["payload"]
+    # Committed first, then offered to the pool — never the other way round.
+    assert dispatched == [job["id"]]
+    db.run("DELETE FROM jobs WHERE id=?", (job["id"],))
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_a_rolled_back_payment_leaves_no_orphan_sync_job(client, monkeypatch):
+    """The other half of atomicity: no job for a payment that never landed.
+
+    A duplicate event rolls the whole transaction back. Before staging, the
+    enqueue sat outside it and could not be rolled back with it.
+    """
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
+    cid, pid, iid = _seed_money_chain(
+        project_status="proposal_sent", total=90000, deposit=30000, inv_status="sent"
+    )
+    watermark = db.one("SELECT COALESCE(MAX(id), 0) AS m FROM jobs")["m"]
+    body = _checkout_event("evt_notion_dupe", iid, "deposit", 30000)
+    assert _post_signed(client, body).status_code == 200
+
+    before = db.one(
+        "SELECT COUNT(*) AS n FROM jobs WHERE kind='notion_sync_invoice' AND id > ?",
+        (watermark,),
+    )["n"]
+    assert before == 1
+    # Stripe redelivers the same event: the INSERT trips the unique event id and
+    # the transaction unwinds — including the staged job.
+    retry = _post_signed(client, body)
+    assert retry.status_code == 200 and retry.json().get("duplicate") is True
+    after = db.one(
+        "SELECT COUNT(*) AS n FROM jobs WHERE kind='notion_sync_invoice' AND id > ?",
+        (watermark,),
+    )["n"]
+    assert after == before, "a rolled-back retry still left a sync job behind"
+    db.run("DELETE FROM jobs WHERE id > ?", (watermark,))
     _cleanup_money_chain(cid, pid, iid)

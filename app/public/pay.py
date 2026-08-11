@@ -5,6 +5,7 @@ import logging
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import alerts, audit, config, db, features, jobs, security
@@ -192,18 +193,38 @@ def _ack_unapplied(event_id: str, invoice_id, code: str, detail: str, diff: dict
 
 @router.post("/webhooks/stripe")
 async def stripe_webhook(request: Request):
-    if not features.stripe_webhook_enabled():
-        raise HTTPException(status_code=503, detail="webhook not configured")
+    """Read the body, then get off the loop.
+
+    Everything past the read is blocking: signature verification is HMAC over
+    the payload, and the handler then makes roughly six database round-trips
+    (invoice lookup, idempotency probe, the payment transaction, the staged job)
+    before it answers. On the event loop those stall EVERY other in-flight
+    request — and this is the one route whose caller is a machine that retries,
+    so a slow database here turns into Stripe redelivering into a server already
+    struggling.
+
+    The body read itself cannot move: it is the await. Same split as the rest of
+    the de-async sweep (see the fence in tests/test_deasync.py); the size checks
+    stay here because they touch nothing but the request.
+    """
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > _MAX_BODY:
         raise HTTPException(status_code=413, detail="payload too large")
     payload = await request.body()
     if len(payload) > _MAX_BODY:
         raise HTTPException(status_code=413, detail="payload too large")
+    signature = request.headers.get("stripe-signature", "")
+    return await run_in_threadpool(_process_stripe_webhook, payload, signature)
+
+
+def _process_stripe_webhook(payload: bytes, signature: str):
+    # The configured check moved in here with the rest of the app-code calls, so
+    # an oversized body on an unconfigured host now answers 413 before 503. Both
+    # are refusals and the combination cannot arise from Stripe.
+    if not features.stripe_webhook_enabled():
+        raise HTTPException(status_code=503, detail="webhook not configured")
     try:
-        event = stripe.Webhook.construct_event(
-            payload, request.headers.get("stripe-signature", ""), config.STRIPE_WEBHOOK_SECRET
-        )
+        event = stripe.Webhook.construct_event(payload, signature, config.STRIPE_WEBHOOK_SECRET)
     except (ValueError, stripe.SignatureVerificationError):
         raise HTTPException(status_code=400, detail="bad signature")
 
@@ -297,9 +318,22 @@ async def stripe_webhook(request: Request):
                                      'proposal_sent','contract_signed')""",
                 (d["project_id"],),
             )
+            # Staged INSIDE the transaction, not enqueued after it. jobs.enqueue
+            # writes its own row in a separate transaction, so a crash, a restart,
+            # or a killed worker between the commit above and that call left the
+            # payment recorded with no sync job and nothing to notice it: Stripe's
+            # retry short-circuits on the duplicate event id, the sweeper only
+            # re-offers rows that exist, and Notion stays silently stale. Staging
+            # makes the job as durable as the payment — they commit together or
+            # not at all, which is the pattern uploads.py already uses for work
+            # far less important than this.
+            notion_job = jobs.stage(con, "notion_sync_invoice", {"invoice_id": invoice_id})
     except db.sqlite3.IntegrityError:
         return {"ok": True, "duplicate": True}  # Stripe retries — idempotent by event id
-    jobs.enqueue("notion_sync_invoice", {"invoice_id": invoice_id})
+    # Offer it to the pool only after the commit: a durable row means a lost
+    # dispatch is recoverable (the sweeper picks it up), while dispatching a row
+    # that might still roll back is not.
+    jobs.dispatch([notion_job])
     log.info(
         "invoice %s payment recorded: %s %s cents (event %s)",
         invoice_id,

@@ -60,10 +60,25 @@ Data rollback is the nightly backup chain — see [`BACKUP.md`](BACKUP.md).
 ## Specialty slice script (not full deploy)
 
 [`scripts/deploy-flow.sh`](../scripts/deploy-flow.sh) is a **legacy-named** rsync
-slice (Plutus/Argus/Platekit modules, one admin gallery template, `mise.css`,
-migrations). It takes its SSH target from `MISE_FLOW_HOST` — set that explicitly
-before running it. Use it only for that surgical patch — **not** as “how main reaches
-prod.” Ordinary template/app/static changes use the git pull path above.
+slice (Plutus/Argus/Platekit modules, one admin gallery template, `mise.css`). It
+takes its SSH target from `MISE_FLOW_HOST` — set that explicitly before running it,
+there is no default, so a typo cannot ship to the wrong box. Use it only for that
+surgical patch — **not** as “how main reaches prod.” Ordinary template/app/static
+changes use the git pull path above.
+
+It **refuses to run** from a dirty tree, or from a HEAD not yet merged into
+`origin/main`: rsync overwrites live files with whatever is in your clone, so a stale
+branch or a forgotten local edit would otherwise reach production with no review and
+no record. `MISE_FLOW_ALLOW_UNMERGED=yes` overrides it, loudly, for an incident.
+
+**It no longer ships `migrations/`, and must not be made to.** The restart runs
+`db.migrate()`, so any `.sql` landing there is applied to the live database
+immediately and irreversibly. The staleness guard above does not make that safe,
+because the danger is not only staleness: this script ships three Python files, so a
+migration sent this way moves the **schema without the code that expects it** — 071
+renames `admin_sessions.token`, which would break admin login on the spot. Schema
+changes reach production through git pull + restart, where code and schema move
+together. See [`MIGRATIONS.md`](MIGRATIONS.md).
 
 Touching `scripts/deploy-flow.sh`, `mise.service`, host hardening, or the backup chain
 is **red-light** per [`AGENTS.md`](../AGENTS.md) (PR + human merge).
