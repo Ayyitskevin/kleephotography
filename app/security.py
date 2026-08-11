@@ -182,8 +182,40 @@ def get_visitor(request: Request, gallery_id: int) -> "db.sqlite3.Row | None":
         return None
     v = db.one("SELECT * FROM visitors WHERE token=? AND gallery_id=?", (token, gallery_id))
     if v:
-        db.run("UPDATE visitors SET last_seen=datetime('now') WHERE id=?", (v["id"],))
+        _touch_last_seen(v)
     return v
+
+
+def _touch_last_seen(v: "db.sqlite3.Row") -> None:
+    """Refresh visitors.last_seen at most once per debounce window.
+
+    This ran on EVERY request that resolves a visitor, and the busiest of those
+    is the per-image media route — so opening a 60-photo gallery meant 60
+    serialized writes, each taking SQLite's single write lock, on the one hot
+    path deliberately exempt from rate limiting. Nothing in the app reads this
+    column; it was pure write amplification in front of the work that matters.
+
+    Two guards, because they stop different things. The Python check uses the row
+    already in hand, so the steady state costs no write lock at all. The WHERE
+    clause covers the burst the Python check cannot: a browser opens several
+    connections at once, they all read the same stale value, and without it every
+    one of them would dirty a page. With it, only the first commit writes.
+
+    Timestamps are fixed-width UTC from datetime('now'), so a string compare is a
+    chronological compare — the same trick create_admin_session uses to prune.
+    """
+    cutoff = time.strftime(
+        "%Y-%m-%d %H:%M:%S",
+        time.gmtime(time.time() - config.VISITOR_LAST_SEEN_DEBOUNCE_SECONDS),
+    )
+    last = v["last_seen"]
+    if last is not None and last > cutoff:
+        return
+    db.run(
+        "UPDATE visitors SET last_seen=datetime('now') "
+        "WHERE id=? AND (last_seen IS NULL OR last_seen <= ?)",
+        (v["id"], cutoff),
+    )
 
 
 def create_visitor(gallery_id: int) -> tuple[int, str]:

@@ -333,6 +333,22 @@ MONTHLY_GOAL_CENTS = int(os.environ.get("MISE_MONTHLY_GOAL", "0")) * 100
 
 SESSION_MAX_AGE = int(os.environ.get("MISE_SESSION_MAX_AGE", str(60 * 60 * 24 * 90)))
 
+# How stale visitors.last_seen may get before a request refreshes it. Every
+# thumbnail request used to rewrite it, so one 60-photo gallery load meant 60
+# serialized writes on the hottest, rate-limit-exempt path in the app — for a
+# column nothing reads. 10 minutes keeps "when did they last look" useful at a
+# fraction of the cost.
+VISITOR_LAST_SEEN_DEBOUNCE_SECONDS = int(
+    os.environ.get("MISE_VISITOR_LAST_SEEN_DEBOUNCE_SECONDS", "600")
+)
+
+# SQLite durability. NORMAL is the standard WAL pairing: commits stop fsyncing
+# individually and are flushed at checkpoint instead. A process crash is still
+# safe (the WAL survives in the page cache); an OS crash or power loss can lose
+# the most recent commits. FULL restores fsync-per-commit. Only these two are
+# accepted — OFF is a footgun with no use here. See ops/BACKUP.md.
+SQLITE_SYNCHRONOUS = os.environ.get("MISE_SQLITE_SYNCHRONOUS", "NORMAL").strip().upper()
+
 # Admin sessions expire far sooner than client ones. 90 days suits a client who
 # should not have to re-enter a PIN to look at their own photos; applied to the
 # admin cookie it meant a single stolen laptop session stayed valid for a

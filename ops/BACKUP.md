@@ -46,6 +46,22 @@ staleness (`app/ops_monitor.py`, threshold `MISE_BACKUP_STALE_HOURS`) and fires 
 throttled ops alert, so a silently dead timer announces itself instead of being
 discovered during a restore.
 
+## Durability: what a power cut can cost
+
+SQLite runs with `synchronous=NORMAL` (`app/db.py`), the standard WAL pairing:
+commits are not fsynced individually, they are flushed at checkpoint. A crashed
+or restarted **process** loses nothing — the WAL lives in the OS page cache and
+outlives it. An **OS crash or power cut** can lose the most recent commits,
+typically seconds of work.
+
+That trade buys a large reduction in write latency on a single-writer database
+where the busiest path is serving images. If it is ever the wrong trade — a
+worsening power situation, no UPS — `MISE_SQLITE_SYNCHRONOUS=FULL` restores
+fsync-per-commit with a restart and no deploy. Worth knowing which writes are
+exposed: Stripe redelivers unacknowledged webhooks, so payment state re-converges
+on its own; a contract signature or a form submission in that window would need
+redoing.
+
 ## Off-host DR — a known open gap
 
 **This chain is host-local, both stages.** Snapshots protect against the failure modes
