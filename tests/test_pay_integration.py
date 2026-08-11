@@ -172,28 +172,45 @@ def test_pay_refuses_when_nothing_due(client, monkeypatch):
 # ── Webhook reconcile + ACH async ───────────────────────────────────────────
 
 
-def test_webhook_rejects_amount_mismatch(client, monkeypatch):
+def test_webhook_acks_amount_mismatch_without_applying_it(client, monkeypatch):
+    """Acknowledged, NOT applied.
+
+    A non-2xx here made Stripe retry for ~3 days and counted toward
+    auto-disabling the endpoint — after which real payment events stop arriving.
+    Retrying could never change the outcome, so the 409 spent the endpoint's
+    health for nothing. What must not change: no payment row, no status move.
+    """
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
     monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
-    monkeypatch.setattr(pay.alerts, "security_alert", lambda *a, **k: None)
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
     cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
     r = _post_signed(client, _checkout_event("evt_bad_amt", iid, "full", 1))
-    assert r.status_code == 409
+    assert r.status_code == 200
+    assert r.json()["unapplied"] == "amount_mismatch"
     assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
     assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "sent"
+    # The anomaly is durable, not just a log line: Stripe's retries used to be
+    # the only thing keeping it visible.
+    row = db.one(
+        "SELECT action, diff_json FROM audit_log WHERE entity_type='invoice' AND entity_id=? "
+        "ORDER BY id DESC LIMIT 1",
+        (iid,),
+    )
+    assert row["action"] == "stripe_amount_mismatch"
+    assert "90000" in row["diff_json"]
     _cleanup_money_chain(cid, pid, iid)
 
 
-def test_webhook_rejects_kind_mismatch(client, monkeypatch):
+def test_webhook_acks_kind_mismatch_without_applying_it(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
     monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
-    monkeypatch.setattr(pay.alerts, "security_alert", lambda *a, **k: None)
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
     cid, pid, iid = _seed_money_chain(
         project_status="proposal_sent", total=90000, deposit=30000, inv_status="sent"
     )
     # Owed is deposit/30000; claiming balance with that amount is still wrong kind.
     r = _post_signed(client, _checkout_event("evt_bad_kind", iid, "balance", 30000))
-    assert r.status_code == 409
+    assert r.status_code == 200 and r.json()["unapplied"] == "amount_mismatch"
     assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
     _cleanup_money_chain(cid, pid, iid)
 
@@ -216,18 +233,22 @@ def test_webhook_retry_same_event_is_duplicate_after_deposit(client, monkeypatch
     _cleanup_money_chain(cid, pid, iid)
 
 
-def test_webhook_rejects_settled_invoice(client, monkeypatch):
+def test_webhook_acks_settled_invoice_and_still_alerts(client, monkeypatch):
+    """Money may really have been taken here, so acknowledging must not go quiet."""
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
     monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
-    alerts = []
-    monkeypatch.setattr(pay.alerts, "security_alert", lambda text: alerts.append(text))
+    fired = []
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: fired.append((a, k)))
     cid, pid, iid = _seed_money_chain(
         project_status="retainer_paid", total=90000, deposit=0, inv_status="paid"
     )
     r = _post_signed(client, _checkout_event("evt_settled", iid, "full", 90000))
-    assert r.status_code == 409
-    assert "already-settled" in alerts[0] or "settled" in alerts[0].lower()
+    assert r.status_code == 200
+    assert r.json()["unapplied"] == "already_settled"
+    assert fired, "acknowledged the payment without telling anyone"
+    assert "already_settled" in fired[0][0]
     assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
+    assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "paid"
     _cleanup_money_chain(cid, pid, iid)
 
 
@@ -360,3 +381,58 @@ def test_webhook_ignores_non_numeric_invoice_id(client, monkeypatch):
         ]
         == 0
     )
+
+
+def test_webhook_acks_unknown_invoice(client, monkeypatch):
+    """Same reasoning as the mismatches: a missing invoice never arrives later.
+
+    The invoice row exists before Checkout is created, so there is no race that
+    a retry would win — 404ing this just burned deliveries against the
+    endpoint's auto-disable budget.
+    """
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    fired = []
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: fired.append(a))
+    missing = 99_123_456
+    r = _post_signed(client, _checkout_event("evt_unknown_inv", missing, "full", 5000))
+    assert r.status_code == 200
+    assert r.json()["unapplied"] == "unknown_invoice"
+    assert fired, "acknowledged an unknown invoice silently"
+    row = db.one(
+        "SELECT action FROM audit_log WHERE entity_type='invoice' AND entity_id=? "
+        "ORDER BY id DESC LIMIT 1",
+        (missing,),
+    )
+    assert row["action"] == "stripe_unknown_invoice"
+    db.run("DELETE FROM audit_log WHERE entity_type='invoice' AND entity_id=?", (missing,))
+
+
+def test_webhook_still_rejects_a_bad_signature(client, monkeypatch):
+    """The retry-storm fix must not have swallowed the one thing Stripe SHOULD
+    retry — or, worse, started acking forged payloads.
+
+    A signature failure is not a permanent business condition: it usually means
+    the secret was rotated or misconfigured, and acking would silently discard
+    real payments.
+    """
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    r = client.post(
+        "/webhooks/stripe",
+        content=_checkout_event("evt_forged", 1, "full", 1000),
+        headers={"stripe-signature": "t=1,v1=deadbeef", "content-type": "application/json"},
+    )
+    assert r.status_code == 400
+
+
+def test_webhook_applies_a_legitimate_payment_unchanged(client, monkeypatch):
+    """Guard against over-acking: the happy path must still record money."""
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "enqueue", lambda *a, **k: 0)
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    r = _post_signed(client, _checkout_event("evt_good_full", iid, "full", 90000))
+    assert r.status_code == 200 and "unapplied" not in r.json()
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 1
+    assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "paid"
+    _cleanup_money_chain(cid, pid, iid)

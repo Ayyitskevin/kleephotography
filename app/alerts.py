@@ -127,6 +127,34 @@ def inquiry_owner_email_failed(inquiry_id: int, reason: str) -> None:
     ops_alert(signature, text)
 
 
+def payment_anomaly(invoice_id, event_id: str, code: str, detail: str) -> None:
+    """Deduplicated operator signal for a Stripe webhook we acknowledge but do
+    NOT apply — an already-settled invoice, an amount/kind mismatch, or an
+    invoice that does not exist.
+
+    Keyed by event id. Acknowledging stops Stripe's retries, so this normally
+    fires once per anomaly, while a genuine burst of DISTINCT bad events still
+    notifies per event instead of collapsing into a single message.
+
+    Money may really have been captured on Stripe's side in these cases, so the
+    text says what to go and check rather than only that something was odd.
+    """
+    log.error(
+        "stripe payment anomaly invoice=%s event=%s code=%s: %s",
+        invoice_id,
+        event_id,
+        code,
+        detail,
+    )
+    ops_alert(
+        f"payment_anomaly:{event_id}",
+        f"Stripe payment NOT applied to invoice #{invoice_id} ({code}): {detail}. "
+        f"Stripe may still have taken the money — check the Stripe dashboard and "
+        f"refund or apply it by hand. Acknowledged so Stripe stops retrying; "
+        f"details are in the audit log: {config.BASE_URL}/admin/audit",
+    )
+
+
 def notify(text: str) -> None:
     """Fire-and-forget outbound nudge for a business event the CALLER has already
     de-duplicated (e.g. a one-shot DB flag), so no throttle is applied here. Used
