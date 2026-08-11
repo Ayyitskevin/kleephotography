@@ -13,7 +13,8 @@ import logging
 import re
 import threading
 import zipfile
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import wait as futures_wait
 from pathlib import Path
 
 from . import (
@@ -42,6 +43,13 @@ _sweeper_stop = threading.Event()
 # or by stop(), which cancels futures that will never reach that finally.
 _inflight: set[int] = set()
 _inflight_lock = threading.Lock()
+
+# Live futures, so stop(wait=True) can drain rather than merely signal. Kept
+# separate from _inflight (job ids, for sweep dedup) because this answers a
+# different question: not "is this job spoken for" but "is a worker thread still
+# inside it right now".
+_futures: set[Future] = set()
+_futures_lock = threading.Lock()
 MAX_ATTEMPTS = 3
 # Delay before the Nth retry, indexed by the attempt that just failed. Bounded and
 # modest on purpose — this is a solo-operator queue, not a distributed system. It
@@ -344,7 +352,12 @@ def dispatch(job_ids: list[int]) -> None:
         with _inflight_lock:
             _inflight.add(job_id)
         try:
-            pool.submit(_execute, job_id)
+            fut = pool.submit(_execute, job_id)
+            with _futures_lock:
+                _futures.add(fut)
+            # discard on completion, so the set tracks what is actually running
+            # instead of growing for the life of the process
+            fut.add_done_callback(lambda f: _futures.discard(f))
         except RuntimeError:
             with _inflight_lock:
                 _inflight.discard(job_id)
@@ -622,14 +635,47 @@ def start() -> None:
     )
 
 
-def stop() -> None:
+def stop(*, wait: bool = False, timeout: float = 10.0) -> None:
+    """Shut the queue down.
+
+    `wait=False` (the default, and what app shutdown uses) signals and returns
+    immediately: a restart must not block behind a long transcode, and it is
+    safe to drop in-flight work because start() re-queues anything left in
+    'running'.
+
+    `wait=True` drains first, and exists for callers that are about to change
+    the ground the workers stand on — chiefly tests, which repoint
+    config.DB_PATH at a fresh database between cases. A worker that outlives
+    stop() reads that module global at its next db.connect(), so it stops
+    talking to the database it was started against and starts talking to the
+    NEXT test's, mid-migrate. That is the "database is locked" flake in
+    test_smoke_argus: the job survives, the path moves under it, and the two
+    collide. The window is small, which is why it only appeared in some runs.
+
+    Bounded on purpose: a wedged job should cost a warning, not a hung suite.
+    """
     global _pool
     _stop_sweeper()
-    if _pool:
-        _pool.shutdown(wait=False, cancel_futures=True)
-        _pool = None
+    pool = _pool
+    _pool = None
+    if pool:
+        if wait:
+            with _futures_lock:
+                pending = [f for f in _futures if not f.done()]
+            if pending:
+                _, not_done = futures_wait(pending, timeout=timeout)
+                if not_done:
+                    log.warning(
+                        "jobs.stop(wait=True): %d job(s) still running after %ss — "
+                        "they may now write against whatever DB_PATH is current",
+                        len(not_done),
+                        timeout,
+                    )
+        pool.shutdown(wait=False, cancel_futures=True)
     # cancel_futures drops submissions that will never reach _execute's finally,
     # so their ids have to be released here or the next pool in this process
     # (a test restarting the queue) would treat them as permanently in flight.
     with _inflight_lock:
         _inflight.clear()
+    with _futures_lock:
+        _futures.clear()
