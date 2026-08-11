@@ -121,22 +121,34 @@ app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 # are pervasive (progress widths, board colors), style injection is a far
 # weaker vector than script, and removing it buys little for a large diff.
 # Plausible is the only off-origin asset, and only when analytics is enabled.
-CSP_POLICY = "; ".join(
-    (
-        "default-src 'self'",
-        "base-uri 'self'",
-        "object-src 'none'",
-        "frame-ancestors 'none'",
-        "frame-src 'none'",
-        "form-action 'self'",
-        "img-src 'self' data: blob:",
-        "media-src 'self'",
-        "font-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
-        "script-src 'self' 'nonce-{nonce}' https://plausible.io",
-        "connect-src 'self' https://plausible.io",
+def build_csp_policy() -> str:
+    """The comment above said Plausible was allowed "only when analytics is
+    enabled"; the policy allowed it unconditionally. A host with analytics off
+    still handed injected script a permitted off-origin destination to execute
+    from and exfiltrate to — a standing hole for a feature that was not even
+    running. The allowance now follows the flag that actually turns it on."""
+    plausible = " https://plausible.io" if config.PLAUSIBLE_DOMAIN else ""
+    return "; ".join(
+        (
+            "default-src 'self'",
+            "base-uri 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "frame-src 'none'",
+            "form-action 'self'",
+            "img-src 'self' data: blob:",
+            "media-src 'self'",
+            "font-src 'self'",
+            "style-src 'self' 'unsafe-inline'",
+            "script-src 'self' 'nonce-{nonce}'" + plausible,
+            "connect-src 'self'" + plausible,
+        )
     )
-)
+
+
+# Computed once: PLAUSIBLE_DOMAIN is read from the environment at boot and does
+# not change while the process lives, and this header is set on every response.
+CSP_POLICY = build_csp_policy()
 
 # Browser features the site never uses, switched off outright so injected or
 # third-party script can't quietly reach them. fullscreen / picture-in-picture /

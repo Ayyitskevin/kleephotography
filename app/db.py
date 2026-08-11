@@ -1,5 +1,6 @@
 """SQLite access — WAL mode, short-lived connections (safe across job threads)."""
 
+import logging
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -8,6 +9,8 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from . import config
+
+log = logging.getLogger("mise.db")
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 # Apply order is lexicographic on the full filename (see migrate()). New files
@@ -37,12 +40,28 @@ _RESTORABLE_PRAGMAS = frozenset({"foreign_keys"})
 _PRAGMA_NAME = re.compile(r"\APRAGMA\s+(\w+)", re.IGNORECASE)
 
 
+_SYNCHRONOUS_ALLOWED = frozenset({"NORMAL", "FULL"})
+
+
 def connect() -> sqlite3.Connection:
     con = sqlite3.connect(config.DB_PATH, timeout=30)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA foreign_keys=ON")
     con.execute("PRAGMA busy_timeout=30000")
+    # WAL's standard pairing: stop fsyncing every commit and flush at checkpoint
+    # instead. A process crash or a restart is still safe — the WAL lives in the
+    # OS page cache and outlives the process — so what this trades away is
+    # narrow: an OS crash or power cut can lose the most recent commits. Set
+    # MISE_SQLITE_SYNCHRONOUS=FULL to put fsync-per-commit back without a deploy.
+    sync = config.SQLITE_SYNCHRONOUS
+    if sync not in _SYNCHRONOUS_ALLOWED:
+        # Fall back toward MORE durability, never less, and say so.
+        log.warning(
+            "MISE_SQLITE_SYNCHRONOUS=%r not in %s — using FULL", sync, sorted(_SYNCHRONOUS_ALLOWED)
+        )
+        sync = "FULL"
+    con.execute(f"PRAGMA synchronous={sync}")
     return con
 
 

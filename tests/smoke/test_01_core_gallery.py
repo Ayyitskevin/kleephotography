@@ -64,8 +64,16 @@ def test_csp_header(client):
         "form-action 'self'",
     ):
         assert needed in csp, needed
-    # analytics is the only off-origin asset, allowed for script + connect
-    assert "https://plausible.io" in csp
+    # Analytics is the only off-origin asset, and now allowed ONLY when it is
+    # actually configured — asserted in full by
+    # test_csp_allows_plausible_only_when_analytics_is_on. Here the header is
+    # read from a live response, whose CSP was built at import from whatever
+    # PLAUSIBLE_DOMAIN the environment had, so this pins the invariant that
+    # holds either way: no off-origin destination beyond plausible.io.
+    for directive in ("script-src", "connect-src"):
+        d = next(x for x in csp.split("; ") if x.startswith(directive + " "))
+        offsite = [t for t in d.split() if t.startswith("http")]
+        assert offsite in ([], ["https://plausible.io"]), (directive, offsite)
     # indexable marketing pages carry the policy too
     assert "content-security-policy" in client.get("/").headers
 
