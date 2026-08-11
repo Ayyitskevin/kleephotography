@@ -30,6 +30,11 @@ def telegram_enabled() -> bool:
     return bool(config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID)
 
 
+def deadman_enabled() -> bool:
+    """External dead-man's switch. Independent of telegram_enabled on purpose."""
+    return bool(config.HEARTBEAT_PING_URL)
+
+
 def sms_enabled() -> bool:
     """Quo / OpenPhone SMS."""
     return bool(config.QUO_API_KEY and config.QUO_NUMBER)

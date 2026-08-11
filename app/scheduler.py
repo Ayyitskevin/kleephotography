@@ -21,6 +21,7 @@ from . import (
     booking_reminders,
     config,
     contract_reminders,
+    deadman,
     gallery_reminders,
     jobs,
     ops_monitor,
@@ -59,6 +60,14 @@ def _loop() -> None:
             jobs.prune_done()
         except Exception:
             log.exception("job retention sweep failed")
+        # Last, and outside every sweep's own try: reaching here means the loop
+        # itself completed a pass. Individual sweeps failing is what Telegram is
+        # for; this answers the different question of whether anything is
+        # running at all, which nothing on this host can answer about itself.
+        try:
+            deadman.ping()
+        except Exception:
+            log.exception("dead-man ping failed")
 
 
 def start() -> None:
