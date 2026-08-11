@@ -89,7 +89,8 @@ provider changes.
    301/308 that can replay an unsafe request body across origins.
 3. Validate HTTP → HTTPS and `www` → apex with temporary, non-cacheable redirects
    that preserve path and query.
-4. Keep HSTS at `max-age=300`. Do not enable `includeSubDomains` or preload in
+4. HSTS is now `max-age=15552000` (180 days) via `MISE_HSTS_MAX_AGE` — see
+   "HSTS ratchet" below. Do not enable `includeSubDomains` or preload in
    this pass.
 5. Promote the edge redirects to permanent only after the acceptance checks and
    an observation window. A browser-cached permanent redirect cannot be rolled
@@ -142,7 +143,8 @@ canonical link. Also verify:
   `Secure`, `HttpOnly`, and `SameSite=Lax` without exposing the password in
   a command or log.
 - `curl -sSI https://kleephotography.com/healthz` includes
-  `Strict-Transport-Security: max-age=300`.
+  `Strict-Transport-Security: max-age=15552000` (or whatever
+  `MISE_HSTS_MAX_AGE` is set to), with no `includeSubDomains` and no `preload`.
 - Unit, integration, smoke, Ruff check, Ruff format, and exact-SHA CI all pass.
 
 ## Rollback
@@ -158,3 +160,31 @@ canonical link. Also verify:
    the exact proof, then verify public absence before returning traffic.
 4. Republish only individually verified testimonials, case studies, galleries,
    and assets. Never restore unverified proof merely to fill an empty layout.
+
+## HSTS ratchet
+
+`max-age=300` was July's deliberately reversible starting value. Five minutes of
+protection is close to none — it only covers a visitor who returns within the
+window — and it then sat at that value, which is the usual way a temporary
+setting becomes permanent. It is now **15552000** (180 days), the normal
+production figure, set through `MISE_HSTS_MAX_AGE` so the next change needs a
+restart rather than a deploy.
+
+**Before deploying the raise, confirm TLS actually holds**, because this is the
+one header you cannot take back quickly: a browser that has cached a long
+max-age refuses to reach the site over plaintext for that long, so if TLS breaks
+the lockout lasts as long as the number. Run the baseline `curl` checks above and
+confirm apex and `www` both serve valid certificates and the redirect chain ends
+on `https://kleephotography.com`.
+
+If you would rather step it, set `MISE_HSTS_MAX_AGE` to `86400` (a day), then
+`604800` (a week), then leave it at the default. Lowering the value does
+propagate — browsers pick up the smaller max-age on their next successful visit
+— but only while TLS still works, which is exactly why the pre-flight matters.
+
+**Still open, owner decision:** `includeSubDomains` and `preload`. Both need a
+subdomain TLS inventory that does not exist yet — `includeSubDomains` will break
+any subdomain not on valid TLS, and preload is embedded in browser binaries and
+takes months to reverse. Revisit once every subdomain in use is inventoried and
+confirmed on TLS; there is no deadline pressure to enable either, and neither is
+required for the protection the 180-day root policy already gives.

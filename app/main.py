@@ -276,10 +276,11 @@ async def common_headers(request: Request, call_next):
     resp.headers["Permissions-Policy"] = PERMISSIONS_POLICY
     # HSTS only when we know we're served over TLS (same signal as Secure
     # cookies) — sending it for a plain-http dev origin would wrongly pin
-    # localhost to https. Start with a reversible five-minute policy; longer
-    # retention and subdomain coverage require a separate TLS inventory.
+    # localhost to https. No includeSubDomains and no preload: both need a
+    # subdomain TLS inventory that does not exist yet, and preload is materially
+    # harder to undo than max-age. See ops/TRUTHFUL-HTTPS.md.
     if config.COOKIE_SECURE:
-        resp.headers["Strict-Transport-Security"] = "max-age=300"
+        resp.headers["Strict-Transport-Security"] = f"max-age={config.HSTS_MAX_AGE}"
     # App templates version top-level static URLs with a content-derived ?v=
     # buster (see app/render.py), so those responses stay long-lived. Font URLs
     # inside fonts.css have stable filenames and need a bounded freshness window.

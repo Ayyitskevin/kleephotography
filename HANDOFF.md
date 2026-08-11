@@ -150,7 +150,9 @@ The audit remediation and the follow-up queue finished as:
   sessions (migration 065 + `admin_sessions`), `COOKIE_SECURE` derives from an
   https BASE_URL, cross-IP per-target PIN cap (`PIN_TARGET_MAX_FAILS`), Stripe
   `?thanks=1` return acknowledged (#17), `/c/ /w/ /t/` now rate-metered, admin
-  password compare is bytes-safe. HSTS ships at `max-age=300` when COOKIE_SECURE.
+  password compare is bytes-safe. HSTS ships at `max-age=15552000` (180d, `MISE_HSTS_MAX_AGE`) when COOKIE_SECURE,
+  root-only — no `includeSubDomains`/preload pending a subdomain TLS inventory
+  (ops/TRUTHFUL-HTTPS.md).
 - **Security follow-ups:** Permissions-Policy header + RFC 9116 security.txt (#16);
   CSP `script-src` has NO `unsafe-inline` — per-request nonces + delegated
   `static/behaviors.js` (data-confirm / data-print / data-autosubmit / data-goto),
