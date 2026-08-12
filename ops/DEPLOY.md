@@ -83,6 +83,13 @@ together. See [`MIGRATIONS.md`](MIGRATIONS.md).
 Touching `scripts/deploy-flow.sh`, `mise.service`, host hardening, or the backup chain
 is **red-light** per [`AGENTS.md`](../AGENTS.md) (PR + human merge).
 
+## Open design question
+
+[`DB-CONNECTIONS.md`](DB-CONNECTIONS.md) measures what `db.one`/`all_`/`run`
+cost by opening a connection per statement (~150 ms of a 60-photo gallery load,
+growing with every migration) and lays out the options. Nothing is implemented —
+it is a decision waiting on a measurement from the prod host.
+
 ## Migrations on deploy
 
 `db.migrate()` runs on app startup. Migrations are forward-only against the live
