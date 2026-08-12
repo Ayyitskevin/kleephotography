@@ -305,13 +305,14 @@ def test_plutus_callback_records_the_handoff_result(monkeypatch):
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-# Every module whose async handlers were swept. app/main.py is out by design
-# (/healthz and the error handler are degradation paths that must answer while
-# the threadpool is saturated), and so are app/admin/financials.py and
-# app/admin/uploads.py, which still carry the defect and are owned elsewhere.
-# Adding a module here is how the fence grows to cover them — app/public/pay.py
-# joined when the Stripe webhook was split.
+# Every module whose async handlers were swept. app/main.py is out by design:
+# /healthz and the error handler are degradation paths that must answer while the
+# threadpool is saturated. Everything else is now covered — app/public/pay.py
+# joined when the Stripe webhook was split, and app/admin/financials.py and
+# app/admin/uploads.py when the upload handlers were.
 SWEPT = (
+    "app/admin/financials.py",
+    "app/admin/uploads.py",
     "app/public/forms.py",
     "app/public/pay.py",
     "app/public/sms_webhook.py",

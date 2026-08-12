@@ -40,6 +40,15 @@
 {% block head %}{% endblock %}
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
+{# Keyboard users land here first. Client galleries put 60+ focusable tiles
+   between the top of the page and anything else, so without this a keyboard or
+   switch user tabs the whole grid to reach the download rail. The marketing
+   base ships its own (with the #main flex wrapper it needs) and blanks this.
+   The target is a bare span, not a wrapper: #main carries layout CSS, and the
+   18 templates on base_cream — every client page and the whole admin shell —
+   are not all flex columns. #}
+{% block skip_link %}<a class="skip-link" href="#content-start">Skip to content</a>
+<span id="content-start" tabindex="-1"></span>{% endblock %}
 {% block content %}{% endblock %}
 {# Live region for window.miseToast (behaviors.js) — inert until a toast
    lands; marketing pages don't ship behaviors.js and never use it. #}

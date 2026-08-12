@@ -5,6 +5,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from .. import config, db, jobs, security
 from ..imaging import PHOTO_EXTS, VIDEO_EXTS
@@ -27,6 +28,45 @@ def _cleanup_staged_uploads(originals: list[Path]) -> None:
 
 @router.post("/galleries/{gallery_id}/upload")
 async def upload(gallery_id: int, files: list[UploadFile], section_id: int | None = None):
+    """Only the byte streaming stays on the loop — it IS the await.
+
+    The database preflight, the disk-space stat, the directory creation and the
+    whole commit block are blocking, and on the event loop they stall every other
+    request. Uploads are the longest-running admin action there is, so this is
+    the handler where that hurts most. Same split as the rest of the de-async
+    sweep (the fence in tests/test_deasync.py now covers this module).
+    """
+    section_id, base = await run_in_threadpool(_upload_preflight, gallery_id, section_id)
+
+    rejected: list[str] = []
+    originals: list[Path] = []
+    staged: list[tuple[str, str, str, int]] = []
+    try:
+        for f in files:
+            name = _SAFE_NAME.sub("_", Path(f.filename or "upload").name)
+            ext = Path(name).suffix.lower()
+            if ext in PHOTO_EXTS:
+                kind = "photo"
+            elif ext in VIDEO_EXTS:
+                kind = "video"
+            else:
+                rejected.append(name)
+                continue
+            stored = f"{uuid.uuid4().hex}{ext}"
+            original = base / "original" / stored
+            originals.append(original)
+            size = await common.save_upload(f, original)
+            staged.append((kind, name, stored, size))
+    except Exception:
+        await run_in_threadpool(_cleanup_staged_uploads, originals)
+        raise
+
+    return await run_in_threadpool(
+        _commit_uploads, gallery_id, section_id, staged, originals, rejected
+    )
+
+
+def _upload_preflight(gallery_id: int, section_id: int | None) -> tuple[int | None, Path]:
     db.get_or_404("SELECT id FROM galleries WHERE id=?", (gallery_id,))
     # Preflight before creating media directories or copying upload bytes. The same
     # ownership check runs again inside the write transaction after all awaited
@@ -51,30 +91,16 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
     base = config.MEDIA_DIR / str(gallery_id)
     for sub in ("original", "web", "thumb"):
         (base / sub).mkdir(parents=True, exist_ok=True)
+    return section_id, base
 
-    rejected: list[str] = []
-    originals: list[Path] = []
-    staged: list[tuple[str, str, str, int]] = []
-    try:
-        for f in files:
-            name = _SAFE_NAME.sub("_", Path(f.filename or "upload").name)
-            ext = Path(name).suffix.lower()
-            if ext in PHOTO_EXTS:
-                kind = "photo"
-            elif ext in VIDEO_EXTS:
-                kind = "video"
-            else:
-                rejected.append(name)
-                continue
-            stored = f"{uuid.uuid4().hex}{ext}"
-            original = base / "original" / stored
-            originals.append(original)
-            size = await common.save_upload(f, original)
-            staged.append((kind, name, stored, size))
-    except Exception:
-        _cleanup_staged_uploads(originals)
-        raise
 
+def _commit_uploads(
+    gallery_id: int,
+    section_id: int | None,
+    staged: list[tuple[str, str, str, int]],
+    originals: list[Path],
+    rejected: list[str],
+) -> dict:
     accepted: list[int] = []
     job_ids: list[int] = []
     if staged:

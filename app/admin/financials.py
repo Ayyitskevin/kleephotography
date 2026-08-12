@@ -20,6 +20,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 
 from .. import config, db, security
@@ -648,21 +649,35 @@ def receipts(request: Request, filter: str = "all", offset: int = 0):
 
 @router.post("/receipts")
 async def receipt_upload(file: UploadFile = File(...), expense_id: int | None = Form(None)):
+    """Streaming stays on the loop; the lookup, the mkdir and the INSERT do not.
+
+    A phone-camera receipt is a few megabytes, and the database calls either side
+    of it were blocking the loop for every other request. Extension checking runs
+    here because it touches nothing but the filename.
+    """
     name = Path(file.filename or "receipt").name
     ext = Path(name).suffix.lower()
     if ext not in _RECEIPT_EXTS:
         raise HTTPException(status_code=400, detail="receipt must be an image or PDF")
+    stored = await run_in_threadpool(_receipt_preflight, expense_id, ext)
+    size = await common.save_upload(file, config.RECEIPTS_DIR / stored)
+    await run_in_threadpool(_record_receipt, name, stored, file.content_type, size, expense_id)
+    return RedirectResponse("/admin/financials/receipts", status_code=303)
+
+
+def _receipt_preflight(expense_id: int | None, ext: str) -> str:
     if expense_id and not db.one("SELECT id FROM expenses WHERE id=?", (expense_id,)):
         raise HTTPException(status_code=400, detail="unknown expense")
     config.RECEIPTS_DIR.mkdir(parents=True, exist_ok=True)
-    stored = f"{uuid.uuid4().hex}{ext}"
-    size = await common.save_upload(file, config.RECEIPTS_DIR / stored)
+    return f"{uuid.uuid4().hex}{ext}"
+
+
+def _record_receipt(name, stored, content_type, size, expense_id) -> None:
     db.run(
         """INSERT INTO receipts (filename, stored, content_type, size_bytes, expense_id)
               VALUES (?,?,?,?,?)""",
-        (name, stored, file.content_type, size, expense_id or None),
+        (name, stored, content_type, size, expense_id or None),
     )
-    return RedirectResponse("/admin/financials/receipts", status_code=303)
 
 
 @router.post("/receipts/{receipt_id}/delete")
