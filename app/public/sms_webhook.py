@@ -196,9 +196,30 @@ def _dispatch(raw: bytes, signature: str) -> dict:
     except (ValueError, UnicodeDecodeError):
         raise HTTPException(status_code=400, detail="unreadable payload")
 
+    # A body that parses but is not a JSON object is not a Quo envelope — a proxy
+    # error page, a captive portal, a wrong URL. Same reasoning as sms.py's
+    # response guard, and the same defect class as the four fixed there: without
+    # this, event.get raises AttributeError, which is an unhandled 500 rather
+    # than a refusal — and main.py's handler turns every unhandled 500 into a
+    # Telegram alert, so a malformed sender floods the operator channel too.
+    if not isinstance(event, dict):
+        raise HTTPException(
+            status_code=400, detail=f"payload is not a JSON object ({type(event).__name__})"
+        )
+
     # Quo nests the message/call under data.object; tolerate a flatter shape.
     etype = event.get("type", "")
-    obj = (event.get("data") or {}).get("object") or event.get("data") or {}
+    data = event.get("data")
+    obj = data.get("object") if isinstance(data, dict) else None
+    if not isinstance(obj, dict):
+        # data.object absent or the wrong shape — fall back to data itself, but
+        # only when THAT is an object. Every read below is obj.get(...), so a
+        # string or list here would raise exactly like the envelope did.
+        obj = data if isinstance(data, dict) else {}
+
+    if not isinstance(etype, str):
+        # etype feeds startswith / "in" checks; a non-string is not an event type.
+        etype = ""
 
     if etype.startswith("call."):
         return _handle_call(etype, obj)

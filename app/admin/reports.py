@@ -259,15 +259,17 @@ def reports(request: Request, period: str = Query("ytd", alias="range")):
 @router.get("/revenue.csv", response_class=PlainTextResponse)
 def revenue_csv():
     """Collected cash per month, all-time — for the accountant/spreadsheet.
-    Same wall-clock bucketing as the on-page chart, so the two never disagree."""
-    rows = db.all_(
-        """SELECT strftime('%Y-%m', created_at, 'localtime') AS month,
-                  COALESCE(SUM(amount_cents), 0) AS cents
-           FROM payments GROUP BY month ORDER BY month"""
-    )
+
+    Reads common.collected_by_month rather than re-issuing the query. The comment
+    below used to promise "the same wall-clock bucketing as the on-page chart";
+    it was a second copy of that SQL keeping the promise by hand, which is how
+    the earlier three copies drifted (see month_money_series). Now the file the
+    accountant receives and the chart on screen cannot disagree, because there
+    is one query."""
+    by_ym = common.collected_by_month()
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["month", "collected_usd"])
-    for r in rows:
-        w.writerow([r["month"], f"{r['cents'] / 100:.2f}"])
+    for month in sorted(by_ym):
+        w.writerow([month, f"{by_ym[month] / 100:.2f}"])
     return buf.getvalue()
