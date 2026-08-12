@@ -46,6 +46,9 @@
    film-stock class (sr-re / sr-pl / sr-fb) via the sr_stock block so their
    accent color reads var(--sr-stock). Kill switch: MISE_SCREENING_ROOM=false. #}
 {% block bodyclass %}site-body{% if sr_enabled() %} sr{% block sr_stock %}{% endblock %}{% endif %}{% endblock %}
+{# Its own skip link + #main wrapper below, so the shared one in base.html
+   would be a duplicate. #}
+{% block skip_link %}{% endblock %}
 {% block content %}
 <a class="skip-link" href="#main">Skip to content</a>
 {# Marquee nav (Screening Room 3a): one global link set on every page —

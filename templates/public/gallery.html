@@ -211,7 +211,12 @@
         <button type="button" class="vc-at" title="Tag your note to the current frame">Comment at 0:00</button>
         <button type="button" class="vc-cancel-reply" hidden>cancel reply</button>
       </div>
-      <textarea class="vc-body" placeholder="Leave a note at this moment…" required></textarea>
+      {# aria-label rather than a visually-hidden <label>: this codebase has no
+         such utility, and its `sr-` prefix means Screening Room, not screen
+         reader. A placeholder is not a label — it disappears the moment the
+         client starts typing, which is exactly when they might need it. #}
+      <textarea class="vc-body" aria-label="Your note"
+                placeholder="Leave a note at this moment…" required></textarea>
       <button type="submit" class="btn">Post note</button>
     </form>
   </div>
