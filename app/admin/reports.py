@@ -271,5 +271,5 @@ def revenue_csv():
     w = csv.writer(buf)
     w.writerow(["month", "collected_usd"])
     for month in sorted(by_ym):
-        w.writerow([month, f"{by_ym[month] / 100:.2f}"])
+        w.writerow([month, f"{by_ym[month]['cents'] / 100:.2f}"])
     return buf.getvalue()

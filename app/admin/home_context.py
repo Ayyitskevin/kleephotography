@@ -210,7 +210,7 @@ def _ctx_recent_galleries() -> list:
     )
 
 
-def _ctx_revenue_months(today: dt.date) -> list:
+def _ctx_revenue_months(today: dt.date, by_ym=None) -> list:
     """Trailing six months of collected revenue for the money-card bars —
     current month last, heights proportional to the best month (or the goal
     if it's higher, so the dashed goal silhouette stays the tallest thing).
@@ -223,6 +223,7 @@ def _ctx_revenue_months(today: dt.date) -> list:
         6,
         lambda m: m.strftime("%b").upper(),
         goal_cents=config.MONTHLY_GOAL_CENTS,
+        by_ym=by_ym,
     )
     return series
 
@@ -552,18 +553,20 @@ def _ctx_docs_in_flight() -> list:
     )
 
 
-def _ctx_revenue(outstanding, today: dt.date) -> dict:
+def _ctx_revenue(outstanding, today: dt.date, by_ym=None) -> dict:
     """Revenue snapshot: collected this month vs goal (display-only). The
     month-to-date window is the operator's calendar month — stored-UTC
     created_at converts to localtime before it is bucketed — so an evening
     payment on the last of the month lands in the month Kevin collected it, not
     the next one by UTC. The month being asked about is `today`'s, the same
     date the label beneath the figure is printed from."""
-    paid_mtd = db.one(
-        """SELECT COALESCE(SUM(amount_cents), 0) AS cents, COUNT(*) AS n
-           FROM payments
-           WHERE strftime('%Y-%m', created_at, 'localtime') = ?""",
-        (today.strftime("%Y-%m"),),
+    # Reads the shared mapping instead of a second query carrying its own copy of
+    # the bucketing expression, so the figure at the top of Home cannot disagree
+    # with the chart below it — there is one query left to disagree with. The
+    # caller passes `by_ym` in, because this page renders both and would
+    # otherwise run the same GROUP BY twice.
+    paid_mtd = (by_ym if by_ym is not None else common.collected_by_month()).get(
+        today.strftime("%Y-%m"), common.NO_CASH
     )
     goal_cents = config.MONTHLY_GOAL_CENTS
     return {
@@ -630,6 +633,10 @@ def _home_context() -> dict:
     recent_galleries = _ctx_recent_galleries()
     dismissed_today = _ctx_dismissed_today(today_iso)
     next_steps = _ctx_next_steps(dismissed_today, today_iso)
+    # One GROUP BY for both money widgets. The reel and the month-to-date figure
+    # ask the same question of the same table, so computing it twice would be
+    # both wasted work and a second chance for them to disagree.
+    by_ym = common.collected_by_month()
     return {
         **_ctx_greeting(today),
         **_ctx_orphans(),
@@ -638,7 +645,7 @@ def _home_context() -> dict:
         "open_tasks": _ctx_open_tasks(today_iso),
         **queue,
         "recent_galleries": recent_galleries,
-        "revenue_months": _ctx_revenue_months(today),
+        "revenue_months": _ctx_revenue_months(today, by_ym),
         "horizon_shoots": _ctx_horizon_shoots(today_iso),
         **invoices,
         "activity_24h": _ctx_activity_24h(),
@@ -652,7 +659,7 @@ def _home_context() -> dict:
             recent_galleries,
         ),
         "docs_in_flight": _ctx_docs_in_flight(),
-        "revenue": _ctx_revenue(counts["outstanding"], today),
+        "revenue": _ctx_revenue(counts["outstanding"], today, by_ym),
         "mini_cal": _ctx_mini_cal(today),
         "base_url": config.BASE_URL,
     }

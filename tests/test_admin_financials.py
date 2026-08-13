@@ -182,7 +182,10 @@ def test_reports_chart_buckets_a_late_payment_in_the_local_month(admin, new_york
     before = common.collected_by_month()
     with _payment_at(new_york["created_utc"], _LATE_CENTS):
         after = common.collected_by_month()
-    assert after[new_york["local"]] - before.get(new_york["local"], 0) == _LATE_CENTS
+    assert (
+        after[new_york["local"]]["cents"] - before.get(new_york["local"], common.NO_CASH)["cents"]
+        == _LATE_CENTS
+    )
     assert after.get(new_york["utc"], 0) == before.get(new_york["utc"], 0)
 
 
