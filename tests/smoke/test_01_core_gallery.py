@@ -168,13 +168,16 @@ def test_unhandled_exception_alerts_and_500(monkeypatch):
         assert r.status_code == 500
         assert "Something went wrong" in r.text
         assert "kaboom-secret-detail" not in r.text  # detail never leaks to client
+        assert r.headers.get("x-request-id")
         r = c.get("/__test_boom", headers={"accept": "application/json"})
         assert r.status_code == 500 and r.json()["detail"] == "internal server error"
+        assert r.headers.get("x-request-id")
     finally:
         app.router.routes = [
             rt for rt in app.router.routes if getattr(rt, "path", None) != "/__test_boom"
         ]
     assert fired and "RuntimeError" in fired[0][0]
+    assert "id=" in fired[0][1]
 
 
 def test_branded_error_pages(client):

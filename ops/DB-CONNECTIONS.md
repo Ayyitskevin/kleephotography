@@ -1,13 +1,19 @@
-# Connection reuse — a decision, not a change
+# Connection reuse
 
-`db.one`, `db.all_` and `db.run` each open a SQLite connection, run one
-statement, and close it. This file exists because that costs more than it looks
-like it does, and because fixing it touches a design choice that was made
-deliberately — so the fix wants agreeing before it wants writing.
+`db.one` and `db.all_` reuse a **per-thread** SQLite connection. `db.run` and
+`db.tx()` still open their own, unchanged. That is option 1 below, shipped
+because connect-per-statement was 99.7% of a read and a 60-photo gallery load
+spent ~150 ms opening the database.
 
-**Nothing here has been implemented.**
+Reads are keyed by `config.DB_PATH` so a test that points at a throwaway file
+does not keep reading the previous one. Write paths and `BEGIN IMMEDIATE`
+semantics are untouched. Do not hold a cursor on the read connection across a
+yield — `one`/`all_` exhaust theirs in the same statement; a held cursor pins
+a WAL snapshot and blocks checkpointing.
 
-## What it costs
+The rest of this file is the decision record that led here.
+
+## What it costs (measured before the change)
 
 Measured against a fully migrated database:
 
@@ -153,18 +159,16 @@ entry, which is a security property traded for latency — a different kind of
 decision from the others here, and one this file does not recommend making
 casually.
 
-## Recommendation
+## Recommendation (taken)
 
-Run the `mickey` measurement first. If it confirms the number:
+**Option 1, reads only.** Long-lived read connections set `PRAGMA cache_size=-500`
+(500 KiB instead of the 2 MB default). A test asserts a `wal_checkpoint(TRUNCATE)`
+still returns busy=0 after a reused read, and that a write on another connection
+is visible on the next `one()`.
 
-**Option 1, reads only, with a memory check.** It takes the whole saving on the
-path that is hot, leaves every write path and `db.tx()` untouched, and its one
-sharp edge — cursor pinning — provably does not apply to the two functions
-involved. Ship it behind a test that asserts a checkpoint still succeeds after a
-read, and compare process RSS before and after on the real host.
-
-If the memory ceiling proves uncomfortable, fall back to option 2 for two thirds
-of the win and no accumulation.
+Option 2 remains the fallback if RSS on the prod host grows more than a few tens
+of MB. Option 4 (caching the per-thumbnail auth lookups) is still not recommended:
+it caches an authorization decision.
 
 ## What would make this wrong
 

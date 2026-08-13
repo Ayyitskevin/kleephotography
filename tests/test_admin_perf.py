@@ -66,8 +66,12 @@ def _walk_spy(monkeypatch) -> list[str]:
 
 
 def _connection_spy(monkeypatch) -> list[str]:
-    """Count DB round trips. Every db helper opens its own short-lived
-    connection (app/db.py), so connections opened == queries issued."""
+    """Count new db.connect() calls after the spy is installed.
+
+    Reads reuse a per-thread connection, so this is no longer "queries issued".
+    Writes and tx() still open their own. The star-toggle tests compare two
+    benches of different sizes: the count must not scale with the bench.
+    """
     opened: list[str] = []
     real_connect = db.connect
 
@@ -213,6 +217,7 @@ def test_star_toggle_cost_does_not_scale_with_the_bench(admin_client, monkeypatc
     # A 20-asset/3-video bench costs exactly what a 3-asset one does: the write,
     # the gallery, the one asset, its sections and the two grouped count
     # queries, plus the two the admin session gate spends on every request.
+    # Connection reuse means this counts new connect() calls, not statements.
     assert big_queries == small_queries
     assert big_queries <= 8, f"{big_queries} queries for one tile"
 

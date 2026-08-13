@@ -5,7 +5,7 @@ PIN-gated client galleries, content delivery, proposals → contracts → Stripe
 and the public marketing site — one FastAPI + HTMX app on SQLite/WAL, with no ORM and no
 JavaScript build step.
 
-Live: **<https://kleephotography.com>** · Python 3.12+ (CI on 3.12 and 3.14) · 711 tests · no bundler, no broker, no ORM
+Live: **<https://kleephotography.com>** · Python 3.12+ (CI on 3.12 and 3.14) · no bundler, no broker, no ORM
 
 ---
 
@@ -66,10 +66,11 @@ Three audiences, one process, one SQLite file:
 Each of these is a deliberate constraint, and each is one file away if you want to check it.
 
 **No ORM.** `app/db.py` is ~270 lines of `sqlite3` wrapped in `one()` / `all_()` / `run()` /
-`tx()`, over half of it the migration runner. Every connection is opened per call and closed in a `finally`, which is what makes
-the same helpers safe to use from the job threads. Dynamic identifiers go through
+`tx()`, over half of it the migration runner. Reads reuse a per-thread connection
+(schema parse was 99% of `db.one`); writes still open and close per call so job
+threads and `tx()` stay isolated. Dynamic identifiers go through
 `db.ident(name, allowed)` — an allowlist that raises rather than interpolating — and values
-always go through `?` placeholders.
+always go through `?` placeholders. Decision: [`ops/DB-CONNECTIONS.md`](ops/DB-CONNECTIONS.md).
 
 **Jobs are staged inside the caller's transaction.** `jobs.stage(con, kind, payload)`
 inserts a queued row on the *caller's* connection; `jobs.dispatch(ids)` is only called after
@@ -123,14 +124,13 @@ different filenames, so both names are treated as equivalent and a clean deploy 
 re-run its `ALTER`s against a database that already has them. Policy:
 [`ops/MIGRATIONS.md`](ops/MIGRATIONS.md).
 
-**711 tests in a unit / integration / smoke split**, so feedback is tiered rather than
-one slow suite: 179 unit (pure logic, no DB), 351 integration (SQLite + `TestClient` seams),
-187 smoke (end-to-end against a throwaway DB, ffmpeg required for the video path) — six
-tests carry both the unit and integration markers, which is why those add up to more than
-the non-smoke total. CI runs all three plus ruff on every push to `main` and every pull
-request, and a second job re-runs unit + integration on 3.12 so the supported floor above
-is tested rather than asserted. Coverage is measured against `app/` with a floor CI
-enforces.
+**Tests in a unit / integration / smoke split**, so feedback is tiered rather than
+one slow suite: unit (pure logic, no DB), integration (SQLite + `TestClient` seams),
+smoke (end-to-end against a throwaway DB, ffmpeg required for the video path). CI
+runs all three plus ruff on every push to `main` and every pull request, and a
+second job re-runs unit + integration on 3.12 so the supported floor above is
+tested rather than asserted. Coverage is measured against `app/` with a floor CI
+enforces. Counts drift; the gates in CI are the contract.
 
 ## Local setup
 
@@ -194,7 +194,8 @@ a human on the irreversible parts.
   needs a human (money, schema, deploy, security, contracts), the gates above, and the
   conventions that bite.
 - [`ops/`](ops/) — operator runbooks: [`DEPLOY.md`](ops/DEPLOY.md),
-  [`BACKUP.md`](ops/BACKUP.md) (nightly local snapshot; off-host DR is a tracked open gap),
+  [`BACKUP.md`](ops/BACKUP.md) (nightly local snapshot + durable files),
+  [`DR.md`](ops/DR.md) (off-host restic; opt-in until `RESTIC_REPOSITORY` is set),
   [`MIGRATIONS.md`](ops/MIGRATIONS.md), [`CSS-DUAL-STACK.md`](ops/CSS-DUAL-STACK.md),
   [`SPECIALTY-LAUNCH.md`](ops/SPECIALTY-LAUNCH.md),
   [`AT-LEAST-ONCE.md`](ops/AT-LEAST-ONCE.md) — jobs/reminders send-then-record contract.

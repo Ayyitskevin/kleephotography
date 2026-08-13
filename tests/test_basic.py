@@ -668,18 +668,17 @@ def test_static_asset_cache_and_font_preload_identity(client):
     assert fonts_css_response.headers["cache-control"] == r.headers["cache-control"]
     fonts_css = fonts_css_response.text
 
-    # Font filenames are stable and unversioned in fonts.css. They must revalidate
-    # on a short cadence, and preload URLs must be byte-for-byte identical so the
-    # browser can reuse each preload for the later @font-face request.
+    # Font filenames carry a version infix so they can be cached forever.
+    # Preload URLs must be byte-for-byte identical so the browser can reuse
+    # each preload for the later @font-face request.
     font_urls = (
-        "/static/fonts/newsreader-latin.woff2",
-        "/static/fonts/archivo-latin.woff2",
+        "/static/fonts/newsreader-latin.v1.woff2",
+        "/static/fonts/archivo-latin.v1.woff2",
     )
     for url in font_urls:
         font = client.get(url)
         assert font.status_code == 200
-        assert font.headers["cache-control"] == "public, max-age=86400"
-        assert "immutable" not in font.headers["cache-control"]
+        assert font.headers["cache-control"] == "public, max-age=31536000, immutable"
         assert f"url({url})" in fonts_css
 
     def assert_font_preloads(page):
@@ -790,13 +789,16 @@ def test_unhandled_exception_alerts_and_500(monkeypatch):
         assert r.status_code == 500
         assert "Something went wrong" in r.text
         assert "kaboom-secret-detail" not in r.text  # detail never leaks to client
+        assert r.headers.get("x-request-id")
         r = c.get("/__test_boom", headers={"accept": "application/json"})
         assert r.status_code == 500 and r.json()["detail"] == "internal server error"
+        assert r.headers.get("x-request-id")
     finally:
         app.router.routes = [
             rt for rt in app.router.routes if getattr(rt, "path", None) != "/__test_boom"
         ]
     assert fired and "RuntimeError" in fired[0][0]
+    assert "id=" in fired[0][1]
 
 
 @pytest.mark.integration

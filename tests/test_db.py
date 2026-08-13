@@ -295,3 +295,64 @@ def test_a_files_pragma_does_not_leak_into_the_next_migration(tmp_path, monkeypa
     assert db.all_("SELECT parent_id FROM child") == []
     assert db.one("SELECT name FROM schema_migrations WHERE name='003_needs_fk.sql'") is None
     assert db.one("SELECT name FROM schema_migrations WHERE name='002_fk_off.sql'") is not None
+
+
+@pytest.mark.integration
+def test_one_reuses_a_thread_local_connection(monkeypatch):
+    """A gallery load is ~186 reads; opening the database was 99% of each one."""
+    old = getattr(db._local, "con", None)
+    if old is not None:
+        old.close()
+    db._local.con = None
+    db._local.path = None
+
+    opened: list[str] = []
+    real = db.connect
+
+    def spy():
+        opened.append("db")
+        return real()
+
+    monkeypatch.setattr(db, "connect", spy)
+    db.one("SELECT 1 AS n")
+    db.one("SELECT 1 AS n")
+    db.all_("SELECT 1 AS n")
+    assert len(opened) == 1
+
+
+@pytest.mark.integration
+def test_reused_read_sees_writes_from_another_connection():
+    """Autocommit on the next statement starts a fresh snapshot — not a stale one."""
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin) VALUES (?,?,?)",
+        ("read-reuse-visible", "read reuse", "1234"),
+    )
+    try:
+        assert db.one("SELECT title FROM galleries WHERE id=?", (gid,))["title"] == "read reuse"
+        db.run("UPDATE galleries SET title=? WHERE id=?", ("after write", gid))
+        assert db.one("SELECT title FROM galleries WHERE id=?", (gid,))["title"] == "after write"
+    finally:
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
+@pytest.mark.integration
+def test_reused_read_does_not_pin_a_wal_snapshot():
+    """A held cursor would make wal_checkpoint(TRUNCATE) return busy!=0."""
+    db.one("SELECT 1 AS n")
+    db.all_("SELECT name FROM sqlite_master LIMIT 1")
+    con = db.connect()
+    try:
+        busy, _log, _checkpointed = con.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        assert busy == 0
+    finally:
+        con.close()
+
+
+@pytest.mark.integration
+def test_read_connection_follows_a_db_path_swap(tmp_path, monkeypatch):
+    """Tests (and a rare config swap) must not keep reading the previous file."""
+    db.one("SELECT 1 AS n")
+    migrations = _isolated_db(tmp_path, monkeypatch)
+    (migrations / "001_init.sql").write_text("CREATE TABLE only_here (id INTEGER PRIMARY KEY);")
+    db.migrate()
+    assert db.one("SELECT name FROM sqlite_master WHERE name='only_here'")["name"] == "only_here"

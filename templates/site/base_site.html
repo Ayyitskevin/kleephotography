@@ -30,8 +30,8 @@
 {# Self-hosted typefaces — no Google Fonts CDN; fonts.css is loaded once for
    every surface by base.html. These preloads just jump the queue for the two
    latin files the site paints first. #}
-<link rel="preload" href="/static/fonts/newsreader-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/newsreader-latin.v1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/archivo-latin.v1.woff2" as="font" type="font/woff2" crossorigin>
 {% if plausible_domain %}
 <script nonce="{{ csp_nonce }}">window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)};</script>
 {% endif %}

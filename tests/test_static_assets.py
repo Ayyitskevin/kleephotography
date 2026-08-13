@@ -136,6 +136,14 @@ def test_both_sheets_enter_the_same_cascade_layer():
     assert idiom.search(BASE_ADMIN.read_text()).group(1) == "mise-admin"
 
 
+def test_screening_caption_floor():
+    """The 8.5–9px caption/kicker sizes are gone. 9.5px labels are a separate scale."""
+    css = (ROOT / "static/screening.css").read_text()
+    assert "8.5px" not in css
+    assert not re.search(r"font-size:\s*9px\b", css)
+    assert not re.search(r"\bfont:\s*[^;{}]*\s9px/", css)
+
+
 def test_admin_shell_markup_lives_only_on_the_admin_base():
     """The moved rules are unreachable elsewhere only while this stays true."""
     wearers = [

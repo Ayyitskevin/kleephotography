@@ -53,9 +53,9 @@ minutes; the cost of an unattended money/schema mistake is an incident.
 ```sh
 source .venv/bin/activate
 # 1. unit (fast, pure logic — no DB/network)
-python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m unit
+python -m pytest tests/ --ignore=tests/smoke -q -m unit
 # 2. integration (SQLite + TestClient seams — CI runs this too)
-python -m pytest tests/ --ignore=tests/smoke --ignore=tests/test_smoke.py -q -m integration
+python -m pytest tests/ --ignore=tests/smoke -q -m integration
 # 3. full smoke (e2e against a throwaway DB; ffmpeg needed for video tests)
 MISE_DATA_DIR=$(mktemp -d) MISE_SECRET_KEY=test MISE_ADMIN_PASSWORD=pw \
   python -m pytest tests/ -q -m smoke
@@ -103,10 +103,12 @@ display-only, one row per write. Never read that log back into any Mise flow.
 
 ## Safety net (so you know what's catching you)
 
-Nightly on the prod host: integrity-checked SQLite snapshot
-(`mise-backup.timer` → `ops/backup.sh` → `/opt/mise/data/backups/`). Off-host DR is a
-**known open gap**, tracked in `ops/BACKUP.md`. Local nightlies do **not** make a bad
-migration or a wrong Stripe charge a non-event. Red-light rules still hold.
+Nightly on the prod host: integrity-checked SQLite snapshot plus `media/` /
+`brand/` / `receipts/` (`mise-backup.timer` → `ops/backup.sh`). Off-host encrypted
+restic + monthly restore-verify is **opt-in** — `RESTIC_REPOSITORY` on the host,
+runbook [`ops/DR.md`](ops/DR.md). Until that env is set, treat backups as "we can
+undo a mistake," not "we can survive losing the host." Local nightlies do **not**
+make a bad migration or a wrong Stripe charge a non-event. Red-light rules still hold.
 
 ## Done means
 

@@ -1,8 +1,9 @@
-"""SQLite access — WAL mode, short-lived connections (safe across job threads)."""
+"""SQLite access — WAL mode, thread-local reads, short-lived writes."""
 
 import logging
 import re
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -41,6 +42,18 @@ _PRAGMA_NAME = re.compile(r"\APRAGMA\s+(\w+)", re.IGNORECASE)
 
 
 _SYNCHRONOUS_ALLOWED = frozenset({"NORMAL", "FULL"})
+
+# one() / all_ reuse a connection per thread. sqlite3.connect defaults to
+# check_same_thread=True, so this is the reuse scheme that keeps that invariant
+# — never a process-wide singleton. Keyed by DB_PATH so a test (or a rare config
+# swap) that points at a different file does not keep reading the previous one.
+#
+# Default cache_size is −2000 (2 MB) per connection. Across the anyio pool plus
+# job threads that is tens of MB the process did not use when every helper
+# opened and closed. 500 KiB is enough for the hot gallery reads; writes still
+# use a fresh connect() with the default. See ops/DB-CONNECTIONS.md.
+_READ_CACHE_KIB = 500
+_local = threading.local()
 
 
 def connect() -> sqlite3.Connection:
@@ -222,20 +235,39 @@ def ident(name: str, allowed) -> str:
     return name
 
 
-def one(sql: str, params: tuple = ()) -> sqlite3.Row | None:
+def _read_con() -> sqlite3.Connection:
+    """Per-thread connection for one() / all_ only.
+
+    Do not hold a cursor on this connection across a yield — a held cursor pins
+    a WAL snapshot and blocks checkpointing. one() and all_ exhaust their cursor
+    in the same statement; keep it that way.
+    """
+    path = str(config.DB_PATH)
+    cached = getattr(_local, "con", None)
+    cached_path = getattr(_local, "path", None)
+    if cached is not None and cached_path == path:
+        return cached
+    if cached is not None:
+        try:
+            cached.close()
+        except sqlite3.Error:
+            pass
     con = connect()
-    try:
-        return con.execute(sql, params).fetchone()
-    finally:
-        con.close()
+    con.execute(f"PRAGMA cache_size=-{_READ_CACHE_KIB}")
+    _local.con = con
+    _local.path = path
+    return con
+
+
+def one(sql: str, params: tuple = ()) -> sqlite3.Row | None:
+    # Cursor is a temporary; CPython frees it when the statement ends, so this
+    # cannot pin a WAL snapshot. Do not assign the cursor to a name that outlives
+    # the fetch.
+    return _read_con().execute(sql, params).fetchone()
 
 
 def all_(sql: str, params: tuple = ()) -> list[sqlite3.Row]:
-    con = connect()
-    try:
-        return con.execute(sql, params).fetchall()
-    finally:
-        con.close()
+    return _read_con().execute(sql, params).fetchall()
 
 
 def run(sql: str, params: tuple = ()) -> int:

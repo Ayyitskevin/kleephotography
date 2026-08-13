@@ -282,14 +282,13 @@ async def common_headers(request: Request, call_next):
     if config.COOKIE_SECURE:
         resp.headers["Strict-Transport-Security"] = f"max-age={config.HSTS_MAX_AGE}"
     # App templates version top-level static URLs with a content-derived ?v=
-    # buster (see app/render.py), so those responses stay long-lived. Font URLs
-    # inside fonts.css have stable filenames and need a bounded freshness window.
+    # buster (see app/render.py). Font files are versioned in the filename
+    # (newsreader-latin.v1.woff2) so they can share the immutable policy —
+    # bump the infix when a face changes.
     if 300 <= resp.status_code < 400 and "location" in resp.headers:
         # Redirect targets can change during rollback; never let browsers or the
         # edge pin even a permanent redirect response.
         resp.headers.setdefault("Cache-Control", "no-store")
-    elif p.startswith("/static/fonts/"):
-        resp.headers["Cache-Control"] = "public, max-age=86400"
     elif p.startswith("/static/"):
         resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     elif resp.headers.get("content-type", "").startswith("text/html"):
@@ -327,14 +326,17 @@ async def unhandled_errors(request: Request, exc: Exception):
     # threadpool is saturated, a sync handler could not run, and the one request
     # guaranteed to need it is the one that already failed.
     # An uncaught exception means a 500 the user already hit — make it loud.
-    # Log the full traceback for debugging, fire ONE throttled Telegram alert so
-    # Kevin hears about the bug while the app is still up, then return a branded
-    # 500 (HTML) / plain 500 (API) without leaking the exception detail.
-    log.exception("unhandled error: %s %s", request.method, request.url.path)
+    # Log the full traceback, fire ONE throttled Telegram alert so Kevin hears
+    # about the bug while the app is still up, stamp a short request id on the
+    # log line / alert / response so journald matches a client report, then
+    # return a branded 500 without leaking the exception detail.
+    req_id = secrets.token_hex(8)
+    log.exception("unhandled error id=%s %s %s", req_id, request.method, request.url.path)
     alerts.error_alert(
         f"{request.method} {request.url.path}|{type(exc).__name__}",
-        f"{type(exc).__name__} on {request.method} {request.url.path}: {str(exc)[:300]}",
+        f"{type(exc).__name__} on {request.method} {request.url.path} id={req_id}: {str(exc)[:300]}",
     )
+    headers = {"X-Request-ID": req_id}
     if "text/html" in request.headers.get("accept", ""):
         return templates.TemplateResponse(
             request,
@@ -344,8 +346,9 @@ async def unhandled_errors(request: Request, exc: Exception):
                 "Try again in a moment, or get in touch if it persists."
             },
             status_code=500,
+            headers=headers,
         )
-    return JSONResponse({"detail": "internal server error"}, status_code=500)
+    return JSONResponse({"detail": "internal server error"}, status_code=500, headers=headers)
 
 
 # Its OWN thread, not an anyio worker: the anyio pool being saturated is one of
