@@ -1,10 +1,14 @@
 """Derivative + original serving. FileResponse handles HTTP Range (iOS video)."""
 
+import hashlib
 import mimetypes
+from email.utils import formatdate, parsedate
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
+from starlette.datastructures import Headers
+from starlette.staticfiles import NotModifiedResponse
 
 from .. import config, db, security
 from .downloads import _email_required
@@ -13,6 +17,59 @@ from .gallery import get_live_gallery, is_expired
 router = APIRouter(prefix="/media")
 
 VARIANTS = {"thumb", "web", "original"}
+
+# Client galleries are private, so these bytes cannot go in a shared cache, but a
+# returning client should not re-fetch what they already hold.
+_CACHE_CONTROL = "private, max-age=86400"
+
+
+def _conditional_file(request: Request, path: Path, media_type: str):
+    """FileResponse, or 304 when the client already holds these exact bytes.
+
+    FileResponse SENDS ETag and Last-Modified but never reads the conditional
+    request headers back — that logic lives in StaticFiles, which these routes
+    cannot use because every byte here is behind a PIN. So once the 24h freshness
+    window lapsed, a returning client re-downloaded the entire grid in full,
+    having just presented the very ETag proving it had not changed. On a 60-photo
+    gallery that is megabytes over mobile data for nothing.
+
+    The ETag is derived exactly as FileResponse derives it (mtime + size), so a
+    tag minted by an earlier response still matches here.
+    """
+    try:
+        st = path.stat()
+    except OSError:
+        raise HTTPException(status_code=404)
+    etag_base = f"{st.st_mtime}-{st.st_size}"
+    etag = f'"{hashlib.md5(etag_base.encode(), usedforsecurity=False).hexdigest()}"'
+    last_modified = formatdate(st.st_mtime, usegmt=True)
+    headers = {
+        "Cache-Control": _CACHE_CONTROL,
+        "ETag": etag,
+        "Last-Modified": last_modified,
+    }
+    if _client_copy_is_current(request.headers, etag, last_modified):
+        return NotModifiedResponse(Headers(headers))
+    # stat_result is handed over so FileResponse does not stat the file again.
+    return FileResponse(path, media_type=media_type, headers=headers, stat_result=st)
+
+
+def _client_copy_is_current(req_headers, etag: str, last_modified: str) -> bool:
+    """Mirrors starlette.staticfiles.StaticFiles.is_not_modified.
+
+    If-None-Match wins outright when present, per RFC 9110: it is exact where a
+    date comparison is only second-resolution. W/ prefixes are stripped because a
+    weak validator still identifies the same bytes for our purposes.
+    """
+    if if_none_match := req_headers.get("if-none-match"):
+        return etag in [tag.strip().removeprefix("W/") for tag in if_none_match.split(",")]
+    if_modified_since = parsedate(req_headers.get("if-modified-since", ""))
+    parsed_last_modified = parsedate(last_modified)
+    return bool(
+        if_modified_since is not None
+        and parsed_last_modified is not None
+        and if_modified_since >= parsed_last_modified
+    )
 
 
 def _resolve(slug: str, variant: str, asset_id: int, request: Request):
@@ -65,15 +122,11 @@ def poster(request: Request, slug: str, asset_id: int):
     path = config.MEDIA_DIR / str(g["id"]) / "web" / f"{stem}_poster.jpg"
     if not path.is_file():
         raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"}
-    )
+    return _conditional_file(request, path, "image/jpeg")
 
 
 @router.get("/{slug}/{variant}/{asset_id}")
 def serve(request: Request, slug: str, variant: str, asset_id: int):
     a, path = _resolve(slug, variant, asset_id, request)
     media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
-    return FileResponse(
-        path, media_type=media_type, headers={"Cache-Control": "private, max-age=86400"}
-    )
+    return _conditional_file(request, path, media_type)
