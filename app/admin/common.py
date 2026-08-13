@@ -49,23 +49,33 @@ def open_invoice_balance():
     )
 
 
-def collected_by_month() -> dict[str, int]:
+def collected_by_month() -> dict[str, dict[str, int]]:
     """Cash collected per YYYY-MM from Stripe payment events (the source of
     truth for revenue — an invoice total stamped by paid_at counts a
     deposit-paid-but-still-open invoice as zero).
+
+    Maps 'YYYY-MM' to {"cents": ..., "n": ...}. The count rides along because
+    Home prints "N payments" beside the figure and used to fetch it with a second
+    query carrying its own copy of the bucketing expression below — the fourth
+    copy of a rule that had already drifted once (see month_money_series).
 
     created_at is stored UTC, but the month is decided on the operator's wall
     clock ('localtime'): a 9 PM payment on the last of the month is already the
     first of the next month in UTC, and it belongs to the month he collected
     it. Months with no cash are simply absent from the mapping."""
     return {
-        r["ym"]: r["cents"]
+        r["ym"]: {"cents": r["cents"], "n": r["n"]}
         for r in db.all_(
             """SELECT strftime('%Y-%m', created_at, 'localtime') AS ym,
-                      COALESCE(SUM(amount_cents), 0) AS cents
+                      COALESCE(SUM(amount_cents), 0) AS cents,
+                      COUNT(*) AS n
                FROM payments GROUP BY ym"""
         )
     }
+
+
+# Months with no cash are absent from the mapping; this is what they look like.
+NO_CASH = {"cents": 0, "n": 0}
 
 
 def month_money_series(
@@ -75,6 +85,7 @@ def month_money_series(
     *,
     goal_cents: int = 0,
     bars: bool = True,
+    by_ym: dict[str, dict[str, int]] | None = None,
 ) -> tuple[list[dict], int]:
     """The trailing `months` months of collected cash ending with `today`'s
     month, oldest first, plus the scale their bars are drawn against.
@@ -99,8 +110,11 @@ def month_money_series(
         window.append(cursor)
         cursor = (cursor - dt.timedelta(days=1)).replace(day=1)
     window.reverse()
-    by_ym = collected_by_month()
-    cents = [by_ym.get(m.strftime("%Y-%m"), 0) for m in window]
+    # `by_ym` lets a caller that already holds the mapping pass it in — Home
+    # renders both this reel and the month-to-date figure, and would otherwise
+    # run the same GROUP BY twice for one page.
+    by_ym = collected_by_month() if by_ym is None else by_ym
+    cents = [by_ym.get(m.strftime("%Y-%m"), NO_CASH)["cents"] for m in window]
     # The 1 floor keeps a studio with no cash yet from dividing by zero.
     scale = max(cents + [goal_cents or 0, 1])
     series = []
