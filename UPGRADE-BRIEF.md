@@ -10,10 +10,15 @@
 >
 > - **Workstream G in full.** Every item is red-light under `AGENTS.md` and needs Kevin.
 >   G1/G2 (media + off-host backup) are still the only existential risk in the project.
-> - **B6** (TTL-cache the per-render template globals). Skipped with evidence: a plain
->   cross-render TTL breaks three smoke tests that pin an admin write reflecting
->   immediately, and doing it safely needs write-side invalidation in the admin write
->   paths. Correct as specified, wrong as scoped — needs a cross-cutting change.
+> - **B6** (TTL-cache the per-render template globals). **Closed — do not implement.**
+>   Skipped first with evidence: a plain cross-render TTL breaks three smoke tests that
+>   pin an admin write reflecting immediately, and doing it safely needs write-side
+>   invalidation in the admin write paths. It is now moot as well as awkward. B6 existed
+>   because each global opened its own connection (~0.9 ms apiece, ~1.8 ms a page);
+>   thread-local read connections landed in `820944a` and the pair now measures
+>   **0.005 ms per render**. A TTL would buy five microseconds in exchange for a
+>   staleness window on a newly starred photo or a freshly published press hit. The
+>   reasoning is recorded at the functions in `app/render.py` so it is not re-litigated.
 > - **C6** (version the font filenames for immutable caching) — deferred, not attempted.
 > - **C8** (raise the 8.5–9px caption floor) — deliberately left: it is a visual design
 >   change this brief said Kevin should eyeball, not an agent.
