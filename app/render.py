@@ -49,6 +49,18 @@ templates.env.globals["base_url"] = config.BASE_URL
 templates.env.globals["static_rev"] = _static_rev()
 
 
+# These two run per render of the marketing base, and a plan once existed to
+# TTL-cache them (brief item B6) because each opened its own connection —
+# ~0.9 ms apiece, so ~1.8 ms a page. Thread-local read connections removed that:
+# measured together they now cost 0.005 ms per render.
+#
+# So do not cache them. A TTL would buy five microseconds and cost a staleness
+# window on exactly the writes an operator checks immediately — a newly starred
+# portfolio photo, a press hit cleared for the footer — which is why the first
+# attempt broke three smoke tests. Making it safe needs invalidation wired into
+# the admin write paths: a cross-cutting change, now for no measurable gain.
+
+
 def _og_image_id() -> int | None:
     """Newest starred ready photo — stronger share cards than the oldest id."""
     row = db.one("""SELECT id FROM assets WHERE portfolio=1 AND status='ready'
