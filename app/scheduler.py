@@ -18,6 +18,7 @@ import logging
 import threading
 
 from . import (
+    anniversary_nudges,
     booking_reminders,
     config,
     contract_reminders,
@@ -25,6 +26,7 @@ from . import (
     gallery_reminders,
     jobs,
     ops_monitor,
+    review_requests,
     scheduling,
 )
 from .admin import recurring
@@ -50,9 +52,17 @@ def _loop() -> None:
         except Exception:
             log.exception("gallery reminder sweep failed")
         try:
+            review_requests.sweep()
+        except Exception:
+            log.exception("review ask sweep failed")
+        try:
             contract_reminders.sweep()
         except Exception:
             log.exception("contract reminder sweep failed")
+        try:
+            anniversary_nudges.sweep()
+        except Exception:
+            log.exception("anniversary nudge sweep failed")
         try:
             ops_monitor.sweep()
         except Exception:

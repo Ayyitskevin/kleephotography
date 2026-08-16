@@ -35,6 +35,11 @@ def healthz_detail_enabled() -> bool:
     return bool(config.HEALTHZ_TOKEN)
 
 
+def review_engine_enabled() -> bool:
+    """Post-delivery Google review asks. Dormant without the review URL."""
+    return bool(config.GOOGLE_REVIEW_URL)
+
+
 def deadman_enabled() -> bool:
     """External dead-man's switch. Independent of telegram_enabled on purpose."""
     return bool(config.HEARTBEAT_PING_URL)

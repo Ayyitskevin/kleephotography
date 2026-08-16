@@ -61,8 +61,20 @@ from .admin import (
     tasks,
     uploads,
 )
+from .admin import announcements as admin_announcements
 from .admin import scheduling as admin_scheduling
-from .public import docs, downloads, gallery, media, pay, portal, site, sms_webhook, workspace
+from .public import (
+    docs,
+    downloads,
+    gallery,
+    media,
+    pay,
+    portal,
+    site,
+    sms_webhook,
+    unsubscribe,
+    workspace,
+)
 from .public import forms as public_forms
 from .public import scheduling as public_scheduling
 from .render import ROOT, templates
@@ -484,6 +496,7 @@ for r in (
     content.router,
     portals.router,
     admin_scheduling.router,
+    admin_announcements.router,
     gallery.router,
     media.router,
     downloads.router,
@@ -495,6 +508,7 @@ for r in (
     public_scheduling.router,
     site.router,
     sms_webhook.router,
+    unsubscribe.router,
     service_api.router,
 ):
     app.include_router(r)

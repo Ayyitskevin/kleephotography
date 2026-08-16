@@ -11,10 +11,10 @@ Kevin's merge, no exceptions.
 | # | Item | Status |
 |---|------|--------|
 | 1 | **Pay-to-book** — Stripe reservation fee holds the slot; the mini-session engine | **built** (this PR) |
-| 2 | **Google review engine** — automated post-delivery review ask | next up |
+| 2 | **Google review engine** — automated post-delivery review ask | **built** (this PR) |
 | 3 | **Lead attribution** — "how did you hear about me?" + reports rollup | **built** (this PR) |
-| 4 | **List announcements** — one-shot campaigns to past clients + gallery-gate emails | queued |
-| 5 | **Session-anniversary nudges** — 11 months after a portrait/family delivery | queued |
+| 4 | **List announcements** — one-shot campaigns to past clients + gallery-gate emails | **built** (this PR) |
+| 5 | **Session-anniversary nudges** — "invite them back" Telegram line at ~11 months | **built** (this PR) |
 | 6 | **Prints, phase one** — "order prints of your favorites" request flow, quoted by hand | queued |
 | 7 | **Expired galleries → reactivation pages** — dead end becomes a re-engagement lead | queued |
 
@@ -41,22 +41,32 @@ you" with an honest unattributed count.
 
 ## Design notes for what's queued
 
-**2 — Review engine.** Hang the ask on the existing delivery event (gallery
-publish → reminder sweep). One warm email per delivered gallery, N days after
-delivery, with a direct Google review link (`MISE_GOOGLE_REVIEW_URL`); route the
-unhappy to a private reply instead. Throttle per client, never per gallery; a
-`review_requested_at` column keeps it one-shot. The pros' baseline is 50+
-reviews; the sweep and mailer already exist.
+**2 — Review engine — built.** `app/review_requests.py`, fired from the
+recurring sweep like the gallery reminders. One warm email per delivered
+gallery (`MISE_REVIEW_ASK_DAYS` after it goes up, skipping expired galleries),
+one-shot via `galleries.review_requested_at`, with a per-CLIENT cooldown
+(`MISE_REVIEW_COOLDOWN_DAYS`, default 180) across all their galleries. The
+unhappy are invited to reply privately; the delighted get the direct
+`MISE_GOOGLE_REVIEW_URL` link. Dormant until the URL is set.
 
-**4 — Announcements.** Not a marketing suite. One admin page: audience = past
-clients ∪ gallery-gate emails (deduped, minus unsubscribes), one message, one
-send via the existing mailer with per-recipient jitter. Needs an `unsubscribes`
-table + `/u/{token}` one-click link in every send (CAN-SPAM). First real use:
-announcing item 1's mini-session days.
+**4 — Announcements — built.** Admin → Announcements: audience = past clients ∪
+gallery-gate emails (deduped case-insensitively, minus `unsubscribes`), one
+plain-text message, one send. Deliveries are one durable job per recipient
+(staged with the paper-trail row in one transaction, per-recipient jitter so a
+burst trickles through Gmail), each re-checking the ledger at send time. Every
+email carries `/u/{signed-email}` — a GET-safe confirm page + POST record, so
+mail-client prefetch can never unsubscribe anyone. `unsubscribes` is a legal
+ledger; its rollback is deliberately inert.
 
-**5 — Anniversary nudges.** Scheduler sweep: portrait/family projects delivered
-~11 months ago and not since rebooked → draft a nudge for Kevin to approve, not
-an auto-send. Reuses the reminder-sweep pattern and the one-heads-up throttle.
+**5 — Anniversary nudges — built.** `app/anniversary_nudges.py`, mirroring
+contract_reminders: a Telegram line to KEVIN (never the client — the machine
+remembers, the invitation is his) when a client's latest project closed
+`MISE_ANNIVERSARY_NUDGE_DAYS` (~11 months) ago. Bounded window so enabling it
+never floods with ancient history; clients already back in the funnel (a newer
+project in any stage, or an upcoming confirmed booking) are left alone; one
+nudge per yearly cycle via `clients.anniversary_nudged_at`; nothing is stamped
+while alerts are disabled, so enabling Telegram later still catches the
+current window.
 
 **6 — Prints phase one.** A "print your favorites" request button on delivered
 galleries that opens a quote conversation (new inquiry kind `prints`). No lab
