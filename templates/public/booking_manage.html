@@ -48,6 +48,10 @@
     <dt>When</dt><dd>{{ b.start_utc | localtime(tz=b.tz) }}
       <span class="muted">({{ tz_name }})</span></dd>
     {% if b.location %}<dt>Where</dt><dd>{{ b.location }}</dd>{% endif %}
+    {% if b.status == 'confirmed' and b.meet_url %}
+      <dt>Join</dt><dd><a href="{{ b.meet_url }}" target="_blank"
+        rel="noopener">{{ b.meet_url }}</a></dd>
+    {% endif %}
     <dt>Who</dt><dd>{{ b.name }}</dd>
     {% if b.notes %}<dt>Notes</dt><dd>{{ b.notes }}</dd>{% endif %}
   </dl>

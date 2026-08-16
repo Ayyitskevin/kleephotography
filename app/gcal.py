@@ -22,6 +22,7 @@ logged.
 import datetime as dt
 import json
 import logging
+import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -283,6 +284,18 @@ def _event_body(b) -> dict:
     }
 
 
+def _meet_link(ev: dict) -> str:
+    """Extract the Meet join URL from an events API response. Google surfaces it
+    as hangoutLink; fall back to the conferenceData video entry point."""
+    link = ev.get("hangoutLink") or ""
+    if not link:
+        for ep in (ev.get("conferenceData") or {}).get("entryPoints") or []:
+            if isinstance(ep, dict) and ep.get("entryPointType") == "video" and ep.get("uri"):
+                link = ep["uri"]
+                break
+    return link
+
+
 def _delete_event(booking_id: int) -> None:
     b = db.one("SELECT google_event_id FROM bookings WHERE id=?", (booking_id,))
     if not b or not b["google_event_id"]:
@@ -303,7 +316,7 @@ def on_booking_confirmed(booking_id: int) -> None:
     if not configured() or not is_connected():
         return
     b = db.one(
-        """SELECT b.*, e.name AS event_name, e.location AS event_location
+        """SELECT b.*, e.name AS event_name, e.location AS event_location, e.auto_meet
            FROM bookings b JOIN event_types e ON e.id=b.event_type_id
            WHERE b.id=? AND b.status='confirmed'""",
         (booking_id,),
@@ -315,9 +328,12 @@ def on_booking_confirmed(booking_id: int) -> None:
             _delete_event(b["reschedule_of"])
         body = _event_body(b)
         event_id = b["google_event_id"]
+        ev = {}
         if event_id:
             try:
-                _api("PATCH", f"/calendars/{_cal()}/events/{event_id}", body)
+                # No conferenceDataVersion param, so Google leaves any existing
+                # conference on the event untouched.
+                ev = _api("PATCH", f"/calendars/{_cal()}/events/{event_id}", body)
             except urllib.error.HTTPError as exc:
                 if exc.code not in (404, 410):
                     raise
@@ -325,9 +341,24 @@ def on_booking_confirmed(booking_id: int) -> None:
                 db.run("UPDATE bookings SET google_event_id=NULL WHERE id=?", (booking_id,))
                 event_id = None
         if not event_id:
-            ev = _api("POST", f"/calendars/{_cal()}/events", body)
+            path = f"/calendars/{_cal()}/events"
+            if b["auto_meet"]:
+                # requestId is Google's idempotency key for conference minting —
+                # unique per create attempt so a recreated event (vanished
+                # original) gets a working fresh conference, not a stale ref.
+                body["conferenceData"] = {
+                    "createRequest": {
+                        "requestId": f"mise-b{booking_id}-{secrets.token_hex(8)}",
+                        "conferenceSolutionKey": {"type": "hangoutsMeet"},
+                    }
+                }
+                path += "?conferenceDataVersion=1"
+            ev = _api("POST", path, body)
             if ev.get("id"):
                 db.run("UPDATE bookings SET google_event_id=? WHERE id=?", (ev["id"], booking_id))
+        link = _meet_link(ev)
+        if link and link != b["meet_url"]:
+            db.run("UPDATE bookings SET meet_url=? WHERE id=?", (link, booking_id))
         log.info("gcal event synced for booking %s", booking_id)
     except Exception as e:
         log.warning("gcal event sync for booking %s failed: %s", booking_id, e)

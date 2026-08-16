@@ -2,14 +2,27 @@
 Inquiry form emails Kevin's inbox so Odysseus inquiry_intake picks it up unchanged."""
 
 import logging
+import time
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
-from .. import config, db, features, imaging, inquiry_notify, jobs, mailer, security, specialties
+from .. import (
+    config,
+    db,
+    features,
+    imaging,
+    inquiry_notify,
+    jobs,
+    mailer,
+    scheduling,
+    security,
+    specialties,
+)
 from ..render import ROOT, _static_rev, templates
 from . import site_catalog as _site_catalog
 
@@ -905,6 +918,43 @@ def reels(request: Request):
     )
 
 
+# Real availability on a marketing page: worth showing, never worth blocking on.
+# days_with_slots consults Google free/busy when the calendar is connected — a
+# network call — so the strip is cached briefly per event type. Staleness is
+# benign: the deep link lands on the live picker, which tells the truth.
+_AVAIL_TTL_SECONDS = 300.0
+_AVAIL_SCAN_DAYS = 45
+_avail_cache: dict[str, tuple[float, list]] = {}
+
+
+def _next_open_days(et, limit: int = 3) -> list[dict]:
+    """The next few days with open slots for `et`, as picker deep links —
+    [{'iso', 'label', 'url'}]. Empty on any scheduling hiccup: the specialty
+    page renders without the strip rather than failing over a teaser."""
+    now = time.monotonic()
+    hit = _avail_cache.get(et["slug"])
+    if hit and now < hit[0]:
+        return hit[1]
+    days: list[dict] = []
+    try:
+        today = datetime.now(UTC).astimezone(ZoneInfo(config.TIMEZONE)).date()
+        scan = min(_AVAIL_SCAN_DAYS, et["booking_window_days"])
+        for iso in sorted(scheduling.days_with_slots(et, today, scan))[:limit]:
+            d = date.fromisoformat(iso)
+            days.append(
+                {
+                    "iso": iso,
+                    "label": d.strftime("%a, %b %-d").replace(" 0", " "),
+                    "url": f"/book/{et['slug']}?year={d.year}&month={d.month}&day={iso}",
+                }
+            )
+    except Exception:
+        log.warning("availability strip failed for %s", et["slug"], exc_info=True)
+        days = []
+    _avail_cache[et["slug"]] = (now + _AVAIL_TTL_SECONDS, days)
+    return days
+
+
 def _specialty_page(request: Request, key: str):
     """Shared renderer for the three specialty spokes — same anatomy, distinct
     copy (SPECIALTY_PAGES) and specialty-filtered work/reels/studies."""
@@ -912,8 +962,10 @@ def _specialty_page(request: Request, key: str):
     # CTA deep-link: the moment Kevin creates the conventional event type in
     # the live admin (ops/SPECIALTY-LAUNCH.md slugs), spokes route straight to
     # its picker; until then they land on the /book index. No code redeploy.
-    et = db.one("SELECT slug FROM event_types WHERE slug=? AND active=1", (page["book_slug"],))
+    # The full row (not just slug) so the availability strip can compute slots.
+    et = db.one("SELECT * FROM event_types WHERE slug=? AND active=1", (page["book_slug"],))
     book_url = f"/book/{et['slug']}" if et else "/book"
+    open_days = _next_open_days(et) if et else []
     photos = [
         a for a in _portfolio_assets() if specialties.specialty_key(a["portfolio_tag"]) == key
     ]
@@ -947,6 +999,7 @@ def _specialty_page(request: Request, key: str):
             "testimonials": quotes[:3],
             "demo_gallery": _demo_gallery(),
             "book_url": book_url,
+            "open_days": open_days,
             "faqs": page["faqs"],
             "faq_heading": "Good to know",
             "rates": _sr_rate_cells(key),

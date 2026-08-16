@@ -39,6 +39,7 @@ _EVENT_COLS = frozenset(
         "position",
         "creates_notion_session",
         "booking_fee_cents",
+        "auto_meet",
     }
 )
 
@@ -534,6 +535,7 @@ def _update_event(e: "db.sqlite3.Row", form, event_id: int):
         "position": _posint(form, "position", 0, 999),
         "creates_notion_session": 1 if form.get("creates_notion_session") else 0,
         "booking_fee_cents": _fee_cents(form, e["booking_fee_cents"]),
+        "auto_meet": 1 if form.get("auto_meet") else 0,
     }
     sets = ", ".join(f"{db.ident(k, _EVENT_COLS)}=?" for k in fields)
     with db.tx() as con:
