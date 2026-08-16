@@ -23,6 +23,7 @@ from . import (
     config,
     contract_reminders,
     deadman,
+    digest,
     gallery_reminders,
     jobs,
     ops_monitor,
@@ -75,6 +76,10 @@ def _loop() -> None:
             scheduling.expire_pending_payments()
         except Exception:
             log.exception("booking payment-hold sweep failed")
+        try:
+            digest.sweep()
+        except Exception:
+            log.exception("weekly digest sweep failed")
         # Last, and outside every sweep's own try: reaching here means the loop
         # itself completed a pass. Individual sweeps failing is what Telegram is
         # for; this answers the different question of whether anything is
