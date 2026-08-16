@@ -18,6 +18,7 @@ import logging
 import threading
 
 from . import (
+    anniversary_nudges,
     booking_reminders,
     config,
     contract_reminders,
@@ -58,6 +59,10 @@ def _loop() -> None:
             contract_reminders.sweep()
         except Exception:
             log.exception("contract reminder sweep failed")
+        try:
+            anniversary_nudges.sweep()
+        except Exception:
+            log.exception("anniversary nudge sweep failed")
         try:
             ops_monitor.sweep()
         except Exception:

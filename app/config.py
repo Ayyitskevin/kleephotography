@@ -369,6 +369,12 @@ GOOGLE_REVIEW_URL = os.environ.get("MISE_GOOGLE_REVIEW_URL", "")
 REVIEW_ASK_DAYS = int(os.environ.get("MISE_REVIEW_ASK_DAYS", "3"))
 REVIEW_COOLDOWN_DAYS = int(os.environ.get("MISE_REVIEW_COOLDOWN_DAYS", "180"))
 
+# Session-anniversary nudges: how many days after a client's latest project
+# closes before Kevin gets the "invite them back" Telegram line. ~11 months —
+# timed to land the rebooking conversation before the year mark. The nudge is
+# to Kevin only; no client is ever auto-emailed.
+ANNIVERSARY_NUDGE_DAYS = int(os.environ.get("MISE_ANNIVERSARY_NUDGE_DAYS", "335"))
+
 # How long an unpaid pay-to-book hold keeps its slot before the sweeper releases
 # it (minutes). Long enough to type card details twice; short enough that an
 # abandoned checkout cannot squat on a mini-session slot all afternoon.

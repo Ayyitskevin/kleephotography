@@ -14,7 +14,7 @@ Kevin's merge, no exceptions.
 | 2 | **Google review engine** — automated post-delivery review ask | **built** (this PR) |
 | 3 | **Lead attribution** — "how did you hear about me?" + reports rollup | **built** (this PR) |
 | 4 | **List announcements** — one-shot campaigns to past clients + gallery-gate emails | **built** (this PR) |
-| 5 | **Session-anniversary nudges** — 11 months after a portrait/family delivery | queued |
+| 5 | **Session-anniversary nudges** — "invite them back" Telegram line at ~11 months | **built** (this PR) |
 | 6 | **Prints, phase one** — "order prints of your favorites" request flow, quoted by hand | queued |
 | 7 | **Expired galleries → reactivation pages** — dead end becomes a re-engagement lead | queued |
 
@@ -58,9 +58,15 @@ email carries `/u/{signed-email}` — a GET-safe confirm page + POST record, so
 mail-client prefetch can never unsubscribe anyone. `unsubscribes` is a legal
 ledger; its rollback is deliberately inert.
 
-**5 — Anniversary nudges.** Scheduler sweep: portrait/family projects delivered
-~11 months ago and not since rebooked → draft a nudge for Kevin to approve, not
-an auto-send. Reuses the reminder-sweep pattern and the one-heads-up throttle.
+**5 — Anniversary nudges — built.** `app/anniversary_nudges.py`, mirroring
+contract_reminders: a Telegram line to KEVIN (never the client — the machine
+remembers, the invitation is his) when a client's latest project closed
+`MISE_ANNIVERSARY_NUDGE_DAYS` (~11 months) ago. Bounded window so enabling it
+never floods with ancient history; clients already back in the funnel (a newer
+project in any stage, or an upcoming confirmed booking) are left alone; one
+nudge per yearly cycle via `clients.anniversary_nudged_at`; nothing is stamped
+while alerts are disabled, so enabling Telegram later still catches the
+current window.
 
 **6 — Prints phase one.** A "print your favorites" request button on delivered
 galleries that opens a quote conversation (new inquiry kind `prints`). No lab
