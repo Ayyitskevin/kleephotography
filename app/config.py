@@ -375,6 +375,13 @@ REVIEW_COOLDOWN_DAYS = int(os.environ.get("MISE_REVIEW_COOLDOWN_DAYS", "180"))
 # to Kevin only; no client is ever auto-emailed.
 ANNIVERSARY_NUDGE_DAYS = int(os.environ.get("MISE_ANNIVERSARY_NUDGE_DAYS", "335"))
 
+# Weekly owner digest: the Monday-morning "what did the machine do last week"
+# email to Kevin. HOUR is the earliest local hour it may go out on Monday; a
+# host asleep at that hour catches up on its next sweep that week. On by
+# default — it only ever mails GMAIL_USER, so there is nothing to arm.
+WEEKLY_DIGEST = _b("MISE_WEEKLY_DIGEST", "true")
+DIGEST_HOUR = int(os.environ.get("MISE_DIGEST_HOUR", "7"))
+
 # How long an unpaid pay-to-book hold keeps its slot before the sweeper releases
 # it (minutes). Long enough to type card details twice; short enough that an
 # abandoned checkout cannot squat on a mini-session slot all afternoon.
