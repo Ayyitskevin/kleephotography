@@ -70,7 +70,8 @@ def sweep() -> None:
             text = (
                 f"{config.SITE_NAME} reminder: {b['event_name']} tomorrow — "
                 f"{_when(b['start_utc'], b['tz'])}. "
-                f"Change or cancel: {_manage_url(b['token'])}"
+                + (f"Join: {b['meet_url']} " if b["meet_url"] else "")
+                + f"Change or cancel: {_manage_url(b['token'])}"
             )
             try:
                 sms.send(b["phone"], text)
@@ -85,10 +86,11 @@ def sweep() -> None:
         lead = "in about two days" if kind == "48h" else "tomorrow"
         cli_when = _when(b["start_utc"], b["tz"])
         loc = b["location"] or "Details to follow"
+        meet_line = f"  Join: {b['meet_url']}\n" if b["meet_url"] else ""
         body = (
             f"Hi {b['name']},\n\n"
             f"A quick reminder — your booking is {lead}:\n\n"
-            f"  {b['event_name']}\n  {cli_when}\n  {loc}\n\n"
+            f"  {b['event_name']}\n  {cli_when}\n  {loc}\n{meet_line}\n"
             f"Need to change or cancel? {_manage_url(b['token'])}\n\n"
             f"— {config.SITE_NAME}\n"
         )

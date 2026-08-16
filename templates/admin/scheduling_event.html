@@ -52,6 +52,14 @@
         <span class="muted">— for real shoots, so the pipeline (preshoot pack, balance
         chaser, digest) tracks it. Leave off for discovery/consult calls.</span></span>
     </label>
+    <label class="sched-check">
+      <input type="checkbox" name="auto_meet" value="1"
+             {% if e.auto_meet %}checked{% endif %}>
+      <span>Create a Google Meet link when booked
+        <span class="muted">— for video calls. The join link goes out in the
+        confirmation and reminder emails. Needs the Google Calendar connection
+        (Settings → Integrations).</span></span>
+    </label>
     <button type="submit">Save event type</button>
   </form>
 

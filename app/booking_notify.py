@@ -18,7 +18,8 @@ _UTC = dt.UTC
 
 def _load(booking_id: int):
     return db.one(
-        """SELECT b.*, e.name AS event_name, e.location, e.description AS event_desc
+        """SELECT b.*, e.name AS event_name, e.location, e.description AS event_desc,
+                  e.auto_meet
            FROM bookings b JOIN event_types e ON e.id=b.event_type_id
            WHERE b.id=?""",
         (booking_id,),
@@ -156,6 +157,11 @@ def _link_studio(booking_id: int, inquiry_id: int | None) -> None:
 
 def confirm(booking_id: int) -> None:
     """Email client + Kevin with the invite; mirror to Odysseus + Notion."""
+    # Google calendar mirror runs FIRST (best-effort, never raises): for
+    # auto_meet event types it mints the Meet link the emails below carry.
+    # Same calls as before, just reordered — a gcal hiccup costs nothing but
+    # the join line, and the manage page picks the link up on a later sync.
+    gcal.on_booking_confirmed(booking_id)
     b = _load(booking_id)
     if not b:
         log.error("confirm: booking %s vanished", booking_id)
@@ -163,6 +169,15 @@ def confirm(booking_id: int) -> None:
     if b["status"] != "confirmed":
         log.warning("confirm: booking %s is no longer confirmed", booking_id)
         return
+    if b["auto_meet"] and not b["meet_url"]:
+        # A video call the client can't join is a no-show waiting to happen —
+        # louder than the usual best-effort gcal shrug.
+        alerts.ops_alert(
+            "booking_meet_link_missing",
+            f"Booking {booking_id} is a video event type but no Meet link was "
+            f"created (Google Calendar down or not connected). Add one by hand "
+            f"or the client has nothing to join: {config.BASE_URL}/admin/bookings",
+        )
     biz_when = _when(b["start_utc"], config.TIMEZONE)
     cli_when = _when(b["start_utc"], b["tz"])
     uid, sequence = calendar_identity(booking_id)
@@ -170,8 +185,11 @@ def confirm(booking_id: int) -> None:
     loc = b["location"] or "Details to follow"
     summary = f"{b['event_name']} · {config.SITE_NAME}"
     details = (
-        f"{b['event_desc']}\n\n" if b["event_desc"] else ""
-    ) + f"Manage this booking: {_manage_url(b['token'])}"
+        (f"Join the video call: {b['meet_url']}\n\n" if b["meet_url"] else "")
+        + (f"{b['event_desc']}\n\n" if b["event_desc"] else "")
+        + f"Manage this booking: {_manage_url(b['token'])}"
+    )
+    meet_line = f"  Join: {b['meet_url']}\n" if b["meet_url"] else ""
     gcal_link = ics.google_link(
         summary=summary,
         details=details,
@@ -212,7 +230,7 @@ def confirm(booking_id: int) -> None:
         client_body = (
             f"Hi {b['name']},\n\n"
             f"Your booking {'has been rescheduled' if rescheduled else 'is confirmed'}:\n\n"
-            f"  {b['event_name']}\n  {cli_when}\n  {loc}\n\n"
+            f"  {b['event_name']}\n  {cli_when}\n  {loc}\n{meet_line}\n"
             f"{calendar_copy}"
             f"Need to change or cancel? {_manage_url(b['token'])}\n\n"
             f"— {config.SITE_NAME}\n"
@@ -220,7 +238,8 @@ def confirm(booking_id: int) -> None:
         kevin_body = (
             f"{'Rescheduled' if rescheduled else 'New'} booking via {config.BASE_URL}\n\n"
             f"Event: {b['event_name']}\nWhen: {biz_when}\n"
-            f"Name: {b['name']}\nEmail: {b['email']}\nPhone: {b['phone'] or '—'}\n\n"
+            + (f"Meet: {b['meet_url']}\n" if b["meet_url"] else "")
+            + f"Name: {b['name']}\nEmail: {b['email']}\nPhone: {b['phone'] or '—'}\n\n"
             f"{b['notes'] or '(no note)'}\n\nManage: {_manage_url(b['token'])}\n"
         )
         try:
@@ -290,9 +309,6 @@ def confirm(booking_id: int) -> None:
         notion_sync.sync_session_for_booking(booking_id)
     except Exception as e:
         log.error("booking %s notion session sync failed: %s", booking_id, e)
-
-    # Mirror onto Kevin's Google calendar (best-effort; no-op if not connected).
-    gcal.on_booking_confirmed(booking_id)
 
 
 def cancelled(booking_id: int, by_admin: bool = False) -> None:
