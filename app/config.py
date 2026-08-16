@@ -359,6 +359,11 @@ SQLITE_SYNCHRONOUS = os.environ.get("MISE_SQLITE_SYNCHRONOUS", "NORMAL").strip()
 # inventory exists — see ops/TRUTHFUL-HTTPS.md.
 HSTS_MAX_AGE = int(os.environ.get("MISE_HSTS_MAX_AGE", "15552000"))
 
+# How long an unpaid pay-to-book hold keeps its slot before the sweeper releases
+# it (minutes). Long enough to type card details twice; short enough that an
+# abandoned checkout cannot squat on a mini-session slot all afternoon.
+BOOKING_PAY_TTL_MIN = int(os.environ.get("MISE_BOOKING_PAY_TTL_MIN", "30"))
+
 # Admin sessions expire far sooner than client ones. 90 days suits a client who
 # should not have to re-enter a PIN to look at their own photos; applied to the
 # admin cookie it meant a single stolen laptop session stayed valid for a

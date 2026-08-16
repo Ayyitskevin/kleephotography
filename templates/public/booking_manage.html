@@ -8,7 +8,27 @@
     <div class="book-manage-badge book-ok"
          data-analytics-view="Booking Completion" data-analytics-once>Confirmed</div>
     <h1>You're booked</h1>
-    <p class="muted">A calendar invite is on its way to {{ b.email }}.</p>
+    <p class="muted">A calendar invite is on its way to {{ b.email }}.
+      {% if b.paid_cents %}Your ${{ '%.2f'|format(b.paid_cents / 100) }} reservation
+      payment is confirmed.{% endif %}</p>
+  {% elif b.status == 'pending_payment' %}
+    {% if finalizing %}
+      <div class="book-manage-badge book-ok">Finalizing</div>
+      <h1>Payment received — confirming your slot</h1>
+      <p class="muted">Stripe is finishing up. This usually takes a few seconds —
+        your confirmation email lands the moment it does. Refresh to see the
+        booking confirmed.</p>
+    {% else %}
+      <div class="book-manage-badge book-off">Payment needed</div>
+      <h1>Your slot is held</h1>
+      <p class="muted">This time is reserved for you while you complete the
+        {% if fee_cents %}${{ '%.2f'|format(fee_cents / 100) }} {% endif %}reservation
+        payment. Unpaid holds release automatically, so if you've changed your
+        mind you don't need to do anything.</p>
+      <form method="post" action="/booking/{{ b.token }}/pay">
+        <button type="submit" class="btn">Complete payment</button>
+      </form>
+    {% endif %}
   {% else %}
     <div class="book-manage-badge book-off">Cancelled</div>
     <h1>Booking cancelled</h1>

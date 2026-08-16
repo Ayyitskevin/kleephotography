@@ -90,6 +90,13 @@
                   {% if pf.service == opt.value %} selected{% endif %}>{{ opt.label }}</option>
           {% endfor %}
         </select></label>
+      <label for="contact-referral">How did you hear about me? <span class="muted">(optional)</span>
+        <select id="contact-referral" name="referral">
+          <option value="">Prefer not to say</option>
+          {% for src in referral_sources %}
+          <option value="{{ src }}"{% if pf.referral is defined and pf.referral == src %} selected{% endif %}>{{ src }}</option>
+          {% endfor %}
+        </select></label>
       <label for="contact-message">Message
         <textarea id="contact-message" name="message" rows="5" required
                   placeholder="What are we shooting?" {{ invalid('message') }}>{{ pf.message if pf.message is defined else '' }}</textarea></label>

@@ -627,7 +627,7 @@
   text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line);
   vertical-align: top;
 }.sched-table th { color: var(--muted); font-weight: 500; font-size: 0.8rem;
-  text-transform: uppercase; letter-spacing: 0.06em; }.sched-past td { color: var(--muted); }.sched-off td { color: var(--muted); text-decoration: line-through; }.sched-note td { padding-top: 0; color: var(--muted); font-size: 0.85rem; }.sched-eventform { margin: 1.2rem 0; }.sched-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  text-transform: uppercase; letter-spacing: 0.06em; }.sched-past td { color: var(--muted); }.sched-off td { color: var(--muted); text-decoration: line-through; }.sched-note td { padding-top: 0; color: var(--muted); font-size: 0.85rem; }.sched-paid, .sched-hold { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; padding: 0.05rem 0.4rem; border-radius: 3px; margin-left: 0.4rem; vertical-align: 0.08em; }.sched-paid { color: #3e5e34; background: #e4ecdc; }.sched-hold { color: #7a5410; background: #f3e7cd; }.sched-eventform { margin: 1.2rem 0; }.sched-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0.9rem; }.sched-grid label, .sched-desc { display: flex; flex-direction: column;
   font-size: 0.82rem; color: var(--muted); gap: 0.3rem; }.sched-grid input, .sched-desc textarea {
   padding: 0.5rem 0.65rem; border: 1px solid var(--line); border-radius: 7px;

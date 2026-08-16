@@ -38,6 +38,8 @@
         <tr>
           <td>{{ b.start_utc | localtime }}</td>
           <td>{{ b.event_name }}
+            {% if b.paid_cents %}<span class="sched-paid" title="Reservation payment received">PAID ${{ '%.2f'|format(b.paid_cents / 100) }}</span>{% endif %}
+            {% if b.status == 'pending_payment' %}<span class="sched-hold" title="Slot held — awaiting Stripe payment">AWAITING PAYMENT</span>{% endif %}
             {% if b.notes and 'AERIAL PASS' in b.notes %}
             <span class="sr-preflight" title="Aerial Pass requested — preflight before the day">&#9650; Aerial &middot; LAANC &middot; batt &times;3</span>
             {% endif %}</td>
@@ -45,7 +47,7 @@
           <td><a href="mailto:{{ b.email }}">{{ b.email }}</a>{% if b.phone %}<br>{{ b.phone }}{% endif %}</td>
           <td>
             <form method="post" action="/admin/scheduling/booking/{{ b.id }}/cancel"
-                  data-confirm="Cancel this booking and email the client?">
+                  data-confirm="Cancel this booking and email the client?{% if b.paid_cents %} They PAID ${{ '%.2f'|format(b.paid_cents / 100) }} to reserve — refund it from the Stripe dashboard; Mise never refunds automatically.{% endif %}">
               <button class="linkbtn danger">Cancel</button>
             </form>
           </td>
@@ -70,7 +72,7 @@
           <td>{{ b.start_utc | localtime }}</td>
           <td>{{ b.event_name }}</td>
           <td>{{ b.name }}</td>
-          <td>{{ b.status }}</td>
+          <td>{{ b.status }}{% if b.paid_cents %} · paid ${{ '%.2f'|format(b.paid_cents / 100) }}{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>
