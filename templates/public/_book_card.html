@@ -120,6 +120,13 @@
             <input type="tel" name="phone" value="{{ submitted.phone }}"></label>
           <label>Anything I should know? <span class="muted">(optional)</span>
             <textarea name="notes" rows="3">{{ submitted.notes }}</textarea></label>
+          <label>How did you hear about me? <span class="muted">(optional)</span>
+            <select name="referral">
+              <option value="">Prefer not to say</option>
+              {% for src in referral_sources %}
+              <option value="{{ src }}"{% if submitted.referral is defined and submitted.referral == src %} selected{% endif %}>{{ src }}</option>
+              {% endfor %}
+            </select></label>
           {% if e.creates_notion_session %}
           {# Intake labels follow the event-type slug prefix convention
              (ops/SPECIALTY-LAUNCH.md): 're-…' real estate, 'pl-…' portrait &
@@ -173,7 +180,14 @@
           <span class="hp-field" aria-hidden="true">
             <input type="text" name="website" tabindex="-1" autocomplete="off">
           </span>
+          {% if e.booking_fee_cents %}
+          <p class="muted book-fee-note">A ${{ '%.2f'|format(e.booking_fee_cents / 100) }}
+            reservation payment secures your slot — you'll pay by card on the next
+            screen, and the time isn't yours until payment completes.</p>
+          <button type="submit">Reserve &amp; pay</button>
+          {% else %}
           <button type="submit">Schedule event</button>
+          {% endif %}
         {% endif %}
       </form>
 

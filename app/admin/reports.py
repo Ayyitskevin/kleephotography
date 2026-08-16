@@ -194,6 +194,19 @@ def reports(request: Request, period: str = Query("ytd", alias="range")):
            GROUP BY COALESCE(kind, 'contact')
            ORDER BY n DESC"""
     )
+    # Where leads come FROM (revenue roadmap item 3). Answered is split from
+    # unanswered so the share is honest: 6 of 40 saying "Google" is a hint, not
+    # a landslide. Values are constrained to REFERRAL_SOURCES at the form
+    # handlers, so this GROUP BY can never sprout attacker-typed rows.
+    leads_by_source = db.all_(
+        """SELECT referral_source AS source, COUNT(*) AS n
+           FROM inquiries
+           WHERE dismissed_at IS NULL AND referral_source IS NOT NULL
+           GROUP BY referral_source ORDER BY n DESC"""
+    )
+    leads_unattributed = db.one(
+        "SELECT COUNT(*) AS n FROM inquiries WHERE dismissed_at IS NULL AND referral_source IS NULL"
+    )["n"]
 
     # delivery & engagement (all-time)
     delivery = {
@@ -250,6 +263,8 @@ def reports(request: Request, period: str = Query("ytd", alias="range")):
             "leads_converted": leads_converted,
             "conv_rate": conv_rate,
             "leads_by_kind": leads_by_kind,
+            "leads_by_source": leads_by_source,
+            "leads_unattributed": leads_unattributed,
             "delivery": delivery,
             "top_clients": top_clients,
         },

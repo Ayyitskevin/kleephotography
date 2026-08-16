@@ -254,8 +254,8 @@ def confirm(booking_id: int) -> None:
         try:
             iid = db.run(
                 """INSERT INTO inquiries (name, email, business, message, kind,
-                                          shoot_date, service, emailed)
-                   VALUES (?,?,?,?,?,?,?,?)""",
+                                          shoot_date, service, emailed, referral_source)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
                 (
                     b["name"],
                     b["email"],
@@ -265,6 +265,7 @@ def confirm(booking_id: int) -> None:
                     b["start_utc"][:10],
                     b["event_name"],
                     1 if mailer.configured() else 0,
+                    b["referral_source"],
                 ),
             )
             db.run("UPDATE bookings SET inquiry_id=? WHERE id=?", (iid, booking_id))

@@ -25,6 +25,7 @@ from . import (
     gallery_reminders,
     jobs,
     ops_monitor,
+    scheduling,
 )
 from .admin import recurring
 
@@ -60,6 +61,10 @@ def _loop() -> None:
             jobs.prune_done()
         except Exception:
             log.exception("job retention sweep failed")
+        try:
+            scheduling.expire_pending_payments()
+        except Exception:
+            log.exception("booking payment-hold sweep failed")
         # Last, and outside every sweep's own try: reaching here means the loop
         # itself completed a pass. Individual sweeps failing is what Telegram is
         # for; this answers the different question of whether anything is

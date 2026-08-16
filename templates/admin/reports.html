@@ -114,6 +114,27 @@
         </table>
       </section>
 
+      <section class="rep-card" aria-label="Leads by referral source">
+        <div class="rep-card-head"><h2>How they found you <span class="muted">· all time</span></h2></div>
+        {% if leads_by_source %}
+        <table class="report-table">
+          <tbody>
+            {% for src in leads_by_source %}
+            <tr><td>{{ src.source }}</td><td class="num">{{ src.n }}</td></tr>
+            {% endfor %}
+            {% if leads_unattributed %}
+            <tr><td class="muted">Didn&rsquo;t say / not asked</td><td class="num muted">{{ leads_unattributed }}</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+        <p class="muted rep-note">From the optional &ldquo;how did you hear about me?&rdquo;
+          on the contact and booking forms. Double down where the numbers point.</p>
+        {% else %}
+        <p class="muted">No answers yet &mdash; the question is live on the contact and
+          booking forms, and rows appear here as leads answer it.</p>
+        {% endif %}
+      </section>
+
       <section class="rep-card" aria-label="Delivery and engagement">
         <div class="rep-card-head"><h2>Delivery &amp; engagement <span class="muted">· all time</span></h2></div>
         <table class="report-table">

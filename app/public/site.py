@@ -615,6 +615,7 @@ def contact(request: Request):
             "scope_label": scope_label,
             "scope_placeholder": scope_placeholder,
             "service_options": contact_service_options(),
+            "referral_sources": _site_catalog.REFERRAL_SOURCES,
             "specialty_paths": [
                 {"slug": m["slug"], "name": m["name"]} for m in specialties.SPECIALTIES.values()
             ],
@@ -640,6 +641,7 @@ def submit_inquiry(
     phone: str = Form(""),
     usage: str = Form(""),
     budget: str = Form(""),
+    referral: str = Form(""),
 ):
     # Honeypot: real visitors never see the "website" field — bots fill it.
     if website.strip():
@@ -681,10 +683,12 @@ def submit_inquiry(
                     "phone": phone.strip(),
                     "usage": usage.strip(),
                     "budget": budget.strip(),
+                    "referral": referral.strip(),
                 },
                 "scope_label": scope_label,
                 "scope_placeholder": scope_placeholder,
                 "service_options": contact_service_options(),
+                "referral_sources": _site_catalog.REFERRAL_SOURCES,
                 "specialty_paths": [
                     {"slug": m["slug"], "name": m["name"]} for m in specialties.SPECIALTIES.values()
                 ],
@@ -741,8 +745,9 @@ def submit_inquiry(
     security.inquiry_record(ip, security.INQUIRY_BUCKET_CONTACT)
     iid = db.run(
         """INSERT INTO inquiries
-                    (name, email, business, message, service, shoot_date, phone)
-                    VALUES (?,?,?,?,?,?,?)""",
+                    (name, email, business, message, service, shoot_date, phone,
+                     referral_source)
+                    VALUES (?,?,?,?,?,?,?,?)""",
         (
             name,
             email,
@@ -751,6 +756,10 @@ def submit_inquiry(
             service or None,
             shoot_date or None,
             phone,
+            # Only a value from the fixed set reaches the column — anything else
+            # (a tampered POST, a stale option) stores NULL, so the rollup in
+            # admin/reports.py can trust every non-NULL row.
+            referral.strip() if referral.strip() in _site_catalog.REFERRAL_SOURCES else None,
         ),
     )
     # Owner notify is async + idempotent via jobs (survives SMTP outages).

@@ -163,7 +163,9 @@ def pay_invoice(request: Request, slug: str):
     return RedirectResponse(session.url, status_code=303)
 
 
-def _ack_unapplied(event_id: str, invoice_id, code: str, detail: str, diff: dict) -> dict:
+def _ack_unapplied(
+    event_id: str, invoice_id, code: str, detail: str, diff: dict, *, entity: str = "invoice"
+) -> dict:
     """Acknowledge a webhook that can never be applied, instead of 4xx-ing it.
 
     Stripe treats ANY non-2xx as a failed delivery, retries for ~3 days, and
@@ -182,13 +184,83 @@ def _ack_unapplied(event_id: str, invoice_id, code: str, detail: str, diff: dict
     """
     try:
         with db.tx() as con:
-            audit.log(con, "invoice", invoice_id, f"stripe_{code}", diff=diff, actor="stripe")
+            audit.log(con, entity, invoice_id, f"stripe_{code}", diff=diff, actor="stripe")
     except Exception:
         # The audit row is the durable half, but failing to write it must not
         # resurrect the retry storm — log loudly and still acknowledge.
         log.exception("could not audit stripe anomaly invoice=%s event=%s", invoice_id, event_id)
-    alerts.payment_anomaly(invoice_id, event_id, code, detail)
+    alerts.payment_anomaly(invoice_id, event_id, code, detail, entity=entity)
     return {"ok": True, "unapplied": code}
+
+
+def _apply_booking_payment(event, session, metadata) -> dict:
+    """Confirm a pay-to-book hold when its Checkout settles.
+
+    Same doctrine as the invoice path above: permanent conditions are
+    ACKNOWLEDGED (audit row + throttled operator alert), never 4xx'd — Stripe
+    retries 4xx for days and counts them toward disabling the endpoint. The
+    interesting condition here is money landing on a hold the sweeper already
+    released (visitor paid at minute 31 of a 30-minute hold): the slot may have
+    been re-sold, so the payment is recorded and Kevin is told to refund or
+    honour it BY HAND — silently re-confirming a possibly double-booked slot
+    would be worse than either.
+    """
+    from .. import booking_notify
+
+    booking_id = metadata["booking_id"] if "booking_id" in metadata else None
+    if not booking_id or not str(booking_id).isdigit():
+        return {"ok": True, "ignored": "no booking_id"}
+    booking_id = int(booking_id)
+    amount_total = int(session["amount_total"] or 0)
+    b = db.one("SELECT * FROM bookings WHERE id=?", (booking_id,))
+    if not b:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "unknown_booking",
+            f"session {session['id']} names booking {booking_id}, which does not exist",
+            {"session_id": session["id"], "amount_total": amount_total},
+            entity="booking",
+        )
+    if b["status"] == "cancelled":
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "paid_after_release",
+            f"{amount_total} cents arrived for a booking hold that was already "
+            f"released ({b['cancel_reason'] or 'cancelled'}) — the slot may have "
+            f"been re-sold; refund or re-book by hand",
+            {"amount_total": amount_total, "session_id": session["id"]},
+            entity="booking",
+        )
+    try:
+        with db.tx() as con:
+            # UNIQUE stripe_event_id makes a redelivered event roll the whole
+            # transaction back — nothing double-applies, same as invoices.
+            con.execute(
+                """INSERT INTO booking_payments
+                       (booking_id, stripe_event_id, stripe_session_id, amount_cents)
+                   VALUES (?,?,?,?)""",
+                (booking_id, event["id"], session["id"], amount_total),
+            )
+            con.execute(
+                """UPDATE bookings
+                      SET status='confirmed', paid_cents=?, paid_at=datetime('now')
+                    WHERE id=? AND status IN ('pending_payment','confirmed')""",
+                (amount_total, booking_id),
+            )
+    except db.sqlite3.IntegrityError:
+        return {"ok": True, "duplicate": True}
+    # Side-effects only after the money is durable: confirmation emails, the
+    # calendar invite, Notion/Odysseus — everything the free path fires at POST.
+    booking_notify.confirm(booking_id)
+    log.info(
+        "booking %s confirmed by payment: %s cents (event %s)",
+        booking_id,
+        amount_total,
+        event["id"],
+    )
+    return {"ok": True}
 
 
 @router.post("/webhooks/stripe")
@@ -242,6 +314,8 @@ def _process_stripe_webhook(payload: bytes, signature: str):
     # ack and ignore instead of KeyError → 500, which makes Stripe retry and
     # eventually disable the webhook endpoint.
     metadata = (session["metadata"] if "metadata" in session else None) or {}
+    if ("kind" in metadata and metadata["kind"] == "booking") or "booking_id" in metadata:
+        return _apply_booking_payment(event, session, metadata)
     invoice_id = metadata["invoice_id"] if "invoice_id" in metadata else None
     if not invoice_id or not str(invoice_id).isdigit():
         return {"ok": True, "ignored": "no invoice_id"}

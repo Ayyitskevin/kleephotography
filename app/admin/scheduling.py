@@ -38,8 +38,22 @@ _EVENT_COLS = frozenset(
         "slot_step_min",
         "position",
         "creates_notion_session",
+        "booking_fee_cents",
     }
 )
+
+
+def _fee_cents(form, current: int) -> int:
+    """Dollars string -> cents; bad input keeps the current value rather than
+    silently zeroing a paid session type."""
+    raw = (form.get("booking_fee") or "").strip()
+    if raw == "":
+        return current
+    try:
+        cents = round(float(raw) * 100)
+    except ValueError:
+        return current
+    return min(max(cents, 0), 1_000_000)
 
 
 def _min_to_hhmm(m: int | None) -> str:
@@ -519,6 +533,7 @@ def _update_event(e: "db.sqlite3.Row", form, event_id: int):
         "slot_step_min": _posint(form, "slot_step_min", 0, 480),
         "position": _posint(form, "position", 0, 999),
         "creates_notion_session": 1 if form.get("creates_notion_session") else 0,
+        "booking_fee_cents": _fee_cents(form, e["booking_fee_cents"]),
     }
     sets = ", ".join(f"{db.ident(k, _EVENT_COLS)}=?" for k in fields)
     with db.tx() as con:
@@ -565,7 +580,8 @@ def delete_event(event_id: int):
 def bookings(request: Request, past_offset: int = 0):
     upcoming = db.all_("""SELECT b.*, e.name AS event_name FROM bookings b
                           JOIN event_types e ON e.id=b.event_type_id
-                          WHERE b.status='confirmed' AND b.start_utc >= datetime('now')
+                          WHERE b.status IN ('confirmed','pending_payment')
+                            AND b.start_utc >= datetime('now')
                           ORDER BY b.start_utc""")
     # Upcoming is self-limiting; past and cancelled is every booking the studio
     # has ever taken, so it pages instead of stopping dead at a fixed LIMIT.
@@ -597,7 +613,18 @@ def bookings(request: Request, past_offset: int = 0):
 
 @router.post("/booking/{booking_id}/cancel")
 def admin_cancel(booking_id: int):
-    b = db.get_or_404("SELECT token FROM bookings WHERE id=?", (booking_id,))
-    if scheduling.cancel(b["token"], "Cancelled by Kevin Lee Photography"):
+    b = db.get_or_404("SELECT token, status FROM bookings WHERE id=?", (booking_id,))
+    if b["status"] == "pending_payment":
+        # A hold has no lineage and nobody to email — release it directly. If
+        # the visitor's payment lands anyway, the webhook's paid-after-release
+        # path records it and tells Kevin to refund by hand.
+        db.run(
+            """UPDATE bookings SET status='cancelled',
+                      cancel_reason='Cancelled by Kevin Lee Photography',
+                      cancelled_at=datetime('now')
+                WHERE id=? AND status='pending_payment'""",
+            (booking_id,),
+        )
+    elif scheduling.cancel(b["token"], "Cancelled by Kevin Lee Photography"):
         booking_notify.cancelled(booking_id, by_admin=True)
     return RedirectResponse("/admin/scheduling/bookings", status_code=303)

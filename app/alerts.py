@@ -127,7 +127,9 @@ def inquiry_owner_email_failed(inquiry_id: int, reason: str) -> None:
     ops_alert(signature, text)
 
 
-def payment_anomaly(invoice_id, event_id: str, code: str, detail: str) -> None:
+def payment_anomaly(
+    invoice_id, event_id: str, code: str, detail: str, *, entity: str = "invoice"
+) -> None:
     """Deduplicated operator signal for a Stripe webhook we acknowledge but do
     NOT apply — an already-settled invoice, an amount/kind mismatch, or an
     invoice that does not exist.
@@ -140,7 +142,8 @@ def payment_anomaly(invoice_id, event_id: str, code: str, detail: str) -> None:
     text says what to go and check rather than only that something was odd.
     """
     log.error(
-        "stripe payment anomaly invoice=%s event=%s code=%s: %s",
+        "stripe payment anomaly %s=%s event=%s code=%s: %s",
+        entity,
         invoice_id,
         event_id,
         code,
@@ -148,7 +151,7 @@ def payment_anomaly(invoice_id, event_id: str, code: str, detail: str) -> None:
     )
     ops_alert(
         f"payment_anomaly:{event_id}",
-        f"Stripe payment NOT applied to invoice #{invoice_id} ({code}): {detail}. "
+        f"Stripe payment NOT applied to {entity} #{invoice_id} ({code}): {detail}. "
         f"Stripe may still have taken the money — check the Stripe dashboard and "
         f"refund or apply it by hand. Acknowledged so Stripe stops retrying; "
         f"details are in the audit log: {config.BASE_URL}/admin/audit",
