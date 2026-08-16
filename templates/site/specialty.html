@@ -432,6 +432,11 @@
 <section class="sr-wrap sr-section" aria-label="Book">
   <div class="sr-pagehead sr-pagehead--edgeless sr-cta-final">
     <h2 class="sr-title">{{ page.cta_h1 }} <span class="sr-em">{{ page.cta_h2 }}</span></h2>
+    {% if open_days %}
+    <p class="sr-mono sr-availstrip">Next openings:
+      {% for d in open_days %}<a href="{{ d.url }}">{{ d.label }}</a>{% if not loop.last %} <span aria-hidden="true">&middot;</span> {% endif %}{% endfor %}
+    </p>
+    {% endif %}
     <div class="sr-titlecard-actions">
       <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
       <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
