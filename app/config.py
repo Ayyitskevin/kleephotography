@@ -359,6 +359,16 @@ SQLITE_SYNCHRONOUS = os.environ.get("MISE_SQLITE_SYNCHRONOUS", "NORMAL").strip()
 # inventory exists — see ops/TRUTHFUL-HTTPS.md.
 HSTS_MAX_AGE = int(os.environ.get("MISE_HSTS_MAX_AGE", "15552000"))
 
+# Google review engine (revenue roadmap item 2). URL unset = dormant. The URL
+# is the direct "write a review" link from the Google Business Profile share
+# button. ASK_DAYS: how long after a gallery goes up before the ask (seen the
+# photos, delight still fresh). COOLDOWN_DAYS: minimum gap between asks to the
+# SAME client across all their galleries — review fatigue makes happy clients
+# annoyed ones, which is worse than no ask.
+GOOGLE_REVIEW_URL = os.environ.get("MISE_GOOGLE_REVIEW_URL", "")
+REVIEW_ASK_DAYS = int(os.environ.get("MISE_REVIEW_ASK_DAYS", "3"))
+REVIEW_COOLDOWN_DAYS = int(os.environ.get("MISE_REVIEW_COOLDOWN_DAYS", "180"))
+
 # How long an unpaid pay-to-book hold keeps its slot before the sweeper releases
 # it (minutes). Long enough to type card details twice; short enough that an
 # abandoned checkout cannot squat on a mini-session slot all afternoon.

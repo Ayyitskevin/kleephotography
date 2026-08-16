@@ -25,6 +25,7 @@ from . import (
     gallery_reminders,
     jobs,
     ops_monitor,
+    review_requests,
     scheduling,
 )
 from .admin import recurring
@@ -49,6 +50,10 @@ def _loop() -> None:
             gallery_reminders.sweep()
         except Exception:
             log.exception("gallery reminder sweep failed")
+        try:
+            review_requests.sweep()
+        except Exception:
+            log.exception("review ask sweep failed")
         try:
             contract_reminders.sweep()
         except Exception:

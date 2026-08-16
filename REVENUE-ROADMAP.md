@@ -11,7 +11,7 @@ Kevin's merge, no exceptions.
 | # | Item | Status |
 |---|------|--------|
 | 1 | **Pay-to-book** — Stripe reservation fee holds the slot; the mini-session engine | **built** (this PR) |
-| 2 | **Google review engine** — automated post-delivery review ask | next up |
+| 2 | **Google review engine** — automated post-delivery review ask | **built** (this PR) |
 | 3 | **Lead attribution** — "how did you hear about me?" + reports rollup | **built** (this PR) |
 | 4 | **List announcements** — one-shot campaigns to past clients + gallery-gate emails | queued |
 | 5 | **Session-anniversary nudges** — 11 months after a portrait/family delivery | queued |
@@ -41,12 +41,13 @@ you" with an honest unattributed count.
 
 ## Design notes for what's queued
 
-**2 — Review engine.** Hang the ask on the existing delivery event (gallery
-publish → reminder sweep). One warm email per delivered gallery, N days after
-delivery, with a direct Google review link (`MISE_GOOGLE_REVIEW_URL`); route the
-unhappy to a private reply instead. Throttle per client, never per gallery; a
-`review_requested_at` column keeps it one-shot. The pros' baseline is 50+
-reviews; the sweep and mailer already exist.
+**2 — Review engine — built.** `app/review_requests.py`, fired from the
+recurring sweep like the gallery reminders. One warm email per delivered
+gallery (`MISE_REVIEW_ASK_DAYS` after it goes up, skipping expired galleries),
+one-shot via `galleries.review_requested_at`, with a per-CLIENT cooldown
+(`MISE_REVIEW_COOLDOWN_DAYS`, default 180) across all their galleries. The
+unhappy are invited to reply privately; the delighted get the direct
+`MISE_GOOGLE_REVIEW_URL` link. Dormant until the URL is set.
 
 **4 — Announcements.** Not a marketing suite. One admin page: audience = past
 clients ∪ gallery-gate emails (deduped, minus unsubscribes), one message, one
