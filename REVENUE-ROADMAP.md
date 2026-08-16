@@ -15,8 +15,8 @@ Kevin's merge, no exceptions.
 | 3 | **Lead attribution** — "how did you hear about me?" + reports rollup | **built** (this PR) |
 | 4 | **List announcements** — one-shot campaigns to past clients + gallery-gate emails | **built** (this PR) |
 | 5 | **Session-anniversary nudges** — "invite them back" Telegram line at ~11 months | **built** (this PR) |
-| 6 | **Prints, phase one** — "order prints of your favorites" request flow, quoted by hand | queued |
-| 7 | **Expired galleries → reactivation pages** — dead end becomes a re-engagement lead | queued |
+| 6 | **Prints, phase one** — "request a print quote" from inside the gallery | **built** (this PR) |
+| 7 | **Expired galleries → reactivation pages** — "request re-opening" instead of a dead end | **built** (this PR) |
 
 ## Built in this PR
 
@@ -68,11 +68,15 @@ nudge per yearly cycle via `clients.anniversary_nudged_at`; nothing is stamped
 while alerts are disabled, so enabling Telegram later still catches the
 current window.
 
-**6 — Prints phase one.** A "print your favorites" request button on delivered
-galleries that opens a quote conversation (new inquiry kind `prints`). No lab
-API, no cart. If requests convert, THEN spec the store; the fulfillment margin
-research says exists should be proven on this client base first.
+**6 — Prints phase one — built.** "Want prints of your favorites?" in the
+gallery export rail (PIN-gated; the gate email is reused so most clients type
+nothing). The request lands as inquiry kind `prints` with the favorite count,
+their note, and the admin gallery link — a quote conversation, not a cart. If
+these convert, THEN the store earns its spec; a week was risked, not a quarter.
 
-**7 — Reactivation.** The expired-gallery page offers "request this gallery
-back" (inquiry kind `reactivation`) instead of a dead end. Pairs with a small
-restore action in admin. Returning clients are usually returning to spend.
+**7 — Reactivation — built.** The expired page offers "request re-opening"
+(inquiry kind `reactivation`) instead of a mailto dead end. The route exists
+ONLY for expired galleries; since expiry gates the PIN page itself the form is
+necessarily open, so honeypot + throttle + required email carry the abuse load.
+Restore = extend the expiry date on the admin gallery page, which also re-arms
+the expiry reminder.

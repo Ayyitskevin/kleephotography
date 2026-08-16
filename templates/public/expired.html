@@ -5,8 +5,22 @@
   <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
   <p class="sr-state-kicker sr-mono">Screening closed</p>
   <h1 class="sr-state-title">{{ g.title }}</h1>
-  <p>This gallery has expired.
-    {% if contact_email %}<a href="mailto:{{ contact_email }}">Get in touch</a>{% else %}<a href="/contact">Get in touch</a>{% endif %}
-    to have it re-opened.</p>
+  {% if sent %}
+  <p>Request received &mdash; I'll re-open the gallery and email you when it's
+    back, usually within a day.</p>
+  {% else %}
+  <p>This gallery has expired &mdash; but it isn't gone. Leave your email and
+    I'll re-open it for you.</p>
+  {% if error %}<p class="error" role="alert" aria-live="polite">{{ error }}</p>{% endif %}
+  <form method="post" action="/g/{{ g.slug }}/reactivate" class="sr-reactivate">
+    <label>Your email
+      <input type="email" name="email" required></label>
+    <label>Anything I should know? <span class="muted">(optional)</span>
+      <input type="text" name="note" maxlength="1000"></label>
+    <span class="hp-field" aria-hidden="true">
+      <input type="text" name="website" tabindex="-1" autocomplete="off"></span>
+    <button type="submit" class="btn">Request re-opening</button>
+  </form>
+  {% endif %}
 </main>
 {% endblock %}

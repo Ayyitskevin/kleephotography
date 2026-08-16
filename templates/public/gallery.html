@@ -181,6 +181,26 @@
     <a class="sr-btn" href="/g/{{ g.slug }}/download">&darr; Everything{% if total_bytes > 52428800 %} &middot; {{ "%.1f"|format(total_bytes / 1073741824) if total_bytes >= 1073741824 else (total_bytes / 1048576)|round|int ~ " MB" }}{{ " GB" if total_bytes >= 1073741824 }}{% endif %}</a>
   </div>
 </div>
+
+{% if request.query_params.get('prints') %}
+<p class="sr-prints-done">Print request sent &mdash; Kevin will follow up with
+  options and pricing for your favorites.</p>
+{% else %}
+<details class="sr-prints">
+  <summary>Want prints of your favorites?</summary>
+  <form method="post" action="/g/{{ g.slug }}/prints" class="sr-prints-form">
+    {% if not visitor or not visitor.email %}
+    <label>Email for the quote
+      <input type="email" name="email" required></label>
+    {% endif %}
+    <label>Anything specific? <span class="muted">(sizes, framing, how many &mdash; optional)</span>
+      <textarea name="note" rows="2" maxlength="1000"></textarea></label>
+    <span class="hp-field" aria-hidden="true">
+      <input type="text" name="website" tabindex="-1" autocomplete="off"></span>
+    <button type="submit" class="sr-btn">Request a print quote</button>
+  </form>
+</details>
+{% endif %}
 {% endif %}
 
 <div id="lightbox" class="lightbox" hidden data-slug="{{ g.slug }}"

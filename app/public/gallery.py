@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from .. import audit, config, db, features, jobs, reopen_notify, security
+from .. import audit, config, db, features, inquiry_notify, jobs, reopen_notify, security
 from ..gallery_comments import cascade_status, resolve_comment_parent, video_comment_thread
 from ..render import templates
 
@@ -242,6 +242,122 @@ def _progress_oob(g, section_id: int | None, visitor_id: int) -> str:
         g=g, proof_status=proof_status, proof_oob=True
     )
     return progress + status
+
+
+@router.post("/{slug}/prints", response_class=HTMLResponse)
+def request_prints(
+    request: Request,
+    slug: str,
+    email: str = Form(""),
+    note: str = Form(""),
+    website: str = Form(""),
+):
+    """Prints, phase one (revenue roadmap 6): the ask, not the store.
+
+    Working photographers are unanimous that digital-only leaves money on the
+    table, but a print STORE (lab APIs, carts, fulfilment) is a big bet on
+    unproven demand. This is the cheap experiment that decides it: a request
+    from inside the gallery becomes an inquiry Kevin quotes by hand. If these
+    convert, the store earns its spec; if they don't, a week was risked, not a
+    quarter.
+
+    PIN-gated like every gallery action; the visitor's gate email is reused so
+    most clients never retype anything.
+    """
+    g = get_live_gallery(slug)
+    if is_expired(g):
+        raise HTTPException(status_code=410)
+    visitor = security.require_visitor(request, g["id"])
+    if website.strip():  # honeypot
+        return RedirectResponse(f"/g/{slug}?prints=1", status_code=303)
+    ip = security.client_ip(request)
+    if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_FORM):
+        raise HTTPException(status_code=429, detail="too many requests — try again shortly")
+    email = (email or visitor["email"] or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="an email is needed for the quote")
+    favs = db.one(
+        "SELECT COUNT(*) AS n FROM favorites f JOIN assets a ON a.id=f.asset_id "
+        "WHERE a.gallery_id=?",
+        (g["id"],),
+    )["n"]
+    note = note.strip()[:1000]
+    plural = "s" if favs != 1 else ""
+    lines = [f'Print request from gallery "{g["title"]}" — {favs} favorite{plural} circled.']
+    if note:
+        lines.append(f"Their note: {note}")
+    lines.append(f"Gallery: {config.BASE_URL}/g/{g['slug']}")
+    lines.append(f"Admin: {config.BASE_URL}/admin/galleries/{g['id']}")
+    message = "\n\n".join(lines)
+    security.inquiry_record(ip, security.INQUIRY_BUCKET_FORM)
+    iid = db.run(
+        """INSERT INTO inquiries (name, email, message, kind, service)
+           VALUES (?,?,?,?,?)""",
+        (g["client_name"] or "Gallery client", email, message, "prints", g["title"]),
+    )
+    inquiry_notify.enqueue_owner_email(iid)
+    log.info("print request for gallery %s (inquiry %s)", g["id"], iid)
+    return RedirectResponse(f"/g/{slug}?prints=1", status_code=303)
+
+
+@router.post("/{slug}/reactivate", response_class=HTMLResponse)
+def request_reactivation(
+    request: Request,
+    slug: str,
+    email: str = Form(...),
+    note: str = Form(""),
+    website: str = Form(""),
+):
+    """Reactivation (revenue roadmap 7): the expired page stops being a dead end.
+
+    Returning clients are usually returning to SPEND — a print, a re-download,
+    a share with family — and the old page's answer was a mailto link. This
+    works ONLY on an expired gallery (a live one 404s the route): expiry gates
+    the PIN page itself, so this form is necessarily open — hence the honeypot,
+    the throttle, and a required email rather than a free ride.
+
+    Kevin restores by extending the expiry date on the admin gallery page —
+    which also re-arms the expiry reminder (see admin.galleries).
+    """
+    g = get_live_gallery(slug)
+    if not is_expired(g):
+        raise HTTPException(status_code=404)
+    done_ctx = {"g": g, "sent": True}
+    if website.strip():  # honeypot — pretend success
+        return templates.TemplateResponse(request, "public/expired.html", done_ctx)
+    ip = security.client_ip(request)
+    if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_FORM):
+        return templates.TemplateResponse(
+            request,
+            "public/expired.html",
+            {"g": g, "error": "A few requests came through just now — try again shortly."},
+            status_code=429,
+        )
+    email = email.strip().lower()
+    if not email or "@" not in email:
+        return templates.TemplateResponse(
+            request,
+            "public/expired.html",
+            {"g": g, "error": "Please enter the email you'd like the gallery sent to."},
+            status_code=400,
+        )
+    note = note.strip()[:1000]
+    lines = [f'Reactivation request for expired gallery "{g["title"]}".']
+    if note:
+        lines.append(f"Their note: {note}")
+    lines.append(
+        f"Restore it by extending the expiry date: {config.BASE_URL}/admin/galleries/{g['id']}"
+    )
+    message = "\n\n".join(lines)
+    security.inquiry_record(ip, security.INQUIRY_BUCKET_FORM)
+    iid = db.run(
+        """INSERT INTO inquiries (name, email, message, kind, service)
+           VALUES (?,?,?,?,?)""",
+        (g["client_name"] or "Past client", email, message, "reactivation", g["title"]),
+    )
+    inquiry_notify.enqueue_owner_email(iid)
+    log.info("reactivation request for gallery %s (inquiry %s)", g["id"], iid)
+    return templates.TemplateResponse(request, "public/expired.html", done_ctx)
 
 
 @router.post("/{slug}/fav/{asset_id}", response_class=HTMLResponse)
