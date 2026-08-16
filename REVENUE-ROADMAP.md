@@ -13,7 +13,7 @@ Kevin's merge, no exceptions.
 | 1 | **Pay-to-book** — Stripe reservation fee holds the slot; the mini-session engine | **built** (this PR) |
 | 2 | **Google review engine** — automated post-delivery review ask | **built** (this PR) |
 | 3 | **Lead attribution** — "how did you hear about me?" + reports rollup | **built** (this PR) |
-| 4 | **List announcements** — one-shot campaigns to past clients + gallery-gate emails | queued |
+| 4 | **List announcements** — one-shot campaigns to past clients + gallery-gate emails | **built** (this PR) |
 | 5 | **Session-anniversary nudges** — 11 months after a portrait/family delivery | queued |
 | 6 | **Prints, phase one** — "order prints of your favorites" request flow, quoted by hand | queued |
 | 7 | **Expired galleries → reactivation pages** — dead end becomes a re-engagement lead | queued |
@@ -49,11 +49,14 @@ one-shot via `galleries.review_requested_at`, with a per-CLIENT cooldown
 unhappy are invited to reply privately; the delighted get the direct
 `MISE_GOOGLE_REVIEW_URL` link. Dormant until the URL is set.
 
-**4 — Announcements.** Not a marketing suite. One admin page: audience = past
-clients ∪ gallery-gate emails (deduped, minus unsubscribes), one message, one
-send via the existing mailer with per-recipient jitter. Needs an `unsubscribes`
-table + `/u/{token}` one-click link in every send (CAN-SPAM). First real use:
-announcing item 1's mini-session days.
+**4 — Announcements — built.** Admin → Announcements: audience = past clients ∪
+gallery-gate emails (deduped case-insensitively, minus `unsubscribes`), one
+plain-text message, one send. Deliveries are one durable job per recipient
+(staged with the paper-trail row in one transaction, per-recipient jitter so a
+burst trickles through Gmail), each re-checking the ledger at send time. Every
+email carries `/u/{signed-email}` — a GET-safe confirm page + POST record, so
+mail-client prefetch can never unsubscribe anyone. `unsubscribes` is a legal
+ledger; its rollback is deliberately inert.
 
 **5 — Anniversary nudges.** Scheduler sweep: portrait/family projects delivered
 ~11 months ago and not since rebooked → draft a nudge for Kevin to approve, not

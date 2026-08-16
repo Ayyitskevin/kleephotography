@@ -1,0 +1,67 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Announcements · Mise admin{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>Announcements</h1>
+    <p class="pgtop-sub">One message to everyone who already knows the work —
+      <b>{{ audience_n }}</b> {{ "person" if audience_n == 1 else "people" }} right now
+      (clients + gallery downloads, minus unsubscribes)</p>
+  </div>
+  <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/emails">Captured emails</a>
+  </div>
+</header>
+{% endblock %}
+{% block content %}
+<section class="panel">
+  {% if just_sent %}
+  <p class="admin-flash">Queued to {{ just_sent }} recipients — deliveries trickle out
+    through the job queue (watch <a href="/admin/jobs">Jobs</a>).</p>
+  {% endif %}
+  {% if not mailer_on %}
+  <p class="admin-flash admin-flash-warn">The mailer isn't configured — sending is
+    disabled until MISE_GMAIL_USER / MISE_GMAIL_APP_PASSWORD are set.</p>
+  {% endif %}
+  {% if gmail_warn %}
+  <p class="admin-flash admin-flash-warn">Heads-up: {{ audience_n }} recipients is past
+    Gmail's ~400–500/day comfort zone. The queue will trickle them out, but the tail of
+    a very large send can be deferred by Google until tomorrow.</p>
+  {% endif %}
+  <form method="post" action="/admin/announcements/send"
+        data-confirm="Send this to {{ audience_n }} people? There is no unsend.">
+    <label>Subject
+      <input type="text" name="subject" required maxlength="200"
+             placeholder="Fall mini sessions are open — 8 slots, Oct 12"></label>
+    <label>Message <span class="muted">(plain text — each email opens with the
+        recipient's name and closes with your unsubscribe footer automatically)</span>
+      <textarea name="body" rows="10" required maxlength="10000"
+                placeholder="Booking is first-come: {{ base_url }}/book"></textarea></label>
+    <button type="submit" class="btn"{% if not mailer_on or not audience_n %} disabled{% endif %}>
+      Send to {{ audience_n }} people</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Sent</h2>
+  {% if history %}
+  <table class="report-table">
+    <thead><tr><th>When</th><th>Subject</th><th class="num">Audience</th>
+      <th class="num">Delivered</th><th class="num">Skipped</th></tr></thead>
+    <tbody>
+      {% for a in history %}
+      <tr><td>{{ a.created_at | localtime }}</td><td>{{ a.subject }}</td>
+        <td class="num">{{ a.audience_count }}</td>
+        <td class="num">{{ a.sent_count }}</td>
+        <td class="num">{{ a.skipped_count }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted">Delivered climbs as the queue drains; skipped = unsubscribed
+    between queueing and sending.</p>
+  {% else %}
+  <p class="muted">Nothing sent yet. The first good use: announcing a pay-to-book
+    mini-session day.</p>
+  {% endif %}
+</section>
+{% endblock %}

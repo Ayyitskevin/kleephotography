@@ -1,0 +1,20 @@
+{% extends "base_cream.html" %}
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block title %}Email preferences · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="site-main site-narrow">
+  {% if done %}
+    <h1>You're off the list</h1>
+    <p class="muted">{{ email }} won't receive announcements from {{ site_name }} again.
+      Booking confirmations and gallery deliveries for work you've hired me for
+      still arrive as normal.</p>
+  {% else %}
+    <h1>Stop announcement emails?</h1>
+    <p class="muted">{{ email }} will no longer hear about session openings or
+      studio news. Booking confirmations and gallery deliveries are unaffected.</p>
+    <form method="post" action="/u/{{ token }}">
+      <button type="submit" class="btn">Unsubscribe {{ email }}</button>
+    </form>
+  {% endif %}
+</main>
+{% endblock %}
