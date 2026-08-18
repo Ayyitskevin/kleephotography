@@ -49,6 +49,8 @@ def _checkout_event(
     payment_status="paid",
     etype="checkout.session.completed",
     metadata=None,
+    session_id=None,
+    currency="usd",
 ):
     return json.dumps(
         {
@@ -58,10 +60,11 @@ def _checkout_event(
             "type": etype,
             "data": {
                 "object": {
-                    "id": f"cs_{event_id}",
+                    "id": session_id or f"cs_{event_id}",
                     "object": "checkout.session",
                     "payment_status": payment_status,
                     "amount_total": amount,
+                    "currency": currency,
                     "metadata": (
                         metadata
                         if metadata is not None
@@ -94,7 +97,35 @@ def _cleanup_money_chain(cid, pid, iid):
     db.run("DELETE FROM clients WHERE id=?", (cid,))
 
 
-def _post_signed(client, body, secret="whsec_test"):
+def _post_signed(
+    client,
+    body,
+    secret="whsec_test",
+    *,
+    bind=True,
+    authorized_amount=None,
+    authorized_kind=None,
+    authorized_currency="usd",
+    authorized_session=None,
+):
+    event = json.loads(body)
+    session = event["data"]["object"]
+    metadata = session.get("metadata") or {}
+    invoice_id = metadata.get("invoice_id")
+    if bind and invoice_id and str(invoice_id).isdigit():
+        db.run(
+            """UPDATE invoices
+                  SET stripe_session_id=?, stripe_checkout_amount_cents=?,
+                      stripe_checkout_kind=?, stripe_checkout_currency=?
+                WHERE id=?""",
+            (
+                authorized_session or session["id"],
+                session["amount_total"] if authorized_amount is None else authorized_amount,
+                authorized_kind or metadata.get("kind"),
+                authorized_currency,
+                int(invoice_id),
+            ),
+        )
     return client.post(
         "/webhooks/stripe",
         content=body,
@@ -158,6 +189,47 @@ def test_pay_creates_checkout_with_balance_after_deposit(client, monkeypatch):
     _cleanup_money_chain(cid, pid, iid)
 
 
+def test_pay_reuses_open_checkout_for_repeated_request(client, monkeypatch):
+    """A double-click must not create two independently payable sessions."""
+    monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test_pay")
+    created = []
+    sessions = {}
+
+    class FakeSession:
+        status = "open"
+        payment_status = "unpaid"
+        amount_total = 90000
+        currency = "usd"
+
+        def __init__(self, number):
+            self.id = f"cs_repeat_{number}"
+            self.url = f"https://checkout.stripe.test/{self.id}"
+
+    def fake_create(**kwargs):
+        session = FakeSession(len(created) + 1)
+        created.append(kwargs)
+        sessions[session.id] = session
+        return session
+
+    monkeypatch.setattr(pay.stripe.checkout.Session, "create", fake_create)
+    monkeypatch.setattr(
+        pay.stripe.checkout.Session,
+        "retrieve",
+        lambda session_id, **kwargs: sessions[session_id],
+    )
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    inv = db.one("SELECT slug FROM invoices WHERE id=?", (iid,))
+
+    first = client.post(f"/i/{inv['slug']}/pay", follow_redirects=False)
+    second = client.post(f"/i/{inv['slug']}/pay", follow_redirects=False)
+
+    assert first.status_code == 303 and second.status_code == 303
+    assert first.headers["location"] == second.headers["location"]
+    assert len(created) == 1
+    assert created[0]["idempotency_key"].startswith(f"mise:invoice:{iid}:full:90000:")
+    _cleanup_money_chain(cid, pid, iid)
+
+
 def test_pay_refuses_when_nothing_due(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test_pay")
     cid, pid, iid = _seed_money_chain(
@@ -184,9 +256,13 @@ def test_webhook_acks_amount_mismatch_without_applying_it(client, monkeypatch):
     monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
     monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
     cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
-    r = _post_signed(client, _checkout_event("evt_bad_amt", iid, "full", 1))
+    r = _post_signed(
+        client,
+        _checkout_event("evt_bad_amt", iid, "full", 1),
+        authorized_amount=90000,
+    )
     assert r.status_code == 200
-    assert r.json()["unapplied"] == "amount_mismatch"
+    assert r.json()["unapplied"] == "checkout_mismatch"
     assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
     assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "sent"
     # The anomaly is durable, not just a log line: Stripe's retries used to be
@@ -196,7 +272,7 @@ def test_webhook_acks_amount_mismatch_without_applying_it(client, monkeypatch):
         "ORDER BY id DESC LIMIT 1",
         (iid,),
     )
-    assert row["action"] == "stripe_amount_mismatch"
+    assert row["action"] == "stripe_checkout_mismatch"
     assert "90000" in row["diff_json"]
     _cleanup_money_chain(cid, pid, iid)
 
@@ -209,8 +285,61 @@ def test_webhook_acks_kind_mismatch_without_applying_it(client, monkeypatch):
         project_status="proposal_sent", total=90000, deposit=30000, inv_status="sent"
     )
     # Owed is deposit/30000; claiming balance with that amount is still wrong kind.
-    r = _post_signed(client, _checkout_event("evt_bad_kind", iid, "balance", 30000))
-    assert r.status_code == 200 and r.json()["unapplied"] == "amount_mismatch"
+    r = _post_signed(
+        client,
+        _checkout_event("evt_bad_kind", iid, "balance", 30000),
+        authorized_kind="deposit",
+    )
+    assert r.status_code == 200
+    assert r.json()["unapplied"] == "checkout_mismatch"
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_acks_stale_session_without_applying_payment(client, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    r = _post_signed(
+        client,
+        _checkout_event("evt_stale", iid, "full", 90000),
+        authorized_session="cs_authoritative",
+    )
+    assert r.status_code == 200
+    assert r.json()["unapplied"] == "stale_session"
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_acks_wrong_currency_without_applying_payment(client, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    r = _post_signed(
+        client,
+        _checkout_event("evt_eur", iid, "full", 90000, currency="eur"),
+        authorized_currency="usd",
+    )
+    assert r.status_code == 200
+    assert r.json()["unapplied"] == "checkout_mismatch"
+    assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_acks_unbound_checkout_without_applying_payment(client, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.jobs, "dispatch", lambda ids: None)
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    r = _post_signed(
+        client,
+        _checkout_event("evt_unbound", iid, "full", 90000),
+        bind=False,
+    )
+    assert r.status_code == 200
+    assert r.json()["unapplied"] == "checkout_not_bound"
     assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (iid,))["n"] == 0
     _cleanup_money_chain(cid, pid, iid)
 

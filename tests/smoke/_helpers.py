@@ -143,11 +143,23 @@ def _checkout_event(
                     "object": "checkout.session",
                     "payment_status": payment_status,
                     "amount_total": amount,
+                    "currency": "usd",
                     "metadata": {"invoice_id": str(invoice_id), "kind": kind},
                 }
             },
         }
     ).encode()
+
+
+def _bind_invoice_checkout(invoice_id, event_id, kind, amount):
+    """Bind a synthetic Stripe event to the same authoritative snapshot as /pay."""
+    db.run(
+        """UPDATE invoices
+              SET stripe_session_id=?, stripe_checkout_amount_cents=?,
+                  stripe_checkout_kind=?, stripe_checkout_currency='usd'
+            WHERE id=?""",
+        (f"cs_{event_id}", amount, kind, invoice_id),
+    )
 
 
 def _spark_rect_count(html: str) -> int:
@@ -285,7 +297,9 @@ def _studio_chain(admin, title, *, through="project", monkeypatch=None):
     assert r.status_code == 303
     monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
     for kind, cents in (("deposit", 50000), ("balance", 65100)):
-        body = _checkout_event(f"evt_chain_{kind}_{invoice_id}", invoice_id, kind, cents)
+        event_id = f"evt_chain_{kind}_{invoice_id}"
+        _bind_invoice_checkout(invoice_id, event_id, kind, cents)
+        body = _checkout_event(event_id, invoice_id, kind, cents)
         assert _post_signed(admin, body).status_code == 200
     d = db.one("SELECT status, total_cents, deposit_cents FROM invoices WHERE id=?", (invoice_id,))
     assert d["status"] == "paid" and d["total_cents"] == 115100 and d["deposit_cents"] == 50000
@@ -312,10 +326,11 @@ def _drop_studio_chain(admin, chain):
     assert r.status_code == 303
 
 
-def _quo_sig(secret_b64: str, raw: bytes, ts: str = "1700000000") -> str:
+def _quo_sig(secret_b64: str, raw: bytes, ts: str | None = None) -> str:
     """Build a valid openphone-signature header for `raw` (mirrors sms.verify_webhook)."""
     import base64
 
+    ts = ts or str(int(time.time() * 1000))
     key = base64.b64decode(secret_b64)
     sig = base64.b64encode(
         hmac.new(key, ts.encode() + b"." + raw, hashlib.sha256).digest()

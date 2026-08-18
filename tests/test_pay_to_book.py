@@ -95,17 +95,18 @@ def _signed_event(client, body: dict):
     )
 
 
-def _checkout_completed(event_id, booking_id, amount):
+def _checkout_completed(event_id, booking_id, amount, session_id="cs_wh", currency="usd"):
     return {
         "id": event_id,
         "object": "event",
         "type": "checkout.session.completed",
         "data": {
             "object": {
-                "id": f"cs_{event_id}",
+                "id": session_id,
                 "object": "checkout.session",
                 "payment_status": "paid",
                 "amount_total": amount,
+                "currency": currency,
                 "metadata": {"kind": "booking", "booking_id": str(booking_id)},
             }
         },
@@ -191,6 +192,8 @@ def test_paid_type_holds_without_confirming(client, event_type, monkeypatch):
     assert b["status"] == "pending_payment"
     assert b["stripe_session_id"] == "cs_hold_test"
     assert notified == [], "side-effects fired before any money arrived"
+    assert b["stripe_checkout_amount_cents"] == 15000
+    assert b["stripe_checkout_currency"] == "usd"
     assert created["metadata"] == {"kind": "booking", "booking_id": str(b["id"])}
     assert created["line_items"][0]["price_data"]["unit_amount"] == 15000
 
@@ -211,6 +214,88 @@ def test_paid_type_holds_without_confirming(client, event_type, monkeypatch):
     # and the sweep tidies the row itself
     assert scheduling.expire_pending_payments() >= 1
     assert db.one("SELECT status FROM bookings WHERE id=?", (b["id"],))["status"] == "cancelled"
+
+
+@pytest.mark.parametrize("event_type", [15000], indirect=True)
+def test_booking_reuses_open_checkout_on_pay_again(client, event_type, monkeypatch):
+    created = []
+    sessions = {}
+
+    class _Sess:
+        status = "open"
+        amount_total = 15000
+        currency = "usd"
+
+        def __init__(self, number):
+            self.id = f"cs_book_repeat_{number}"
+            self.url = f"https://checkout.stripe.test/{self.id}"
+
+    def fake_create(**kwargs):
+        session = _Sess(len(created) + 1)
+        created.append(kwargs)
+        sessions[session.id] = session
+        return session
+
+    monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test")
+    monkeypatch.setattr(pub_sched.stripe.checkout.Session, "create", fake_create)
+    monkeypatch.setattr(
+        pub_sched.stripe.checkout.Session,
+        "retrieve",
+        lambda session_id, **kwargs: sessions[session_id],
+    )
+
+    first = _book(client, event_type, _a_slot(event_type))
+    b = db.one("SELECT * FROM bookings WHERE event_type_id=?", (event_type["id"],))
+    second = client.post(f"/booking/{b['token']}/pay", follow_redirects=False)
+
+    assert first.status_code == 303 and second.status_code == 303
+    assert first.headers["location"] == second.headers["location"]
+    assert len(created) == 1
+    assert created[0]["idempotency_key"].startswith(f"mise:booking:{b['id']}:15000:usd:")
+    assert b["stripe_checkout_amount_cents"] == 15000
+    assert b["stripe_checkout_currency"] == "usd"
+
+
+@pytest.mark.parametrize("event_type", [15000], indirect=True)
+def test_booking_quote_does_not_change_after_event_price_edit(client, event_type, monkeypatch):
+    created = []
+    sessions = {}
+
+    class _Sess:
+        status = "open"
+        currency = "usd"
+
+        def __init__(self, number, amount):
+            self.id = f"cs_price_{number}"
+            self.url = f"https://checkout.stripe.test/{self.id}"
+            self.amount_total = amount
+
+    def fake_create(**kwargs):
+        amount = kwargs["line_items"][0]["price_data"]["unit_amount"]
+        session = _Sess(len(created) + 1, amount)
+        created.append(kwargs)
+        sessions[session.id] = session
+        return session
+
+    monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test")
+    monkeypatch.setattr(pub_sched.stripe.checkout.Session, "create", fake_create)
+    monkeypatch.setattr(
+        pub_sched.stripe.checkout.Session,
+        "retrieve",
+        lambda session_id, **kwargs: sessions[session_id],
+    )
+
+    _book(client, event_type, _a_slot(event_type))
+    b = db.one("SELECT * FROM bookings WHERE event_type_id=?", (event_type["id"],))
+    sessions[b["stripe_session_id"]].status = "expired"
+    db.run("UPDATE event_types SET booking_fee_cents=25000 WHERE id=?", (event_type["id"],))
+
+    retry = client.post(f"/booking/{b['token']}/pay", follow_redirects=False)
+
+    assert retry.status_code == 303
+    assert len(created) == 2
+    assert [c["line_items"][0]["price_data"]["unit_amount"] for c in created] == [15000, 15000]
+    assert created[1]["idempotency_key"].endswith(b["stripe_session_id"])
 
 
 @pytest.mark.parametrize("event_type", [15000], indirect=True)
@@ -235,9 +320,14 @@ def _held_booking(client, event_type, monkeypatch):
     class _Sess:
         id = "cs_wh"
         url = "https://checkout.stripe.test/pay"
+        status = "open"
+        amount_total = 15000
+        currency = "usd"
 
+    session = _Sess()
     monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test")
-    monkeypatch.setattr(pub_sched.stripe.checkout.Session, "create", lambda **k: _Sess())
+    monkeypatch.setattr(pub_sched.stripe.checkout.Session, "create", lambda **k: session)
+    monkeypatch.setattr(pub_sched.stripe.checkout.Session, "retrieve", lambda *a, **k: session)
     _book(client, event_type, _a_slot(event_type))
     return db.one("SELECT * FROM bookings WHERE event_type_id=?", (event_type["id"],))
 
@@ -263,6 +353,56 @@ def test_webhook_confirms_hold_and_fires_side_effects(client, event_type, monkey
     r2 = _signed_event(client, _checkout_completed("evt_bk_ok", b["id"], 15000))
     assert r2.status_code == 200 and r2.json().get("duplicate") is True
     assert len(notified) == 1
+    assert (
+        db.one("SELECT COUNT(*) n FROM booking_payments WHERE booking_id=?", (b["id"],))["n"] == 1
+    )
+
+
+@pytest.mark.parametrize("event_type", [15000], indirect=True)
+@pytest.mark.parametrize(
+    ("event", "code"),
+    [
+        (_checkout_completed("evt_bk_bad_amount", 0, 1), "checkout_mismatch"),
+        (_checkout_completed("evt_bk_bad_currency", 0, 15000, currency="eur"), "checkout_mismatch"),
+        (_checkout_completed("evt_bk_stale", 0, 15000, session_id="cs_stale"), "stale_session"),
+    ],
+)
+def test_webhook_rejects_untrusted_booking_checkout_fields(
+    client, event_type, monkeypatch, event, code
+):
+    b = _held_booking(client, event_type, monkeypatch)
+    event["data"]["object"]["metadata"]["booking_id"] = str(b["id"])
+    from app.public import pay as pay_mod
+
+    monkeypatch.setattr(pay_mod.alerts, "payment_anomaly", lambda *a, **k: None)
+    r = _signed_event(client, event)
+
+    assert r.status_code == 200
+    assert r.json()["unapplied"] == code
+    assert (
+        db.one("SELECT status FROM bookings WHERE id=?", (b["id"],))["status"] == "pending_payment"
+    )
+    assert (
+        db.one("SELECT COUNT(*) n FROM booking_payments WHERE booking_id=?", (b["id"],))["n"] == 0
+    )
+
+
+@pytest.mark.parametrize("event_type", [15000], indirect=True)
+def test_distinct_event_cannot_confirm_booking_twice(client, event_type, monkeypatch):
+    b = _held_booking(client, event_type, monkeypatch)
+    notified = []
+    import app.booking_notify as bn
+    from app.public import pay as pay_mod
+
+    monkeypatch.setattr(bn, "confirm", lambda bid: notified.append(bid))
+    monkeypatch.setattr(pay_mod.alerts, "payment_anomaly", lambda *a, **k: None)
+
+    first = _signed_event(client, _checkout_completed("evt_bk_once", b["id"], 15000))
+    second = _signed_event(client, _checkout_completed("evt_bk_twice", b["id"], 15000))
+
+    assert first.json() == {"ok": True}
+    assert second.json()["unapplied"] == "already_settled"
+    assert notified == [b["id"]]
     assert (
         db.one("SELECT COUNT(*) n FROM booking_payments WHERE booking_id=?", (b["id"],))["n"] == 1
     )
@@ -308,7 +448,7 @@ def test_webhook_acks_unknown_booking(client, monkeypatch):
 @pytest.mark.parametrize("event_type", [15000], indirect=True)
 def test_pay_again_route_guards_status(client, event_type, monkeypatch):
     b = _held_booking(client, event_type, monkeypatch)
-    # live hold → redirects to a fresh checkout
+    # live hold → redirects to its one authoritative checkout
     r = client.post(f"/booking/{b['token']}/pay", follow_redirects=False)
     assert r.status_code == 303
     # confirmed booking → no pay route
