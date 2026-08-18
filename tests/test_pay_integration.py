@@ -169,6 +169,12 @@ def test_pay_creates_checkout_with_balance_after_deposit(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test_pay")
     captured = {}
 
+    class PaidDeposit:
+        id = "cs_deposit_paid"
+        status = "complete"
+        payment_status = "paid"
+        url = None
+
     class FakeSession:
         id = "cs_balance_1"
         url = "https://checkout.stripe.test/cs_balance_1"
@@ -178,14 +184,38 @@ def test_pay_creates_checkout_with_balance_after_deposit(client, monkeypatch):
         return FakeSession()
 
     monkeypatch.setattr(pay.stripe.checkout.Session, "create", fake_create)
+    monkeypatch.setattr(
+        pay.stripe.checkout.Session,
+        "retrieve",
+        lambda session_id, **kwargs: PaidDeposit(),
+    )
     cid, pid, iid = _seed_money_chain(
         project_status="retainer_paid", total=90000, deposit=30000, inv_status="deposit_paid"
     )
+    db.run(
+        """UPDATE invoices
+              SET stripe_session_id='cs_deposit_paid', stripe_checkout_amount_cents=30000,
+                  stripe_checkout_kind='deposit', stripe_checkout_currency='usd'
+            WHERE id=?""",
+        (iid,),
+    )
+    db.run(
+        """INSERT INTO payments
+              (invoice_id, stripe_event_id, stripe_session_id, amount_cents, kind)
+            VALUES (?, 'evt_deposit_paid', 'cs_deposit_paid', 30000, 'deposit')""",
+        (iid,),
+    )
+
     inv = db.one("SELECT slug FROM invoices WHERE id=?", (iid,))
     r = client.post(f"/i/{inv['slug']}/pay", follow_redirects=False)
     assert r.status_code == 303
+    assert r.headers["location"] == FakeSession.url
     assert captured["line_items"][0]["price_data"]["unit_amount"] == 60000
     assert captured["metadata"]["kind"] == "balance"
+    assert (
+        db.one("SELECT stripe_session_id FROM invoices WHERE id=?", (iid,))["stripe_session_id"]
+        == "cs_balance_1"
+    )
     _cleanup_money_chain(cid, pid, iid)
 
 

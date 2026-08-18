@@ -163,15 +163,17 @@ def _invoice_checkout(d, amount: int, kind: str, slug: str):
         if status == "complete":
             # Checkout marks delayed methods complete before the bank transfer
             # settles. That session is still collectible: replacing it could
-            # let both the old ACH debit and a new session take money. A paid
-            # session is terminal/reusable while its webhook catches up; an
-            # unpaid one stays bound until async_payment_failed explicitly
-            # releases it.
-            if payment_status == "paid":
-                return prior
+            # let both the old ACH debit and a new session take money. An unpaid
+            # one stays bound until async_payment_failed explicitly releases it.
             if payment_status == "unpaid":
                 raise HTTPException(status_code=409, detail="payment is still processing")
-            raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+            if payment_status != "paid":
+                raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+            # A matching paid session is terminal/reusable while its webhook
+            # catches up. A paid *previous installment* (deposit before balance)
+            # is safe to supersede and must not block the remainder Checkout.
+            if snapshot_matches:
+                return prior
         if status == "open":
             try:
                 stripe.checkout.Session.expire(
@@ -187,7 +189,7 @@ def _invoice_checkout(d, amount: int, kind: str, slug: str):
                     exc,
                 )
                 raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
-        elif status != "expired":
+        elif status not in ("expired", "complete"):
             # Stripe currently documents open, complete, and expired. Never
             # mint another payable session if it introduces a new state we do
             # not understand.
