@@ -12,6 +12,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -20,15 +23,17 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24"
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.14"
 
@@ -37,10 +42,10 @@ jobs:
         run: python scripts/check-migration-numbering.py
 
       - name: Cache pip
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.14-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+          key: ${{ runner.os }}-pip-3.14-${{ hashFiles('requirements-dev.lock') }}
           restore-keys: |
             ${{ runner.os }}-pip-3.14-
 
@@ -52,8 +57,7 @@ jobs:
       - name: Create venv and install deps
         run: |
           python -m venv .venv
-          .venv/bin/pip install --upgrade pip
-          .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+          .venv/bin/pip install --require-hashes -r requirements-dev.lock
 
       - name: Run unit tests (fast feedback)
         run: |
@@ -71,6 +75,18 @@ jobs:
         run: |
           .venv/bin/ruff check . --output-format=github
           .venv/bin/ruff format --check .
+      - name: Audit runtime dependencies
+        run: .venv/bin/pip-audit -r requirements.lock
+
+      - name: Scan Python for high-severity security defects
+        # Medium findings are reviewed in the security audit; fail CI on high
+        # severity rather than normalizing a noisy allowlist.
+        run: .venv/bin/bandit -q -r app -lll
+
+      - name: Reject secrets not present in the reviewed baseline
+        run: |
+          git ls-files -z -- ':!.secrets.baseline' ':!requirements.lock' ':!requirements-dev.lock' |
+            xargs -0 .venv/bin/detect-secrets-hook --baseline .secrets.baseline
 
       - name: Run full smoke suite
         run: |
@@ -91,31 +107,32 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24"
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
 
       - name: Cache pip
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.12-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+          key: ${{ runner.os }}-pip-3.12-${{ hashFiles('requirements-dev.lock') }}
           restore-keys: |
             ${{ runner.os }}-pip-3.12-
 
       - name: Create venv and install deps
         run: |
           python -m venv .venv
-          .venv/bin/pip install --upgrade pip
-          .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+          .venv/bin/pip install --require-hashes -r requirements-dev.lock
 
       - name: Run unit tests (fast feedback)
         run: |
