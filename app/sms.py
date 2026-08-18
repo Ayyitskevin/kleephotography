@@ -21,6 +21,7 @@ import hmac
 import http.client
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 
@@ -104,14 +105,25 @@ def verify_webhook(raw: bytes, signature_header: str) -> bool:
     parts = signature_header.split(";")
     if len(parts) != 4 or parts[0] != "hmac":
         return False
-    _, _version, timestamp, provided = parts
+    _, version, timestamp, provided = parts
+    if version != "1":
+        return False
     try:
-        key = base64.b64decode(secret)
+        timestamp_value = int(timestamp)
+        # Quo's documented signature example is a 13-digit Unix timestamp in
+        # milliseconds. Accept seconds too for older OpenPhone deliveries, but
+        # normalize before enforcing the same replay window.
+        timestamp_sec = (
+            timestamp_value / 1000 if timestamp_value >= 10_000_000_000 else timestamp_value
+        )
+        if abs(time.time() - timestamp_sec) > config.QUO_WEBHOOK_TOLERANCE_SEC:
+            return False
+        key = base64.b64decode(secret, validate=True)
         signed = timestamp.encode() + b"." + raw
         # Both halves stay bytes: compare_digest rejects a non-ASCII str with
         # TypeError, and every byte of this header is caller-controlled.
         provided_sig = provided.encode()
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
         return False
     expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest())
     return hmac.compare_digest(expected, provided_sig)

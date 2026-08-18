@@ -90,7 +90,7 @@ def _never_called(monkeypatch):
     monkeypatch.setattr(sms.urllib.request, "urlopen", fake_urlopen)
 
 
-def _sign(raw: bytes, timestamp: str = "1700000000", secret: str = SIGNING_SECRET) -> str:
+def _sign(raw: bytes, timestamp: str = "1700000000000", secret: str = SIGNING_SECRET) -> str:
     digest = hmac.new(base64.b64decode(secret), timestamp.encode() + b"." + raw, hashlib.sha256)
     return f"hmac;1;{timestamp};{base64.b64encode(digest.digest()).decode()}"
 
@@ -236,12 +236,14 @@ def test_send_rejects_a_json_body_that_is_not_an_object(armed, monkeypatch, body
 
 def test_verify_webhook_accepts_a_correctly_signed_body(monkeypatch):
     monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", SIGNING_SECRET)
+    monkeypatch.setattr(sms.time, "time", lambda: 1_700_000_000)
     raw = b'{"type":"message.received"}'
     assert sms.verify_webhook(raw, _sign(raw)) is True
 
 
 def test_verify_webhook_rejects_a_body_that_changed_after_signing(monkeypatch):
     monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", SIGNING_SECRET)
+    monkeypatch.setattr(sms.time, "time", lambda: 1_700_000_000)
     header = _sign(b'{"type":"message.received"}')
     assert sms.verify_webhook(b'{"type":"message.tampered"}', header) is False
 
@@ -251,6 +253,24 @@ def test_verify_webhook_rejects_a_replayed_timestamp_swap(monkeypatch):
     raw = b'{"type":"message.received"}'
     header = _sign(raw, timestamp="1700000000")
     assert sms.verify_webhook(raw, header.replace("1700000000", "1700009999")) is False
+
+
+@pytest.mark.parametrize("timestamp", ["1699999699999", "1700000300001", "not-a-time"])
+def test_verify_webhook_rejects_stale_future_or_invalid_timestamps(monkeypatch, timestamp):
+    monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", SIGNING_SECRET)
+    monkeypatch.setattr(config, "QUO_WEBHOOK_TOLERANCE_SEC", 300)
+    monkeypatch.setattr(sms.time, "time", lambda: 1_700_000_000)
+    raw = b'{"type":"message.received"}'
+    assert sms.verify_webhook(raw, _sign(raw, timestamp=timestamp)) is False
+
+
+@pytest.mark.parametrize("timestamp", ["1699999700000", "1700000300000"])
+def test_verify_webhook_accepts_timestamps_at_tolerance_boundary(monkeypatch, timestamp):
+    monkeypatch.setattr(config, "QUO_WEBHOOK_SECRET", SIGNING_SECRET)
+    monkeypatch.setattr(config, "QUO_WEBHOOK_TOLERANCE_SEC", 300)
+    monkeypatch.setattr(sms.time, "time", lambda: 1_700_000_000)
+    raw = b'{"type":"message.received"}'
+    assert sms.verify_webhook(raw, _sign(raw, timestamp=timestamp)) is True
 
 
 def test_verify_webhook_rejects_when_no_secret_is_provisioned(monkeypatch):
@@ -266,6 +286,7 @@ def test_verify_webhook_rejects_when_no_secret_is_provisioned(monkeypatch):
         "hmac;1;1700000000",
         "hmac;1;1700000000;sig;extra",
         "sha256;1;1700000000;c2ln",
+        "hmac;2;1700000000000;c2ln",
         "hmac;1;1700000000;not-the-signature",
     ],
 )
