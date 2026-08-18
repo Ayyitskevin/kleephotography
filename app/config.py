@@ -197,6 +197,7 @@ QUO_NUMBER = os.environ.get("MISE_QUO_NUMBER", "")
 QUO_WEBHOOK_SECRET = os.environ.get("MISE_QUO_WEBHOOK_SECRET", "")
 QUO_API_BASE = os.environ.get("MISE_QUO_API_BASE", "https://api.openphone.com/v1")
 QUO_TIMEOUT = int(os.environ.get("MISE_QUO_TIMEOUT", "20"))
+QUO_WEBHOOK_TOLERANCE_SEC = int(os.environ.get("MISE_QUO_WEBHOOK_TOLERANCE_SEC", "300"))
 
 # Shot-list read API (Domain F / B-Direct integration). Odysseus's preshoot_pack
 # reads Mise's local shot list over GET /api/shots?session=<notion_page_id> with a

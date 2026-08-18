@@ -136,7 +136,7 @@ enforces. Counts drift; the gates in CI are the contract.
 
 ```sh
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
+pip install --require-hashes -r requirements-dev.lock
 # ffmpeg required for video smoke tests
 cp .env.example .env   # set MISE_SECRET_KEY + MISE_ADMIN_PASSWORD at minimum
 uvicorn app.main:app --reload --port 8400
@@ -144,7 +144,9 @@ uvicorn app.main:app --reload --port 8400
 
 Migrations run automatically on startup. Secrets and integration keys are documented in
 [`.env.example`](.env.example); integrations stay dormant until their keys are set. CI and
-local installs use **pip + `requirements.txt`** — do not commit `uv.lock`.
+CI and local installs use **pip + the committed hash locks** (`requirements.lock`
+for runtime, `requirements-dev.lock` for tests and tooling). Regenerate them from
+the short exact-pinned input files when dependencies change; do not commit `uv.lock`.
 
 ### Feature flags (kill switches)
 

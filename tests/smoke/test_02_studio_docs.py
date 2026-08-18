@@ -14,6 +14,7 @@ from PIL import Image
 from app import config, db, platekit
 from app.main import app
 from tests.smoke._helpers import (
+    _bind_invoice_checkout,
     _checkout_event,
     _cleanup_money_chain,
     _close,
@@ -363,6 +364,7 @@ def test_invoice_lifecycle(admin, monkeypatch):
 
         # webhook with signature verification
         monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+        _bind_invoice_checkout(d["id"], "evt_dep_1", "deposit", 50000)
         body = _checkout_event("evt_dep_1", d["id"], "deposit", 50000)
         assert (
             pub.post(
@@ -389,6 +391,7 @@ def test_invoice_lifecycle(admin, monkeypatch):
         assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (d["id"],))["n"] == 1
 
         # balance payment settles the invoice
+        _bind_invoice_checkout(d["id"], "evt_bal_1", "balance", 65100)
         body = _checkout_event("evt_bal_1", d["id"], "balance", 65100)
         r = pub.post(
             "/webhooks/stripe",

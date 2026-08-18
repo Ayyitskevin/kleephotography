@@ -306,24 +306,71 @@ def confirm_booking(
 # ── manage: confirmation page, cancel, reschedule, invite download ───────────
 
 
-def _booking_checkout_url(bid: int, token: str, et, email: str, fee: int) -> str:
-    """Create the Stripe Checkout session for a booking hold; return its URL.
+def _session_value(session, key: str, default=None):
+    try:
+        return session[key]
+    except (KeyError, TypeError):
+        return getattr(session, key, default)
 
-    Mirrors the invoice checkout in public/pay.py: metadata carries kind +
-    booking_id, and the shared /webhooks/stripe endpoint branches on kind. Card
-    only — a mini-session hold must settle while the hold is alive, and ACH
-    settles in days, which is longer than any sane hold TTL.
-    """
+
+def _booking_checkout_url(bid: int, token: str, et, email: str, fee: int) -> str:
+    """Return one authoritative Checkout Session for this booking hold."""
+    currency = "usd"
+    b = db.one("SELECT * FROM bookings WHERE id=?", (bid,))
+    if not b or b["status"] != "pending_payment":
+        raise HTTPException(status_code=404)
+
+    # The quote freezes when the booking is created. A later event-type price
+    # edit must not change what this client is asked to pay.
+    amount = b["stripe_checkout_amount_cents"]
+    if amount is None:
+        amount = fee
+        db.run(
+            """UPDATE bookings
+                  SET stripe_checkout_amount_cents=?, stripe_checkout_currency=?
+                WHERE id=? AND stripe_checkout_amount_cents IS NULL""",
+            (amount, currency, bid),
+        )
+    else:
+        currency = b["stripe_checkout_currency"] or currency
+
+    prior_id = b["stripe_session_id"]
+    if prior_id:
+        prior = stripe.checkout.Session.retrieve(
+            prior_id,
+            api_key=config.STRIPE_SECRET_KEY,
+        )
+        status = _session_value(prior, "status")
+        snapshot_matches = (
+            int(_session_value(prior, "amount_total", 0) or 0) == amount
+            and str(_session_value(prior, "currency", "") or "").lower() == currency
+        )
+        if snapshot_matches and status == "open":
+            url = _session_value(prior, "url")
+            if url:
+                return url
+            raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+        if snapshot_matches and status == "complete":
+            return f"{config.BASE_URL}/booking/{token}?paid=1"
+        if status == "open":
+            stripe.checkout.Session.expire(
+                prior_id,
+                api_key=config.STRIPE_SECRET_KEY,
+                idempotency_key=f"mise:booking:{bid}:expire:{prior_id}",
+            )
+
+    predecessor = prior_id or "initial"
     session = stripe.checkout.Session.create(
         api_key=config.STRIPE_SECRET_KEY,
+        idempotency_key=f"mise:booking:{bid}:{amount}:{currency}:{predecessor}",
         mode="payment",
         payment_method_types=["card"],
         line_items=[
             {
                 "quantity": 1,
                 "price_data": {
-                    "currency": "usd",
-                    "unit_amount": fee,
+                    "currency": currency,
+                    "unit_amount": amount,
                     "product_data": {"name": f"Session reservation — {et['name']}"},
                 },
             }
@@ -332,13 +379,20 @@ def _booking_checkout_url(bid: int, token: str, et, email: str, fee: int) -> str
         metadata={"kind": "booking", "booking_id": str(bid)},
         success_url=f"{config.BASE_URL}/booking/{token}?paid=1",
         cancel_url=f"{config.BASE_URL}/booking/{token}",
-        # Stripe expires the checkout page in step with the hold, so the visitor
-        # can never pay through a link whose slot has already been released.
         expires_at=int(dt.datetime.now(dt.UTC).timestamp())
         + max(config.BOOKING_PAY_TTL_MIN, 30) * 60,
     )
-    db.run("UPDATE bookings SET stripe_session_id=? WHERE id=?", (session.id, bid))
-    return session.url
+    db.run(
+        """UPDATE bookings
+              SET stripe_session_id=?, stripe_checkout_amount_cents=?,
+                  stripe_checkout_currency=?
+            WHERE id=? AND status='pending_payment'""",
+        (session.id, amount, currency, bid),
+    )
+    url = _session_value(session, "url")
+    if not url:
+        raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+    return url
 
 
 @router.post("/booking/{token}/pay")

@@ -130,24 +130,81 @@ def view_receipt(request: Request, slug: str):
     )
 
 
-@router.post("/i/{slug}/pay")
-def pay_invoice(request: Request, slug: str):
-    d = _invoice_or_404(slug)
-    amount, kind = next_payment(d)
-    if not amount:
-        raise HTTPException(status_code=400, detail="nothing due on this invoice")
-    if not features.stripe_enabled():
-        raise HTTPException(status_code=503, detail="online payment is not configured")
+def _stripe_value(obj, key: str, default=None):
+    try:
+        return obj[key]
+    except (KeyError, TypeError):
+        return getattr(obj, key, default)
+
+
+def _invoice_checkout(d, amount: int, kind: str, slug: str):
+    """Return one authoritative Checkout Session for this invoice installment."""
+    currency = "usd"
+    prior_id = d["stripe_session_id"]
+    if prior_id:
+        try:
+            prior = stripe.checkout.Session.retrieve(
+                prior_id,
+                api_key=config.STRIPE_SECRET_KEY,
+            )
+        except stripe.StripeError as exc:
+            log.error("invoice %s checkout %s could not be verified: %s", d["id"], prior_id, exc)
+            raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+
+        snapshot_matches = (
+            d["stripe_checkout_amount_cents"] == amount
+            and d["stripe_checkout_kind"] == kind
+            and d["stripe_checkout_currency"] == currency
+        )
+        status = _stripe_value(prior, "status")
+        payment_status = _stripe_value(prior, "payment_status")
+        if snapshot_matches and status == "open":
+            return prior
+        if status == "complete":
+            # Checkout marks delayed methods complete before the bank transfer
+            # settles. That session is still collectible: replacing it could
+            # let both the old ACH debit and a new session take money. A paid
+            # session is terminal/reusable while its webhook catches up; an
+            # unpaid one stays bound until async_payment_failed explicitly
+            # releases it.
+            if payment_status == "paid":
+                return prior
+            if payment_status == "unpaid":
+                raise HTTPException(status_code=409, detail="payment is still processing")
+            raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+        if status == "open":
+            try:
+                stripe.checkout.Session.expire(
+                    prior_id,
+                    api_key=config.STRIPE_SECRET_KEY,
+                    idempotency_key=f"mise:invoice:{d['id']}:expire:{prior_id}",
+                )
+            except stripe.StripeError as exc:
+                log.error(
+                    "invoice %s stale checkout %s could not be expired: %s",
+                    d["id"],
+                    prior_id,
+                    exc,
+                )
+                raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+        elif status != "expired":
+            # Stripe currently documents open, complete, and expired. Never
+            # mint another payable session if it introduces a new state we do
+            # not understand.
+            raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+
     label = {"deposit": "Deposit", "balance": "Balance", "full": "Payment"}[kind]
+    predecessor = prior_id or "initial"
     session = stripe.checkout.Session.create(
         api_key=config.STRIPE_SECRET_KEY,
+        idempotency_key=f"mise:invoice:{d['id']}:{kind}:{amount}:{predecessor}",
         mode="payment",
         payment_method_types=["card", "us_bank_account"],
         line_items=[
             {
                 "quantity": 1,
                 "price_data": {
-                    "currency": "usd",
+                    "currency": currency,
                     "unit_amount": amount,
                     "product_data": {"name": f"{label} — {d['title']}"},
                 },
@@ -158,9 +215,36 @@ def pay_invoice(request: Request, slug: str):
         success_url=f"{config.BASE_URL}/i/{slug}?thanks=1",
         cancel_url=f"{config.BASE_URL}/i/{slug}",
     )
-    db.run("UPDATE invoices SET stripe_session_id=? WHERE id=?", (session.id, d["id"]))
+    db.run(
+        """UPDATE invoices
+              SET stripe_session_id=?, stripe_checkout_amount_cents=?,
+                  stripe_checkout_kind=?, stripe_checkout_currency=?
+            WHERE id=?""",
+        (session.id, amount, kind, currency, d["id"]),
+    )
     log.info("invoice %s checkout %s created (%s, %s cents)", d["id"], session.id, kind, amount)
-    return RedirectResponse(session.url, status_code=303)
+    return session
+
+
+@router.post("/i/{slug}/pay")
+def pay_invoice(request: Request, slug: str):
+    d = _invoice_or_404(slug)
+    amount, kind = next_payment(d)
+    if not amount:
+        raise HTTPException(status_code=400, detail="nothing due on this invoice")
+    if not features.stripe_enabled():
+        raise HTTPException(status_code=503, detail="online payment is not configured")
+    session = _invoice_checkout(d, amount, kind, slug)
+    if _stripe_value(session, "status") == "complete":
+        return RedirectResponse(f"/i/{slug}?thanks=1", status_code=303)
+    url = _stripe_value(session, "url")
+    if not url:
+        raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+    return RedirectResponse(url, status_code=303)
+
+
+class _PaymentStateConflict(Exception):
+    pass
 
 
 def _ack_unapplied(
@@ -193,33 +277,136 @@ def _ack_unapplied(
     return {"ok": True, "unapplied": code}
 
 
-def _apply_booking_payment(event, session, metadata) -> dict:
-    """Confirm a pay-to-book hold when its Checkout settles.
+def _handle_invoice_async_payment_failed(event, session, metadata) -> dict:
+    """Release only the authoritative invoice session after delayed payment fails."""
+    if ("kind" in metadata and metadata["kind"] == "booking") or "booking_id" in metadata:
+        # Pay-to-book is card-only. Do not let an impossible/malformed delayed
+        # event mutate a booking hold.
+        return {"ok": True, "ignored": "booking_async_payment_failed"}
 
-    Same doctrine as the invoice path above: permanent conditions are
-    ACKNOWLEDGED (audit row + throttled operator alert), never 4xx'd — Stripe
-    retries 4xx for days and counts them toward disabling the endpoint. The
-    interesting condition here is money landing on a hold the sweeper already
-    released (visitor paid at minute 31 of a 30-minute hold): the slot may have
-    been re-sold, so the payment is recorded and Kevin is told to refund or
-    honour it BY HAND — silently re-confirming a possibly double-booked slot
-    would be worse than either.
-    """
+    invoice_id = metadata["invoice_id"] if "invoice_id" in metadata else None
+    if not invoice_id or not str(invoice_id).isdigit():
+        return {"ok": True, "ignored": "no invoice_id"}
+    invoice_id = int(invoice_id)
+    session_id = str(_stripe_value(session, "id", "") or "")
+    d = db.one("SELECT * FROM invoices WHERE id=?", (invoice_id,))
+    if not d:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "unknown_invoice",
+            f"failed session {session_id} names invoice {invoice_id}, which does not exist",
+            {"session_id": session_id},
+        )
+    if d["stripe_session_id"] != session_id:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "stale_session",
+            f"failed session {session_id} is not authoritative for this invoice",
+            {"session_id": session_id, "expected_session_id": d["stripe_session_id"]},
+        )
+    if db.one("SELECT id FROM payments WHERE stripe_session_id=?", (session_id,)):
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "failed_after_payment",
+            f"session {session_id} reported failure after its payment was recorded",
+            {"session_id": session_id},
+        )
+
+    try:
+        with db.tx() as con:
+            changed = con.execute(
+                """UPDATE invoices
+                      SET stripe_session_id=NULL, stripe_checkout_amount_cents=NULL,
+                          stripe_checkout_kind=NULL, stripe_checkout_currency=NULL
+                    WHERE id=? AND stripe_session_id=?""",
+                (invoice_id, session_id),
+            )
+            if changed.rowcount != 1:
+                raise _PaymentStateConflict
+            audit.log(
+                con,
+                "invoice",
+                invoice_id,
+                "stripe_async_payment_failed",
+                diff={"event_id": event["id"], "session_id": session_id},
+                actor="stripe",
+            )
+    except _PaymentStateConflict:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "state_conflict",
+            "invoice Checkout binding changed while applying the payment failure",
+            {"session_id": session_id},
+        )
+
+    detail = f"delayed payment failed for session {session_id}; Checkout binding released"
+    alerts.payment_anomaly(invoice_id, event["id"], "async_payment_failed", detail)
+    log.warning("invoice %s checkout %s async payment failed", invoice_id, session_id)
+    return {"ok": True, "payment_failed": True}
+
+
+def _apply_booking_payment(event, session, metadata) -> dict:
+    """Confirm exactly one authorized payment for a pay-to-book hold."""
     from .. import booking_notify
 
     booking_id = metadata["booking_id"] if "booking_id" in metadata else None
     if not booking_id or not str(booking_id).isdigit():
         return {"ok": True, "ignored": "no booking_id"}
     booking_id = int(booking_id)
-    amount_total = int(session["amount_total"] or 0)
+    session_id = str(_stripe_value(session, "id", "") or "")
+    amount_total = int(_stripe_value(session, "amount_total", 0) or 0)
+    currency = str(_stripe_value(session, "currency", "") or "").lower()
     b = db.one("SELECT * FROM bookings WHERE id=?", (booking_id,))
     if not b:
         return _ack_unapplied(
             event["id"],
             booking_id,
             "unknown_booking",
-            f"session {session['id']} names booking {booking_id}, which does not exist",
-            {"session_id": session["id"], "amount_total": amount_total},
+            f"session {session_id} names booking {booking_id}, which does not exist",
+            {"session_id": session_id, "amount_total": amount_total, "currency": currency},
+            entity="booking",
+        )
+    if db.one("SELECT id FROM booking_payments WHERE stripe_event_id=?", (event["id"],)):
+        return {"ok": True, "duplicate": True}
+
+    expected_session = b["stripe_session_id"]
+    expected_amount = b["stripe_checkout_amount_cents"]
+    expected_currency = b["stripe_checkout_currency"]
+    if not expected_session or expected_amount is None or not expected_currency:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "checkout_not_bound",
+            "booking has no complete authoritative Checkout snapshot",
+            {"session_id": session_id, "amount_total": amount_total, "currency": currency},
+            entity="booking",
+        )
+    if session_id != expected_session:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "stale_session",
+            f"session {session_id} is not authoritative for this booking",
+            {"session_id": session_id, "expected_session_id": expected_session},
+            entity="booking",
+        )
+    if amount_total != expected_amount or currency != expected_currency:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "checkout_mismatch",
+            "session amount or currency differs from the authorized Checkout snapshot",
+            {
+                "session_id": session_id,
+                "got_amount": amount_total,
+                "got_currency": currency,
+                "expected_amount": expected_amount,
+                "expected_currency": expected_currency,
+            },
             entity="booking",
         )
     if b["status"] == "cancelled":
@@ -230,29 +417,70 @@ def _apply_booking_payment(event, session, metadata) -> dict:
             f"{amount_total} cents arrived for a booking hold that was already "
             f"released ({b['cancel_reason'] or 'cancelled'}) — the slot may have "
             f"been re-sold; refund or re-book by hand",
-            {"amount_total": amount_total, "session_id": session["id"]},
+            {"amount_total": amount_total, "session_id": session_id},
             entity="booking",
         )
+    if b["status"] == "confirmed":
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "already_settled",
+            "a distinct paid Checkout arrived after this booking was confirmed",
+            {"amount_total": amount_total, "session_id": session_id},
+            entity="booking",
+        )
+    if b["status"] != "pending_payment":
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "state_conflict",
+            f"booking state {b['status']} cannot accept payment",
+            {"amount_total": amount_total, "session_id": session_id},
+            entity="booking",
+        )
+
     try:
         with db.tx() as con:
-            # UNIQUE stripe_event_id makes a redelivered event roll the whole
-            # transaction back — nothing double-applies, same as invoices.
             con.execute(
                 """INSERT INTO booking_payments
                        (booking_id, stripe_event_id, stripe_session_id, amount_cents)
                    VALUES (?,?,?,?)""",
-                (booking_id, event["id"], session["id"], amount_total),
+                (booking_id, event["id"], session_id, amount_total),
             )
-            con.execute(
+            changed = con.execute(
                 """UPDATE bookings
                       SET status='confirmed', paid_cents=?, paid_at=datetime('now')
-                    WHERE id=? AND status IN ('pending_payment','confirmed')""",
+                    WHERE id=? AND status='pending_payment'""",
                 (amount_total, booking_id),
             )
+            if changed.rowcount != 1:
+                raise _PaymentStateConflict
+    except _PaymentStateConflict:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "state_conflict",
+            "booking state changed while applying the payment",
+            {"amount_total": amount_total, "session_id": session_id},
+            entity="booking",
+        )
     except db.sqlite3.IntegrityError:
-        return {"ok": True, "duplicate": True}
-    # Side-effects only after the money is durable: confirmation emails, the
-    # calendar invite, Notion/Odysseus — everything the free path fires at POST.
+        if db.one("SELECT id FROM booking_payments WHERE stripe_event_id=?", (event["id"],)):
+            return {"ok": True, "duplicate": True}
+        prior = db.one(
+            """SELECT id FROM booking_payments
+                 WHERE booking_id=? OR stripe_session_id=?""",
+            (booking_id, session_id),
+        )
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "duplicate_payment" if prior else "constraint_conflict",
+            "a distinct Stripe event conflicts with an existing booking payment",
+            {"amount_total": amount_total, "session_id": session_id},
+            entity="booking",
+        )
+    # Side-effects only after the money and state transition are durable.
     booking_notify.confirm(booking_id)
     log.info(
         "booking %s confirmed by payment: %s cents (event %s)",
@@ -303,17 +531,20 @@ def _process_stripe_webhook(payload: bytes, signature: str):
     if event["type"] not in (
         "checkout.session.completed",
         "checkout.session.async_payment_succeeded",
+        "checkout.session.async_payment_failed",
     ):
         return {"ok": True, "ignored": event["type"]}
     session = event["data"]["object"]
-    if session["payment_status"] != "paid":  # ACH settles via the async event
-        return {"ok": True, "pending": True}
-
     # StripeObject has no .get() — `in` + [] is the equivalent. A foreign/stray
     # checkout session on the same Stripe account carries no usable invoice_id:
     # ack and ignore instead of KeyError → 500, which makes Stripe retry and
     # eventually disable the webhook endpoint.
     metadata = (session["metadata"] if "metadata" in session else None) or {}
+    if event["type"] == "checkout.session.async_payment_failed":
+        return _handle_invoice_async_payment_failed(event, session, metadata)
+    if session["payment_status"] != "paid":  # ACH settles via the async event
+        return {"ok": True, "pending": True}
+
     if ("kind" in metadata and metadata["kind"] == "booking") or "booking_id" in metadata:
         return _apply_booking_payment(event, session, metadata)
     invoice_id = metadata["invoice_id"] if "invoice_id" in metadata else None
@@ -335,32 +566,73 @@ def _process_stripe_webhook(payload: bytes, signature: str):
     # so a retry would otherwise look like a mismatch and 409 forever.
     if db.one("SELECT id FROM payments WHERE stripe_event_id=?", (event["id"],)):
         return {"ok": True, "duplicate": True}
-    # Defense in depth: Checkout metadata + amount_total are not trusted blindly.
-    # A stale session (client paid an old Checkout after the invoice changed) or
-    # metadata drift must not mark the wrong amount/kind paid.
+    session_id = str(_stripe_value(session, "id", "") or "")
+    amount_total = int(_stripe_value(session, "amount_total", 0) or 0)
+    currency = str(_stripe_value(session, "currency", "") or "").lower()
+    expected_session = d["stripe_session_id"]
+    expected_amount = d["stripe_checkout_amount_cents"]
+    expected_kind = d["stripe_checkout_kind"]
+    expected_currency = d["stripe_checkout_currency"]
+
+    if (
+        not expected_session
+        or expected_amount is None
+        or not expected_kind
+        or not expected_currency
+    ):
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "checkout_not_bound",
+            "invoice has no complete authoritative Checkout snapshot",
+            {"session_id": session_id, "amount_total": amount_total, "currency": currency},
+        )
+    if session_id != expected_session:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "stale_session",
+            f"session {session_id} is not authoritative for this invoice",
+            {"session_id": session_id, "expected_session_id": expected_session},
+        )
+    if kind != expected_kind or amount_total != expected_amount or currency != expected_currency:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "checkout_mismatch",
+            "session kind, amount, or currency differs from the authorized Checkout snapshot",
+            {
+                "got_kind": kind,
+                "got_amount": amount_total,
+                "got_currency": currency,
+                "expected_kind": expected_kind,
+                "expected_amount": expected_amount,
+                "expected_currency": expected_currency,
+                "session_id": session_id,
+            },
+        )
+
     owed_cents, owed_kind = next_payment(d)
-    amount_total = int(session["amount_total"] or 0)
     if not owed_cents:
         return _ack_unapplied(
             event["id"],
             invoice_id,
             "already_settled",
             f"invoice is fully settled but a payment of {amount_total} cents arrived",
-            {"amount_total": amount_total, "kind": kind, "session_id": session["id"]},
+            {"amount_total": amount_total, "kind": kind, "session_id": session_id},
         )
     if kind != owed_kind or amount_total != owed_cents:
         return _ack_unapplied(
             event["id"],
             invoice_id,
-            "amount_mismatch",
-            f"got {kind}/{amount_total} cents, owed {owed_kind}/{owed_cents} cents "
-            f"(usually a stale Checkout link paid after the invoice changed)",
+            "invoice_changed",
+            "invoice state changed after Checkout creation",
             {
                 "got_kind": kind,
                 "got_amount": amount_total,
                 "owed_kind": owed_kind,
                 "owed_amount": owed_cents,
-                "session_id": session["id"],
+                "session_id": session_id,
             },
         )
     # Record the payment and advance invoice + project state as one atomic unit:
@@ -376,12 +648,25 @@ def _process_stripe_webhook(payload: bytes, signature: str):
                 (invoice_id, event["id"], session["id"], amount_total, kind),
             )
             if kind == "deposit":
-                con.execute("UPDATE invoices SET status='deposit_paid' WHERE id=?", (invoice_id,))
-            else:
-                con.execute(
-                    "UPDATE invoices SET status='paid', paid_at=datetime('now') WHERE id=?",
+                changed = con.execute(
+                    """UPDATE invoices SET status='deposit_paid'
+                         WHERE id=? AND status IN ('sent','viewed')""",
                     (invoice_id,),
                 )
+            elif kind == "balance":
+                changed = con.execute(
+                    """UPDATE invoices SET status='paid', paid_at=datetime('now')
+                         WHERE id=? AND status='deposit_paid'""",
+                    (invoice_id,),
+                )
+            else:
+                changed = con.execute(
+                    """UPDATE invoices SET status='paid', paid_at=datetime('now')
+                         WHERE id=? AND status IN ('sent','viewed')""",
+                    (invoice_id,),
+                )
+            if changed.rowcount != 1:
+                raise _PaymentStateConflict
             # Payment landed → advance the project to Retainer Paid (the funnel's
             # money gate). Only moves forward from pre-payment stages; never rewinds
             # a project already at session planning / closed / archived.
@@ -402,8 +687,29 @@ def _process_stripe_webhook(payload: bytes, signature: str):
             # not at all, which is the pattern uploads.py already uses for work
             # far less important than this.
             notion_job = jobs.stage(con, "notion_sync_invoice", {"invoice_id": invoice_id})
+    except _PaymentStateConflict:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "state_conflict",
+            "invoice state changed while applying the payment",
+            {"session_id": session_id, "kind": kind, "amount_total": amount_total},
+        )
     except db.sqlite3.IntegrityError:
-        return {"ok": True, "duplicate": True}  # Stripe retries — idempotent by event id
+        if db.one("SELECT id FROM payments WHERE stripe_event_id=?", (event["id"],)):
+            return {"ok": True, "duplicate": True}
+        prior = db.one(
+            """SELECT id FROM payments
+                 WHERE (invoice_id=? AND kind=?) OR stripe_session_id=?""",
+            (invoice_id, kind, session_id),
+        )
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "duplicate_installment" if prior else "constraint_conflict",
+            "a distinct Stripe event conflicts with an existing payment invariant",
+            {"session_id": session_id, "kind": kind, "amount_total": amount_total},
+        )
     # Offer it to the pool only after the commit: a durable row means a lost
     # dispatch is recoverable (the sweeper picks it up), while dispatching a row
     # that might still roll back is not.

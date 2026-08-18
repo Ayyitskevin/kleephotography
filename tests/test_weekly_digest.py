@@ -140,10 +140,15 @@ def test_body_scopes_to_covered_week():
         (bid, _in_week(2)),
     )
     # Outside the covered week — must not count.
+    old_iid = db.run(
+        """INSERT INTO invoices (project_id, slug, title)
+           VALUES (?, 'digest-inv-old', 'digest-Inv old')""",
+        (pid,),
+    )
     db.run(
         """INSERT INTO payments (invoice_id, amount_cents, kind, created_at)
            VALUES (?, 99900, 'full', '2031-06-12 12:00:00')""",
-        (iid,),
+        (old_iid,),
     )
     db.run(
         """INSERT INTO inquiries (name, email, message, referral_source, created_at)
