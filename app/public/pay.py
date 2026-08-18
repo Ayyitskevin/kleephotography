@@ -157,8 +157,21 @@ def _invoice_checkout(d, amount: int, kind: str, slug: str):
             and d["stripe_checkout_currency"] == currency
         )
         status = _stripe_value(prior, "status")
-        if snapshot_matches and status in ("open", "complete"):
+        payment_status = _stripe_value(prior, "payment_status")
+        if snapshot_matches and status == "open":
             return prior
+        if status == "complete":
+            # Checkout marks delayed methods complete before the bank transfer
+            # settles. That session is still collectible: replacing it could
+            # let both the old ACH debit and a new session take money. A paid
+            # session is terminal/reusable while its webhook catches up; an
+            # unpaid one stays bound until async_payment_failed explicitly
+            # releases it.
+            if payment_status == "paid":
+                return prior
+            if payment_status == "unpaid":
+                raise HTTPException(status_code=409, detail="payment is still processing")
+            raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
         if status == "open":
             try:
                 stripe.checkout.Session.expire(
@@ -174,6 +187,11 @@ def _invoice_checkout(d, amount: int, kind: str, slug: str):
                     exc,
                 )
                 raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+        elif status != "expired":
+            # Stripe currently documents open, complete, and expired. Never
+            # mint another payable session if it introduces a new state we do
+            # not understand.
+            raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
 
     label = {"deposit": "Deposit", "balance": "Balance", "full": "Payment"}[kind]
     predecessor = prior_id or "initial"
@@ -257,6 +275,78 @@ def _ack_unapplied(
         log.exception("could not audit stripe anomaly invoice=%s event=%s", invoice_id, event_id)
     alerts.payment_anomaly(invoice_id, event_id, code, detail, entity=entity)
     return {"ok": True, "unapplied": code}
+
+
+def _handle_invoice_async_payment_failed(event, session, metadata) -> dict:
+    """Release only the authoritative invoice session after delayed payment fails."""
+    if ("kind" in metadata and metadata["kind"] == "booking") or "booking_id" in metadata:
+        # Pay-to-book is card-only. Do not let an impossible/malformed delayed
+        # event mutate a booking hold.
+        return {"ok": True, "ignored": "booking_async_payment_failed"}
+
+    invoice_id = metadata["invoice_id"] if "invoice_id" in metadata else None
+    if not invoice_id or not str(invoice_id).isdigit():
+        return {"ok": True, "ignored": "no invoice_id"}
+    invoice_id = int(invoice_id)
+    session_id = str(_stripe_value(session, "id", "") or "")
+    d = db.one("SELECT * FROM invoices WHERE id=?", (invoice_id,))
+    if not d:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "unknown_invoice",
+            f"failed session {session_id} names invoice {invoice_id}, which does not exist",
+            {"session_id": session_id},
+        )
+    if d["stripe_session_id"] != session_id:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "stale_session",
+            f"failed session {session_id} is not authoritative for this invoice",
+            {"session_id": session_id, "expected_session_id": d["stripe_session_id"]},
+        )
+    if db.one("SELECT id FROM payments WHERE stripe_session_id=?", (session_id,)):
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "failed_after_payment",
+            f"session {session_id} reported failure after its payment was recorded",
+            {"session_id": session_id},
+        )
+
+    try:
+        with db.tx() as con:
+            changed = con.execute(
+                """UPDATE invoices
+                      SET stripe_session_id=NULL, stripe_checkout_amount_cents=NULL,
+                          stripe_checkout_kind=NULL, stripe_checkout_currency=NULL
+                    WHERE id=? AND stripe_session_id=?""",
+                (invoice_id, session_id),
+            )
+            if changed.rowcount != 1:
+                raise _PaymentStateConflict
+            audit.log(
+                con,
+                "invoice",
+                invoice_id,
+                "stripe_async_payment_failed",
+                diff={"event_id": event["id"], "session_id": session_id},
+                actor="stripe",
+            )
+    except _PaymentStateConflict:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "state_conflict",
+            "invoice Checkout binding changed while applying the payment failure",
+            {"session_id": session_id},
+        )
+
+    detail = f"delayed payment failed for session {session_id}; Checkout binding released"
+    alerts.payment_anomaly(invoice_id, event["id"], "async_payment_failed", detail)
+    log.warning("invoice %s checkout %s async payment failed", invoice_id, session_id)
+    return {"ok": True, "payment_failed": True}
 
 
 def _apply_booking_payment(event, session, metadata) -> dict:
@@ -441,17 +531,20 @@ def _process_stripe_webhook(payload: bytes, signature: str):
     if event["type"] not in (
         "checkout.session.completed",
         "checkout.session.async_payment_succeeded",
+        "checkout.session.async_payment_failed",
     ):
         return {"ok": True, "ignored": event["type"]}
     session = event["data"]["object"]
-    if session["payment_status"] != "paid":  # ACH settles via the async event
-        return {"ok": True, "pending": True}
-
     # StripeObject has no .get() — `in` + [] is the equivalent. A foreign/stray
     # checkout session on the same Stripe account carries no usable invoice_id:
     # ack and ignore instead of KeyError → 500, which makes Stripe retry and
     # eventually disable the webhook endpoint.
     metadata = (session["metadata"] if "metadata" in session else None) or {}
+    if event["type"] == "checkout.session.async_payment_failed":
+        return _handle_invoice_async_payment_failed(event, session, metadata)
+    if session["payment_status"] != "paid":  # ACH settles via the async event
+        return {"ok": True, "pending": True}
+
     if ("kind" in metadata and metadata["kind"] == "booking") or "booking_id" in metadata:
         return _apply_booking_payment(event, session, metadata)
     invoice_id = metadata["invoice_id"] if "invoice_id" in metadata else None

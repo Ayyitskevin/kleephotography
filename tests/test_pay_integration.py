@@ -230,6 +230,87 @@ def test_pay_reuses_open_checkout_for_repeated_request(client, monkeypatch):
     _cleanup_money_chain(cid, pid, iid)
 
 
+@pytest.mark.parametrize("current_total", [90000, 100000])
+def test_pay_never_replaces_complete_unpaid_ach_session(client, monkeypatch, current_total):
+    """Completed ACH remains collectible until success/failure webhook resolution."""
+    monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test_pay")
+
+    class PendingAch:
+        id = "cs_ach_pending"
+        status = "complete"
+        payment_status = "unpaid"
+        url = None
+
+    monkeypatch.setattr(
+        pay.stripe.checkout.Session,
+        "retrieve",
+        lambda session_id, **kwargs: PendingAch(),
+    )
+    monkeypatch.setattr(
+        pay.stripe.checkout.Session,
+        "create",
+        lambda **kwargs: pytest.fail("created a second collectible Checkout session"),
+    )
+    monkeypatch.setattr(
+        pay.stripe.checkout.Session,
+        "expire",
+        lambda *args, **kwargs: pytest.fail("attempted to expire completed ACH"),
+    )
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    db.run(
+        """UPDATE invoices
+              SET stripe_session_id='cs_ach_pending', stripe_checkout_amount_cents=90000,
+                  stripe_checkout_kind='full', stripe_checkout_currency='usd', total_cents=?
+            WHERE id=?""",
+        (current_total, iid),
+    )
+    inv = db.one("SELECT slug FROM invoices WHERE id=?", (iid,))
+
+    r = client.post(f"/i/{inv['slug']}/pay", follow_redirects=False)
+
+    assert r.status_code == 409
+    assert r.json() == {"detail": "payment is still processing"}
+    bound = db.one("SELECT stripe_session_id FROM invoices WHERE id=?", (iid,))
+    assert bound["stripe_session_id"] == "cs_ach_pending"
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_pay_reuses_only_paid_complete_session(client, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test_pay")
+
+    class PaidSession:
+        id = "cs_paid_complete"
+        status = "complete"
+        payment_status = "paid"
+        url = None
+
+    monkeypatch.setattr(
+        pay.stripe.checkout.Session,
+        "retrieve",
+        lambda session_id, **kwargs: PaidSession(),
+    )
+    monkeypatch.setattr(
+        pay.stripe.checkout.Session,
+        "create",
+        lambda **kwargs: pytest.fail("replaced a completed paid Checkout session"),
+    )
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    db.run(
+        """UPDATE invoices
+              SET stripe_session_id='cs_paid_complete', stripe_checkout_amount_cents=90000,
+                  stripe_checkout_kind='full', stripe_checkout_currency='usd'
+            WHERE id=?""",
+        (iid,),
+    )
+    inv = db.one("SELECT slug FROM invoices WHERE id=?", (iid,))
+
+    r = client.post(f"/i/{inv['slug']}/pay", follow_redirects=False)
+
+    assert r.status_code == 303
+    assert r.headers["location"] == f"/i/{inv['slug']}?thanks=1"
+    _cleanup_money_chain(cid, pid, iid)
+
+
 def test_pay_refuses_when_nothing_due(client, monkeypatch):
     monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test_pay")
     cid, pid, iid = _seed_money_chain(
@@ -422,6 +503,89 @@ def test_webhook_async_payment_succeeded_settles_ach(client, monkeypatch):
     assert settled.status_code == 200 and settled.json() == {"ok": True}
     assert db.one("SELECT status FROM invoices WHERE id=?", (iid,))["status"] == "paid"
     assert db.one("SELECT status FROM projects WHERE id=?", (pid,))["status"] == "retainer_paid"
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_async_payment_failed_releases_binding_and_allows_retry(client, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(config, "STRIPE_SECRET_KEY", "sk_test_pay")
+    fired = []
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: fired.append((a, k)))
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    failed = _post_signed(
+        client,
+        _checkout_event(
+            "evt_ach_failed",
+            iid,
+            "full",
+            90000,
+            payment_status="unpaid",
+            etype="checkout.session.async_payment_failed",
+            session_id="cs_ach_failed",
+        ),
+    )
+
+    assert failed.status_code == 200
+    assert failed.json() == {"ok": True, "payment_failed": True}
+    inv = db.one(
+        """SELECT stripe_session_id, stripe_checkout_amount_cents,
+                  stripe_checkout_kind, stripe_checkout_currency
+             FROM invoices WHERE id=?""",
+        (iid,),
+    )
+    assert tuple(inv) == (None, None, None, None)
+    assert fired and fired[0][0][2] == "async_payment_failed"
+    audit_row = db.one(
+        """SELECT action, diff_json FROM audit_log
+             WHERE entity_type='invoice' AND entity_id=? ORDER BY id DESC LIMIT 1""",
+        (iid,),
+    )
+    assert audit_row["action"] == "stripe_async_payment_failed"
+    assert "cs_ach_failed" in audit_row["diff_json"]
+
+    class Replacement:
+        id = "cs_after_ach_failure"
+        status = "open"
+        payment_status = "unpaid"
+        url = "https://checkout.stripe.test/cs_after_ach_failure"
+
+    monkeypatch.setattr(pay.stripe.checkout.Session, "create", lambda **kwargs: Replacement())
+    slug = db.one("SELECT slug FROM invoices WHERE id=?", (iid,))["slug"]
+    retry = client.post(f"/i/{slug}/pay", follow_redirects=False)
+    assert retry.status_code == 303
+    assert retry.headers["location"] == Replacement.url
+    assert (
+        db.one("SELECT stripe_session_id FROM invoices WHERE id=?", (iid,))["stripe_session_id"]
+        == "cs_after_ach_failure"
+    )
+
+    db.run("DELETE FROM audit_log WHERE entity_type='invoice' AND entity_id=?", (iid,))
+    _cleanup_money_chain(cid, pid, iid)
+
+
+def test_webhook_stale_async_failure_cannot_release_current_session(client, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(pay.alerts, "payment_anomaly", lambda *a, **k: None)
+    cid, pid, iid = _seed_money_chain(project_status="proposal_sent", total=90000)
+    failed = _post_signed(
+        client,
+        _checkout_event(
+            "evt_old_ach_failed",
+            iid,
+            "full",
+            90000,
+            payment_status="unpaid",
+            etype="checkout.session.async_payment_failed",
+            session_id="cs_old_ach",
+        ),
+        authorized_session="cs_current",
+    )
+
+    assert failed.status_code == 200
+    assert failed.json()["unapplied"] == "stale_session"
+    bound = db.one("SELECT stripe_session_id FROM invoices WHERE id=?", (iid,))
+    assert bound["stripe_session_id"] == "cs_current"
+    db.run("DELETE FROM audit_log WHERE entity_type='invoice' AND entity_id=?", (iid,))
     _cleanup_money_chain(cid, pid, iid)
 
 
