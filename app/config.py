@@ -243,6 +243,13 @@ AVIF_QUALITY = int(os.environ.get("MISE_AVIF_QUALITY", "63"))
 VIDEO_MAX_W = int(os.environ.get("MISE_VIDEO_MAX_W", "1920"))
 VIDEO_CRF = int(os.environ.get("MISE_VIDEO_CRF", "23"))
 
+# ZIP_DIR eviction. Archives are a rebuildable cache (ops/backup.sh excludes
+# /zips/ for exactly this reason, and a missing one re-enqueues its build), but
+# nothing ever swept the directory as a whole, so a delivered gallery's archive
+# lived forever. Idleness, not age: serving one refreshes its clock.
+# 0 disables eviction entirely.
+ZIP_CACHE_TTL_DAYS = int(os.environ.get("MISE_ZIP_CACHE_TTL_DAYS", "30"))
+
 JOB_WORKERS = int(os.environ.get("MISE_JOB_WORKERS", "2"))
 
 # The job queue's OWN clock (jobs._sweep_loop), deliberately separate from the
