@@ -24,7 +24,7 @@ from .. import (
     specialties,
 )
 from ..http_cache import PUBLIC_24H, conditional_file
-from ..render import ROOT, _static_rev, templates
+from ..render import ROOT, _reel_description, _reel_title, _static_rev, templates
 from . import site_catalog as _site_catalog
 
 BOOK_ACTIVE_PROMISES = _site_catalog.BOOK_ACTIVE_PROMISES
@@ -1130,8 +1130,59 @@ def _sitemap_day(value) -> str:
         return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
-def _sitemap_url(path: str, lastmod: str) -> str:
-    return f"<url><loc>{config.BASE_URL}{path}</loc><lastmod>{lastmod}</lastmod></url>"
+# Google caps a sitemap URL at 1000 images. The portfolio is nowhere near that,
+# but an unbounded loop over a growing table is how a sitemap silently becomes
+# invalid years later.
+SITEMAP_MAX_IMAGES = 1000
+
+
+def _xml_escape(value: str) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _image_entries(assets) -> str:
+    """<image:image> children for one <url>, capped at Google's per-URL limit."""
+    return "".join(
+        f"<image:image><image:loc>{config.BASE_URL}/site/img/{a['id']}</image:loc></image:image>"
+        for a in assets[:SITEMAP_MAX_IMAGES]
+    )
+
+
+def _video_entries(reels) -> str:
+    """<video:video> children for one <url>.
+
+    Title and description come from app/render.py, the same helpers /reels uses
+    for its VideoObject JSON-LD — Google cross-checks the two and a forked
+    formula would make them disagree.
+    """
+    out = []
+    for r in reels[:SITEMAP_MAX_IMAGES]:
+        duration = ""
+        if r["duration"]:
+            seconds = int(round(float(r["duration"])))
+            # Google rejects a video:duration outside 1..28800 seconds.
+            if 1 <= seconds <= 28800:
+                duration = f"<video:duration>{seconds}</video:duration>"
+        out.append(
+            "<video:video>"
+            f"<video:thumbnail_loc>{config.BASE_URL}/site/poster/{r['id']}</video:thumbnail_loc>"
+            f"<video:title>{_xml_escape(_reel_title(r))}</video:title>"
+            f"<video:description>{_xml_escape(_reel_description(r))}</video:description>"
+            f"<video:content_loc>{config.BASE_URL}/site/vid/{r['id']}</video:content_loc>"
+            f"{duration}"
+            "</video:video>"
+        )
+    return "".join(out)
+
+
+def _sitemap_url(path: str, lastmod: str, children: str = "") -> str:
+    return f"<url><loc>{config.BASE_URL}{path}</loc><lastmod>{lastmod}</lastmod>{children}</url>"
 
 
 @router.get("/sitemap.xml")
@@ -1154,7 +1205,25 @@ def sitemap():
         "/reels",
         "/press",
     ]
-    urls = "".join(_sitemap_url(p, shell_day) for p in paths)
+    # Image and video children: the frames are the product, and a photographer
+    # who does not appear in Google Images is invisible in half the search
+    # surface. Each page carries exactly the assets it actually renders, so the
+    # sitemap never promises a crawler a frame the page does not show.
+    photos = _portfolio_assets()
+    reels = _portfolio_reels()
+    by_specialty = {
+        meta["slug"]: [a for a in photos if specialties.specialty_key(a["portfolio_tag"]) == key]
+        for key, meta in specialties.SPECIALTIES.items()
+    }
+    children = {
+        "/": _image_entries(photos[:6]),  # the home filmstrip renders six
+        "/portfolio": _image_entries(photos),
+        "/reels": _video_entries(reels),
+    }
+    for slug, mine in by_specialty.items():
+        children[f"/{slug}"] = _image_entries(mine)
+
+    urls = "".join(_sitemap_url(p, shell_day, children.get(p, "")) for p in paths)
     # Case-study detail pages are also surfaced on /portfolio (Featured clients)
     # but get their own crawlable URLs here (/work index + /work/{slug} details).
     # Prefer created_at so publishing a study bumps lastmod for crawlers.
@@ -1162,6 +1231,9 @@ def sitemap():
         urls += _sitemap_url(f"/work/{g['slug']}", _sitemap_day(g["created_at"]))
     return Response(
         content='<?xml version="1.0" encoding="UTF-8"?>'
-        f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
+        ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"'
+        ' xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">'
+        f"{urls}</urlset>",
         media_type="application/xml",
     )

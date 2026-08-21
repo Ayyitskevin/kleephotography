@@ -92,8 +92,10 @@
 {
   "@context": "https://schema.org",
   "@type": "VideoObject",
-  "name": {{ ((r.portfolio_tag|tag_label if r.portfolio_tag else 'Reel') ~ ' — ' ~ site_name)|tojson }},
-  "description": {{ ('Short-form ' ~ (r.portfolio_tag|tag_label|lower if r.portfolio_tag else 'social') ~ ' video by ' ~ site_name ~ ', Asheville NC.')|tojson }},
+  {# name/description come from app/render.py so this VideoObject and the
+     <video:video> in sitemap.xml cannot drift apart. #}
+  "name": {{ (r|reel_title(site_name))|tojson }},
+  "description": {{ (r|reel_description(site_name))|tojson }},
   "contentUrl": {{ (base_url ~ '/site/vid/' ~ r.id)|tojson }},
   "thumbnailUrl": {{ (base_url ~ '/site/poster/' ~ r.id)|tojson }}{% if r.created_at %},
   "uploadDate": {{ r.created_at[:10]|tojson }}{% endif %}{% if r.duration %},

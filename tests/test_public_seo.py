@@ -401,3 +401,66 @@ def test_gallery_frames_publish_the_generated_description(client, delivery):
     assert f'alt="Alt Premiere &mdash; frame {plain:04d}"' in plain_tag or (
         f"frame {plain:04d}" in plain_tag
     ), plain_tag
+
+
+def test_sitemap_carries_image_and_video_children(client, portfolio):
+    """The frames ARE the product; a photographer absent from Google Images is
+    invisible in half the search surface. Each page carries exactly the assets
+    it renders, so the sitemap never promises a crawler a frame it cannot see."""
+    fb = _seed_photo(portfolio, "plated", "fb/dishes")
+    re_ = _seed_photo(portfolio, "kitchen", "re/interiors")
+    reel = _seed_video(portfolio, "walkthrough", "re/interiors")
+
+    xml = client.get("/sitemap.xml").text
+    assert 'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' in xml
+    assert 'xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"' in xml
+
+    def block(path: str) -> str:
+        marker = f"<loc>{config.BASE_URL}{path}</loc>"
+        start = xml.index(marker)
+        return xml[start : xml.index("</url>", start)]
+
+    # /portfolio renders every starred photo, so it carries every one.
+    assert f"/site/img/{fb}" in block("/portfolio")
+    assert f"/site/img/{re_}" in block("/portfolio")
+    # A spoke carries only its own specialty — the F&B frame must not appear
+    # under /real-estate.
+    assert f"/site/img/{re_}" in block("/real-estate")
+    assert f"/site/img/{fb}" not in block("/real-estate")
+    # Videos ride /reels with the fields Google requires.
+    reels = block("/reels")
+    assert f"<video:content_loc>{config.BASE_URL}/site/vid/{reel}</video:content_loc>" in reels
+    assert f"<video:thumbnail_loc>{config.BASE_URL}/site/poster/{reel}</video:thumbnail_loc>" in (
+        reels
+    )
+    assert "<video:title>" in reels and "<video:description>" in reels
+    # Photos are not videos and vice versa.
+    assert "<video:" not in block("/portfolio")
+    assert "<image:" not in reels
+
+
+def test_sitemap_video_titles_match_the_reels_json_ld(client, portfolio):
+    """Google cross-checks a <video:video> against the page's VideoObject.
+
+    Both read app/render.py, so this asserts the two cannot drift apart.
+    """
+    _seed_video(portfolio, "match", "fb/plating")
+    xml = client.get("/sitemap.xml").text
+    title = re.search(r"<video:title>(.*?)</video:title>", xml).group(1)
+    description = re.search(r"<video:description>(.*?)</video:description>", xml).group(1)
+
+    page = client.get("/reels").text
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', page, re.S)
+    video_ld = [json.loads(b) for b in blocks if "VideoObject" in b][0]
+    assert video_ld[0]["name"] == title
+    assert video_ld[0]["description"] == description
+
+
+def test_sitemap_omits_an_out_of_range_video_duration(client, portfolio):
+    """Google rejects video:duration outside 1..28800s — omit it, don't lie."""
+    reel = _seed_video(portfolio, "overlong", "re/interiors")
+    db.run("UPDATE assets SET duration=? WHERE id=?", (99999, reel))
+    assert "<video:duration>" not in client.get("/sitemap.xml").text
+
+    db.run("UPDATE assets SET duration=? WHERE id=?", (42.4, reel))
+    assert "<video:duration>42</video:duration>" in client.get("/sitemap.xml").text

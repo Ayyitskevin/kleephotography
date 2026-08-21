@@ -177,6 +177,30 @@ def _tag_label(tag: str | None) -> str:
 
 
 templates.env.filters["tag_label"] = _tag_label
+
+
+def _reel_title(reel, site_name: str | None = None) -> str:
+    """Display name for one portfolio reel.
+
+    Shared with the sitemap: /reels emits a VideoObject and sitemap.xml emits a
+    <video:video> for the same asset, and Google cross-checks the two. A forked
+    formula would make them disagree the first time either is edited.
+    """
+    name = site_name or config.SITE_NAME
+    tag = _asset_field(reel, "portfolio_tag")
+    return f"{_tag_label(tag) if tag else 'Reel'} — {name}"
+
+
+def _reel_description(reel, site_name: str | None = None) -> str:
+    """Description for one portfolio reel — see _reel_title on why this is shared."""
+    name = site_name or config.SITE_NAME
+    tag = _asset_field(reel, "portfolio_tag")
+    kind = _tag_label(tag).lower() if tag else "social"
+    return f"Short-form {kind} video by {name}, Asheville NC."
+
+
+templates.env.filters["reel_title"] = _reel_title
+templates.env.filters["reel_description"] = _reel_description
 # 're/exteriors' → 're'; unprefixed → 'fb' (legacy F&B). Drives the data-sp
 # specialty-filter attribute on portfolio/reels tiles.
 templates.env.filters["tag_specialty"] = specialties.specialty_key
