@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
-from .. import config, db, security
+from .. import config, db, imaging, security
 from ..http_cache import PRIVATE_24H, conditional_file
 from .downloads import _email_required
 from .gallery import get_live_gallery, is_expired
@@ -17,6 +17,16 @@ from .gallery import get_live_gallery, is_expired
 router = APIRouter(prefix="/media")
 
 VARIANTS = {"thumb", "web", "original"}
+
+
+def _negotiated_file(request: Request, jpeg_path, media_type: str, cache_control: str):
+    """Serve the best encoding this caller accepts, or the JPEG.
+
+    `Vary: Accept` rides every response — including the 304s — or a shared cache
+    would hand an AVIF to the next client that cannot decode one.
+    """
+    served, served_type = imaging.negotiate(jpeg_path, request.headers.get("accept"))
+    return conditional_file(request, served, served_type, cache_control, {"Vary": "Accept"})
 
 
 def _resolve(slug: str, variant: str, asset_id: int, request: Request):
@@ -69,11 +79,14 @@ def poster(request: Request, slug: str, asset_id: int):
     path = config.MEDIA_DIR / str(g["id"]) / "web" / f"{stem}_poster.jpg"
     if not path.is_file():
         raise HTTPException(status_code=404)
-    return conditional_file(request, path, "image/jpeg", PRIVATE_24H)
+    return _negotiated_file(request, path, "image/jpeg", PRIVATE_24H)
 
 
 @router.get("/{slug}/{variant}/{asset_id}")
 def serve(request: Request, slug: str, variant: str, asset_id: int):
     a, path = _resolve(slug, variant, asset_id, request)
     media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+    # Originals are the master file the client paid for — never substituted.
+    if variant != "original" and media_type == "image/jpeg":
+        return _negotiated_file(request, path, media_type, PRIVATE_24H)
     return conditional_file(request, path, media_type, PRIVATE_24H)

@@ -1024,6 +1024,16 @@ def specialty_food_beverage(request: Request):
     return _specialty_page(request, "fb")
 
 
+def _negotiated_file(request: Request, jpeg_path: Path):
+    """Serve the best still encoding this caller accepts, or the JPEG.
+
+    `Vary: Accept` rides every response — including the 304s — or Cloudflare's
+    edge would hand an AVIF to the next visitor that cannot decode one.
+    """
+    served, served_type = imaging.negotiate(jpeg_path, request.headers.get("accept"))
+    return conditional_file(request, served, served_type, PUBLIC_24H, {"Vary": "Accept"})
+
+
 @router.get("/site/img/{asset_id}")
 def portfolio_image(request: Request, asset_id: int, variant: str = "web"):
     """Unauthenticated — serves ONLY portfolio-flagged, ready photos."""
@@ -1041,7 +1051,7 @@ def portfolio_image(request: Request, asset_id: int, variant: str = "web"):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / variant / f"{Path(a['stored']).stem}.jpg"
-    return conditional_file(request, path, "image/jpeg", PUBLIC_24H)
+    return _negotiated_file(request, path)
 
 
 @router.get("/site/vid/{asset_id}")
@@ -1070,7 +1080,7 @@ def portfolio_video_poster(request: Request, asset_id: int):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / "web" / f"{Path(a['stored']).stem}_poster.jpg"
-    return conditional_file(request, path, "image/jpeg", PUBLIC_24H)
+    return _negotiated_file(request, path)
 
 
 @router.get("/favicon.ico", include_in_schema=False)

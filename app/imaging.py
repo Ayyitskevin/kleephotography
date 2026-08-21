@@ -162,6 +162,103 @@ def make_crops(
     return written
 
 
+# ── Modern still formats ─────────────────────────────────────────────────────
+#
+# Written ALONGSIDE each JPEG, never instead of it. The JPEG stays the file of
+# record: it is what /site/img and /media serve to anything that does not
+# explicitly ask for better, what _public_photo_spec measures for srcset, and
+# what survives if a host's Pillow turns out to lack a codec. A missing sibling
+# is a normal state, not a failure — nothing in the app requires one to exist.
+
+MODERN_FORMATS: dict[str, tuple[str, str]] = {
+    # ext: (PIL format, mime type) — declaration order is preference order.
+    "avif": ("AVIF", "image/avif"),
+    "webp": ("WEBP", "image/webp"),
+}
+
+
+def _modern_save_kwargs(ext: str, config_module) -> dict:
+    if ext == "avif":
+        # speed=6 is Pillow's balance point: ~0.3s for a 2048px frame against
+        # ~1s at speed 2, for a few percent of size. This runs in the job queue,
+        # but a slow encode still holds a worker.
+        return {"quality": config_module.AVIF_QUALITY, "speed": 6}
+    return {"quality": config_module.WEBP_QUALITY, "method": 4}
+
+
+def write_modern_siblings(img: Image.Image, jpeg_path: str | Path, formats=None) -> list[str]:
+    """Write `img` next to `jpeg_path` in each enabled modern format.
+
+    Returns the extensions actually written. Encoding is best-effort by design:
+    a host whose Pillow was built without libavif must still finish the upload
+    and mark the asset ready, so a codec failure is logged and skipped rather
+    than raised. `img` is already resized and sRGB — this never re-decodes.
+    """
+    from . import config
+
+    jpeg_path = Path(jpeg_path)
+    written: list[str] = []
+    for ext in config.MODERN_IMAGE_FORMATS if formats is None else formats:
+        pil_format, _ = MODERN_FORMATS[ext]
+        out = jpeg_path.with_suffix(f".{ext}")
+        try:
+            img.save(out, pil_format, **_modern_save_kwargs(ext, config))
+        except Exception:  # noqa: BLE001 — any codec/IO failure is non-fatal
+            log.warning("modern derivative %s failed for %s", ext, jpeg_path.name, exc_info=True)
+            out.unlink(missing_ok=True)
+            continue
+        written.append(ext)
+    return written
+
+
+def accepted_formats(accept_header: str | None) -> set[str]:
+    """The modern image mime types the caller explicitly accepts.
+
+    An exact type match is required: `image/*` and `*/*` do NOT qualify, because
+    every browser sends one of those and only the ones that actually decode AVIF
+    name it. A `q=0` parameter means "not acceptable" and is honoured.
+    """
+    out: set[str] = set()
+    if not accept_header:
+        return out
+    wanted = {mime: ext for ext, (_, mime) in MODERN_FORMATS.items()}
+    for part in accept_header.split(","):
+        bits = part.strip().split(";")
+        mime = bits[0].strip().lower()
+        if mime not in wanted:
+            continue
+        quality = 1.0
+        for param in bits[1:]:
+            key, _, value = param.partition("=")
+            if key.strip().lower() == "q":
+                try:
+                    quality = float(value.strip())
+                except ValueError:
+                    quality = 0.0
+        if quality > 0:
+            out.add(wanted[mime])
+    return out
+
+
+def negotiate(jpeg_path: Path, accept_header: str | None) -> tuple[Path, str]:
+    """(path, media_type) for the best encoding this caller accepts.
+
+    Falls back to the JPEG whenever the caller is silent, the sibling was never
+    written, or the format is switched off — so an old gallery with no siblings
+    on disk behaves exactly as it did before, with no backfill required.
+    """
+    from . import config
+
+    accepted = accepted_formats(accept_header)
+    for ext in config.MODERN_IMAGE_FORMATS:
+        if ext not in accepted:
+            continue
+        candidate = jpeg_path.with_suffix(f".{ext}")
+        if candidate.is_file():
+            return candidate, MODERN_FORMATS[ext][1]
+    return jpeg_path, "image/jpeg"
+
+
 def make_derivatives(
     src_path: str, web_path: str, thumb_path: str, web_max: int, thumb_max: int, quality: int
 ) -> tuple[int, int]:
@@ -174,7 +271,9 @@ def make_derivatives(
         web = im.copy()
         web.thumbnail((web_max, web_max), Image.LANCZOS)
         web.save(web_path, "JPEG", quality=quality, progressive=True, optimize=True)
+        write_modern_siblings(web, web_path)
 
         im.thumbnail((thumb_max, thumb_max), Image.LANCZOS)
         im.save(thumb_path, "JPEG", quality=quality, progressive=True, optimize=True)
+        write_modern_siblings(im, thumb_path)
     return w, h

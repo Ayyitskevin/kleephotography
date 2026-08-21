@@ -204,3 +204,120 @@ def test_unstarred_asset_is_still_404_on_a_conditional_request(starred):
     db.run("UPDATE assets SET portfolio=0 WHERE id=?", (photo,))
     r = c.get(f"/site/img/{photo}", headers={"If-None-Match": etag})
     assert r.status_code == 404
+
+
+# ── Content negotiation (AVIF / WebP alongside the JPEG) ─────────────────────
+
+
+@pytest.fixture
+def negotiable(tmp_path, monkeypatch):
+    """A starred photo with real AVIF/WebP siblings next to its JPEG."""
+    from PIL import Image
+
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path)
+    gid = db.run(
+        "INSERT INTO galleries (slug,title,pin,published) VALUES (?,?,?,1)",
+        (f"neg{time.time_ns()}", "Neg", "1234"),
+    )
+    web = tmp_path / str(gid) / "web"
+    thumb = tmp_path / str(gid) / "thumb"
+    original = tmp_path / str(gid) / "original"
+    for d in (web, thumb, original):
+        d.mkdir(parents=True)
+    src = original / "n.jpg"
+    Image.new("RGB", (900, 600), (140, 90, 40)).save(src, "JPEG", quality=92)
+    from app import imaging
+
+    imaging.make_derivatives(str(src), str(web / "n.jpg"), str(thumb / "n.jpg"), 600, 200, 85)
+    aid = db.run(
+        "INSERT INTO assets (gallery_id,kind,filename,stored,status,portfolio) "
+        "VALUES (?,'photo','n.jpg','n.jpg','ready',1)",
+        (gid,),
+    )
+    slug = db.one("SELECT slug FROM galleries WHERE id=?", (gid,))["slug"]
+    try:
+        with TestClient(app) as c:
+            yield c, slug, aid, web
+    finally:
+        db.run("DELETE FROM visitors WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM assets WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
+AVIF_ACCEPT = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+WEBP_ACCEPT = "image/webp,image/apng,image/*,*/*;q=0.8"
+LEGACY_ACCEPT = "image/*,*/*;q=0.8"
+
+
+def test_public_frame_is_negotiated_down_and_always_varies(negotiable):
+    c, _, aid, _ = negotiable
+    avif = c.get(f"/site/img/{aid}", headers={"Accept": AVIF_ACCEPT})
+    webp = c.get(f"/site/img/{aid}", headers={"Accept": WEBP_ACCEPT})
+    jpeg = c.get(f"/site/img/{aid}", headers={"Accept": LEGACY_ACCEPT})
+
+    assert avif.headers["content-type"] == "image/avif"
+    assert webp.headers["content-type"] == "image/webp"
+    assert jpeg.headers["content-type"] == "image/jpeg"
+    # Without Vary, Cloudflare would hand a cached AVIF to a browser that
+    # cannot decode one — the classic negotiation cache-poisoning bug.
+    for r in (avif, webp, jpeg):
+        assert r.headers.get("vary") == "Accept", r.headers
+
+
+def test_each_encoding_gets_its_own_validator(negotiable):
+    """One URL, three bodies — a shared ETag would let a 304 return the wrong
+    bytes to a client holding a different encoding."""
+    c, _, aid, _ = negotiable
+    tags = {
+        c.get(f"/site/img/{aid}", headers={"Accept": a}).headers["etag"]
+        for a in (AVIF_ACCEPT, WEBP_ACCEPT, LEGACY_ACCEPT)
+    }
+    assert len(tags) == 3
+
+
+def test_a_304_on_a_negotiated_frame_still_varies(negotiable):
+    c, _, aid, _ = negotiable
+    first = c.get(f"/site/img/{aid}", headers={"Accept": AVIF_ACCEPT})
+    again = c.get(
+        f"/site/img/{aid}", headers={"Accept": AVIF_ACCEPT, "If-None-Match": first.headers["etag"]}
+    )
+    assert again.status_code == 304
+    assert again.headers.get("vary") == "Accept"
+
+
+def test_an_avif_etag_does_not_satisfy_a_jpeg_request(negotiable):
+    """The safety property: switching Accept must re-fetch, not 304."""
+    c, _, aid, _ = negotiable
+    avif_tag = c.get(f"/site/img/{aid}", headers={"Accept": AVIF_ACCEPT}).headers["etag"]
+    r = c.get(f"/site/img/{aid}", headers={"Accept": LEGACY_ACCEPT, "If-None-Match": avif_tag})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/jpeg"
+
+
+def test_gallery_frames_negotiate_but_originals_never_do(negotiable):
+    """The original is the master file the client paid for. thumb/web are
+    presentation copies and may be substituted; the original may not."""
+    c, slug, aid, _ = negotiable
+    c.post(f"/g/{slug}/pin", data={"pin": "1234"}, follow_redirects=False)
+
+    thumb = c.get(f"/media/{slug}/thumb/{aid}", headers={"Accept": AVIF_ACCEPT})
+    assert thumb.headers["content-type"] == "image/avif"
+    assert thumb.headers.get("vary") == "Accept"
+
+    # Originals are behind the email gate as well as the PIN.
+    gid = db.one("SELECT id FROM galleries WHERE slug=?", (slug,))["id"]
+    db.run("UPDATE visitors SET email=? WHERE gallery_id=?", ("client@example.com", gid))
+    original = c.get(f"/media/{slug}/original/{aid}", headers={"Accept": AVIF_ACCEPT})
+    assert original.status_code == 200
+    assert original.headers["content-type"] == "image/jpeg"
+
+
+def test_a_gallery_with_no_siblings_behaves_exactly_as_before(negotiable):
+    """Deployable with no backfill: delete the siblings and nothing changes."""
+    c, _, aid, web = negotiable
+    for sibling in list(web.glob("n.*")):
+        if sibling.suffix != ".jpg":
+            sibling.unlink()
+    r = c.get(f"/site/img/{aid}", headers={"Accept": AVIF_ACCEPT})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/jpeg"

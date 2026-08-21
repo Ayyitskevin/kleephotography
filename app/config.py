@@ -222,6 +222,24 @@ PLATEKIT_TIMEOUT = int(
 WEB_MAX_PX = int(os.environ.get("MISE_WEB_MAX_PX", "2048"))
 THUMB_MAX_PX = int(os.environ.get("MISE_THUMB_MAX_PX", "480"))
 JPEG_QUALITY = int(os.environ.get("MISE_JPEG_QUALITY", "85"))
+
+# Modern still formats written ALONGSIDE the JPEG (never instead of it), picked
+# per-request from the browser's Accept header. Order is preference order.
+# Kill switch: MISE_MODERN_IMAGE_FORMATS= (empty) serves nothing but JPEG, and
+# any siblings already on disk are simply ignored.
+MODERN_IMAGE_FORMATS = tuple(
+    fmt
+    for fmt in (
+        f.strip().lower()
+        for f in os.environ.get("MISE_MODERN_IMAGE_FORMATS", "avif,webp").split(",")
+    )
+    if fmt in ("avif", "webp")
+)
+# Quality scales are not comparable across codecs — these are the values that
+# hold roughly the JPEG q85 appearance, not the same number.
+WEBP_QUALITY = int(os.environ.get("MISE_WEBP_QUALITY", "80"))
+AVIF_QUALITY = int(os.environ.get("MISE_AVIF_QUALITY", "63"))
+
 VIDEO_MAX_W = int(os.environ.get("MISE_VIDEO_MAX_W", "1920"))
 VIDEO_CRF = int(os.environ.get("MISE_VIDEO_CRF", "23"))
 
