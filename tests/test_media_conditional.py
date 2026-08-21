@@ -110,3 +110,97 @@ def test_304_still_requires_the_pin(gallery):
         r = anon.get(f"/media/{slug}/thumb/{aid}", headers={"If-None-Match": etag})
         assert r.status_code != 304, "served a 304 to a caller with no gallery cookie"
         assert r.status_code == 403
+
+
+# ── Public portfolio media (/site/img, /site/vid, /site/poster) ───────────────
+#
+# The same defect, in the routes that face crawlers and every repeat visitor:
+# they set a 24h public window but never read the conditional headers back, so
+# every returning browser and every cold Cloudflare edge re-pulled full-size
+# frames it already held. Same seam now (app/http_cache.py), opposite sharing
+# rule — portfolio bytes are public by definition, so they may sit in a shared
+# cache where gallery bytes may not.
+
+
+@pytest.fixture
+def starred(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path)
+    gid = db.run(
+        "INSERT INTO galleries (slug,title,pin,published) VALUES (?,?,?,1)",
+        (f"pub{time.time_ns()}", "Pub", "1234"),
+    )
+    web = tmp_path / str(gid) / "web"
+    thumb = tmp_path / str(gid) / "thumb"
+    web.mkdir(parents=True)
+    thumb.mkdir(parents=True)
+    (thumb / "p.jpg").write_bytes(b"\xff\xd8\xff" + b"t" * 800)
+    (web / "p.jpg").write_bytes(b"\xff\xd8\xff" + b"w" * 4000)
+    (web / "v.mp4").write_bytes(b"mp4" + b"v" * 2000)
+    (web / "v_poster.jpg").write_bytes(b"\xff\xd8\xff" + b"p" * 1500)
+    photo = db.run(
+        "INSERT INTO assets (gallery_id,kind,filename,stored,status,portfolio) "
+        "VALUES (?,'photo','p.jpg','p.jpg','ready',1)",
+        (gid,),
+    )
+    video = db.run(
+        "INSERT INTO assets (gallery_id,kind,filename,stored,status,portfolio) "
+        "VALUES (?,'video','v.mp4','v.mp4','ready',1)",
+        (gid,),
+    )
+    try:
+        with TestClient(app) as c:
+            yield c, photo, video, web / "p.jpg"
+    finally:
+        db.run("DELETE FROM assets WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
+def test_public_portfolio_routes_answer_a_matching_etag_with_304(starred):
+    c, photo, video, _ = starred
+    for url in (f"/site/img/{photo}", f"/site/vid/{video}", f"/site/poster/{video}"):
+        first = c.get(url)
+        assert first.status_code == 200 and first.content, url
+        etag = first.headers["etag"]
+
+        again = c.get(url, headers={"If-None-Match": etag})
+        assert again.status_code == 304, url
+        assert again.content == b"", url
+        # Renew the window, or the client re-asks on the very next navigation.
+        assert again.headers.get("etag") == etag, url
+        assert again.headers.get("cache-control") == "public, max-age=86400", url
+
+
+def test_public_portfolio_media_stays_shared_cacheable(starred):
+    """Portfolio frames are public; marking them `private` would disable the
+    Cloudflare edge cache that keeps the marketing site fast."""
+    c, photo, _, _ = starred
+    assert c.get(f"/site/img/{photo}").headers["cache-control"] == "public, max-age=86400"
+
+
+def test_public_thumb_variant_gets_its_own_validator(starred):
+    """thumb and web are different bytes behind one route — one ETag each."""
+    c, photo, _, _ = starred
+    web = c.get(f"/site/img/{photo}").headers["etag"]
+    thumb = c.get(f"/site/img/{photo}?variant=thumb").headers["etag"]
+    assert web != thumb
+
+
+def test_changed_public_derivative_invalidates_the_old_etag(starred):
+    c, photo, _, path = starred
+    etag = c.get(f"/site/img/{photo}").headers["etag"]
+    time.sleep(1.1)  # mtime has second resolution
+    path.write_bytes(b"\xff\xd8\xff" + b"z" * 9000)
+
+    r = c.get(f"/site/img/{photo}", headers={"If-None-Match": etag})
+    assert r.status_code == 200
+    assert len(r.content) == 9003
+    assert r.headers["etag"] != etag
+
+
+def test_unstarred_asset_is_still_404_on_a_conditional_request(starred):
+    """A 304 must never become a way to probe an unpublished frame."""
+    c, photo, _, _ = starred
+    etag = c.get(f"/site/img/{photo}").headers["etag"]
+    db.run("UPDATE assets SET portfolio=0 WHERE id=?", (photo,))
+    r = c.get(f"/site/img/{photo}", headers={"If-None-Match": etag})
+    assert r.status_code == 404

@@ -23,6 +23,7 @@ from .. import (
     security,
     specialties,
 )
+from ..http_cache import PUBLIC_24H, conditional_file
 from ..render import ROOT, _static_rev, templates
 from . import site_catalog as _site_catalog
 
@@ -1024,7 +1025,7 @@ def specialty_food_beverage(request: Request):
 
 
 @router.get("/site/img/{asset_id}")
-def portfolio_image(asset_id: int, variant: str = "web"):
+def portfolio_image(request: Request, asset_id: int, variant: str = "web"):
     """Unauthenticated — serves ONLY portfolio-flagged, ready photos."""
     if variant not in ("web", "thumb"):
         raise HTTPException(status_code=404)
@@ -1040,15 +1041,11 @@ def portfolio_image(asset_id: int, variant: str = "web"):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / variant / f"{Path(a['stored']).stem}.jpg"
-    if not path.is_file():
-        raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"}
-    )
+    return conditional_file(request, path, "image/jpeg", PUBLIC_24H)
 
 
 @router.get("/site/vid/{asset_id}")
-def portfolio_video(asset_id: int):
+def portfolio_video(request: Request, asset_id: int):
     """Unauthenticated — serves ONLY portfolio-flagged, ready videos (the /reels
     showcase). FileResponse handles HTTP Range, so iOS scrubbing works."""
     a = db.one(
@@ -1059,15 +1056,11 @@ def portfolio_video(asset_id: int):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / "web" / f"{Path(a['stored']).stem}.mp4"
-    if not path.is_file():
-        raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="video/mp4", headers={"Cache-Control": "public, max-age=86400"}
-    )
+    return conditional_file(request, path, "video/mp4", PUBLIC_24H)
 
 
 @router.get("/site/poster/{asset_id}")
-def portfolio_video_poster(asset_id: int):
+def portfolio_video_poster(request: Request, asset_id: int):
     """Poster frame for a portfolio video — same public portfolio gate."""
     a = db.one(
         """SELECT * FROM assets WHERE id=? AND portfolio=1
@@ -1077,11 +1070,7 @@ def portfolio_video_poster(asset_id: int):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / "web" / f"{Path(a['stored']).stem}_poster.jpg"
-    if not path.is_file():
-        raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"}
-    )
+    return conditional_file(request, path, "image/jpeg", PUBLIC_24H)
 
 
 @router.get("/favicon.ico", include_in_schema=False)
