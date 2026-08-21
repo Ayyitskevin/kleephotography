@@ -24,8 +24,9 @@ without an integration in between.
 ## What it does
 
 - **Client galleries** — unguessable 14-character slug plus a 4-digit PIN, with per-IP
-  lockout after 5 failed attempts. Favorites and proofing, video comments, single-asset and
-  full-gallery ZIP downloads, Range-served media so iOS video scrubs properly.
+  lockout after 5 failed attempts. Favorites and proofing, threaded review notes on stills
+  and films alike, single-asset and full-gallery ZIP downloads, Range-served media so iOS
+  video scrubs properly, and AVIF/WebP served to browsers that ask for it.
 - **Content delivery portal** — a per-client hub with social crops, brand kits, and usage
   and licensing rights.
 - **Studio (the money side)** — proposals become contracts become Stripe invoices, with
@@ -201,4 +202,7 @@ a human on the irreversible parts.
   [`MIGRATIONS.md`](ops/MIGRATIONS.md), [`CSS-DUAL-STACK.md`](ops/CSS-DUAL-STACK.md),
   [`SPECIALTY-LAUNCH.md`](ops/SPECIALTY-LAUNCH.md),
   [`AT-LEAST-ONCE.md`](ops/AT-LEAST-ONCE.md) — jobs/reminders send-then-record contract.
+- [`ENHANCEMENT-BRIEF.md`](ENHANCEMENT-BRIEF.md) — where Mise sits against the products it
+  replaces (Pixieset, Pic-Time, ShootProof, HoneyBook, Dubsado, …), what that benchmark
+  changed, and the ranked red/green queue it left behind.
 - [`HANDOFF.md`](HANDOFF.md) — historical refactor notes. Prefer AGENTS.md and this README.
