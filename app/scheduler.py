@@ -29,6 +29,7 @@ from . import (
     ops_monitor,
     review_requests,
     scheduling,
+    zip_cache,
 )
 from .admin import recurring
 
@@ -72,6 +73,10 @@ def _loop() -> None:
             jobs.prune_done()
         except Exception:
             log.exception("job retention sweep failed")
+        try:
+            zip_cache.sweep()
+        except Exception:
+            log.exception("zip cache sweep failed")
         try:
             scheduling.expire_pending_payments()
         except Exception:

@@ -150,8 +150,14 @@ def test_transfer_sizes_come_from_assets_bytes_without_walking_media(admin_clien
 
 
 @pytest.mark.integration
-def test_bench_reads_every_video_thread_in_one_query(admin_client, monkeypatch):
-    gallery_id, _, _, videos = _bench_gallery("perf-threads", 4, 3)
+def test_bench_reads_every_thread_in_one_query(admin_client, monkeypatch):
+    """One batched call for every commentable asset, not one call per asset.
+
+    The batch widened from videos to photos-and-videos when stills became
+    commentable; the property under test — that it stays a single call as the
+    bench grows — is unchanged.
+    """
+    gallery_id, _, photos, videos = _bench_gallery("perf-threads", 4, 3)
 
     calls: list[list[int]] = []
     real_threads = galleries.video_comment_threads
@@ -165,8 +171,7 @@ def test_bench_reads_every_video_thread_in_one_query(admin_client, monkeypatch):
     page = admin_client.get(f"/admin/galleries/{gallery_id}")
 
     assert page.status_code == 200
-    # one batched call for every video on the bench, not one call per video
-    assert len(calls) == 1 and sorted(calls[0]) == sorted(videos)
+    assert len(calls) == 1 and sorted(calls[0]) == sorted(photos + videos)
     for asset_id in videos:
         assert f"note on {asset_id}" in page.text
 

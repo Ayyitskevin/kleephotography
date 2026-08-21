@@ -561,3 +561,94 @@ def test_month_money_buckets_an_evening_payment_in_the_local_month(admin_client)
         else:
             os.environ["TZ"] = original_tz
         time.tzset()
+
+
+@pytest.mark.integration
+def test_the_wire_carries_favourites_and_client_notes(admin_client):
+    """The two signals a photographer most wants used to happen in silence.
+
+    Favouriting is the strongest buying signal in the business, and a client
+    note is a change request; neither reached the owner anywhere.
+    """
+    gid = db.run(
+        "INSERT INTO galleries (slug,title,pin,published) VALUES (?,?,?,1)",
+        ("wire-signals", "Copper Crane — Dinner", "1234"),
+    )
+    vid = db.run(
+        "INSERT INTO visitors (gallery_id,token) VALUES (?,?)", (gid, "wire-visitor-token")
+    )
+    assets = [
+        db.run(
+            "INSERT INTO assets (gallery_id,kind,filename,stored,status) "
+            "VALUES (?,'photo',?,?,'ready')",
+            (gid, f"w{n}.jpg", f"w{n}.jpg"),
+        )
+        for n in range(3)
+    ]
+    try:
+        for asset_id in assets:
+            db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (vid, asset_id))
+        db.run(
+            """INSERT INTO video_comments
+               (asset_id, gallery_id, visitor_id, author_role, timecode, body)
+               VALUES (?,?,?,'client',0,?)""",
+            (assets[0], gid, vid, "Can we get a tighter crop on this one?"),
+        )
+        # The studio's own reply is not news to the studio.
+        db.run(
+            """INSERT INTO video_comments
+               (asset_id, gallery_id, visitor_id, author_role, timecode, body)
+               VALUES (?,?,NULL,'admin',0,?)""",
+            (assets[0], gid, "On it"),
+        )
+
+        wire = admin_client.get("/admin/home").context["activity_24h"]
+        by_kind = {row["kind"]: row for row in wire}
+
+        assert "favorite" in by_kind, "a client circling their picks never reached the deck"
+        # Three favourites are ONE event, not three rows — otherwise a 40-frame
+        # selection pushes everything else off an eight-row wire.
+        assert len([r for r in wire if r["kind"] == "favorite"]) == 1
+        assert by_kind["favorite"]["who"] == "Copper Crane — Dinner"
+        assert by_kind["favorite"]["detail"] == "circled 3 takes"
+
+        assert "note" in by_kind, "a client change request never reached the deck"
+        assert "tighter crop" in by_kind["note"]["detail"]
+        assert not any("On it" in (r["detail"] or "") for r in wire), "studio reply echoed back"
+    finally:
+        db.run("DELETE FROM video_comments WHERE gallery_id=?", (gid,))
+        db.run(
+            "DELETE FROM favorites WHERE asset_id IN (SELECT id FROM assets WHERE gallery_id=?)",
+            (gid,),
+        )
+        db.run("DELETE FROM assets WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM visitors WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
+@pytest.mark.integration
+def test_a_single_favourite_reads_as_one_take(admin_client):
+    """'circled 1 takes' is the kind of thing that makes a dashboard look cheap."""
+    gid = db.run(
+        "INSERT INTO galleries (slug,title,pin,published) VALUES (?,?,?,1)",
+        ("wire-singular", "One Frame", "1234"),
+    )
+    vid = db.run("INSERT INTO visitors (gallery_id,token) VALUES (?,?)", (gid, "wire-singular-tok"))
+    aid = db.run(
+        "INSERT INTO assets (gallery_id,kind,filename,stored,status) "
+        "VALUES (?,'photo','s.jpg','s.jpg','ready')",
+        (gid,),
+    )
+    try:
+        db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (vid, aid))
+        wire = admin_client.get("/admin/home").context["activity_24h"]
+        row = next(r for r in wire if r["kind"] == "favorite" and r["who"] == "One Frame")
+        assert row["detail"] == "circled 1 take"
+    finally:
+        db.run(
+            "DELETE FROM favorites WHERE asset_id IN (SELECT id FROM assets WHERE gallery_id=?)",
+            (gid,),
+        )
+        db.run("DELETE FROM assets WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM visitors WHERE gallery_id=?", (gid,))
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))

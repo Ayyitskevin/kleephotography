@@ -296,7 +296,6 @@ def test_lightbox_comment_get_outcomes_are_latest_load_owned_source_contract():
         "\n  }\n\n  function advanceCommentServerActivity(assetId)",
     )
     load = block("async function loadComments(assetId)", "function stopShow()")
-    render = block("function render(i)", "// Return focus")
     comments_render = block("function renderComments(list)", "function renderServerComments")
     server_render = block("function renderServerComments", "async function loadComments")
     close = block("function close()", "// Each tile image")
@@ -316,7 +315,8 @@ def test_lightbox_comment_get_outcomes_are_latest_load_owned_source_contract():
     assert 'if (status === 410) return "This gallery has expired' in state
     assert 'if (status === 429) return "Comments are temporarily rate-limited' in state
     assert "if (status === 403) return \"We couldn't confirm gallery access" in state
-    assert 'return "Comments couldn\'t load — reopen this video or refresh."' in state
+    # Kind-neutral wording: the composer opens on stills as well as films.
+    assert 'return "Comments couldn\'t load — reopen it or refresh."' in state
 
     assert load.count("const loadVersion = ++commentLoadVersion;") == 1
     assert 'await fetch("/g/" + slug + "/comments/" + assetId)' in load
@@ -346,7 +346,10 @@ def test_lightbox_comment_get_outcomes_are_latest_load_owned_source_contract():
         < load.index("renderServerComments(assetId, comments);")
     )
 
-    assert render.index("activeAsset = null;") < render.index("commentLoadVersion += 1;")
+    # Opening any asset invalidates an in-flight load before starting its own,
+    # so a slow response for the previous frame can never render into this one.
+    panel = block("function openCommentPanel()", "function render(i)")
+    assert panel.index("commentLoadVersion += 1;") < panel.index("loadComments(activeAsset);")
     assert close.index("activeAsset = null;") < close.index("commentLoadVersion += 1;")
     assert "const loadVersion" not in submit
     assert "ownsCommentLoad" not in submit
@@ -363,8 +366,7 @@ def test_lightbox_comment_post_outcomes_survive_asset_round_trip_source_contract
 
     state = block("let activeVideo = null;", "function fmtTC(s)")
     feedback = block("function setCommentFeedback(assetId, message,", "function fmtTC(s)")
-    render = block("function render(i)", "// Return focus")
-    video = render.split('if (t.dataset.kind === "video") {', 1)[1].split("\n    } else {", 1)[0]
+    panel = block("function openCommentPanel()", "function render(i)")
     close = block("function close()", "// Each tile image")
     submit = block(
         'if (cForm) cForm.addEventListener("submit", async (e) => {',
@@ -376,9 +378,7 @@ def test_lightbox_comment_post_outcomes_survive_asset_round_trip_source_contract
     failure = submit.split("if (res && res.status === 403)", 1)[1].split("\n    } finally {", 1)[0]
     finally_block = submit.split("} finally {", 1)[1]
 
-    refresh_error = (
-        "Your note was posted, but comments couldn't refresh — reopen this video or refresh."
-    )
+    refresh_error = "Your note was posted, but comments couldn't refresh — reopen it or refresh."
     definite_error = "Your note wasn't posted — check the gallery before trying again."
     ambiguous_error = (
         "We couldn't confirm whether your note posted — refresh and check the thread before "
@@ -399,8 +399,9 @@ def test_lightbox_comment_post_outcomes_survive_asset_round_trip_source_contract
     assert "const feedback = assetId && commentFeedback.get(assetId);" in feedback
     assert 'vcError(feedback ? feedback.message : "");' in feedback
     assert 'if (feedback && feedback.clearOnLoad) setCommentFeedback(assetId, "");' in feedback
-    assert "restoreCommentFeedback(activeAsset);" in video
-    assert "restoreCommentFeedback(null);" in render
+    # Both stage kinds reach this through the shared opener; only close() —
+    # which owns no asset — restores the null slate.
+    assert "restoreCommentFeedback(activeAsset);" in panel
     assert "restoreCommentFeedback(null);" in close
 
     assert "const assetId = activeAsset;" in submit
@@ -513,6 +514,9 @@ def test_lightbox_comment_draft_lifecycle_source_contract():
     render = block("function render(i)", "// Return focus")
     video = render.split('if (t.dataset.kind === "video") {', 1)[1].split("\n    } else {", 1)[0]
     photo = render.split("\n    } else {", 1)[1]
+    # Both stage kinds open the composer through one function now that stills
+    # carry notes too — the ordering invariant moved here with it.
+    panel = block("function openCommentPanel()", "function render(i)")
     close = block("function close()", "// Each tile image")
     reply = block('reply.addEventListener("click", () => {', "\n        });")
     handlers = block("// Freeze the note", "// Client-side filter")
@@ -522,15 +526,20 @@ def test_lightbox_comment_draft_lifecycle_source_contract():
     )
 
     assert render.index("saveCommentDraft(activeAsset);") < render.index("idx =")
-    assert (
-        video.index("activeAsset = t.dataset.id;")
-        < video.index("restoreCommentDraft(activeAsset);")
-        < video.index("loadComments(activeAsset);")
-    )
+    # Each branch claims the asset and its kind BEFORE handing off to the
+    # shared opener, which is what makes the restore asset-owned.
+    for branch in (video, photo):
+        assert branch.index("activeAsset = t.dataset.id;") < branch.index("openCommentPanel();")
+        assert branch.index("activeIsStill =") < branch.index("openCommentPanel();")
+    assert "activeIsStill = false;" in video and "activeIsStill = true;" in photo
     assert "clearReply();" not in video
-    assert 'cTc.value = "0";' not in video
-    assert "activeAsset = null;" in photo
-    assert photo.index("activeAsset = null;") < photo.index("restoreCommentDraft(null);")
+    assert panel.index("restoreCommentDraft(activeAsset);") < panel.index(
+        "loadComments(activeAsset);"
+    )
+    # The still-only timecode reset lands AFTER the restore, so the draft
+    # helpers stay free of ambient state.
+    assert panel.index("restoreCommentDraft(activeAsset);") < panel.index('cTc.value = "0";')
+    assert panel.index('cTc.value = "0";') < panel.index("loadComments(activeAsset);")
 
     assert close.index("saveCommentDraft(activeAsset);") < close.index("activeAsset = null;")
     assert close.index("activeAsset = null;") < close.index("restoreCommentDraft(null);")

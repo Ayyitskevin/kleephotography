@@ -514,7 +514,8 @@ def test_video_comments_flow(admin):
     leaves a note anchored to a playhead second; replies thread under it and
     inherit the parent's timecode; the admin authors + threads too; admin hide
     soft-deletes the comment AND its replies and writes one audit row. The gate
-    rejects non-visitors and non-video assets."""
+    rejects non-visitors and unknown assets. Stills carry notes too, pinned at
+    timecode 0, and the studio sees and can answer them."""
     g, vid, photo = _ready_video(admin, title="Reel Review A")
 
     # the client gallery page ships the lightbox comment wiring
@@ -560,7 +561,7 @@ def test_video_comments_flow(admin):
         apage = admin.get(f"/admin/galleries/{g['id']}").text
         assert "Tighten this cut" in apage and "agreed" in apage
 
-        # gate: empty body 400, bogus reply target 400, photo/asset are not video → 404
+        # gate: empty body 400, bogus reply target 400
         assert (
             pub.post(f"/g/{g['slug']}/comments/{vid['id']}", data={"body": "   "}).status_code
             == 400
@@ -571,11 +572,44 @@ def test_video_comments_flow(admin):
             ).status_code
             == 400
         )
-        assert pub.get(f"/g/{g['slug']}/comments/{photo['id']}").status_code == 404
-        assert (
-            pub.post(f"/g/{g['slug']}/comments/{photo['id']}", data={"body": "x"}).status_code
-            == 404
+        # Stills are commentable too — this used to assert 404 on both, which
+        # made "annotate the film but not the frames" the contract for a studio
+        # that mostly delivers frames. A still has no playhead, so whatever
+        # timecode the form sends is pinned to 0.
+        assert pub.get(f"/g/{g['slug']}/comments/{photo['id']}").status_code == 200
+        posted = pub.post(
+            f"/g/{g['slug']}/comments/{photo['id']}",
+            data={"body": "Crop tighter on the left", "timecode": 12.5},
         )
+        assert posted.status_code == 200
+        still_thread = posted.json()
+        assert [c["body"] for c in still_thread] == ["Crop tighter on the left"]
+        assert still_thread[0]["timecode"] == 0
+        # A reply on a still threads exactly as it does on a film.
+        replied = pub.post(
+            f"/g/{g['slug']}/comments/{photo['id']}",
+            data={"body": "will do", "parent_id": still_thread[0]["id"]},
+        ).json()
+        assert [c["parent_id"] for c in replied] == [None, still_thread[0]["id"]]
+        # An asset that is neither photo nor video is still 404.
+        assert pub.get(f"/g/{g['slug']}/comments/999999").status_code == 404
+        assert pub.post(f"/g/{g['slug']}/comments/999999", data={"body": "x"}).status_code == 404
+
+        # the studio sees the client's note on the still, and can answer it
+        apage = admin.get(f"/admin/galleries/{g['id']}").text
+        assert "Crop tighter on the left" in apage, "client note on a still is invisible to admin"
+        assert (
+            admin.post(
+                f"/admin/galleries/{g['id']}/comments/{photo['id']}",
+                data={"body": "Recropped", "timecode": 9},
+                follow_redirects=False,
+            ).status_code
+            == 303
+        )
+        studio = pub.get(f"/g/{g['slug']}/comments/{photo['id']}").json()
+        assert "Recropped" in [c["body"] for c in studio]
+        # the studio side pins a still's note at 0 as well
+        assert [c["timecode"] for c in studio if c["body"] == "Recropped"] == [0]
 
     # gate: a visitor cookie is required (no PIN → 403 on read and write)
     with TestClient(app) as anon:

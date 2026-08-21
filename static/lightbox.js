@@ -12,7 +12,8 @@
   let idx = -1;
   let timer = null;
 
-  // ── Timecoded review comments (only present on the client gallery) ──────────
+  // ── Review comments (only present on the client gallery) ───────────────────
+  // Timecoded on films, pinned at 0 on stills — see openCommentPanel().
   const slug = lb.dataset.slug;
   const cWrap = lb.querySelector(".lb-comments");
   const cList = cWrap && cWrap.querySelector(".vc-list");
@@ -26,6 +27,9 @@
   const cFilter = cWrap && cWrap.querySelector(".vc-filter");
   let activeVideo = null;
   let activeAsset = null;
+  // Stills carry notes too, but they have no playhead: no timecode chrome, no
+  // seek-on-click, and every note pinned at 0. See app/public/gallery.py.
+  let activeIsStill = false;
   let lastComments = [];
   let commentLoadVersion = 0;
   const commentDrafts = new Map();
@@ -63,9 +67,9 @@
 
   function commentLoadErrorMessage(status) {
     if (status === 410) return "This gallery has expired — comments are no longer available.";
-    if (status === 429) return "Comments are temporarily rate-limited — wait a moment, then reopen this video.";
-    if (status === 403) return "We couldn't confirm gallery access — refresh before reopening this video.";
-    return "Comments couldn't load — reopen this video or refresh.";
+    if (status === 429) return "Comments are temporarily rate-limited — wait a moment, then reopen it.";
+    if (status === 403) return "We couldn't confirm gallery access — refresh before reopening it.";
+    return "Comments couldn't load — reopen it or refresh.";
   }
 
   function fmtTC(s) {
@@ -140,14 +144,17 @@
         const li = document.createElement("li");
         li.className = "vc" + (resolved ? " vc-resolved" : "");
         li.style.marginLeft = (depth * 1.1) + "rem";
-        const tc = document.createElement("button");
-        tc.type = "button";
-        tc.className = "vc-tc";
-        tc.textContent = fmtTC(c.timecode);
-        // The seek payoff: clicking a timecode jumps the player there.
-        tc.addEventListener("click", () => {
-          if (activeVideo) { activeVideo.currentTime = c.timecode; activeVideo.play().catch(() => {}); }
-        });
+        let tc = null;
+        if (!activeIsStill) {
+          tc = document.createElement("button");
+          tc.type = "button";
+          tc.className = "vc-tc";
+          tc.textContent = fmtTC(c.timecode);
+          // The seek payoff: clicking a timecode jumps the player there.
+          tc.addEventListener("click", () => {
+            if (activeVideo) { activeVideo.currentTime = c.timecode; activeVideo.play().catch(() => {}); }
+          });
+        }
         const role = document.createElement("span");
         role.className = "vc-role" + (c.author_role === "admin" ? " studio" : "");
         role.textContent = c.author_role === "admin" ? "Studio" : "You";
@@ -265,6 +272,36 @@
     return (source && source.alt) || fallback;
   }
 
+  // One opener for both stage kinds. The only difference a still makes is the
+  // timecode chrome: no "Comment at 0:00" button (there is no playhead to tag),
+  // and the composer says "note", not "note at this moment".
+  function openCommentPanel() {
+    if (!cWrap) return;
+    commentLoadVersion += 1;
+    cWrap.hidden = false;
+    if (cAt) cAt.hidden = false;
+    if (cBody) {
+      cBody.placeholder = activeIsStill
+        ? "Leave a note on this frame\u2026"
+        : "Leave a note at this moment\u2026";
+    }
+    lastComments = [];
+    if (cList) cList.innerHTML = "";
+    if (cCount) {
+      cCount.textContent = "";
+      cCount.classList.remove("ok");
+    }
+    restoreCommentFeedback(activeAsset);
+    restoreCommentDraft(activeAsset);
+    // Applied AFTER the restore: the draft helpers are deliberately
+    // asset-owned and must not read ambient state like activeIsStill.
+    if (activeIsStill) {
+      if (cTc) cTc.value = "0";
+      if (cAt) cAt.hidden = true;
+    }
+    loadComments(activeAsset);
+  }
+
   function render(i) {
     saveCommentDraft(activeAsset);
     idx = (i + tiles.length) % tiles.length;
@@ -289,18 +326,8 @@
       stage.appendChild(v);
       activeVideo = v;
       activeAsset = t.dataset.id;
-      if (cWrap) {
-        cWrap.hidden = false;
-        lastComments = [];
-        if (cList) cList.innerHTML = "";
-        if (cCount) {
-          cCount.textContent = "";
-          cCount.classList.remove("ok");
-        }
-        restoreCommentFeedback(activeAsset);
-        restoreCommentDraft(activeAsset);
-        loadComments(activeAsset);
-      }
+      activeIsStill = false;
+      openCommentPanel();
     } else {
       const img = document.createElement("img");
       img.src = t.dataset.web;
@@ -309,13 +336,9 @@
       img.alt = mediaName(t, "");
       stage.appendChild(img);
       activeVideo = null;
-      activeAsset = null;
-      commentLoadVersion += 1;
-      if (cWrap) {
-        cWrap.hidden = true;
-        restoreCommentFeedback(null);
-        restoreCommentDraft(null);
-      }
+      activeAsset = t.dataset.id;
+      activeIsStill = true;
+      openCommentPanel();
     }
     // Announce the stage change — the dialog is modal, so without a live
     // region arrow/slideshow navigation is silent to screen readers.
@@ -445,7 +468,7 @@
         const commentsValid = Array.isArray(comments);
         const draftCleared = clearSubmittedDraft(assetId, submittedRevision);
         if (draftCleared && activeAsset === assetId) restoreCommentDraft(assetId);
-        setCommentFeedback(assetId, commentsValid ? "" : "Your note was posted, but comments couldn't refresh — reopen this video or refresh.", !commentsValid);
+        setCommentFeedback(assetId, commentsValid ? "" : "Your note was posted, but comments couldn't refresh — reopen it or refresh.", !commentsValid);
         if (activeAsset !== assetId) return;
         commentLoadVersion += 1;
         if ((commentServerActivityVersions.get(assetId) || 0) !== submittedActivityVersion) {

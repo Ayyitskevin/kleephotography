@@ -14,7 +14,7 @@
 {% macro vc_thread(comments, parent, g, a, depth) %}
   {% for c in comments if (c.parent_id or 0) == parent %}
   <div class="avc{{ ' avc-resolved' if (c.status or 'open') == 'resolved' else '' }}" style="margin-left:{{ depth }}rem">
-    <span class="avc-tc">{{ '%d:%02d'|format((c.timecode // 60)|int, (c.timecode % 60)|int) }}</span>
+    {% if a.kind == 'video' %}<span class="avc-tc">{{ '%d:%02d'|format((c.timecode // 60)|int, (c.timecode % 60)|int) }}</span>{% endif %}
     <span class="avc-role">{{ 'Studio' if c.author_role == 'admin' else 'Client' }}</span>
     <span class="avc-text">{{ c.body }}</span>
     {% if depth == 0 %}
@@ -131,13 +131,17 @@
         </form>
       </div>
       {% endif %}
-      {% if a.kind == 'video' %}
+      {# Notes on stills as well as films. A still has no playhead, so it gets
+         no timecode field and the server pins its notes at 0 regardless. #}
+      {% if a.kind in ('video', 'photo') %}
       {% set thread = video_comments.get(a.id, []) %}
       <details class="avc-panel">
         <summary>Notes ({{ thread|length }})</summary>
         {{ vc_thread(thread, 0, g, a, 0) }}
         <form method="post" action="/admin/galleries/{{ g.id }}/comments/{{ a.id }}" class="avc-new">
+          {% if a.kind == 'video' %}
           <input type="text" name="timecode" value="0" size="4" title="Timecode in seconds (0 = general note)">
+          {% endif %}
           <textarea name="body" rows="2" required placeholder="Add a studio note…"></textarea>
           <button class="link">Post note</button>
         </form>

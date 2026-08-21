@@ -152,7 +152,7 @@ def _bench_context(g: "db.sqlite3.Row") -> dict:
             # helper the client gallery uses, so the visibility rule can never drift
             # between the two views. One batched query, not one per video.
             "video_comments": video_comment_threads(
-                [a["id"] for a in assets if a["kind"] == "video"]
+                [a["id"] for a in assets if a["kind"] in ("photo", "video")]
             ),
             "renditions": renditions,
         }
@@ -181,9 +181,10 @@ def _tile_context(g: "db.sqlite3.Row", asset_id: int) -> dict:
         {
             "a": a,
             "hero_asset_ids": _hero_asset_ids(g),
-            # Threads and renditions only exist for videos, and the tile only
-            # reads them there — so a photo action skips both queries entirely.
-            "video_comments": video_comment_threads([asset_id]) if is_video else {},
+            # Notes exist for stills and films alike; renditions are video-only,
+            # and the tile only reads those there, so a photo action skips that
+            # query but never the thread.
+            "video_comments": video_comment_threads([asset_id]),
             "renditions": {
                 asset_id: db.all_(
                     "SELECT * FROM asset_renditions WHERE asset_id=? ORDER BY preset", (asset_id,)
@@ -915,7 +916,7 @@ def delete_asset(request: Request, gallery_id: int, asset_id: int):
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
-# ── Video review comments (Domain C slice 3) ─────────────────────────────────
+# ── Review comments (Domain C slice 3) — stills and films alike ──────────────
 
 
 @router.post("/galleries/{gallery_id}/comments/{asset_id}")
@@ -929,14 +930,20 @@ def admin_add_comment(
     """Studio-side author path. Admin comments are author_role='admin',
     visitor_id NULL; a reply inherits its parent's timecode."""
     get_gallery(gallery_id)
-    db.get_or_404(
-        "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='video'", (asset_id, gallery_id)
-    )
+    kind = db.get_or_404(
+        """SELECT kind FROM assets
+           WHERE id=? AND gallery_id=? AND kind IN ('photo','video')""",
+        (asset_id, gallery_id),
+    )["kind"]
     body = body.strip()
     if not body:
         raise HTTPException(status_code=400, detail="comment body required")
     parent, inherited = resolve_comment_parent(asset_id, parent_id)
-    tc = inherited if parent is not None else max(0.0, timecode)
+    # A still has no playhead — mirror the client route and pin its notes at 0.
+    if kind == "photo":
+        tc = 0.0
+    else:
+        tc = inherited if parent is not None else max(0.0, timecode)
     db.run(
         """INSERT INTO video_comments
               (asset_id, gallery_id, parent_id, visitor_id, author_role, timecode, body)

@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from .. import config, db, jobs, security
+from .. import config, db, jobs, security, zip_cache
 from ..render import templates
 from .gallery import get_live_gallery, is_expired
 
@@ -315,6 +315,10 @@ def download_zip(request: Request, slug: str):
         return RedirectResponse(f"/g/{slug}/download", status_code=303)
     path = jobs.zip_path(g["id"], g["content_rev"])
     if path.is_file():
+        # Refresh the archive's clock so ZIP_DIR eviction measures idleness
+        # rather than age — a gallery a client keeps coming back to must not
+        # age out from under them (app/zip_cache.py).
+        zip_cache.touch(path)
         db.run(
             "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
             (g["id"], visitor["id"]),

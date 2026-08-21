@@ -352,3 +352,134 @@ def test_reels_video_schema_omits_a_missing_upload_date(client, portfolio):
     by_url = {entry["contentUrl"].rsplit("/", 1)[-1]: entry for entry in payload}
     assert by_url[str(dated)]["uploadDate"]
     assert "uploadDate" not in by_url[str(undated)]
+
+
+def test_portfolio_tiles_publish_the_generated_description(client, portfolio):
+    """Argus writes a description per frame; the grid must ship it, not the tag.
+
+    Before this, every starred F&B photo on the public site carried the byte-
+    identical alt string — the description in `assets.argus_alt_text` was read
+    only by an admin hover overlay (templates/admin/_gd_tile.html).
+    """
+    described = _seed_photo(portfolio, "described", "fb/dishes")
+    db.run(
+        "UPDATE assets SET argus_alt_text=? WHERE id=?",
+        ("Seared scallops with brown butter on slate", described),
+    )
+    _seed_photo(portfolio, "plain", "fb/dishes")
+
+    markup = client.get("/portfolio").text
+    tags = _tags_for(markup, f"/site/img/{described}?variant=thumb")
+    assert tags, "the described frame is missing from /portfolio"
+    assert 'alt="Seared scallops with brown butter on slate"' in tags[0], tags[0]
+    # The undescribed frame keeps the craft-phrase fallback, so the two tiles
+    # no longer share one string.
+    assert "food &amp; beverage photography by" in markup.lower()
+
+
+def test_gallery_frames_publish_the_generated_description(client, delivery):
+    """The client gallery's positional alt is a fallback, not the answer."""
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published, type) VALUES (?,?,?,1,'gallery')",
+        ("alt-premiere", "Alt Premiere", "1234"),
+    )
+    delivery["galleries"].append(gid)
+    described = _seed_delivery_asset(gid, "described", "photo", (4000, 3000))
+    plain = _seed_delivery_asset(gid, "plain", "photo", (4000, 3000))
+    db.run(
+        "UPDATE assets SET argus_alt_text=? WHERE id=?",
+        ("Corner banquette under a skylight", described),
+    )
+
+    assert client.post("/g/alt-premiere/pin", data={"pin": "1234"}).status_code == 200
+    markup = client.get("/g/alt-premiere").text
+    (described_tag,) = _tags_for(markup, f"/media/alt-premiere/thumb/{described}")
+    assert 'alt="Corner banquette under a skylight"' in described_tag, described_tag
+    assert "frame 00" not in described_tag, described_tag
+    # An unanalyzed frame keeps the positional fallback.
+    (plain_tag,) = _tags_for(markup, f"/media/alt-premiere/thumb/{plain}")
+    assert f'alt="Alt Premiere &mdash; frame {plain:04d}"' in plain_tag or (
+        f"frame {plain:04d}" in plain_tag
+    ), plain_tag
+
+
+def test_sitemap_carries_image_and_video_children(client, portfolio):
+    """The frames ARE the product; a photographer absent from Google Images is
+    invisible in half the search surface. Each page carries exactly the assets
+    it renders, so the sitemap never promises a crawler a frame it cannot see."""
+    fb = _seed_photo(portfolio, "plated", "fb/dishes")
+    re_ = _seed_photo(portfolio, "kitchen", "re/interiors")
+    reel = _seed_video(portfolio, "walkthrough", "re/interiors")
+
+    xml = client.get("/sitemap.xml").text
+    assert 'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' in xml
+    assert 'xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"' in xml
+
+    def block(path: str) -> str:
+        marker = f"<loc>{config.BASE_URL}{path}</loc>"
+        start = xml.index(marker)
+        return xml[start : xml.index("</url>", start)]
+
+    # /portfolio renders every starred photo, so it carries every one.
+    assert f"/site/img/{fb}" in block("/portfolio")
+    assert f"/site/img/{re_}" in block("/portfolio")
+    # A spoke carries only its own specialty — the F&B frame must not appear
+    # under /real-estate.
+    assert f"/site/img/{re_}" in block("/real-estate")
+    assert f"/site/img/{fb}" not in block("/real-estate")
+    # Videos ride /reels with the fields Google requires.
+    reels = block("/reels")
+    assert f"<video:content_loc>{config.BASE_URL}/site/vid/{reel}</video:content_loc>" in reels
+    assert f"<video:thumbnail_loc>{config.BASE_URL}/site/poster/{reel}</video:thumbnail_loc>" in (
+        reels
+    )
+    assert "<video:title>" in reels and "<video:description>" in reels
+    # Photos are not videos and vice versa.
+    assert "<video:" not in block("/portfolio")
+    assert "<image:" not in reels
+
+
+def test_sitemap_video_titles_match_the_reels_json_ld(client, portfolio):
+    """Google cross-checks a <video:video> against the page's VideoObject.
+
+    Both read app/render.py, so this asserts the two cannot drift apart.
+    """
+    _seed_video(portfolio, "match", "fb/plating")
+    xml = client.get("/sitemap.xml").text
+    title = re.search(r"<video:title>(.*?)</video:title>", xml).group(1)
+    description = re.search(r"<video:description>(.*?)</video:description>", xml).group(1)
+
+    page = client.get("/reels").text
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', page, re.S)
+    video_ld = [json.loads(b) for b in blocks if "VideoObject" in b][0]
+    assert video_ld[0]["name"] == title
+    assert video_ld[0]["description"] == description
+
+
+def test_sitemap_omits_an_out_of_range_video_duration(client, portfolio):
+    """Google rejects video:duration outside 1..28800s — omit it, don't lie."""
+    reel = _seed_video(portfolio, "overlong", "re/interiors")
+    db.run("UPDATE assets SET duration=? WHERE id=?", (99999, reel))
+    assert "<video:duration>" not in client.get("/sitemap.xml").text
+
+    db.run("UPDATE assets SET duration=? WHERE id=?", (42.4, reel))
+    assert "<video:duration>42</video:duration>" in client.get("/sitemap.xml").text
+
+
+def test_share_debugger_previews_the_og_image_the_pages_actually_emit(client, portfolio):
+    """The debugger's whole contract is 'what shows here matches what the
+    socials will scrape' (app/admin/share.py:_build_urls). It was previewing
+    ORDER BY id (the OLDEST starred frame) while render._og_image_id emits
+    ORDER BY id DESC (the newest), so the two disagreed the moment a second
+    photo was starred."""
+    from app.admin.share import _build_urls
+    from app.render import _og_image_id
+
+    _seed_photo(portfolio, "oldest", "fb/dishes")
+    newest = _seed_photo(portfolio, "newest", "fb/dishes")
+
+    assert _og_image_id() == newest
+    home = [u for u in _build_urls() if u["path"] == "/"][0]
+    assert home["og_image_id"] == newest, "the debugger is previewing a different frame"
+    # And the live page agrees.
+    assert f"/site/img/{newest}" in client.get("/").text

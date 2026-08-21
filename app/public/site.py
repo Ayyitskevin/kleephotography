@@ -23,7 +23,8 @@ from .. import (
     security,
     specialties,
 )
-from ..render import ROOT, _static_rev, templates
+from ..http_cache import PUBLIC_24H, conditional_file
+from ..render import ROOT, _reel_description, _reel_title, _static_rev, templates
 from . import site_catalog as _site_catalog
 
 BOOK_ACTIVE_PROMISES = _site_catalog.BOOK_ACTIVE_PROMISES
@@ -1023,8 +1024,18 @@ def specialty_food_beverage(request: Request):
     return _specialty_page(request, "fb")
 
 
+def _negotiated_file(request: Request, jpeg_path: Path):
+    """Serve the best still encoding this caller accepts, or the JPEG.
+
+    `Vary: Accept` rides every response — including the 304s — or Cloudflare's
+    edge would hand an AVIF to the next visitor that cannot decode one.
+    """
+    served, served_type = imaging.negotiate(jpeg_path, request.headers.get("accept"))
+    return conditional_file(request, served, served_type, PUBLIC_24H, {"Vary": "Accept"})
+
+
 @router.get("/site/img/{asset_id}")
-def portfolio_image(asset_id: int, variant: str = "web"):
+def portfolio_image(request: Request, asset_id: int, variant: str = "web"):
     """Unauthenticated — serves ONLY portfolio-flagged, ready photos."""
     if variant not in ("web", "thumb"):
         raise HTTPException(status_code=404)
@@ -1040,15 +1051,11 @@ def portfolio_image(asset_id: int, variant: str = "web"):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / variant / f"{Path(a['stored']).stem}.jpg"
-    if not path.is_file():
-        raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"}
-    )
+    return _negotiated_file(request, path)
 
 
 @router.get("/site/vid/{asset_id}")
-def portfolio_video(asset_id: int):
+def portfolio_video(request: Request, asset_id: int):
     """Unauthenticated — serves ONLY portfolio-flagged, ready videos (the /reels
     showcase). FileResponse handles HTTP Range, so iOS scrubbing works."""
     a = db.one(
@@ -1059,15 +1066,11 @@ def portfolio_video(asset_id: int):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / "web" / f"{Path(a['stored']).stem}.mp4"
-    if not path.is_file():
-        raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="video/mp4", headers={"Cache-Control": "public, max-age=86400"}
-    )
+    return conditional_file(request, path, "video/mp4", PUBLIC_24H)
 
 
 @router.get("/site/poster/{asset_id}")
-def portfolio_video_poster(asset_id: int):
+def portfolio_video_poster(request: Request, asset_id: int):
     """Poster frame for a portfolio video — same public portfolio gate."""
     a = db.one(
         """SELECT * FROM assets WHERE id=? AND portfolio=1
@@ -1077,11 +1080,7 @@ def portfolio_video_poster(asset_id: int):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / "web" / f"{Path(a['stored']).stem}_poster.jpg"
-    if not path.is_file():
-        raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"}
-    )
+    return _negotiated_file(request, path)
 
 
 @router.get("/favicon.ico", include_in_schema=False)
@@ -1141,8 +1140,59 @@ def _sitemap_day(value) -> str:
         return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
-def _sitemap_url(path: str, lastmod: str) -> str:
-    return f"<url><loc>{config.BASE_URL}{path}</loc><lastmod>{lastmod}</lastmod></url>"
+# Google caps a sitemap URL at 1000 images. The portfolio is nowhere near that,
+# but an unbounded loop over a growing table is how a sitemap silently becomes
+# invalid years later.
+SITEMAP_MAX_IMAGES = 1000
+
+
+def _xml_escape(value: str) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _image_entries(assets) -> str:
+    """<image:image> children for one <url>, capped at Google's per-URL limit."""
+    return "".join(
+        f"<image:image><image:loc>{config.BASE_URL}/site/img/{a['id']}</image:loc></image:image>"
+        for a in assets[:SITEMAP_MAX_IMAGES]
+    )
+
+
+def _video_entries(reels) -> str:
+    """<video:video> children for one <url>.
+
+    Title and description come from app/render.py, the same helpers /reels uses
+    for its VideoObject JSON-LD — Google cross-checks the two and a forked
+    formula would make them disagree.
+    """
+    out = []
+    for r in reels[:SITEMAP_MAX_IMAGES]:
+        duration = ""
+        if r["duration"]:
+            seconds = int(round(float(r["duration"])))
+            # Google rejects a video:duration outside 1..28800 seconds.
+            if 1 <= seconds <= 28800:
+                duration = f"<video:duration>{seconds}</video:duration>"
+        out.append(
+            "<video:video>"
+            f"<video:thumbnail_loc>{config.BASE_URL}/site/poster/{r['id']}</video:thumbnail_loc>"
+            f"<video:title>{_xml_escape(_reel_title(r))}</video:title>"
+            f"<video:description>{_xml_escape(_reel_description(r))}</video:description>"
+            f"<video:content_loc>{config.BASE_URL}/site/vid/{r['id']}</video:content_loc>"
+            f"{duration}"
+            "</video:video>"
+        )
+    return "".join(out)
+
+
+def _sitemap_url(path: str, lastmod: str, children: str = "") -> str:
+    return f"<url><loc>{config.BASE_URL}{path}</loc><lastmod>{lastmod}</lastmod>{children}</url>"
 
 
 @router.get("/sitemap.xml")
@@ -1165,7 +1215,25 @@ def sitemap():
         "/reels",
         "/press",
     ]
-    urls = "".join(_sitemap_url(p, shell_day) for p in paths)
+    # Image and video children: the frames are the product, and a photographer
+    # who does not appear in Google Images is invisible in half the search
+    # surface. Each page carries exactly the assets it actually renders, so the
+    # sitemap never promises a crawler a frame the page does not show.
+    photos = _portfolio_assets()
+    reels = _portfolio_reels()
+    by_specialty = {
+        meta["slug"]: [a for a in photos if specialties.specialty_key(a["portfolio_tag"]) == key]
+        for key, meta in specialties.SPECIALTIES.items()
+    }
+    children = {
+        "/": _image_entries(photos[:6]),  # the home filmstrip renders six
+        "/portfolio": _image_entries(photos),
+        "/reels": _video_entries(reels),
+    }
+    for slug, mine in by_specialty.items():
+        children[f"/{slug}"] = _image_entries(mine)
+
+    urls = "".join(_sitemap_url(p, shell_day, children.get(p, "")) for p in paths)
     # Case-study detail pages are also surfaced on /portfolio (Featured clients)
     # but get their own crawlable URLs here (/work index + /work/{slug} details).
     # Prefer created_at so publishing a study bumps lastmod for crawlers.
@@ -1173,6 +1241,9 @@ def sitemap():
         urls += _sitemap_url(f"/work/{g['slug']}", _sitemap_day(g["created_at"]))
     return Response(
         content='<?xml version="1.0" encoding="UTF-8"?>'
-        f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
+        ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"'
+        ' xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">'
+        f"{urls}</urlset>",
         media_type="application/xml",
     )
