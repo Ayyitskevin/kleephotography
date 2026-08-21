@@ -253,7 +253,8 @@
         </div>
         <ul class="dash-activity">
           {% for a in activity_24h %}
-          {% set adot = {'paid':'var(--ok)','viewed':'var(--honey)','booking':'var(--clay)'}.get(a.kind, 'var(--neutral)') %}
+          {# favorite = a buying signal, note = something waiting on a reply #}
+          {% set adot = {'paid':'var(--ok)','viewed':'var(--honey)','booking':'var(--clay)','favorite':'var(--honey)','note':'var(--clay)'}.get(a.kind, 'var(--neutral)') %}
           <li>
             <span class="dash-dot" style="background: {{ adot }};"></span>
             <div class="dash-act-text"><b>{{ a.who }}</b> {{ a.detail or a.kind }}</div>
@@ -265,8 +266,8 @@
       {% else %}
       <section class="v4-activity-strip" aria-label="Activity">
         <span class="v4-idle-dot" aria-hidden="true"></span>
-        <p>Quiet for 24 hours — activity lands here the moment a client opens a
-           gallery, pays, or books.</p>
+        <p>Quiet for 24 hours — activity lands here the moment a client circles a
+           take, leaves a note, downloads, pays, or books.</p>
         <a class="link" href="/admin/today">Today &rarr;</a>
       </section>
       {% endif %}

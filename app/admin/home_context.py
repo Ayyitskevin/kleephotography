@@ -283,8 +283,22 @@ def _ctx_invoices(today_iso: str) -> dict:
 
 
 def _ctx_activity_24h() -> list:
-    """The wire: the last 24 hours across inquiries, downloads and sent email,
-    interleaved by timestamp. The deep view is /admin/today."""
+    """The wire: the last 24 hours of client activity, interleaved by timestamp.
+
+    Inquiries, downloads and sent email were the whole wire, which meant the two
+    signals a photographer most wants — the client circling their picks, and the
+    client asking for a change — happened in silence. Favouriting is the
+    strongest buying signal in the business and it reached the owner nowhere.
+
+    Favourites are aggregated per gallery per visitor rather than emitted per
+    row: a client selecting forty frames is ONE event to the owner, and an
+    unaggregated burst would push everything else off an eight-row wire. Notes
+    stay per-row (they are low-volume and individually actionable) and only
+    client-authored, undeleted ones count — the studio's own replies are not
+    news to the studio.
+
+    The deep view is /admin/today.
+    """
     return db.all_(
         """SELECT 'inquiry' AS kind, i.name AS who, i.business AS detail, i.created_at AS ts
            FROM inquiries i WHERE i.created_at >= datetime('now', '-24 hours')
@@ -299,6 +313,20 @@ def _ctx_activity_24h() -> list:
            LEFT JOIN projects p ON p.id=e.project_id
            LEFT JOIN clients c ON c.id=p.client_id
            WHERE e.created_at >= datetime('now', '-24 hours')
+         UNION ALL
+           SELECT 'favorite', g.title,
+                  'circled ' || COUNT(*) || ' take' || (CASE WHEN COUNT(*)=1 THEN '' ELSE 's' END),
+                  MAX(f.created_at)
+           FROM favorites f
+           JOIN assets a ON a.id=f.asset_id
+           JOIN galleries g ON g.id=a.gallery_id
+           WHERE f.created_at >= datetime('now', '-24 hours')
+           GROUP BY a.gallery_id, f.visitor_id
+         UNION ALL
+           SELECT 'note', g.title, 'left a note — ' || substr(vc.body, 1, 48), vc.created_at
+           FROM video_comments vc JOIN galleries g ON g.id=vc.gallery_id
+           WHERE vc.author_role='client' AND vc.deleted_at IS NULL
+             AND vc.created_at >= datetime('now', '-24 hours')
          ORDER BY ts DESC LIMIT 8"""
     )
 
