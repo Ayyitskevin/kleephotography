@@ -481,25 +481,33 @@ def _maybe_reopen_on_reply(con, reply_id: int):
     return {"root_id": root["id"], "asset_id": root["asset_id"], "cause_reply_id": reply_id}
 
 
-def _live_video_asset(request: Request, slug: str, asset_id: int):
+def _live_commentable_asset(request: Request, slug: str, asset_id: int):
     """Shared gate for the client comment routes: live + unexpired gallery,
-    valid visitor cookie, and a ready video asset in that gallery."""
+    valid visitor cookie, and a ready photo or video asset in that gallery.
+
+    Photos were excluded only by this WHERE clause — `video_comments` never had
+    a kind constraint (migrations/026), the thread/resolve/reply/reopen machinery
+    is kind-agnostic, and for a studio whose deliverable is usually stills, "the
+    client can annotate the film but not the frames" was the wrong way round.
+    Returns the asset kind so the caller can decide what a timecode means.
+    """
     g = get_live_gallery(slug)
     if is_expired(g):
         raise HTTPException(status_code=410)
     visitor = security.require_visitor(request, g["id"])
     a = db.one(
-        "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='video' AND status='ready'",
+        """SELECT kind FROM assets
+           WHERE id=? AND gallery_id=? AND kind IN ('photo','video') AND status='ready'""",
         (asset_id, g["id"]),
     )
     if not a:
         raise HTTPException(status_code=404)
-    return g, visitor
+    return g, visitor, a["kind"]
 
 
 @router.get("/{slug}/comments/{asset_id}")
 def list_comments(request: Request, slug: str, asset_id: int):
-    _live_video_asset(request, slug, asset_id)
+    _live_commentable_asset(request, slug, asset_id)
     return JSONResponse(video_comment_thread(asset_id))
 
 
@@ -512,12 +520,17 @@ def add_comment(
     timecode: float = Form(0.0),
     parent_id: str = Form(""),
 ):
-    g, visitor = _live_video_asset(request, slug, asset_id)
+    g, visitor, kind = _live_commentable_asset(request, slug, asset_id)
     body = body.strip()
     if not body:
         raise HTTPException(status_code=400, detail="comment body required")
     parent, inherited = resolve_comment_parent(asset_id, parent_id)
-    tc = inherited if parent is not None else max(0.0, timecode)
+    # A still has no playhead, so its notes are pinned at 0 whatever the form
+    # sent — the column stays NOT NULL and the ordering index still applies.
+    if kind == "photo":
+        tc = 0.0
+    else:
+        tc = inherited if parent is not None else max(0.0, timecode)
     reopened = None
     with db.tx() as con:
         cur = con.execute(
