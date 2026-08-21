@@ -464,3 +464,22 @@ def test_sitemap_omits_an_out_of_range_video_duration(client, portfolio):
 
     db.run("UPDATE assets SET duration=? WHERE id=?", (42.4, reel))
     assert "<video:duration>42</video:duration>" in client.get("/sitemap.xml").text
+
+
+def test_share_debugger_previews_the_og_image_the_pages_actually_emit(client, portfolio):
+    """The debugger's whole contract is 'what shows here matches what the
+    socials will scrape' (app/admin/share.py:_build_urls). It was previewing
+    ORDER BY id (the OLDEST starred frame) while render._og_image_id emits
+    ORDER BY id DESC (the newest), so the two disagreed the moment a second
+    photo was starred."""
+    from app.admin.share import _build_urls
+    from app.render import _og_image_id
+
+    _seed_photo(portfolio, "oldest", "fb/dishes")
+    newest = _seed_photo(portfolio, "newest", "fb/dishes")
+
+    assert _og_image_id() == newest
+    home = [u for u in _build_urls() if u["path"] == "/"][0]
+    assert home["og_image_id"] == newest, "the debugger is previewing a different frame"
+    # And the live page agrees.
+    assert f"/site/img/{newest}" in client.get("/").text

@@ -11,17 +11,10 @@ from fastapi.responses import HTMLResponse
 
 from .. import config, db, security, specialties
 from ..public.site import marketing_page_catalog
-from ..render import templates
+from ..render import _og_image_id, templates
 
 log = logging.getLogger("mise.admin.share")
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
-
-
-def _first_starred_id() -> int | None:
-    """The og:image for marketing pages with no specific subject."""
-    row = db.one("""SELECT id FROM assets WHERE portfolio=1 AND status='ready'
-                    AND kind='photo' ORDER BY id LIMIT 1""")
-    return row["id"] if row else None
 
 
 def _specialty_hero_ids() -> dict[str, int]:
@@ -41,7 +34,7 @@ def _build_urls() -> list[dict]:
     """Compose every indexable URL with its computed OG metadata. Mirrors what
     the templates produce server-side so what shows here matches what the
     socials will scrape (no live HTTP fetch needed)."""
-    default_img = _first_starred_id()
+    default_img = _og_image_id()
     specialty_heroes = _specialty_hero_ids()
     specialty_by_path = {f"/{meta['slug']}": key for key, meta in specialties.SPECIALTIES.items()}
     urls: list[dict] = []
