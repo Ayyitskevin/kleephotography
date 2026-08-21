@@ -352,3 +352,52 @@ def test_reels_video_schema_omits_a_missing_upload_date(client, portfolio):
     by_url = {entry["contentUrl"].rsplit("/", 1)[-1]: entry for entry in payload}
     assert by_url[str(dated)]["uploadDate"]
     assert "uploadDate" not in by_url[str(undated)]
+
+
+def test_portfolio_tiles_publish_the_generated_description(client, portfolio):
+    """Argus writes a description per frame; the grid must ship it, not the tag.
+
+    Before this, every starred F&B photo on the public site carried the byte-
+    identical alt string — the description in `assets.argus_alt_text` was read
+    only by an admin hover overlay (templates/admin/_gd_tile.html).
+    """
+    described = _seed_photo(portfolio, "described", "fb/dishes")
+    db.run(
+        "UPDATE assets SET argus_alt_text=? WHERE id=?",
+        ("Seared scallops with brown butter on slate", described),
+    )
+    _seed_photo(portfolio, "plain", "fb/dishes")
+
+    markup = client.get("/portfolio").text
+    tags = _tags_for(markup, f"/site/img/{described}?variant=thumb")
+    assert tags, "the described frame is missing from /portfolio"
+    assert 'alt="Seared scallops with brown butter on slate"' in tags[0], tags[0]
+    # The undescribed frame keeps the craft-phrase fallback, so the two tiles
+    # no longer share one string.
+    assert "food &amp; beverage photography by" in markup.lower()
+
+
+def test_gallery_frames_publish_the_generated_description(client, delivery):
+    """The client gallery's positional alt is a fallback, not the answer."""
+    gid = db.run(
+        "INSERT INTO galleries (slug, title, pin, published, type) VALUES (?,?,?,1,'gallery')",
+        ("alt-premiere", "Alt Premiere", "1234"),
+    )
+    delivery["galleries"].append(gid)
+    described = _seed_delivery_asset(gid, "described", "photo", (4000, 3000))
+    plain = _seed_delivery_asset(gid, "plain", "photo", (4000, 3000))
+    db.run(
+        "UPDATE assets SET argus_alt_text=? WHERE id=?",
+        ("Corner banquette under a skylight", described),
+    )
+
+    assert client.post("/g/alt-premiere/pin", data={"pin": "1234"}).status_code == 200
+    markup = client.get("/g/alt-premiere").text
+    (described_tag,) = _tags_for(markup, f"/media/alt-premiere/thumb/{described}")
+    assert 'alt="Corner banquette under a skylight"' in described_tag, described_tag
+    assert "frame 00" not in described_tag, described_tag
+    # An unanalyzed frame keeps the positional fallback.
+    (plain_tag,) = _tags_for(markup, f"/media/alt-premiere/thumb/{plain}")
+    assert f'alt="Alt Premiere &mdash; frame {plain:04d}"' in plain_tag or (
+        f"frame {plain:04d}" in plain_tag
+    ), plain_tag
