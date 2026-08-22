@@ -25,6 +25,7 @@ from . import (
     deadman,
     digest,
     gallery_reminders,
+    invoice_dunning,
     jobs,
     ops_monitor,
     review_requests,
@@ -57,6 +58,10 @@ def _loop() -> None:
             review_requests.sweep()
         except Exception:
             log.exception("review ask sweep failed")
+        try:
+            invoice_dunning.sweep()
+        except Exception:
+            log.exception("invoice dunning sweep failed")
         try:
             contract_reminders.sweep()
         except Exception:

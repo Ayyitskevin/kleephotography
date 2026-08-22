@@ -66,3 +66,8 @@ def screening_room() -> bool:
 def aerials_live() -> bool:
     """Aerial (drone) deliverables — flips on when the Part 107 cert lands."""
     return bool(config.AERIALS_LIVE)
+
+
+def invoice_dunning_enabled() -> bool:
+    """Client-facing overdue-invoice chasing. Owner-armed; OFF by default."""
+    return bool(config.INVOICE_DUNNING)

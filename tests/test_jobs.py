@@ -648,6 +648,10 @@ def test_hourly_scheduler_runs_the_retention_sweep(monkeypatch):
         (scheduler.ops_monitor, "sweep"),
     ):
         monkeypatch.setattr(module, name, lambda: None)
+    dunned = []
+    # A stub that records the call: unwiring the dunning sweep from _loop must
+    # fail HERE, not silently stop chasing invoices with green CI.
+    monkeypatch.setattr(scheduler.invoice_dunning, "sweep", lambda: dunned.append(True))
     pruned = []
 
     def _prune() -> int:
@@ -663,3 +667,4 @@ def test_hourly_scheduler_runs_the_retention_sweep(monkeypatch):
     finally:
         scheduler._stop.clear()
     assert pruned == [True]
+    assert dunned == [True], "the dunning sweep must ride the hourly loop"
