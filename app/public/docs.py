@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import db, security
+from .. import db, proposal_notify, security
 from ..render import templates
 from . import telemetry
 
@@ -59,6 +59,9 @@ def accept_proposal(request: Request, slug: str):
         "UPDATE proposals SET status='accepted', accepted_at=datetime('now') WHERE id=?", (d["id"],)
     )
     log.info("proposal %s ACCEPTED from %s", d["id"], security.client_ip(request))
+    # Owner nudge rides the job queue AFTER the commit and never raises — a down
+    # notify channel must not fail the client's acceptance (app/proposal_notify.py).
+    proposal_notify.enqueue_decision(d["id"], "accepted")
     if request.headers.get("hx-request") == "true":
         return templates.TemplateResponse(
             request, "public/_proposal_state.html", {"d": _proposal_or_404(slug)}
@@ -79,6 +82,8 @@ def decline_proposal(request: Request, slug: str):
         raise HTTPException(status_code=400, detail="proposal is not open")
     db.run("UPDATE proposals SET status='declined' WHERE id=?", (d["id"],))
     log.info("proposal %s declined from %s", d["id"], security.client_ip(request))
+    # Same shape as accept: staged, post-commit, can never fail the client's action.
+    proposal_notify.enqueue_decision(d["id"], "declined")
     if request.headers.get("hx-request") == "true":
         return templates.TemplateResponse(
             request, "public/_proposal_state.html", {"d": _proposal_or_404(slug)}
