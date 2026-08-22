@@ -94,6 +94,8 @@ def test_prints_count_spans_devices_and_excludes_other_visitors(notified):
     laptop request carry different visitor_ids — the gate email is the only
     cross-device identity. Another guest's picks stay out of the headline count
     and surface in the gallery-wide line instead of inflating the requester's.
+    The form email arrives mixed-case (stored gate emails are lowercase), and
+    the same client's favourites in ANOTHER gallery stay out of both numbers.
     """
     slug, gid = _gallery()
     a1, a2, a3 = _asset(gid, 1), _asset(gid, 2), _asset(gid, 3)
@@ -102,9 +104,12 @@ def test_prints_count_spans_devices_and_excludes_other_visitors(notified):
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (phone, a2))
     guest = _visitor(gid, email="guest@example.com")  # someone else entirely
     db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (guest, a3))
+    _, gid2 = _gallery()  # the same client's picks in a PREVIOUS gallery
+    other = _visitor(gid2, email="buyer@example.com")
+    db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (other, _asset(gid2, 9)))
     with TestClient(app) as c:  # the laptop: fresh PIN admission, no picks of its own
         c.post(f"/g/{slug}/pin", data={"pin": "1234"}, follow_redirects=False)
-        r = c.post(f"/g/{slug}/prints", data={"email": "buyer@example.com"}, follow_redirects=False)
+        r = c.post(f"/g/{slug}/prints", data={"email": "Buyer@Example.com"}, follow_redirects=False)
         assert r.status_code == 303
     q = db.one("SELECT * FROM inquiries WHERE kind='prints' ORDER BY id DESC LIMIT 1")
     assert "2 favorites circled by buyer@example.com" in q["message"]
