@@ -238,3 +238,27 @@ def test_contract_sign_stages_no_decision_notify(client, monkeypatch):
         db.run("DELETE FROM contracts WHERE id=?", (did,))
         db.run("DELETE FROM projects WHERE id=?", (pid,))
         db.run("DELETE FROM clients WHERE id=?", (cid,))
+
+
+def test_notify_is_staged_only_after_the_decision_committed(client, monkeypatch):
+    """Ordering pin: the enqueue runs AFTER the decision row is durable.
+
+    Enqueue-first plus a transient failure on the UPDATE would nudge Kevin
+    about a decision that never committed — the probe asserts the row already
+    reads 'accepted' at the moment the job is staged."""
+    freeze_job_pool(monkeypatch)
+    slug, did, pid, cid = _seed_proposal()
+    seen: list[str] = []
+
+    def probe(kind, payload):
+        row = db.one("SELECT status FROM proposals WHERE id=?", (payload["proposal_id"],))
+        seen.append(row["status"])
+        return 1
+
+    monkeypatch.setattr(jobs, "enqueue", probe)
+    try:
+        r = client.post(f"/p/{slug}/accept", follow_redirects=False)
+        assert r.status_code == 303
+        assert seen == ["accepted"]
+    finally:
+        _cleanup(did, pid, cid)

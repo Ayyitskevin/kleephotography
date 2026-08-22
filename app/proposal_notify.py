@@ -37,9 +37,12 @@ DECISIONS = ("accepted", "declined")
 def enqueue_decision(proposal_id: int, decision: str) -> int | None:
     """Stage the owner notification for a committed accept/decline.
 
-    NEVER raises: the client's decision is already committed, and losing the
-    nudge must cost a log line (the board still shows it), not a 500 on the
-    client's response."""
+    NEVER raises: the client's decision is already committed, so an enqueue
+    failure costs a log line, never a 500 on the client's response. One honest
+    window remains: a process death between the decision's commit and this
+    INSERT loses the nudge with no log line at all (the board still shows the
+    decision). That matches the inquiry-notify precedent; money paths close
+    the same window with in-transaction jobs.stage() instead — see pay.py."""
     try:
         return jobs.enqueue(
             "proposal_decision_notify", {"proposal_id": proposal_id, "decision": decision}
