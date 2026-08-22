@@ -19,6 +19,9 @@ from app import config, db
 from app.main import app
 
 JPEG = b"\xff\xd8\xff" + b"x" * 4000
+JPEG_B = (
+    b"\xff\xd8\xff" + b"y" * 4000
+)  # distinct bytes: a wrong-sibling-path bug must fail the content assert
 
 
 @pytest.fixture
@@ -33,7 +36,7 @@ def gallery():
     # Two originals: an ASCII filename and a non-ASCII one (the RFC 5987 axis).
     # `stored` stays ASCII on disk either way — disposition reads `filename`.
     (orig / "a.jpg").write_bytes(JPEG)
-    (orig / "b.jpg").write_bytes(JPEG)
+    (orig / "b.jpg").write_bytes(JPEG_B)
     for filename, stored in (("dish-one.jpg", "a.jpg"), ("café menü.jpg", "b.jpg")):
         db.run(
             "INSERT INTO assets (gallery_id,kind,filename,stored,bytes,status) "

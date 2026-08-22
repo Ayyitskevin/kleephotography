@@ -177,7 +177,10 @@ def download_asset(request: Request, slug: str, asset_id: int):
     a nameless "file" instead of an image the share sheet can put in Photos.
     Same gates and per-visitor download log as every sibling route; the 304
     path (http_cache) means a re-save of bytes the client already holds costs
-    nothing — and logs nothing, because no file was delivered.
+    nothing — and logs nothing, because no file was delivered. A fully-fresh
+    cache hit inside the 24h window is the same class (browser serves it, no
+    server hit, no row) — the log counts deliveries, not saves. Any request
+    that DOES reach the server re-runs every gate before the 304 branch.
     """
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
