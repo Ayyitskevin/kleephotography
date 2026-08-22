@@ -18,7 +18,7 @@ what MISE sent — a copy mailed from Kevin's own client leaves no row.
 import pytest
 from fastapi.testclient import TestClient
 
-from app import db
+from app import config, db
 from app.main import app
 
 BADGE = "data-no-send-recorded"
@@ -29,7 +29,7 @@ def admin_client():
     with TestClient(app) as client:
         response = client.post(
             "/admin/login",
-            data={"password": "test-pw"},
+            data={"password": config.ADMIN_PASSWORD},
             follow_redirects=False,
         )
         assert response.status_code == 303
