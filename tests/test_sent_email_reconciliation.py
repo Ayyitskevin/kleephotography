@@ -196,6 +196,13 @@ def test_a_fresh_sent_mark_gets_a_day_of_grace_on_home_but_not_on_the_doc(
     assert f"no_send:invoice:{studio_docs['invoice']}" not in keys
     page = admin_client.get(f"/admin/studio/invoices/{studio_docs['invoice']}")
     assert BADGE in page.text
+    # …and the grace is a DAY, not longer: two days out, the nudge is back.
+    db.run(
+        "UPDATE invoices SET sent_at=datetime('now', '-2 days') WHERE id=?",
+        (studio_docs["invoice"],),
+    )
+    keys = _no_send_keys(admin_client.get("/admin/home").context)
+    assert f"no_send:invoice:{studio_docs['invoice']}" in keys
 
 
 @pytest.mark.integration

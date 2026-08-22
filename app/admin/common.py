@@ -60,10 +60,12 @@ def open_invoice_balance():
 def doc_emails_on_record(doc_kind: str, doc_id: int) -> int:
     """How many sends Mise has on record for one studio doc.
 
-    emails_log is written only by the in-app "Email to client" send (after SMTP
-    succeeds), so it is the complete record of what MISE sent — and nothing
-    more. A copy Kevin mailed from his own client, or a link he texted, leaves
-    no row here. Callers therefore say "no send recorded", never "never sent".
+    For doc_kind 'proposal'/'contract'/'invoice', emails_log rows come only
+    from the in-app "Email to client" send (after SMTP succeeds) — the table
+    itself has other writers (gallery delivery, inbox replies) but they write
+    doc_kind 'other', so the filter below is load-bearing. A copy Kevin mailed
+    from his own client, or a link he texted, leaves no row here. Callers
+    therefore say "no send recorded", never "never sent".
     The three doc detail pages and the Home no-send nudge all read this one
     query so they can never disagree about the same doc."""
     return db.one(
