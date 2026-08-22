@@ -276,14 +276,34 @@ def request_prints(
     email = (email or visitor["email"] or "").strip().lower()
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="an email is needed for the quote")
+    # Count the REQUESTER's favourites, not the gallery's. A visitor row is
+    # minted per device (every PIN success), so `f.visitor_id=?` alone would
+    # miss the phone picks behind a laptop request — the gate email is the only
+    # cross-device identity. Match it, plus the device making this request
+    # (whose fresh row may carry no email yet); DISTINCT so a photo circled on
+    # two devices counts once. Picks from a device that never left an email are
+    # unattributable, so the gallery-wide total rides along whenever it differs.
     favs = db.one(
-        "SELECT COUNT(*) AS n FROM favorites f JOIN assets a ON a.id=f.asset_id "
-        "WHERE a.gallery_id=?",
+        "SELECT COUNT(DISTINCT f.asset_id) AS n FROM favorites f "
+        "JOIN visitors v ON v.id=f.visitor_id "
+        "WHERE v.gallery_id=? AND (v.id=? OR v.email=?)",
+        (g["id"], visitor["id"], email),
+    )["n"]
+    total = db.one(
+        "SELECT COUNT(DISTINCT f.asset_id) AS n FROM favorites f "
+        "JOIN assets a ON a.id=f.asset_id WHERE a.gallery_id=?",
         (g["id"],),
     )["n"]
     note = note.strip()[:1000]
     plural = "s" if favs != 1 else ""
-    lines = [f'Print request from gallery "{g["title"]}" — {favs} favorite{plural} circled.']
+    lines = [
+        f'Print request from gallery "{g["title"]}" — {favs} favorite{plural} circled by {email}.'
+    ]
+    if total != favs:
+        lines.append(
+            f"Gallery-wide: {total} favorite{'s' if total != 1 else ''} circled "
+            "across all visitors."
+        )
     if note:
         lines.append(f"Their note: {note}")
     lines.append(f"Gallery: {config.BASE_URL}/g/{g['slug']}")

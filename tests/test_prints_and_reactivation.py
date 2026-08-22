@@ -47,6 +47,22 @@ def _gallery(expired=False):
     return slug, db.one("SELECT id FROM galleries WHERE slug=?", (slug,))["id"]
 
 
+def _asset(gid, n=0):
+    return db.run(
+        "INSERT INTO assets (gallery_id, kind, filename, stored, status) "
+        "VALUES (?,'photo',?,?,'ready')",
+        (gid, f"p{n}.jpg", f"p{n}.jpg"),
+    )
+
+
+def _visitor(gid, email=None):
+    vid = db.run(
+        "INSERT INTO visitors (gallery_id, token, email) VALUES (?,?,?)",
+        (gid, f"t-{time.time_ns()}", email),
+    )
+    return vid
+
+
 @pytest.fixture
 def notified(monkeypatch):
     ids = []
@@ -68,6 +84,56 @@ def test_prints_request_creates_inquiry_and_notifies(notified):
     assert q["email"] == "buyer@example.com"
     assert "two 16x20s framed" in q["message"]
     assert f"/admin/galleries/{gid}" in q["message"]
+    assert notified == [q["id"]]
+
+
+def test_prints_count_spans_devices_and_excludes_other_visitors(notified):
+    """G1: the quote email counts the REQUESTER's favourites, not the gallery's.
+
+    A new visitor row is minted on every PIN success, so phone picks and a
+    laptop request carry different visitor_ids — the gate email is the only
+    cross-device identity. Another guest's picks stay out of the headline count
+    and surface in the gallery-wide line instead of inflating the requester's.
+    """
+    slug, gid = _gallery()
+    a1, a2, a3 = _asset(gid, 1), _asset(gid, 2), _asset(gid, 3)
+    phone = _visitor(gid, email="buyer@example.com")  # circled here days ago
+    db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (phone, a1))
+    db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (phone, a2))
+    guest = _visitor(gid, email="guest@example.com")  # someone else entirely
+    db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (guest, a3))
+    with TestClient(app) as c:  # the laptop: fresh PIN admission, no picks of its own
+        c.post(f"/g/{slug}/pin", data={"pin": "1234"}, follow_redirects=False)
+        r = c.post(f"/g/{slug}/prints", data={"email": "buyer@example.com"}, follow_redirects=False)
+        assert r.status_code == 303
+    q = db.one("SELECT * FROM inquiries WHERE kind='prints' ORDER BY id DESC LIMIT 1")
+    assert "2 favorites circled by buyer@example.com" in q["message"]
+    assert "3 favorites circled across all visitors" in q["message"]
+    assert notified == [q["id"]]
+
+
+def test_prints_count_dedupes_devices_and_counts_the_ungated_one(notified):
+    """The requesting device's picks count even though its freshly minted
+    visitor row never got a gate email, and a photo circled on two devices is
+    one favourite, not two. With nothing left unattributed, the gallery-wide
+    line stays out of the email."""
+    slug, gid = _gallery()
+    a1, a2 = _asset(gid, 1), _asset(gid, 2)
+    phone = _visitor(gid, email="buyer@example.com")
+    db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (phone, a1))
+    with TestClient(app) as c:
+        c.post(f"/g/{slug}/pin", data={"pin": "1234"}, follow_redirects=False)
+        # the row the PIN check just minted — no email on it, ever
+        laptop = db.one(
+            "SELECT id FROM visitors WHERE gallery_id=? ORDER BY id DESC LIMIT 1", (gid,)
+        )["id"]
+        db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (laptop, a1))
+        db.run("INSERT INTO favorites (visitor_id, asset_id) VALUES (?,?)", (laptop, a2))
+        r = c.post(f"/g/{slug}/prints", data={"email": "buyer@example.com"}, follow_redirects=False)
+        assert r.status_code == 303
+    q = db.one("SELECT * FROM inquiries WHERE kind='prints' ORDER BY id DESC LIMIT 1")
+    assert "2 favorites circled by buyer@example.com" in q["message"]
+    assert "across all visitors" not in q["message"]
     assert notified == [q["id"]]
 
 
