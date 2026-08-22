@@ -115,7 +115,22 @@ control: pause the check at the service (or set a 1-minute grace) and confirm th
 notification actually reaches you. The failure mode of a dead-man's switch is
 that it was never wired to a channel anyone reads.
 
-## Still open
+## Off-host DR — check, don't assume
 
-Off-host DR (workstream G2) — see [`BACKUP.md`](BACKUP.md). Monitoring tells you
-the host died; it does not give you a second copy to restore from.
+Monitoring tells you the host died; it does not give you a second copy to restore
+from. That second copy is stage 3 — nightly encrypted restic plus a monthly
+restore-verify — and it **exists in code** ([`DR.md`](DR.md),
+[`BACKUP.md`](BACKUP.md)). It is opt-in, so whether *this* host runs it is a
+question with an answer, not an assumption:
+
+```sh
+sudo grep -c '^RESTIC_REPOSITORY=' /opt/mise/.env   # 0 = stage 3 skips: no off-host copy
+command -v restic || echo 'restic NOT installed — stage 3 cannot run here'
+systemctl is-enabled mise-offsite.timer mise-restore-verify.timer   # not-found = never installed
+```
+
+Two dead-man's switches cover the armed case (`MISE_OFFSITE_PING_URL` nightly,
+`MISE_RESTORE_VERIFY_PING_URL` on a ~5-week period). Neither covers the unarmed
+one, and neither does leg 3: the backup ping fires from the stage-2-skipped exit
+path as well, so a green switch proves the nightly *ran*, never that it copied the
+files or shipped them off the host. Run the checks.

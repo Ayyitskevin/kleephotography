@@ -71,13 +71,36 @@ not constitute disaster recovery: fire, theft, or the host being lost takes
 everything.
 
 **Stage 3 closes that**: a nightly client-side-encrypted push to an off-host
-repository, plus a monthly restore-verify that proves the data actually comes
-back. Runbook: [`DR.md`](DR.md). It is opt-in like stage 2 — until
-`RESTIC_REPOSITORY` is set, the job skips loudly and this host has no off-host
-copy. A replacement off-host sink (second machine or
-object store) plus an automated restore-verify is **pending and tracked**; until it
-lands, treat "we have backups" as "we can undo a mistake," not "we can survive losing
-the host."
+repository ([`offsite-backup.sh`](offsite-backup.sh)), plus a monthly
+restore-verify that proves the data actually comes back
+([`restore-verify.sh`](restore-verify.sh)). Runbook: [`DR.md`](DR.md).
+
+**The chain exists in code; whether a given host runs it is a separate question.**
+Stage 2 and stage 3 are both opt-in, and an unarmed stage does not fail — it skips
+and the run still exits 0. Worse for a casual reader: the backup ping fires from
+the stage-2-skipped exit path too, so a **green dead-man's switch does not prove
+the files were copied** ([`MONITORING.md`](MONITORING.md)). Never infer the armed
+state; check it:
+
+```sh
+sudo grep -c '^MISE_FILE_BACKUP_DIR=' /opt/mise/.env   # 0 = stage 2 skips: db only
+sudo grep -c '^RESTIC_REPOSITORY='    /opt/mise/.env   # 0 = stage 3 skips: no off-host copy
+command -v restic || echo 'restic NOT installed — stage 3 cannot run here'
+# the units ship in ops/ but are inert until installed and enabled (DR.md):
+systemctl is-enabled mise-offsite.timer mise-restore-verify.timer   # not-found = never installed
+# what the last run actually did, in its own words:
+journalctl -u mise-backup.service -n 30 --no-pager | grep -E 'stage[12]'
+```
+
+Read that last one carefully. Every run prints a stage-2 line — `stage2 ok:` or
+`stage2 SKIPPED:`. **No stage-2 line at all** means neither: the host is running a
+`backup.sh` that predates the stage, i.e. the deploy tree is behind `main`. Check
+with `git -C /opt/mise log -1` and see [`DEPLOY.md`](DEPLOY.md); a unit file also
+only picks up `EnvironmentFile` after it is reinstalled and `daemon-reload`ed.
+
+Until those checks come back armed on *this* host, treat "we have backups" as "we
+can undo a mistake," not "we can survive losing the host" — and treat the monthly
+restore-verify as unproven, because skipping is not passing.
 
 An earlier two-machine pull-and-verify chain existed and was retired when production
 moved hosts (verifying a frozen copy protects nothing). The lesson worth keeping — the
@@ -85,9 +108,10 @@ off-host sink has to be a *different* box from the origin of truth, and the copy
 only real once a scripted restore has proven it — is why stage 3 ships with
 `restore-verify.sh` rather than trusting `restic check` alone.
 
-Because the gap is open, the red-light rules in [`AGENTS.md`](../AGENTS.md) do real
-work: a nightly snapshot is not a license to run an unreviewed migration or a live
-money change.
+Whenever that gap is open — and the checks above are the only way to know it is not
+— the red-light rules in [`AGENTS.md`](../AGENTS.md) do real work. Even fully armed,
+a nightly snapshot is not a license to run an unreviewed migration or a live money
+change.
 
 ## Restore (manual)
 

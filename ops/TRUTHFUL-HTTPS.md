@@ -34,11 +34,34 @@ provider changes.
 
 2. Before editing `/opt/mise/.env`, preserve it outside the deploy tree in a
    timestamped, root-readable `0600` backup. Verify the backup exists without
-   printing its contents. There is **no off-machine restore proof to confirm** —
-   the two-machine chain was retired when production moved hosts and its
-   replacement is still an open gap ([`BACKUP.md`](BACKUP.md)). The nightly
-   snapshot covers `mise.db` and nothing else, so copy `receipts/` — and any
-   other durable directory this change could touch — off the host by hand first.
+   printing its contents.
+
+   Then establish **what this host actually has**, rather than assuming either
+   way. The durable-file stage (`media/`, `brand/`, `receipts/`) and the off-host
+   restic stage both exist in code — [`backup.sh`](backup.sh) stage 2 and
+   [`DR.md`](DR.md) stage 3 — and both are **opt-in**: each skips when its
+   environment variable is unset, and a skipped stage still exits 0 and still
+   pings the dead-man's switch, so a green monitor does **not** prove the files
+   were copied. Run these before you mutate anything:
+
+   ```sh
+   # armed or not? (0 = that stage will skip tonight)
+   sudo grep -c '^MISE_FILE_BACKUP_DIR=' /opt/mise/.env   # stage 2: media/, brand/, receipts/
+   sudo grep -c '^RESTIC_REPOSITORY='    /opt/mise/.env   # stage 3: off-host, encrypted
+   command -v restic || echo 'restic NOT installed — stage 3 cannot run here'
+   systemctl is-enabled mise-offsite.timer mise-restore-verify.timer  # not-found = never installed
+   # ground truth — what the last run actually did:
+   journalctl -u mise-backup.service -n 30 --no-pager | grep -E 'stage[12]'
+   ```
+
+   If stage 2 is not armed, the nightly covers `mise.db` and nothing else. If the
+   journal shows **no stage-2 line at all** — neither `stage2 ok:` nor
+   `stage2 SKIPPED:` — the deploy tree is running a `backup.sh` from before the
+   stage existed; check `git -C /opt/mise log -1` against `main`. If stage 3 is
+   not armed (or `restic` is missing, or the timers report `not-found`), there is
+   **no off-host copy and no restore proof** — arm it per [`DR.md`](DR.md), or
+   copy `receipts/` and any other durable directory this change could touch off
+   the host by hand before proceeding.
 
 3. Perform a read-only inventory before deciding what to change:
 
