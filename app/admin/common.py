@@ -57,6 +57,21 @@ def open_invoice_balance():
     )
 
 
+def doc_emails_on_record(doc_kind: str, doc_id: int) -> int:
+    """How many sends Mise has on record for one studio doc.
+
+    emails_log is written only by the in-app "Email to client" send (after SMTP
+    succeeds), so it is the complete record of what MISE sent — and nothing
+    more. A copy Kevin mailed from his own client, or a link he texted, leaves
+    no row here. Callers therefore say "no send recorded", never "never sent".
+    The three doc detail pages and the Home no-send nudge all read this one
+    query so they can never disagree about the same doc."""
+    return db.one(
+        "SELECT COUNT(*) AS n FROM emails_log WHERE doc_kind=? AND doc_id=?",
+        (doc_kind, doc_id),
+    )["n"]
+
+
 def collected_by_month() -> dict[str, dict[str, int]]:
     """Cash collected per YYYY-MM from Stripe payment events (the source of
     truth for revenue — an invoice total stamped by paid_at counts a

@@ -51,7 +51,14 @@ def invoice_detail(request: Request, invoice_id: int):
     return templates.TemplateResponse(
         request,
         "admin/invoice.html",
-        {"d": d, "p": p, "rows": rows, "payments": payments, "base_url": config.BASE_URL},
+        {
+            "d": d,
+            "p": p,
+            "rows": rows,
+            "payments": payments,
+            "base_url": config.BASE_URL,
+            "email_sends": common.doc_emails_on_record("invoice", invoice_id),
+        },
     )
 
 

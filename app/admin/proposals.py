@@ -357,7 +357,15 @@ def proposal_detail(request: Request, proposal_id: int):
     items = json.loads(d["line_items"])
     rows = items + [{} for _ in range(max(0, MAX_ITEM_ROWS - len(items)))]
     return templates.TemplateResponse(
-        request, "admin/proposal.html", {"d": d, "p": p, "rows": rows, "base_url": config.BASE_URL}
+        request,
+        "admin/proposal.html",
+        {
+            "d": d,
+            "p": p,
+            "rows": rows,
+            "base_url": config.BASE_URL,
+            "email_sends": common.doc_emails_on_record("proposal", proposal_id),
+        },
     )
 
 

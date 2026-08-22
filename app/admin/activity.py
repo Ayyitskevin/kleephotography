@@ -45,7 +45,7 @@ def palette_data():
 # testimonials nudge); we allowlist the prefix so a stray POST can't pollute
 # the table with junk keys that would never match a real nudge anyway.
 _NUDGE_PREFIXES = frozenset(
-    {"inv_overdue", "inq_reply", "retainer_send", "prop_followup", "testimonials_review"}
+    {"inv_overdue", "inq_reply", "no_send", "retainer_send", "prop_followup", "testimonials_review"}
 )
 
 

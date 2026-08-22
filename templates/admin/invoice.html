@@ -133,7 +133,9 @@
         <span class="inv-label">Status</span>
         <ol class="inv-steps">
           <li class="inv-step is-done"><span>1</span><div><strong>Created</strong><small>{% if d.created_at %}{{ d.created_at[:10] }}{% else %}Draft ready{% endif %}</small></div></li>
-          <li class="inv-step {% if d.sent_at or d.status != 'draft' %}is-done{% else %}is-current{% endif %}"><span>2</span><div><strong>Sent</strong><small>{% if d.sent_at %}{{ d.sent_at[:10] }}{% else %}Not sent yet{% endif %}</small></div></li>
+          {# "no send recorded": marked sent, never viewed, and no emails_log row —
+             Mise never emailed it, so the client may not have received it. #}
+          <li class="inv-step {% if d.sent_at or d.status != 'draft' %}is-done{% else %}is-current{% endif %}"><span>2</span><div><strong>Sent</strong><small>{% if d.sent_at %}{{ d.sent_at[:10] }}{% if d.status == 'sent' and not email_sends %} · <span class="warn" data-no-send-recorded>no send recorded</span>{% endif %}{% else %}Not sent yet{% endif %}</small></div></li>
           <li class="inv-step {% if d.viewed_at or d.status in ('viewed','deposit_paid','paid') %}is-done{% endif %}"><span>3</span><div><strong>Viewed</strong><small>{% if d.viewed_at %}{{ d.viewed_at[:10] }}{% else %}Awaiting client{% endif %}</small></div></li>
           <li class="inv-step {% if d.status == 'paid' %}is-done{% elif d.status == 'deposit_paid' %}is-current{% endif %}"><span>4</span><div><strong>Paid</strong><small>{% if d.paid_at %}{{ d.paid_at[:10] }}{% elif d.status == 'deposit_paid' %}Deposit received{% else %}Balance open{% endif %}</small></div></li>
         </ol>

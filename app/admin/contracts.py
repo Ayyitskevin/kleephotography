@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, security
 from ..render import templates
+from . import common
 from .lookups import get_project
 
 log = logging.getLogger("mise.admin.contracts")
@@ -127,7 +128,14 @@ def contract_detail(request: Request, contract_id: int):
     d = get_contract(contract_id)
     p = get_project(d["project_id"])
     return templates.TemplateResponse(
-        request, "admin/contract.html", {"d": d, "p": p, "base_url": config.BASE_URL}
+        request,
+        "admin/contract.html",
+        {
+            "d": d,
+            "p": p,
+            "base_url": config.BASE_URL,
+            "email_sends": common.doc_emails_on_record("contract", contract_id),
+        },
     )
 
 

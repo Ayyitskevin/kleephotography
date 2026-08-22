@@ -405,6 +405,53 @@ def _ctx_next_steps(dismissed_today: set, today_iso: str) -> list:
                 "url": "/admin/inbox",
             }
         )
+    # "Mark sent" and "email it" are two separate acts, and nothing else
+    # reconciles them: a doc can sit marked `sent` that Mise never emailed, and
+    # a proposal the client never received cannot convert. Surface the
+    # discrepancy — display-only, NEVER auto-send. `status='sent'` means the
+    # client link was never opened (public/docs.py owns the viewed transition),
+    # and no emails_log row means no send FROM MISE is on record — a copy sent
+    # from Kevin's own mail client is invisible here, so the wording claims "no
+    # send recorded", never "never sent". The day of grace covers the normal
+    # flow (mark sent, then email from the same page minutes later) without
+    # nagging; both timestamps are UTC. The doc page badge has no grace.
+    for r in db.all_(
+        """SELECT 'proposal' AS kind, pr.id AS doc_id, pr.title, pr.sent_at,
+                  c.name AS client_name, c.company,
+                  '/admin/studio/proposals/' || pr.id AS url
+           FROM proposals pr JOIN projects p ON p.id=pr.project_id
+           JOIN clients c ON c.id=p.client_id
+           WHERE pr.status='sent' AND pr.sent_at <= datetime('now', '-1 day')
+             AND NOT EXISTS (SELECT 1 FROM emails_log e
+                             WHERE e.doc_kind='proposal' AND e.doc_id=pr.id)
+         UNION ALL
+           SELECT 'contract', ct.id, ct.title, ct.sent_at, c.name, c.company,
+                  '/admin/studio/contracts/' || ct.id
+           FROM contracts ct JOIN projects p ON p.id=ct.project_id
+           JOIN clients c ON c.id=p.client_id
+           WHERE ct.status='sent' AND ct.sent_at <= datetime('now', '-1 day')
+             AND NOT EXISTS (SELECT 1 FROM emails_log e
+                             WHERE e.doc_kind='contract' AND e.doc_id=ct.id)
+         UNION ALL
+           SELECT 'invoice', i.id, i.title, i.sent_at, c.name, c.company,
+                  '/admin/studio/invoices/' || i.id
+           FROM invoices i JOIN projects p ON p.id=i.project_id
+           JOIN clients c ON c.id=p.client_id
+           WHERE i.status='sent' AND i.sent_at <= datetime('now', '-1 day')
+             AND NOT EXISTS (SELECT 1 FROM emails_log e
+                             WHERE e.doc_kind='invoice' AND e.doc_id=i.id)
+         ORDER BY sent_at ASC LIMIT 5"""
+    ):
+        who = r["company"] or r["client_name"]
+        next_steps.append(
+            {
+                "tone": "warn",
+                "key": f"no_send:{r['kind']}:{r['doc_id']}",
+                "text": f"No send recorded — {r['kind']} “{r['title']}” · {who} "
+                f"(marked sent {r['sent_at'][:10]}, never emailed from Mise)",
+                "url": r["url"],
+            }
+        )
     for r in db.all_(
         """SELECT p.id, p.title, c.name AS client_name, c.company
            FROM projects p JOIN clients c ON c.id=p.client_id
