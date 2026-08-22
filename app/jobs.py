@@ -29,6 +29,7 @@ from . import (
     notion_sync,
     plutus_recommend,
     presets,
+    proposal_notify,
     video,
 )
 
@@ -324,6 +325,9 @@ HANDLERS = {
     "notion_sync_gallery": lambda p: notion_sync.sync_gallery(p["gallery_id"]),
     "notion_sync_inquiry": lambda p: notion_sync.sync_inquiry(p["inquiry_id"]),
     "inquiry_owner_email": lambda p: inquiry_notify.deliver_owner_email(p["inquiry_id"]),
+    "proposal_decision_notify": lambda p: proposal_notify.deliver_decision(
+        p["proposal_id"], p["decision"]
+    ),
     "announcement_email": lambda p: announcements.deliver(
         p["announcement_id"], p["email"], p.get("name", "")
     ),
