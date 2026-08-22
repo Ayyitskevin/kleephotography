@@ -10,6 +10,9 @@
 >
 > - **Workstream G in full.** Every item is red-light under `AGENTS.md` and needs Kevin.
 >   G1/G2 (media + off-host backup) are still the only existential risk in the project.
+>   **Exception: G9 (and its B7 origin) is CLOSED — do not implement.** It was tried
+>   and rejected in `bebf436`; it locks the owner out of `/admin/login`, and
+>   `tests/test_ratelimit_admin_bypass.py` now guards against re-deriving it.
 > - **B6** (TTL-cache the per-render template globals). **Closed — do not implement.**
 >   Skipped first with evidence: a plain cross-render TTL breaks three smoke tests that
 >   pin an admin write reflecting immediately, and doing it safely needs write-side
@@ -270,7 +273,7 @@ The D is the headline. Everything else is polish on a strong base.
   connections per render); TTL pattern already at `app/render.py:13-30`.
 - **Do:** TTL-cache both (60s is plenty).
 
-### B7. Rate limiter: only check `is_admin` when over limit — LOW **[RED — see G9]**
+### B7. Rate limiter: only check `is_admin` when over limit — **CLOSED / WON'T DO** (see G9)
 - **Misclassified here.** This brief filed B7 as green because the change is a pure
   reorder inside `ratelimit.check` that never opens `security.py`. That reasoning is
   wrong: `AGENTS.md` puts "rate-limit/lockout" in the red-light list by *subject*, not
@@ -278,7 +281,9 @@ The D is the headline. Everything else is polish on a strong base.
   side a change sits on, treat it as red". Reordering when the admin bypass is
   consulted changes who gets metered, which is exactly the class of change that rule
   exists to gate.
-- Moved to Workstream G as **G9**; do not implement it in a green commit.
+- Moved to Workstream G as **G9**, then **rejected outright** in `bebf436` — it locks
+  the owner out of `/admin/login`. Do not implement it in any commit, green or red;
+  the reasoning and the regression guard are recorded under G9.
 
 ### B8. Retention sweeps — LOW
 - **Where:** new hourly task alongside `app/scheduler.py` consumers; `jobs` and
@@ -614,18 +619,28 @@ The D is the headline. Everything else is polish on a strong base.
   After confirming cert coverage per `ops/TRUTHFUL-HTTPS.md`, raise to ≥15552000,
   no `includeSubDomains`/preload yet. Add a dated owner task so it can't idle again.
 
-### G9. Rate limiter: only check `is_admin` when over limit — LOW (moved from B7)
-- **Where:** `app/ratelimit.py:55-77` — `security.is_admin` does a DB read on the
-  event loop for every rate-limited request that carries an admin cookie, including
-  the overwhelming majority that are nowhere near the limit.
-- **Do:** compute the sliding window first; consult `is_admin` only in the branch that
-  would actually block. The DB read drops from per-request to per-429.
-- **Why it is red:** it changes when the admin bypass is evaluated, i.e. who gets
-  metered — `AGENTS.md` gates rate-limit/lockout by subject regardless of which file
-  the diff touches.
-- **Accept:** existing rate-limit tests green, plus one asserting an admin cookie
-  still bypasses at the limit boundary and one asserting an anonymous client is still
-  metered identically.
+### G9. Rate limiter: only check `is_admin` when over limit — **CLOSED / WON'T DO** (was: LOW, moved from B7)
+- **Do not implement this.** It was implemented, it failed, and it was rejected in
+  `bebf436` ("security: ratchet HSTS to 180 days; document why the rate-limiter
+  reorder is unsafe"). Read that commit message before reopening the idea.
+- **The failure mode in one sentence:** deferring the `is_admin` check to the limit
+  boundary lets admin requests land in the sliding window while under the limit, so
+  Kevin's own HTMX-partial-heavy admin browsing fills the `(ip, "admin")` bucket
+  during an ordinary minute and `/admin/login` then answers 429 the moment his
+  session expires — locking the owner out of his own admin exactly when a deploy or
+  a session expiry sends him there.
+- **The guard:** `tests/test_ratelimit_admin_bypass.py` is kept precisely to stop a
+  re-derivation — `test_admin_traffic_does_not_meter_a_later_anonymous_login` fails
+  if the check moves. Seven tests caught it the first time.
+- **The saving was not worth it:** one indexed SELECT on requests that already carry
+  an admin cookie. `security.is_admin` returns `False` without touching the database
+  when there is no cookie, so public traffic never paid for it. Every variant that
+  avoids metering admins (bucket keyed on cookie presence, skipping the append on
+  cookie presence, caching the lookup) either hands an attacker a free or doubled
+  allowance or weakens session revocation.
+- **The code is correct as written** — the `is_admin` short-circuit stays at the top
+  of `ratelimit.check` (`app/ratelimit.py:56`). If this brief and that code ever
+  disagree again, the code wins.
 
 ### G8. Money-path notes (flag only — Kevin decides)
 - **Stripe 409 retry storm:** `app/public/pay.py:216-232` answers settled/mismatch
