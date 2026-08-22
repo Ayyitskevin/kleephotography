@@ -8,7 +8,9 @@ job queue — and useless for the ones that matter most: a host that is powered
 off, a container that wedged, a tunnel that dropped, a process that died at 3am.
 
 In all of those, **nothing sends anything, and silence reads exactly like
-health**. This is the R21 problem applied to the monitoring itself.
+health**. That is the fleet doctrine's verification rule — an empty log or a clean
+journal proves nothing on its own; "no errors" is where verification starts, not
+where it ends — applied to the monitoring itself.
 
 The fix is to invert the direction. The host emits a signal on a schedule and
 something *off* the host alerts when the signal stops.
