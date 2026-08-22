@@ -445,6 +445,14 @@ ANNIVERSARY_NUDGE_DAYS = int(os.environ.get("MISE_ANNIVERSARY_NUDGE_DAYS", "335"
 WEEKLY_DIGEST = _b("MISE_WEEKLY_DIGEST", "true")
 DIGEST_HOUR = int(os.environ.get("MISE_DIGEST_HOUR", "7"))
 
+# Invoice dunning (enhancement brief R1): the overdue-invoice chase emails to
+# CLIENTS at due+3 / due+7 / due+14. OFF by default and only armed here — a
+# deploy never starts emailing clients about money until Kevin flips this,
+# which keeps the manual-send doctrine honest (he sent the invoice; arming
+# this only delegates the chasing). Notification-only either way: the sweep
+# never touches payments or invoice status.
+INVOICE_DUNNING = _b("MISE_INVOICE_DUNNING", "false")
+
 # How long an unpaid pay-to-book hold keeps its slot before the sweeper releases
 # it (minutes). Long enough to type card details twice; short enough that an
 # abandoned checkout cannot squat on a mini-session slot all afternoon.

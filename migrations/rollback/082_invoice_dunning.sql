@@ -1,0 +1,14 @@
+-- Rollback for 082_invoice_dunning.sql — no-op on purpose, matching the house
+-- shape for send trackers (074/076/077).
+--
+-- invoice_dunning is NOT money data: no amounts, no payments state, nothing
+-- Stripe knows about. A DROP here would not destroy financial records — this
+-- is not the 046/050 shape ops/MIGRATIONS.md warns about. The table is still
+-- left in place because dropping it forgets which overdue invoices were
+-- already chased, and the next armed sweep would re-send the highest open
+-- dunning stage to every still-overdue invoice.
+--
+-- Reverting the app (or leaving MISE_INVOICE_DUNNING unset — the default) is
+-- the whole rollback: nothing else reads this table. A deliberate full
+-- removal is `DROP TABLE invoice_dunning;` AFTER the feature is disarmed.
+SELECT 1;
