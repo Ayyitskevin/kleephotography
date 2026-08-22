@@ -1045,10 +1045,12 @@
   font: 600 .78rem/1 var(--sans); letter-spacing: .04em; cursor: pointer;
 }html[data-theme="dark"] .site-body .motion-sound[aria-pressed="true"] {
   background: var(--accent-lt); border-color: var(--accent-lt); color: #0e1319;
-}/* Lightbox web-MP4 chip — sits beside the original-download arrow. */.lightbox .lb-dl-mp4 {
+}/* Lightbox web-MP4 + Save chips — sit beside the original-download arrow.
+   (.lb-save is the mobile save-to-Photos button; lightbox.js reveals it only
+   where the Web Share API can hand a file over.) */.lightbox .lb-dl-mp4, .lightbox .lb-save {
   font: 700 .68rem/1 var(--sans, sans-serif); letter-spacing: .05em;
   color: #fff; text-decoration: none; align-self: center;
   border: 1px solid rgba(255, 255, 255, .45); border-radius: 999px; padding: 6px 10px;
-}.lightbox .lb-dl-mp4:hover { background: rgba(255, 255, 255, .15); }.lightbox .lb-dl-mp4[hidden] { display: none; }/* The meta bar is pointer-events:none by design (clicks pass through to the
+}.lightbox .lb-dl-mp4:hover, .lightbox .lb-save:hover { background: rgba(255, 255, 255, .15); }.lightbox .lb-dl-mp4[hidden], .lightbox .lb-save[hidden] { display: none; }/* The meta bar is pointer-events:none by design (clicks pass through to the
    video); interactive children opt back in — same move as .motion-feature-link.
    Found via real click testing: without this the video ate the button's clicks. */html[data-theme="dark"] .site-body .motion-sound { pointer-events: auto; }

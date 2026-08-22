@@ -215,6 +215,10 @@
     <button class="lb-play" aria-label="Slideshow" aria-pressed="false">&#9654;</button>
     <button class="lb-fav" aria-label="Favorite">&#9825;</button>
     <a class="lb-dl" aria-label="Download original" href="#">&#8595;</a>
+    {# Ships hidden; lightbox.js reveals it for stills where the Web Share API
+       can hand a file over (iOS/Android), so the client's original lands in
+       Photos instead of the Files app. Same gated URL as the arrow beside it. #}
+    <button type="button" class="lb-save" aria-label="Save photo to device" hidden>Save</button>
     <a class="lb-dl-mp4" aria-label="Download web-ready MP4" href="#" hidden>MP4</a>
   </div>
   <div class="lb-comments" hidden>

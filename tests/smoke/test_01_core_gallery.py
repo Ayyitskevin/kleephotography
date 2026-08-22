@@ -304,9 +304,12 @@ def test_full_gallery_flow(admin):
             follow_redirects=False,
         )
         assert r.status_code == 303
-        # single download works now
+        # single download works now — real image type (the share-sheet save
+        # path needs it; octet-stream made the blob a nameless "file"), still
+        # an attachment with the client's filename
         r = pub.get(f"/g/{g['slug']}/download/asset/{a['id']}")
-        assert r.status_code == 200 and r.headers["content-type"] == "application/octet-stream"
+        assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+        assert r.headers["content-disposition"] == 'attachment; filename="dish.jpg"'
         # Range request honored (email now on file)
         r = pub.get(f"/media/{g['slug']}/original/{a['id']}", headers={"Range": "bytes=0-99"})
         assert r.status_code == 206 and len(r.content) == 100

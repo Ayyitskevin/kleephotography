@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+import mimetypes
 import re
 import shutil
 from pathlib import Path
@@ -10,6 +11,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from .. import config, db, jobs, security, zip_cache
+from ..http_cache import conditional_file
 from ..render import templates
 from .gallery import get_live_gallery, is_expired
 
@@ -167,6 +169,16 @@ def capture_email(
 
 @router.get("/{slug}/download/asset/{asset_id}")
 def download_asset(request: Request, slug: str, asset_id: int):
+    """One original, as an attachment — the per-file save path.
+
+    This is the route the lightbox Save button fetches on phones, where a
+    multi-hundred-MB ZIP is exactly what iOS Safari handles worst. The real
+    media type matters there: `application/octet-stream` made the shared blob
+    a nameless "file" instead of an image the share sheet can put in Photos.
+    Same gates and per-visitor download log as every sibling route; the 304
+    path (http_cache) means a re-save of bytes the client already holds costs
+    nothing — and logs nothing, because no file was delivered.
+    """
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download?asset_id={asset_id}", status_code=303)
@@ -178,11 +190,14 @@ def download_asset(request: Request, slug: str, asset_id: int):
     path = config.MEDIA_DIR / str(g["id"]) / "original" / a["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
-    db.run(
-        "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,?)",
-        (g["id"], visitor["id"], asset_id),
-    )
-    return FileResponse(path, filename=a["filename"], media_type="application/octet-stream")
+    media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+    resp = conditional_file(request, path, media_type, filename=a["filename"])
+    if resp.status_code != 304:
+        db.run(
+            "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,?)",
+            (g["id"], visitor["id"], asset_id),
+        )
+    return resp
 
 
 @router.get("/{slug}/download/web/{asset_id}")

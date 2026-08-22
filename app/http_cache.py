@@ -52,11 +52,17 @@ def conditional_file(
     media_type: str,
     cache_control: str = PRIVATE_24H,
     extra_headers: dict[str, str] | None = None,
+    filename: str | None = None,
 ):
     """FileResponse, or 304 when the client already holds these exact bytes.
 
     The ETag is derived exactly as FileResponse derives it (mtime + size), so a
     tag minted by an earlier response still matches here.
+
+    `filename` rides through to FileResponse, which owns the Content-Disposition
+    grammar (attachment; RFC 5987 `filename*` when the name is not plain ASCII) —
+    download routes get the 304 half without re-deriving that header here. The
+    304 branch omits the disposition on purpose: there is no body to name.
     """
     try:
         st = path.stat()
@@ -79,4 +85,6 @@ def conditional_file(
     if client_copy_is_current(request.headers, etag, last_modified):
         return NotModifiedResponse(Headers(headers))
     # stat_result is handed over so FileResponse does not stat the file again.
-    return FileResponse(path, media_type=media_type, headers=headers, stat_result=st)
+    return FileResponse(
+        path, media_type=media_type, headers=headers, stat_result=st, filename=filename
+    )

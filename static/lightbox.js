@@ -5,7 +5,18 @@
   const favBtn = lb.querySelector(".lb-fav");
   const dlLink = lb.querySelector(".lb-dl");
   const dlMp4 = lb.querySelector(".lb-dl-mp4");
+  const saveBtn = lb.querySelector(".lb-save");
   const playBtn = lb.querySelector(".lb-play");
+  // Save-to-device is only offered where the Web Share API can hand a File to
+  // the OS sheet (iOS/Android — "Save Image" lands the original in Photos,
+  // which a plain attachment download never does; it lands in Files). The
+  // typeof guard keeps the Node contract harness (no navigator) loading.
+  const canShareFiles = (function () {
+    try {
+      return typeof navigator !== "undefined" && !!navigator.canShare &&
+        navigator.canShare({ files: [new File(["x"], "x.jpg", { type: "image/jpeg" })] });
+    } catch (err) { return false; }
+  })();
   const proofLabel = lb.querySelector(".lb-proof");
   const live = lb.querySelector(".lb-live");
   const tiles = Array.from(document.querySelectorAll(".tile"));
@@ -314,6 +325,9 @@
       if (t.dataset.dlWeb) { dlMp4.href = t.dataset.dlWeb; dlMp4.hidden = false; }
       else { dlMp4.hidden = true; dlMp4.href = "#"; }
     }
+    // Save-to-Photos: stills only — piping a multi-GB camera original through
+    // a blob is exactly the transfer this button exists to avoid.
+    if (saveBtn) saveBtn.hidden = !(canShareFiles && t.dataset.dl && t.dataset.kind !== "video");
     stage.innerHTML = "";
     if (t.dataset.kind === "video") {
       const v = document.createElement("video");
@@ -586,4 +600,31 @@
       }
     }
   }, { passive: true });
+
+  // Per-file save (mobile's path around the ZIP). The fetch rides the SAME
+  // gated /download?asset_id= URL the ↓ anchor navigates to, so the PIN
+  // session, email gate and per-visitor download log all apply unchanged. If
+  // the gate intercepts (any non-image response), fall through to a plain
+  // navigation so the visitor actually sees it; ditto when sharing itself
+  // fails. A share sheet the visitor dismissed (AbortError) is not a failure.
+  if (saveBtn) saveBtn.addEventListener("click", async () => {
+    const url = dlLink && dlLink.getAttribute("href");
+    if (!url || url === "#") return;
+    saveBtn.disabled = true;
+    try {
+      const res = await fetch(url);
+      const type = (res.headers.get("content-type") || "").split(";")[0].trim();
+      if (!res.ok || !type.startsWith("image/")) { window.location.href = url; return; }
+      const cd = res.headers.get("content-disposition") || "";
+      const star = cd.match(/filename\*=utf-8''([^;]+)/i);
+      const plain = cd.match(/filename="([^"]+)"/i);
+      const name = star ? decodeURIComponent(star[1]) : plain ? plain[1] : "photo.jpg";
+      const file = new File([await res.blob()], name, { type: type });
+      await navigator.share({ files: [file] });
+    } catch (err) {
+      if (!err || err.name !== "AbortError") window.location.href = url;
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
 })();
