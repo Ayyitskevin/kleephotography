@@ -120,6 +120,60 @@ def test_gallery_settings_rejects_a_non_iso_expiry_and_keeps_empty_as_never(admi
 
 
 @pytest.mark.integration
+def test_transfer_settings_round_trip_the_require_pin_toggle(admin_client):
+    """create_transfer chooses require_pin once; the settings form is the only
+    place to change it afterwards. Checkbox off posts nothing → 0, on → 1."""
+    create = admin_client.post(
+        "/admin/transfers",
+        data={"title": "Toggle drop", "require_pin": "true"},
+        follow_redirects=False,
+    )
+    assert create.status_code == 303
+    gid = int(create.headers["location"].rsplit("/", 1)[-1])
+    try:
+        page = admin_client.get(f"/admin/galleries/{gid}")
+        assert page.status_code == 200
+        assert 'name="require_pin"' in page.text
+
+        row = db.one("SELECT pin, require_pin FROM galleries WHERE id=?", (gid,))
+        assert row["require_pin"] == 1
+        form = {"title": "Toggle drop", "pin": row["pin"]}
+
+        off = admin_client.post(
+            f"/admin/galleries/{gid}/settings", data=form, follow_redirects=False
+        )
+        assert off.status_code == 303
+        assert db.one("SELECT require_pin FROM galleries WHERE id=?", (gid,))["require_pin"] == 0
+
+        on = admin_client.post(
+            f"/admin/galleries/{gid}/settings",
+            data={**form, "require_pin": "true"},
+            follow_redirects=False,
+        )
+        assert on.status_code == 303
+        assert db.one("SELECT require_pin FROM galleries WHERE id=?", (gid,))["require_pin"] == 1
+    finally:
+        db.run("DELETE FROM galleries WHERE id=?", (gid,))
+
+
+@pytest.mark.integration
+def test_gallery_settings_leave_require_pin_alone(admin_client, gallery):
+    """Regular galleries render no require_pin control (their PIN gate is
+    unconditional), so a routine settings save must not zero the stored 1."""
+    page = admin_client.get(f"/admin/galleries/{gallery}")
+    assert page.status_code == 200
+    assert 'name="require_pin"' not in page.text
+
+    saved = admin_client.post(
+        f"/admin/galleries/{gallery}/settings",
+        data={"title": "Misc gallery", "pin": "1234"},
+        follow_redirects=False,
+    )
+    assert saved.status_code == 303
+    assert db.one("SELECT require_pin FROM galleries WHERE id=?", (gallery,))["require_pin"] == 1
+
+
+@pytest.mark.integration
 def test_task_board_offers_a_confirm_guarded_delete(admin_client):
     tid = db.run("INSERT INTO tasks (title) VALUES (?)", ("Deletable board task",))
     try:

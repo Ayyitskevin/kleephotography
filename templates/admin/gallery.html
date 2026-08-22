@@ -347,6 +347,11 @@
         <label>Expires <input type="date" name="expires_at" value="{{ g.expires_at or '' }}"></label>
         {% if is_drop %}
         <input type="hidden" name="published" value="true">
+        {# create_transfer sets require_pin once; this is the only place it can
+           be changed afterwards. Drops only — a regular gallery's PIN gate is
+           unconditional (app/public/gallery.py view), so no toggle there. #}
+        <label class="row"><input type="checkbox" name="require_pin" value="true"
+               {% if g.require_pin %}checked{% endif %}> Require PIN (unchecked = anyone with the link)</label>
         {% else %}
         <label class="row"><input type="checkbox" name="published" value="true"
                {% if g.published %}checked{% endif %}> Published</label>

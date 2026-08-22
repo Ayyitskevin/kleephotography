@@ -525,6 +525,7 @@ def update_gallery(
     pin: str = Form(...),
     expires_at: str = Form(""),
     published: bool = Form(False),
+    require_pin: bool = Form(False),
     client_id: int | None = Form(None),
     project_id: int | None = Form(None),
     captions: str = Form(""),
@@ -549,9 +550,13 @@ def update_gallery(
     # Changing the expiry date re-arms the one-shot expiry reminder so the new
     # date re-reminds the client (see gallery_reminders); an unchanged date keeps it.
     reminded_expiry = 0 if new_exp != old["expires_at"] else old["reminded_expiry"]
+    # The require_pin checkbox renders only for drops (the one type whose gate
+    # reads it — see _view_drop). A regular gallery's form posts no such field,
+    # so an absent value must KEEP the stored column, not zero it on every save.
+    new_require_pin = (1 if require_pin else 0) if old["type"] == "drop" else old["require_pin"]
     db.run(
         """UPDATE galleries SET title=?, client_name=?, pin=?, expires_at=?,
-              published=?, client_id=?, project_id=?, captions=?,
+              published=?, require_pin=?, client_id=?, project_id=?, captions=?,
               cs_published=?, cs_tagline=?, cs_brief=?, cs_credits=?, cs_location=?,
               reminded_expiry=?
               WHERE id=?""",
@@ -561,6 +566,7 @@ def update_gallery(
             pin,
             new_exp,
             1 if published else 0,
+            new_require_pin,
             client_id,
             project_id,
             captions.strip() or None,
