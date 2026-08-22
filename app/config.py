@@ -1,5 +1,6 @@
 """Mise configuration — env-driven, .env loaded if present (systemd uses EnvironmentFile)."""
 
+import math
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -92,10 +93,30 @@ BUSINESS_PHONE = (os.environ.get("MISE_BUSINESS_PHONE") or "").strip() or None
 BUSINESS_HOURS = tuple(
     h.strip() for h in (os.environ.get("MISE_BUSINESS_HOURS") or "").split(",") if h.strip()
 )
+
+
+def _parse_coord(name: str, raw: str) -> float:
+    # float() alone accepts "nan"/"inf", which would ship literally invalid
+    # JSON-LD ("latitude": NaN) — the one malformed-number class that does NOT
+    # fail json.dumps. Reject the whole class here, loudly, naming the var.
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"{name} is not a decimal-degrees number: {raw!r}") from None
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be a finite coordinate, got: {raw!r}")
+    return value
+
+
 _business_lat = (os.environ.get("MISE_BUSINESS_LAT") or "").strip()
 _business_lng = (os.environ.get("MISE_BUSINESS_LNG") or "").strip()
 BUSINESS_GEO = (
-    (float(_business_lat), float(_business_lng)) if _business_lat and _business_lng else None
+    (
+        _parse_coord("MISE_BUSINESS_LAT", _business_lat),
+        _parse_coord("MISE_BUSINESS_LNG", _business_lng),
+    )
+    if _business_lat and _business_lng
+    else None
 )
 # Optional filename under /static for the About page studio portrait
 # (e.g. about-portrait.jpg). Empty = auto-detect about-portrait.{jpg,jpeg,png,webp}

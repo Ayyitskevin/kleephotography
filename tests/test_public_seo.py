@@ -525,3 +525,14 @@ def test_local_business_schema_publishes_the_configured_facts(client, monkeypatc
         "latitude": 35.5,
         "longitude": -82.5,
     }
+
+
+def test_a_malformed_coordinate_fails_loud_and_names_the_variable():
+    """The geo envs are optional, but a typo must die at startup naming the
+    var — never ship broken structured data. float() alone would wave
+    "nan"/"inf" through and emit literally invalid JSON-LD, so the finite
+    check is load-bearing."""
+    assert config._parse_coord("MISE_BUSINESS_LAT", "35.595") == 35.595
+    for bad in ("35.59.51", "35,5", "nan", "inf", "-inf"):
+        with pytest.raises(ValueError, match="MISE_BUSINESS_LAT"):
+            config._parse_coord("MISE_BUSINESS_LAT", bad)
