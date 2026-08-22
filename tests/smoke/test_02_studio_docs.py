@@ -350,6 +350,15 @@ def test_invoice_lifecycle(admin, monkeypatch):
 
         # webhook with signature verification
         monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+        db.run(
+            """UPDATE invoices
+                  SET stripe_session_id='cs_evt_dep_1',
+                      stripe_checkout_amount_cents=50000,
+                      stripe_checkout_kind='deposit',
+                      stripe_checkout_currency='usd'
+                WHERE id=?""",
+            (d["id"],),
+        )
         body = _checkout_event("evt_dep_1", d["id"], "deposit", 50000)
         assert (
             pub.post(
@@ -376,6 +385,15 @@ def test_invoice_lifecycle(admin, monkeypatch):
         assert db.one("SELECT COUNT(*) AS n FROM payments WHERE invoice_id=?", (d["id"],))["n"] == 1
 
         # balance payment settles the invoice
+        db.run(
+            """UPDATE invoices
+                  SET stripe_session_id='cs_evt_bal_1',
+                      stripe_checkout_amount_cents=65100,
+                      stripe_checkout_kind='balance',
+                      stripe_checkout_currency='usd'
+                WHERE id=?""",
+            (d["id"],),
+        )
         body = _checkout_event("evt_bal_1", d["id"], "balance", 65100)
         r = pub.post(
             "/webhooks/stripe",

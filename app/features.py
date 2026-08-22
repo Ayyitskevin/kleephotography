@@ -30,6 +30,10 @@ def telegram_enabled() -> bool:
     return bool(config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID)
 
 
+def healthz_detail_enabled() -> bool:
+    return bool(config.HEALTHZ_TOKEN)
+
+
 def sms_enabled() -> bool:
     """Quo / OpenPhone SMS."""
     return bool(config.QUO_API_KEY and config.QUO_NUMBER)

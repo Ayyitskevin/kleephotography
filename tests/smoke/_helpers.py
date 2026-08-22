@@ -143,6 +143,7 @@ def _checkout_event(
                     "object": "checkout.session",
                     "payment_status": payment_status,
                     "amount_total": amount,
+                    "currency": "usd",
                     "metadata": {"invoice_id": str(invoice_id), "kind": kind},
                 }
             },

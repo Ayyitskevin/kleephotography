@@ -16,6 +16,7 @@ from datetime import UTC
 import pytest
 from fastapi.testclient import TestClient
 
+from app import config
 from app.main import app
 
 
@@ -25,9 +26,24 @@ def client():
         yield c
 
 
+_HZ_TOKEN = "healthz-test-token"
+
+
+def _hz_auth(monkeypatch):
+    monkeypatch.setattr(config, "HEALTHZ_TOKEN", _HZ_TOKEN)
+    return {"Authorization": f"Bearer {_HZ_TOKEN}"}
+
+
 @pytest.mark.integration
-def test_healthz(client):
+def test_healthz_public_body_is_minimal(client):
     r = client.get("/healthz")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+
+
+@pytest.mark.integration
+def test_healthz_full_payload_with_bearer(client, monkeypatch):
+    r = client.get("/healthz", headers=_hz_auth(monkeypatch))
     body = r.json()
     assert r.status_code == 200 and body["ok"] is True
     assert body["db_connected"] is True
@@ -36,6 +52,15 @@ def test_healthz(client):
     assert isinstance(body["disk_free_gb"], float)
     assert isinstance(body["backup_present"], bool)
     assert "backup_age_hours" in body
+
+
+@pytest.mark.integration
+def test_healthz_rejects_wrong_or_disarmed_bearer(client, monkeypatch):
+    monkeypatch.setattr(config, "HEALTHZ_TOKEN", _HZ_TOKEN)
+    assert client.get("/healthz", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    monkeypatch.setattr(config, "HEALTHZ_TOKEN", "")
+    assert client.get("/healthz", headers={"Authorization": "Bearer anything"}).status_code == 503
+    assert client.get("/healthz").json() == {"ok": True}
 
 
 @pytest.mark.integration
@@ -52,8 +77,10 @@ def test_healthz_returns_503_only_for_database_failure(client, monkeypatch):
     monkeypatch.setattr(db, "one", fail_probe)
     r = client.get("/healthz")
     assert r.status_code == 503
-    assert r.json()["ok"] is False
-    assert r.json()["db_connected"] is False
+    assert r.json() == {"ok": False}
+    detailed = client.get("/healthz", headers=_hz_auth(monkeypatch))
+    assert detailed.status_code == 503
+    assert detailed.json()["db_connected"] is False
 
 
 @pytest.mark.integration
@@ -71,10 +98,11 @@ def test_healthz_reports_storage_warning_without_failing(client, monkeypatch):
             "backup_stale": True,
         },
     )
-    r = client.get("/healthz")
+    r = client.get("/healthz", headers=_hz_auth(monkeypatch))
     assert r.status_code == 200 and r.json()["ok"] is True
     assert r.json()["disk_low"] is True
     assert r.json()["backup_stale"] is True
+    assert client.get("/healthz").json() == {"ok": True}
 
 
 @pytest.mark.integration

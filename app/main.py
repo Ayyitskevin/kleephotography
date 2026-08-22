@@ -24,6 +24,7 @@ from . import (
     ops_monitor,
     ratelimit,
     scheduler,
+    security,
     service_api,
 )
 from .admin import (
@@ -303,8 +304,13 @@ async def unhandled_errors(request: Request, exc: Exception):
     return JSONResponse({"detail": "internal server error"}, status_code=500)
 
 
+def _healthz_public(payload: dict) -> dict:
+    return {"ok": payload["ok"]}
+
+
 @app.get("/healthz")
-async def healthz():
+async def healthz(request: Request):
+    detail = security.healthz_detail_authorized(request)
     payload = {
         "ok": True,
         "service": "mise",
@@ -329,8 +335,8 @@ async def healthz():
     except Exception:
         log.exception("healthz database check failed")
         payload["ok"] = False
-        return JSONResponse(payload, status_code=503)
-    return payload
+        return JSONResponse(payload if detail else _healthz_public(payload), status_code=503)
+    return payload if detail else _healthz_public(payload)
 
 
 for r in (

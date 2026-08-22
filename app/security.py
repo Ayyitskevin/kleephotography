@@ -284,6 +284,19 @@ def require_argus_token(request: Request) -> None:
         raise HTTPException(status_code=401, detail="bad token")
 
 
+def healthz_detail_authorized(request: Request) -> bool:
+    """Return whether a caller may see detailed operational health fields."""
+    header = request.headers.get("Authorization", "")
+    if not header:
+        return False
+    if not features.healthz_detail_enabled():
+        raise HTTPException(status_code=503, detail="healthz detail disarmed")
+    expected = f"Bearer {config.HEALTHZ_TOKEN}"
+    if not secrets.compare_digest(header, expected):
+        raise HTTPException(status_code=401, detail="bad token")
+    return True
+
+
 def require_shots_token(request: Request) -> None:
     """Bearer gate for the shot-list read API (config.SHOTS_TOKEN).
 

@@ -279,6 +279,10 @@ RATE_LIMITS = {
 TELEGRAM_TOKEN = os.environ.get("MISE_TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("MISE_TELEGRAM_CHAT_ID", "")
 
+# Bearer that unlocks detailed operational fields on /healthz. Unset keeps the
+# public liveness response available while making the detail unreachable.
+HEALTHZ_TOKEN = os.environ.get("MISE_HEALTHZ_TOKEN", "")
+
 # Refuse uploads when free disk drops below this (GB) — fail loud, not full.
 MIN_FREE_GB = int(os.environ.get("MISE_MIN_FREE_GB", "10"))
 
