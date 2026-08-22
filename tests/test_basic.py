@@ -670,25 +670,33 @@ def test_static_asset_cache_and_font_preload_identity(client):
 
     # Font filenames carry a version infix so they can be cached forever.
     # Preload URLs must be byte-for-byte identical so the browser can reuse
-    # each preload for the later @font-face request.
-    font_urls = (
+    # each preload for the later @font-face request. The marketing shell also
+    # preloads the Newsreader italic — every site page paints it (sr-beat and
+    # friends) and it is the largest font shipped (147 KB); the admin shell
+    # stays at two (italic there is one reference page, not worth the bytes).
+    site_font_urls = (
+        "/static/fonts/newsreader-latin.v1.woff2",
+        "/static/fonts/archivo-latin.v1.woff2",
+        "/static/fonts/newsreader-italic-latin.v1.woff2",
+    )
+    admin_font_urls = (
         "/static/fonts/newsreader-latin.v1.woff2",
         "/static/fonts/archivo-latin.v1.woff2",
     )
-    for url in font_urls:
+    for url in site_font_urls:  # superset of admin_font_urls
         font = client.get(url)
         assert font.status_code == 200
         assert font.headers["cache-control"] == "public, max-age=31536000, immutable"
         assert f"url({url})" in fonts_css
 
-    def assert_font_preloads(page):
+    def assert_font_preloads(page, font_urls):
         assert page.count('rel="preload" href="/static/fonts/') == len(font_urls)
         for url in font_urls:
             tag = f'<link rel="preload" href="{url}" as="font" type="font/woff2" crossorigin>'
             assert page.count(tag) == 1
 
     home = client.get("/").text
-    assert_font_preloads(home)
+    assert_font_preloads(home, site_font_urls)
 
     from app import config
 
@@ -698,7 +706,7 @@ def test_static_asset_cache_and_font_preload_identity(client):
     assert login.status_code == 303
     admin = client.get("/admin/home")
     assert admin.status_code == 200
-    assert_font_preloads(admin.text)
+    assert_font_preloads(admin.text, admin_font_urls)
 
     # non-static responses must NOT get the immutable header
     assert "immutable" not in client.get("/healthz").headers.get("cache-control", "")
