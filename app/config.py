@@ -81,6 +81,22 @@ SITE_NAME = os.environ.get("MISE_SITE_NAME", "Kevin Lee Photography")
 INSTAGRAM_URL = os.environ.get("MISE_INSTAGRAM_URL") or None
 # Optional Google Business Profile URL for LocalBusiness sameAs (schema.org).
 GOOGLE_BUSINESS_URL = os.environ.get("MISE_GOOGLE_BUSINESS_URL") or None
+# Optional LocalBusiness entity facts for the marketing pages' JSON-LD
+# (templates/site/_schema_local.html). Unset = the matching property is OMITTED
+# from the markup — a real value comes from env, never invented in code.
+# Phone: E.164 recommended (+1XXXXXXXXXX). Hours: comma-separated schema.org
+# openingHours tokens ("Mo-Fr 09:00-17:00,Sa 10:00-14:00"). Geo: BOTH lat and
+# lng (decimal degrees) or the pair stays off; a malformed number fails loud at
+# startup rather than shipping broken structured data.
+BUSINESS_PHONE = (os.environ.get("MISE_BUSINESS_PHONE") or "").strip() or None
+BUSINESS_HOURS = tuple(
+    h.strip() for h in (os.environ.get("MISE_BUSINESS_HOURS") or "").split(",") if h.strip()
+)
+_business_lat = (os.environ.get("MISE_BUSINESS_LAT") or "").strip()
+_business_lng = (os.environ.get("MISE_BUSINESS_LNG") or "").strip()
+BUSINESS_GEO = (
+    (float(_business_lat), float(_business_lng)) if _business_lat and _business_lng else None
+)
 # Optional filename under /static for the About page studio portrait
 # (e.g. about-portrait.jpg). Empty = auto-detect about-portrait.{jpg,jpeg,png,webp}
 # if present; otherwise the page falls back to the newest starred portfolio still.

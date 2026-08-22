@@ -2,12 +2,16 @@
    og_img is set locally: the base template's og block {% set %} is invisible
    here (Jinja block scoping), so relying on it silently dropped the image
    field on every page. sameAs lists optional Instagram / Google Business
-   Profile URLs when configured. #}
+   Profile URLs when configured. telephone / openingHours / geo publish only
+   when the matching MISE_BUSINESS_* env is set (app/config.py) — an absent
+   fact drops the property, never an invented value. #}
 {% set og_img = og_image_id() %}
+{% set geo = business_geo() %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "ProfessionalService",
+  "@id": {{ (base_url ~ "/#business")|tojson }},
   "name": {{ site_name|tojson }},
   "url": {{ base_url|tojson }},
   "description": "Photography and film studio in Asheville, NC — real estate photography and walkthrough video, portrait and lifestyle sessions, and food and beverage photography and videography for restaurants, cafés, bars, and food brands.",
@@ -26,7 +30,10 @@
     {"@type": "Place", "name": "Raleigh, NC"},
     {"@type": "Place", "name": "Wilmington, NC"}
   ],
-  "priceRange": "$$"{% if og_img %},
+  "priceRange": "$$"{% if business_phone() %},
+  "telephone": {{ business_phone()|tojson }}{% endif %}{% if business_hours() %},
+  "openingHours": {{ business_hours()|tojson }}{% endif %}{% if geo %},
+  "geo": {"@type": "GeoCoordinates", "latitude": {{ geo[0]|tojson }}, "longitude": {{ geo[1]|tojson }}}{% endif %}{% if og_img %},
   "image": {{ (base_url ~ "/site/img/" ~ og_img)|tojson }}{% endif %}{% if contact_email %},
   "email": {{ contact_email|tojson }}{% endif %},
   "sameAs": [{% if instagram_url %}{{ instagram_url|tojson }}{% if google_business_url %}, {% endif %}{% endif %}{% if google_business_url %}{{ google_business_url|tojson }}{% endif %}]

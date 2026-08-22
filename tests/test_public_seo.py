@@ -483,3 +483,45 @@ def test_share_debugger_previews_the_og_image_the_pages_actually_emit(client, po
     assert home["og_image_id"] == newest, "the debugger is previewing a different frame"
     # And the live page agrees.
     assert f"/site/img/{newest}" in client.get("/").text
+
+
+def _local_business_payload(markup: str) -> dict:
+    """The ProfessionalService JSON-LD block a marketing page carries.
+
+    json.loads is part of the assertion: the template splices optional
+    properties with hand-placed commas, so a conditional that mis-nests
+    breaks the whole payload, not just one field.
+    """
+    for block in re.findall(
+        r'<script type="application/ld\+json">\s*(.*?)\s*</script>', markup, re.S
+    ):
+        payload = json.loads(block)
+        if isinstance(payload, dict) and payload.get("@type") == "ProfessionalService":
+            return payload
+    raise AssertionError("no ProfessionalService JSON-LD on the page")
+
+
+def test_local_business_schema_has_an_entity_id_and_omits_unconfigured_facts(client):
+    payload = _local_business_payload(client.get("/contact").text)
+    # A stable @id lets other structured data (reviews, articles) point at the
+    # business as one entity across pages.
+    assert payload["@id"] == config.BASE_URL + "/#business"
+    # No MISE_BUSINESS_* is set in the test env: each fact must DROP its
+    # property — never publish "", null, or an invented value.
+    for absent in ("telephone", "openingHours", "geo"):
+        assert absent not in payload
+
+
+def test_local_business_schema_publishes_the_configured_facts(client, monkeypatch):
+    monkeypatch.setattr(config, "BUSINESS_PHONE", "+18285550100")
+    monkeypatch.setattr(config, "BUSINESS_HOURS", ("Mo-Fr 09:00-17:00", "Sa 10:00-14:00"))
+    monkeypatch.setattr(config, "BUSINESS_GEO", (35.5, -82.5))
+
+    payload = _local_business_payload(client.get("/contact").text)
+    assert payload["telephone"] == "+18285550100"
+    assert payload["openingHours"] == ["Mo-Fr 09:00-17:00", "Sa 10:00-14:00"]
+    assert payload["geo"] == {
+        "@type": "GeoCoordinates",
+        "latitude": 35.5,
+        "longitude": -82.5,
+    }

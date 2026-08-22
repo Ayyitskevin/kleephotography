@@ -87,6 +87,12 @@ templates.env.globals["has_press_features"] = _has_press_features
 templates.env.globals["instagram_url"] = config.INSTAGRAM_URL
 templates.env.globals["google_business_url"] = config.GOOGLE_BUSINESS_URL
 templates.env.globals["contact_email"] = config.CONTACT_EMAIL
+# LocalBusiness facts for the marketing JSON-LD. Callables (not frozen values)
+# so they read current config per render — tests monkeypatch app.config
+# BUSINESS_* and see it stick, same idiom as the feature flags below.
+templates.env.globals["business_phone"] = lambda: config.BUSINESS_PHONE
+templates.env.globals["business_hours"] = lambda: config.BUSINESS_HOURS
+templates.env.globals["business_geo"] = lambda: config.BUSINESS_GEO
 templates.env.globals["plausible_domain"] = config.PLAUSIBLE_DOMAIN
 # Callables (not frozen bools) so the flags read current config per render —
 # tests monkeypatch app.config.SCREENING_ROOM / AERIALS_LIVE and see it stick.
