@@ -70,7 +70,15 @@ def test_inquiry_bucket_does_not_lock_gallery_pin():
 def test_admin_session_create_destroy_and_everywhere():
     db.run("DELETE FROM admin_sessions")
     tok = security.create_admin_session()
-    assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (tok,)) is not None
+    assert (
+        db.one(
+            "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+            (security._admin_token_hash(tok),),
+        )
+        is not None
+    )
+    # and the raw token is nowhere at rest
+    assert db.one("SELECT COUNT(*) AS n FROM admin_sessions WHERE token_hash=?", (tok,))["n"] == 0
     # Second session; destroy-all clears every row (logout everywhere).
     security.create_admin_session()
     assert db.one("SELECT COUNT(*) AS n FROM admin_sessions")["n"] == 2

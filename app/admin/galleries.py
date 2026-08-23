@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from .. import (
@@ -20,7 +21,7 @@ from .. import (
     specialties,
     video,
 )
-from ..gallery_comments import cascade_status, resolve_comment_parent, video_comment_thread
+from ..gallery_comments import cascade_status, resolve_comment_parent, video_comment_threads
 from ..render import templates
 from . import common, studio
 
@@ -68,14 +69,64 @@ def get_gallery(gallery_id: int) -> "db.sqlite3.Row":
     return db.get_or_404("SELECT * FROM galleries WHERE id=?", (gallery_id,))
 
 
+def _hero_asset_ids(g: "db.sqlite3.Row") -> set[int]:
+    """Argus's hero picks, stored on the gallery row as a JSON id list."""
+    raw = g["argus_hero_asset_ids"]
+    if not raw:
+        return set()
+    try:
+        return {int(x) for x in json.loads(raw)}
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return set()
+
+
+def _counts_context(g: "db.sqlite3.Row") -> dict:
+    """Everything the out-of-band pills/stats pair reads, and nothing else: the
+    gallery, its sections, the per-section and favorited tallies, and the
+    delivery counters. Grouped in SQL rather than derived from a loaded asset
+    list, so the per-tile forks can re-true the same numbers without paying for
+    the whole bench. _gd_pills.html and _gd_stats.html read exactly these keys."""
+    gallery_id = g["id"]
+    # One row per section (NULL section included) — the pill counts, the bench
+    # total and the favorited total all fall out of it.
+    by_section = db.all_(
+        """SELECT a.section_id AS section_id, COUNT(*) AS n,
+                  SUM(CASE WHEN a.kind='photo' THEN 1 ELSE 0 END) AS n_photo,
+                  SUM(CASE WHEN EXISTS (SELECT 1 FROM favorites f WHERE f.asset_id=a.id)
+                           THEN 1 ELSE 0 END) AS n_fav
+           FROM assets a WHERE a.gallery_id=? GROUP BY a.section_id""",
+        (gallery_id,),
+    )
+    # Honest delivery stats for the gallery header tiles — real rows only.
+    delivery = db.one(
+        """SELECT (SELECT COUNT(*) FROM visitors WHERE gallery_id=?) AS n_views,
+                  (SELECT COUNT(*) FROM downloads WHERE gallery_id=?) AS n_downloads""",
+        (gallery_id, gallery_id),
+    )
+    return {
+        "g": g,
+        "sections": db.all_(
+            "SELECT * FROM sections WHERE gallery_id=? ORDER BY position", (gallery_id,)
+        ),
+        "n_assets": sum(r["n"] for r in by_section),
+        # assets.kind is CHECK-constrained to ('photo','video'), so the stat tile
+        # can name both halves without a third bucket going missing.
+        "n_photo": sum(r["n_photo"] for r in by_section),
+        "n_video": sum(r["n"] - r["n_photo"] for r in by_section),
+        "n_favorited": sum(r["n_fav"] for r in by_section),
+        "section_counts": {r["section_id"]: r["n"] for r in by_section},
+        "n_views": delivery["n_views"],
+        "n_downloads": delivery["n_downloads"],
+    }
+
+
 def _bench_context(g: "db.sqlite3.Row") -> dict:
     """The bench region's context: assets with fav counts, sections, hero
     picks, per-video comment threads, renditions, tag suggestions, and the
-    header delivery stats. Shared by the gallery detail GET and the HX
-    fragment forks (per-tile / bench-level) so a swapped tile or masonry
-    renders exactly like the full page — a rendering fork, never a logic one."""
+    header delivery stats. Shared by the gallery detail GET and the bench-level
+    HX fragment so a swapped masonry renders exactly like the full page — a
+    rendering fork, never a logic one."""
     gallery_id = g["id"]
-    sections = db.all_("SELECT * FROM sections WHERE gallery_id=? ORDER BY position", (gallery_id,))
     assets = db.all_(
         """SELECT a.*,
                         (SELECT COUNT(*) FROM favorites f WHERE f.asset_id=a.id) AS n_fav
@@ -83,12 +134,6 @@ def _bench_context(g: "db.sqlite3.Row") -> dict:
                         ORDER BY a.section_id, a.position, a.id""",
         (gallery_id,),
     )
-    # Visible review-comment threads per video asset (flat, nested in the template).
-    # Single source of truth for "the visible thread" — the same helper the client
-    # gallery uses, so the visibility rule can never drift between the two views.
-    video_comments = {
-        a["id"]: video_comment_thread(a["id"]) for a in assets if a["kind"] == "video"
-    }
     renditions: dict[int, list] = {}
     for r in db.all_(
         """SELECT r.* FROM asset_renditions r JOIN assets a ON a.id = r.asset_id
@@ -96,42 +141,69 @@ def _bench_context(g: "db.sqlite3.Row") -> dict:
         (gallery_id,),
     ):
         renditions.setdefault(r["asset_id"], []).append(r)
-    hero_asset_ids: set[int] = set()
-    raw_heroes = g["argus_hero_asset_ids"]
-    if raw_heroes:
-        try:
-            hero_asset_ids = {int(x) for x in json.loads(raw_heroes)}
-        except (json.JSONDecodeError, TypeError, ValueError):
-            hero_asset_ids = set()
-    # Honest delivery stats for the gallery header tiles — real rows only.
-    n_views = db.one("SELECT COUNT(*) AS n FROM visitors WHERE gallery_id=?", (gallery_id,))["n"]
-    n_downloads = db.one("SELECT COUNT(*) AS n FROM downloads WHERE gallery_id=?", (gallery_id,))[
-        "n"
-    ]
-    return {
-        "g": g,
-        "sections": sections,
-        "assets": assets,
-        "hero_asset_ids": hero_asset_ids,
-        "tag_suggestions": PORTFOLIO_TAG_SUGGESTIONS,
-        "video_comments": video_comments,
-        "renditions": renditions,
-        "n_views": n_views,
-        "n_downloads": n_downloads,
-    }
+    ctx = _counts_context(g)
+    ctx.update(
+        {
+            "assets": assets,
+            "hero_asset_ids": _hero_asset_ids(g),
+            "tag_suggestions": PORTFOLIO_TAG_SUGGESTIONS,
+            # Visible review-comment threads per video asset (flat, nested in the
+            # template). Single source of truth for "the visible thread" — the same
+            # helper the client gallery uses, so the visibility rule can never drift
+            # between the two views. One batched query, not one per video.
+            "video_comments": video_comment_threads(
+                [a["id"] for a in assets if a["kind"] in ("photo", "video")]
+            ),
+            "renditions": renditions,
+        }
+    )
+    return ctx
+
+
+def _tile_context(g: "db.sqlite3.Row", asset_id: int) -> dict:
+    """Slim context for the per-tile HX fork: the one asset being re-rendered
+    plus _counts_context for its out-of-band siblings. Deliberately NOT
+    _bench_context — one click must not cost a whole-bench rebuild, so nothing
+    here scales with gallery size beyond the section list.
+
+    Must stay a superset of what _gd_tile.html reads (g, a, sections,
+    hero_asset_ids, video_comments, renditions) plus what _counts_context
+    covers: a key that goes missing renders as empty in Jinja rather than
+    raising, so a narrowing here is a silent visual regression."""
+    a = db.get_or_404(
+        """SELECT a.*, (SELECT COUNT(*) FROM favorites f WHERE f.asset_id=a.id) AS n_fav
+           FROM assets a WHERE a.id=? AND a.gallery_id=?""",
+        (asset_id, g["id"]),
+    )
+    is_video = a["kind"] == "video"
+    ctx = _counts_context(g)
+    ctx.update(
+        {
+            "a": a,
+            "hero_asset_ids": _hero_asset_ids(g),
+            # Notes exist for stills and films alike; renditions are video-only,
+            # and the tile only reads those there, so a photo action skips that
+            # query but never the thread.
+            "video_comments": video_comment_threads([asset_id]),
+            "renditions": {
+                asset_id: db.all_(
+                    "SELECT * FROM asset_renditions WHERE asset_id=? ORDER BY preset", (asset_id,)
+                )
+            }
+            if is_video
+            else {},
+        }
+    )
+    return ctx
 
 
 def _tile_fragment(request: Request, gallery_id: int, asset_id: int):
     """HX fork for the per-tile actions: re-render the one tile (primary swap
     onto #asset-{id}) plus pills/stats out-of-band (admin/_gd_tile_frag.html),
     so star/section moves re-true the bench counts in the same response."""
-    g = get_gallery(gallery_id)
-    ctx = _bench_context(g)
-    a = next((x for x in ctx["assets"] if x["id"] == asset_id), None)
-    if a is None:
-        raise HTTPException(status_code=404)
-    ctx["a"] = a
-    return templates.TemplateResponse(request, "admin/_gd_tile_frag.html", ctx)
+    return templates.TemplateResponse(
+        request, "admin/_gd_tile_frag.html", _tile_context(get_gallery(gallery_id), asset_id)
+    )
 
 
 def _bench_fragment(request: Request, gallery_id: int):
@@ -143,14 +215,14 @@ def _bench_fragment(request: Request, gallery_id: int):
 
 
 @router.get("")
-async def admin_root():
+def admin_root():
     # Home is the studio landing now; the bare /admin keeps working for old
     # bookmarks and redirects there. Galleries moved to /admin/galleries.
     return RedirectResponse("/admin/home", status_code=307)
 
 
 @router.get("/galleries", response_class=HTMLResponse)
-async def dashboard(request: Request):
+def dashboard(request: Request):
     gs = db.all_("""SELECT g.*,
                     (SELECT COUNT(*) FROM assets a WHERE a.gallery_id=g.id) AS n_assets,
                     (SELECT COUNT(*) FROM assets a WHERE a.gallery_id=g.id
@@ -173,9 +245,10 @@ async def dashboard(request: Request):
                     ORDER BY g.created_at DESC""")
     today = studio._today()
     failed_jobs = db.one("SELECT COUNT(*) AS n FROM jobs WHERE status='failed'")["n"]
-    # Total media bytes feed only the summary strip; per-card sizes were dropped
-    # from the template, so don't build/pass per-gallery dicts.
-    sizes_b = {g["id"]: common.dir_size(config.MEDIA_DIR / str(g["id"])) for g in gs}
+    # Originals only — the strip sums assets.bytes and the template says
+    # "originals" next to it (see common.original_bytes_by_gallery). Per-card
+    # sizes were dropped from the template, so only the total is used here.
+    sizes_b = common.original_bytes_by_gallery("gallery")
     today_iso = today.isoformat()
     # Library roll-up for the summary strip (display-only).
     totals = {
@@ -214,7 +287,7 @@ async def dashboard(request: Request):
 
 
 @router.post("/galleries")
-async def create_gallery(title: str = Form(...), client_name: str = Form("")):
+def create_gallery(title: str = Form(...), client_name: str = Form("")):
     gid = db.run(
         "INSERT INTO galleries (slug, title, client_name, pin) VALUES (?,?,?,?)",
         (security.new_slug(), title.strip(), client_name.strip() or None, security.new_pin()),
@@ -293,7 +366,7 @@ def _transfer_card(g, size: str, today_iso: str, soon_iso: str) -> dict:
 
 
 @router.get("/transfers", response_class=HTMLResponse)
-async def transfers(request: Request):
+def transfers(request: Request):
     ds = db.all_("""SELECT g.*,
                     (SELECT COUNT(*) FROM assets a WHERE a.gallery_id=g.id) AS n_assets,
                     (SELECT COUNT(*) FROM assets a WHERE a.gallery_id=g.id
@@ -304,8 +377,12 @@ async def transfers(request: Request):
     today = dt.date.today()
     today_iso = today.isoformat()
     soon_iso = (today + dt.timedelta(days=3)).isoformat()
-    sizes_b = {g["id"]: common.dir_size(config.MEDIA_DIR / str(g["id"])) for g in ds}
-    cards = [_transfer_card(g, common.fmt_size(sizes_b[g["id"]]), today_iso, soon_iso) for g in ds]
+    # A transfer card's size is what the recipient downloads, and the ZIP is
+    # built from the originals — so assets.bytes is the honest figure there.
+    sizes_b = common.original_bytes_by_gallery("drop")
+    cards = [
+        _transfer_card(g, common.fmt_size(sizes_b.get(g["id"], 0)), today_iso, soon_iso) for g in ds
+    ]
     month_start = today.replace(day=1).isoformat()
     dl_month = db.one(
         """SELECT COUNT(*) AS n FROM downloads d
@@ -318,7 +395,10 @@ async def transfers(request: Request):
         "active": sum(1 for c in cards if c["status"] in ("Active", "Downloaded")),
         "live": sum(1 for g in ds if not (g["expires_at"] and g["expires_at"] < today_iso)),
         "expired": sum(1 for c in cards if c["status"] == "Expired"),
-        "stored": common.fmt_size(sum(sizes_b.values())),
+        # transfers.html renders this verbatim next to the word "stored", which
+        # reads as disk usage — so the qualifier travels with the value rather
+        # than being left implied. Don't repeat it in the template.
+        "stored": f"{common.fmt_size(sum(sizes_b.values()))} of originals",
         "dl_month": dl_month,
     }
     return templates.TemplateResponse(
@@ -329,7 +409,7 @@ async def transfers(request: Request):
 
 
 @router.post("/transfers")
-async def create_transfer(
+def create_transfer(
     title: str = Form(...), expires_days: str = Form(""), require_pin: bool = Form(False)
 ):
     expires_at = None
@@ -355,7 +435,7 @@ async def create_transfer(
 
 
 @router.get("/galleries/{gallery_id}", response_class=HTMLResponse)
-async def gallery_detail(request: Request, gallery_id: int):
+def gallery_detail(request: Request, gallery_id: int):
     g = get_gallery(gallery_id)
     # unique-asset selection counts per section (proofing progress signal for admin)
     section_picks = {
@@ -424,7 +504,7 @@ async def gallery_detail(request: Request, gallery_id: int):
 
 
 @router.post("/galleries/{gallery_id}/link-client")
-async def link_client(gallery_id: int, client_id: int = Form(...)):
+def link_client(gallery_id: int, client_id: int = Form(...)):
     """Quick re-link from the /admin dashboard orphan picker. Validates the
     client exists, then UPDATE galleries SET client_id=?. Re-link only; does
     NOT change anything else about the gallery (use the full settings form for
@@ -438,13 +518,14 @@ async def link_client(gallery_id: int, client_id: int = Form(...)):
 
 
 @router.post("/galleries/{gallery_id}/settings")
-async def update_gallery(
+def update_gallery(
     gallery_id: int,
     title: str = Form(...),
     client_name: str = Form(""),
     pin: str = Form(...),
     expires_at: str = Form(""),
     published: bool = Form(False),
+    require_pin: bool = Form(False),
     client_id: int | None = Form(None),
     project_id: int | None = Form(None),
     captions: str = Form(""),
@@ -458,12 +539,24 @@ async def update_gallery(
     if not (pin.isdigit() and len(pin) == 4):
         raise HTTPException(status_code=400, detail="PIN must be 4 digits")
     new_exp = expires_at.strip() or None
+    if new_exp:
+        # Stored expiries are compared as plain strings against an ISO date
+        # (common.gallery_card, the expiry reminder sweep), so anything that
+        # isn't canonical YYYY-MM-DD silently never expires. Empty = no expiry.
+        try:
+            new_exp = dt.date.fromisoformat(new_exp).isoformat()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="bad expiry date")
     # Changing the expiry date re-arms the one-shot expiry reminder so the new
     # date re-reminds the client (see gallery_reminders); an unchanged date keeps it.
     reminded_expiry = 0 if new_exp != old["expires_at"] else old["reminded_expiry"]
+    # The require_pin checkbox renders only for drops (the one type whose gate
+    # reads it — see _view_drop). A regular gallery's form posts no such field,
+    # so an absent value must KEEP the stored column, not zero it on every save.
+    new_require_pin = (1 if require_pin else 0) if old["type"] == "drop" else old["require_pin"]
     db.run(
         """UPDATE galleries SET title=?, client_name=?, pin=?, expires_at=?,
-              published=?, client_id=?, project_id=?, captions=?,
+              published=?, require_pin=?, client_id=?, project_id=?, captions=?,
               cs_published=?, cs_tagline=?, cs_brief=?, cs_credits=?, cs_location=?,
               reminded_expiry=?
               WHERE id=?""",
@@ -473,6 +566,7 @@ async def update_gallery(
             pin,
             new_exp,
             1 if published else 0,
+            new_require_pin,
             client_id,
             project_id,
             captions.strip() or None,
@@ -517,7 +611,7 @@ async def update_gallery(
 
 
 @router.post("/galleries/{gallery_id}/argus-analyze")
-async def argus_analyze_now(gallery_id: int):
+def argus_analyze_now(gallery_id: int):
     """Manual re-trigger of Argus folder analyze for a published gallery."""
     g = get_gallery(gallery_id)
     if not g["published"]:
@@ -532,7 +626,7 @@ async def argus_analyze_now(gallery_id: int):
 
 
 @router.post("/galleries/{gallery_id}/plutus-recommend")
-async def plutus_recommend_now(gallery_id: int):
+def plutus_recommend_now(gallery_id: int):
     """Manual re-trigger of Plutus print upsell for a published gallery."""
     g = get_gallery(gallery_id)
     if not g["published"]:
@@ -560,7 +654,7 @@ _PRE_DELIVERED_STATUSES = (
 
 
 @router.post("/galleries/{gallery_id}/email")
-async def email_gallery(
+def email_gallery(
     gallery_id: int,
     to: str = Form(...),
     subject: str = Form(...),
@@ -606,10 +700,10 @@ async def email_gallery(
 
 
 @router.get("/thumb/{gallery_id}/{asset_id}")
-async def admin_thumb(gallery_id: int, asset_id: int):
-    a = db.one("SELECT stored FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
-    if not a:
-        raise HTTPException(status_code=404)
+def admin_thumb(gallery_id: int, asset_id: int):
+    a = db.get_or_404(
+        "SELECT stored FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id)
+    )
     path = config.MEDIA_DIR / str(gallery_id) / "thumb" / f"{Path(a['stored']).stem}.jpg"
     if not path.is_file():
         raise HTTPException(status_code=404)
@@ -623,13 +717,20 @@ async def bulk_star_tag(request: Request, gallery_id: int):
     tagging the archive per specialty — one checkbox sweep per batch instead
     of a per-asset gear-menu round trip. Same kind guard as the single-asset
     endpoints; an empty tag leaves existing tags untouched."""
-    get_gallery(gallery_id)
+    await run_in_threadpool(get_gallery, gallery_id)
     form = await request.form()
+    return await run_in_threadpool(_bulk_star_tag, request, form, gallery_id)
+
+
+def _bulk_star_tag(request: Request, form, gallery_id: int):
     tag = (form.get("portfolio_tag") or "").strip()
     unstar = form.get("mode") == "unstar"
+    try:
+        asset_ids = [int(v) for v in form.getlist("asset_ids")]
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="bad asset id")
     with db.tx() as con:
-        for v in form.getlist("asset_ids"):
-            aid = int(v)
+        for aid in asset_ids:
             if unstar:
                 con.execute(
                     "UPDATE assets SET portfolio=0 WHERE id=? AND gallery_id=?",
@@ -653,12 +754,12 @@ async def bulk_star_tag(request: Request, gallery_id: int):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/move")
-async def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: str = Form(...)):
+def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: str = Form(...)):
     if dir not in ("left", "right"):
         raise HTTPException(status_code=400, detail="dir must be left or right")
-    a = db.one("SELECT section_id FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
-    if not a:
-        raise HTTPException(status_code=404)
+    a = db.get_or_404(
+        "SELECT section_id FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id)
+    )
     siblings = db.all_(
         """SELECT id FROM assets WHERE gallery_id=? AND section_id IS ?
                           ORDER BY position, id""",
@@ -679,13 +780,11 @@ async def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: s
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/cover")
-async def set_cover(request: Request, gallery_id: int, asset_id: int):
+def set_cover(request: Request, gallery_id: int, asset_id: int):
     g = get_gallery(gallery_id)
-    a = db.one(
+    db.get_or_404(
         "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='photo'", (asset_id, gallery_id)
     )
-    if not a:
-        raise HTTPException(status_code=404)
     new = None if g["cover_asset_id"] == asset_id else asset_id
     db.run("UPDATE galleries SET cover_asset_id=? WHERE id=?", (new, gallery_id))
     if request.headers.get("hx-request") == "true":
@@ -694,18 +793,16 @@ async def set_cover(request: Request, gallery_id: int, asset_id: int):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/renditions")
-async def build_renditions(request: Request, gallery_id: int, asset_id: int):
+def build_renditions(request: Request, gallery_id: int, asset_id: int):
     """Queue the social-cut renditions (9:16 / 1:1) for a ready video. Idempotent:
     INSERT OR IGNORE per preset; failed rows re-queue as pending so the button
     doubles as a retry. Encoding happens in the job pool off-request."""
     get_gallery(gallery_id)
-    a = db.one(
+    a = db.get_or_404(
         """SELECT * FROM assets WHERE id=? AND gallery_id=?
            AND kind='video' AND status='ready'""",
         (asset_id, gallery_id),
     )
-    if not a:
-        raise HTTPException(status_code=404)
     stem = Path(a["stored"]).stem
     for preset in video.RENDITION_PRESETS:
         db.run(
@@ -724,7 +821,7 @@ async def build_renditions(request: Request, gallery_id: int, asset_id: int):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/portfolio")
-async def toggle_portfolio(request: Request, gallery_id: int, asset_id: int):
+def toggle_portfolio(request: Request, gallery_id: int, asset_id: int):
     db.run(
         "UPDATE assets SET portfolio = 1 - portfolio WHERE id=? AND gallery_id=? AND kind IN ('photo', 'video')",
         (asset_id, gallery_id),
@@ -735,7 +832,7 @@ async def toggle_portfolio(request: Request, gallery_id: int, asset_id: int):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/tag")
-async def set_portfolio_tag(
+def set_portfolio_tag(
     request: Request, gallery_id: int, asset_id: int, portfolio_tag: str = Form("")
 ):
     db.run(
@@ -764,7 +861,7 @@ def _portal_fav_count(gallery_id: int, client_id: int | None) -> int:
 
 
 @router.post("/galleries/{gallery_id}/delete")
-async def delete_gallery(gallery_id: int, force: bool = Form(False)):
+def delete_gallery(gallery_id: int, force: bool = Form(False)):
     g = get_gallery(gallery_id)
     if g["published"] and g["type"] != "drop":
         raise HTTPException(
@@ -799,7 +896,7 @@ async def delete_gallery(gallery_id: int, force: bool = Form(False)):
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/delete")
-async def delete_asset(request: Request, gallery_id: int, asset_id: int):
+def delete_asset(request: Request, gallery_id: int, asset_id: int):
     a = db.one("SELECT * FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
     if a:
         base = config.MEDIA_DIR / str(gallery_id)
@@ -817,17 +914,19 @@ async def delete_asset(request: Request, gallery_id: int, asset_id: int):
             )
     if request.headers.get("hx-request") == "true":
         # no non-oob content — htmx removes the #asset-{id} target on the empty
-        # swap; pills/stats ride out-of-band so the bench counts drop too
-        g = get_gallery(gallery_id)
-        return templates.TemplateResponse(request, "admin/_gd_delete_frag.html", _bench_context(g))
+        # swap; pills/stats ride out-of-band so the bench counts drop too, and
+        # those two are all _counts_context has to feed
+        return templates.TemplateResponse(
+            request, "admin/_gd_delete_frag.html", _counts_context(get_gallery(gallery_id))
+        )
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
-# ── Video review comments (Domain C slice 3) ─────────────────────────────────
+# ── Review comments (Domain C slice 3) — stills and films alike ──────────────
 
 
 @router.post("/galleries/{gallery_id}/comments/{asset_id}")
-async def admin_add_comment(
+def admin_add_comment(
     gallery_id: int,
     asset_id: int,
     body: str = Form(...),
@@ -837,16 +936,20 @@ async def admin_add_comment(
     """Studio-side author path. Admin comments are author_role='admin',
     visitor_id NULL; a reply inherits its parent's timecode."""
     get_gallery(gallery_id)
-    a = db.one(
-        "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='video'", (asset_id, gallery_id)
-    )
-    if not a:
-        raise HTTPException(status_code=404)
+    kind = db.get_or_404(
+        """SELECT kind FROM assets
+           WHERE id=? AND gallery_id=? AND kind IN ('photo','video')""",
+        (asset_id, gallery_id),
+    )["kind"]
     body = body.strip()
     if not body:
         raise HTTPException(status_code=400, detail="comment body required")
     parent, inherited = resolve_comment_parent(asset_id, parent_id)
-    tc = inherited if parent is not None else max(0.0, timecode)
+    # A still has no playhead — mirror the client route and pin its notes at 0.
+    if kind == "photo":
+        tc = 0.0
+    else:
+        tc = inherited if parent is not None else max(0.0, timecode)
     db.run(
         """INSERT INTO video_comments
               (asset_id, gallery_id, parent_id, visitor_id, author_role, timecode, body)
@@ -857,15 +960,13 @@ async def admin_add_comment(
 
 
 @router.post("/comments/{comment_id}/hide")
-async def admin_hide_comment(comment_id: int):
+def admin_hide_comment(comment_id: int):
     """Moderation: soft-delete a comment AND its descendant replies in one
     recursive UPDATE (so no reply dangles under a hidden parent). This is the
     one auditable human act in this slice — logged to audit_log."""
-    c = db.one(
+    c = db.get_or_404(
         "SELECT id, asset_id, gallery_id, author_role FROM video_comments WHERE id=?", (comment_id,)
     )
-    if not c:
-        raise HTTPException(status_code=404)
     with db.tx() as con:
         con.execute(
             """WITH RECURSIVE sub(id) AS (
@@ -925,10 +1026,10 @@ def _transition_comment(comment_id: int, *, want: str, to: str):
 
 
 @router.post("/comments/{comment_id}/resolve")
-async def admin_resolve_comment(comment_id: int):
+def admin_resolve_comment(comment_id: int):
     return _transition_comment(comment_id, want="open", to="resolved")
 
 
 @router.post("/comments/{comment_id}/reopen")
-async def admin_reopen_comment(comment_id: int):
+def admin_reopen_comment(comment_id: int):
     return _transition_comment(comment_id, want="resolved", to="open")

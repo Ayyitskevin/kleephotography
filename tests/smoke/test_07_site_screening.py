@@ -361,7 +361,7 @@ def test_screening_room_rollout_flag(client, monkeypatch):
     # Plex Mono self-hosted, declared alongside the existing families
     fonts = client.get("/static/fonts.css").text
     assert "IBM Plex Mono" in fonts
-    assert client.get("/static/fonts/ibm-plex-mono-500-latin.woff2").status_code == 200
+    assert client.get("/static/fonts/ibm-plex-mono-500-latin.v1.woff2").status_code == 200
 
     # kill switch: flag OFF — sr scope gone, page still renders
     monkeypatch.setattr(config, "SCREENING_ROOM", False)

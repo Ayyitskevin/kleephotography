@@ -28,10 +28,15 @@
 <meta name="twitter:card" content="{{ 'summary_large_image' if og_img else 'summary' }}">
 {% endblock %}
 {# Self-hosted typefaces — no Google Fonts CDN; fonts.css is loaded once for
-   every surface by base.html. These preloads just jump the queue for the two
-   latin files the site paints first. #}
-<link rel="preload" href="/static/fonts/newsreader-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+   every surface by base.html. These preloads just jump the queue for the
+   latin files the site paints first. The Newsreader italic rides along
+   because every marketing page paints it (sr-beat / sr-3up-q / sr-ticket-for
+   / work-pullquote) and at 147 KB it is the largest font on the site — late
+   discovery via fonts.css meant a visible swap on the hero beat. The admin
+   shell keeps its own two-font list: italic there is one reference page. #}
+<link rel="preload" href="/static/fonts/newsreader-latin.v1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/archivo-latin.v1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/newsreader-italic-latin.v1.woff2" as="font" type="font/woff2" crossorigin>
 {% if plausible_domain %}
 <script nonce="{{ csp_nonce }}">window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)};</script>
 {% endif %}
@@ -46,6 +51,9 @@
    film-stock class (sr-re / sr-pl / sr-fb) via the sr_stock block so their
    accent color reads var(--sr-stock). Kill switch: MISE_SCREENING_ROOM=false. #}
 {% block bodyclass %}site-body{% if sr_enabled() %} sr{% block sr_stock %}{% endblock %}{% endif %}{% endblock %}
+{# Its own skip link + #main wrapper below, so the shared one in base.html
+   would be a duplicate. #}
+{% block skip_link %}{% endblock %}
 {% block content %}
 <a class="skip-link" href="#main">Skip to content</a>
 {# Marquee nav (Screening Room 3a): one global link set on every page —

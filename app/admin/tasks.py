@@ -41,7 +41,7 @@ def _task_due_label(due: str | None, today: dt.date) -> tuple[str, bool]:
 
 
 @router.get("/tasks", response_class=HTMLResponse)
-async def tasks_view(request: Request):
+def tasks_view(request: Request):
     """Studio to-do board (strict-1:1 prototype): three columns — Today (due
     today or overdue), This week (every other open task), Done (recently
     completed). Each card toggles done via a POST form; due_date feeds the
@@ -114,7 +114,7 @@ async def tasks_view(request: Request):
 
 
 @router.post("/tasks")
-async def task_create(title: str = Form(...), due_date: str = Form(""), project_id: str = Form("")):
+def task_create(title: str = Form(...), due_date: str = Form(""), project_id: str = Form("")):
     title = title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="title required")
@@ -128,10 +128,8 @@ async def task_create(title: str = Form(...), due_date: str = Form(""), project_
 
 
 @router.post("/tasks/{task_id}/toggle")
-async def task_toggle(task_id: int):
-    t = db.one("SELECT done FROM tasks WHERE id=?", (task_id,))
-    if not t:
-        raise HTTPException(status_code=404, detail="no such task")
+def task_toggle(task_id: int):
+    t = db.get_or_404("SELECT done FROM tasks WHERE id=?", (task_id,), detail="no such task")
     if t["done"]:
         db.run("UPDATE tasks SET done=0, done_at=NULL WHERE id=?", (task_id,))
     else:
@@ -141,9 +139,8 @@ async def task_toggle(task_id: int):
 
 
 @router.post("/tasks/{task_id}/delete")
-async def task_delete(task_id: int):
-    if not db.one("SELECT 1 FROM tasks WHERE id=?", (task_id,)):
-        raise HTTPException(status_code=404, detail="no such task")
+def task_delete(task_id: int):
+    db.get_or_404("SELECT 1 FROM tasks WHERE id=?", (task_id,), detail="no such task")
     db.run("DELETE FROM tasks WHERE id=?", (task_id,))
     log.info("task %s deleted", task_id)
     return RedirectResponse("/admin/tasks", status_code=303)
@@ -163,7 +160,7 @@ _CAL_BUCKET = {
 
 
 @router.get("/calendar", response_class=HTMLResponse)
-async def calendar_view(request: Request, year: int = 0, month: int = 0):
+def calendar_view(request: Request, year: int = 0, month: int = 0):
     """Month grid overlaying three real date sources, bucketed to the prototype's
     legend: shoots (clay), confirmed consults (green), invoices due (gold).
     Read-only — each cell entry links to the project/booking/invoice it represents."""
@@ -218,10 +215,17 @@ async def calendar_view(request: Request, year: int = 0, month: int = 0):
     # Confirmed consultations/bookings — start_utc is UTC; show on Kevin's local
     # day. zoneinfo handles DST. Bookings link to the bookings console.
     tz = ZoneInfo(config.TIMEZONE)
+    # The band is UTC, the grid is local: a full day either side clears the
+    # widest real zone offset (±14h), so a booking on a month edge is still
+    # fetched and the local-day check below is what decides its cell.
+    band_lo = (first - dt.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+    band_hi = (last + dt.timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")
     for r in db.all_(
         """SELECT b.id, b.name, b.start_utc, e.name AS event_name FROM bookings b
            JOIN event_types e ON e.id=b.event_type_id
-           WHERE b.status='confirmed' AND b.start_utc IS NOT NULL"""
+           WHERE b.status='confirmed' AND b.start_utc IS NOT NULL
+             AND b.start_utc >= ? AND b.start_utc < ?""",
+        (band_lo, band_hi),
     ):
         try:
             local = dt.datetime.fromisoformat(r["start_utc"]).replace(tzinfo=dt.UTC).astimezone(tz)

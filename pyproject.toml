@@ -23,5 +23,12 @@ ignore = [
 known-first-party = ["app"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/test_smoke.py" = ["E401", "UP017", "E731", "F401", "F841", "UP012"]
 "tests/smoke/*" = ["E401", "UP017", "E731", "F401", "F841", "UP012"]
+
+[tool.coverage.report]
+# The integration and smoke steps accumulate into one data file, and this floor
+# is checked once against that union — 80% of app/ measured, two points of slack
+# so an unlucky ordering doesn't turn main red. It has to be checked on the union
+# because neither step clears it alone (integration 47%, smoke 72%), which is why
+# the integration step passes --cov-fail-under=0.
+fail_under = 78

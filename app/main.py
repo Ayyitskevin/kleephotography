@@ -4,8 +4,10 @@ Mise — self-hosted F&B photography delivery · FastAPI + HTMX · port 8400
   uvicorn app.main:app --host 127.0.0.1 --port 8400
 """
 
+import asyncio
 import logging
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from urllib.parse import quote_from_bytes, urlsplit
 
@@ -59,8 +61,20 @@ from .admin import (
     tasks,
     uploads,
 )
+from .admin import announcements as admin_announcements
 from .admin import scheduling as admin_scheduling
-from .public import docs, downloads, gallery, media, pay, portal, site, sms_webhook, workspace
+from .public import (
+    docs,
+    downloads,
+    gallery,
+    media,
+    pay,
+    portal,
+    site,
+    sms_webhook,
+    unsubscribe,
+    workspace,
+)
 from .public import forms as public_forms
 from .public import scheduling as public_scheduling
 from .render import ROOT, templates
@@ -69,8 +83,28 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("mise.app")
 
 
+def _require_secret_key() -> None:
+    """Refuse to boot without a signing key.
+
+    An empty MISE_SECRET_KEY used to surface as a RuntimeError 500 on the first
+    cookie operation (app/security.py): the process came up looking healthy and
+    broke on the first real visitor. Fail here instead, before anything serves.
+
+    MISE_ADMIN_PASSWORD deliberately stays a runtime check — empty already fails
+    CLOSED in security.check_admin_password (every login rejected), which is a
+    legitimate posture for an admin-less deployment, not a reason to refuse boot.
+    """
+    if not config.SECRET_KEY:
+        raise RuntimeError(
+            "MISE_SECRET_KEY is not set — refusing to start. Set it in the .env the "
+            "service loads (MISE_ENV_FILE, default /opt/mise/.env; see .env.example) "
+            "or export it in the environment before uvicorn."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _require_secret_key()
     db.migrate()
     jobs.start()
     scheduler.start()
@@ -99,22 +133,34 @@ app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 # are pervasive (progress widths, board colors), style injection is a far
 # weaker vector than script, and removing it buys little for a large diff.
 # Plausible is the only off-origin asset, and only when analytics is enabled.
-CSP_POLICY = "; ".join(
-    (
-        "default-src 'self'",
-        "base-uri 'self'",
-        "object-src 'none'",
-        "frame-ancestors 'none'",
-        "frame-src 'none'",
-        "form-action 'self'",
-        "img-src 'self' data: blob:",
-        "media-src 'self'",
-        "font-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
-        "script-src 'self' 'nonce-{nonce}' https://plausible.io",
-        "connect-src 'self' https://plausible.io",
+def build_csp_policy() -> str:
+    """The comment above said Plausible was allowed "only when analytics is
+    enabled"; the policy allowed it unconditionally. A host with analytics off
+    still handed injected script a permitted off-origin destination to execute
+    from and exfiltrate to — a standing hole for a feature that was not even
+    running. The allowance now follows the flag that actually turns it on."""
+    plausible = " https://plausible.io" if config.PLAUSIBLE_DOMAIN else ""
+    return "; ".join(
+        (
+            "default-src 'self'",
+            "base-uri 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "frame-src 'none'",
+            "form-action 'self'",
+            "img-src 'self' data: blob:",
+            "media-src 'self'",
+            "font-src 'self'",
+            "style-src 'self' 'unsafe-inline'",
+            "script-src 'self' 'nonce-{nonce}'" + plausible,
+            "connect-src 'self'" + plausible,
+        )
     )
-)
+
+
+# Computed once: PLAUSIBLE_DOMAIN is read from the environment at boot and does
+# not change while the process lives, and this header is set on every response.
+CSP_POLICY = build_csp_policy()
 
 # Browser features the site never uses, switched off outright so injected or
 # third-party script can't quietly reach them. fullscreen / picture-in-picture /
@@ -227,7 +273,13 @@ async def common_headers(request: Request, call_next):
     request.state.csp_nonce = nonce
     resp = await call_next(request)
     p = request.url.path
-    if not (p in site.INDEXABLE or p.startswith(("/site/img/", "/static/", "/work/"))):
+    # /site/vid/ and /site/poster/ ride the allowlist because the /reels
+    # VideoObject JSON-LD points contentUrl/thumbnailUrl at them — a noindexed
+    # target makes the rich result unindexable.
+    if not (
+        p in site.INDEXABLE
+        or p.startswith(("/site/img/", "/site/vid/", "/site/poster/", "/static/", "/work/"))
+    ):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -236,19 +288,19 @@ async def common_headers(request: Request, call_next):
     resp.headers["Permissions-Policy"] = PERMISSIONS_POLICY
     # HSTS only when we know we're served over TLS (same signal as Secure
     # cookies) — sending it for a plain-http dev origin would wrongly pin
-    # localhost to https. Start with a reversible five-minute policy; longer
-    # retention and subdomain coverage require a separate TLS inventory.
+    # localhost to https. No includeSubDomains and no preload: both need a
+    # subdomain TLS inventory that does not exist yet, and preload is materially
+    # harder to undo than max-age. See ops/TRUTHFUL-HTTPS.md.
     if config.COOKIE_SECURE:
-        resp.headers["Strict-Transport-Security"] = "max-age=300"
+        resp.headers["Strict-Transport-Security"] = f"max-age={config.HSTS_MAX_AGE}"
     # App templates version top-level static URLs with a content-derived ?v=
-    # buster (see app/render.py), so those responses stay long-lived. Font URLs
-    # inside fonts.css have stable filenames and need a bounded freshness window.
+    # buster (see app/render.py). Font files are versioned in the filename
+    # (newsreader-latin.v1.woff2) so they can share the immutable policy —
+    # bump the infix when a face changes.
     if 300 <= resp.status_code < 400 and "location" in resp.headers:
         # Redirect targets can change during rollback; never let browsers or the
         # edge pin even a permanent redirect response.
         resp.headers.setdefault("Cache-Control", "no-store")
-    elif p.startswith("/static/fonts/"):
-        resp.headers["Cache-Control"] = "public, max-age=86400"
     elif p.startswith("/static/"):
         resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     elif resp.headers.get("content-type", "").startswith("text/html"):
@@ -282,15 +334,21 @@ async def branded_errors(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(Exception)
 async def unhandled_errors(request: Request, exc: Exception):
+    # Async for the same reason as /healthz: this is a degradation path. If the
+    # threadpool is saturated, a sync handler could not run, and the one request
+    # guaranteed to need it is the one that already failed.
     # An uncaught exception means a 500 the user already hit — make it loud.
-    # Log the full traceback for debugging, fire ONE throttled Telegram alert so
-    # Kevin hears about the bug while the app is still up, then return a branded
-    # 500 (HTML) / plain 500 (API) without leaking the exception detail.
-    log.exception("unhandled error: %s %s", request.method, request.url.path)
+    # Log the full traceback, fire ONE throttled Telegram alert so Kevin hears
+    # about the bug while the app is still up, stamp a short request id on the
+    # log line / alert / response so journald matches a client report, then
+    # return a branded 500 without leaking the exception detail.
+    req_id = secrets.token_hex(8)
+    log.exception("unhandled error id=%s %s %s", req_id, request.method, request.url.path)
     alerts.error_alert(
         f"{request.method} {request.url.path}|{type(exc).__name__}",
-        f"{type(exc).__name__} on {request.method} {request.url.path}: {str(exc)[:300]}",
+        f"{type(exc).__name__} on {request.method} {request.url.path} id={req_id}: {str(exc)[:300]}",
     )
+    headers = {"X-Request-ID": req_id}
     if "text/html" in request.headers.get("accept", ""):
         return templates.TemplateResponse(
             request,
@@ -300,23 +358,75 @@ async def unhandled_errors(request: Request, exc: Exception):
                 "Try again in a moment, or get in touch if it persists."
             },
             status_code=500,
+            headers=headers,
         )
-    return JSONResponse({"detail": "internal server error"}, status_code=500)
+    return JSONResponse({"detail": "internal server error"}, status_code=500, headers=headers)
 
 
+# Its OWN thread, not an anyio worker: the anyio pool being saturated is one of
+# the things /healthz is asked about, so borrowing a slot from it would make the
+# probe queue behind exactly the problem it is reporting.
+_HEALTHZ_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mise-healthz")
+# Short enough that a monitor's own timeout never fires first; a healthy probe is
+# sub-millisecond, so anything past this is already the degraded answer.
+HEALTHZ_DB_TIMEOUT = 0.5
+
+
+def _healthz_db_probe() -> dict:
+    """The blocking half of /healthz — a stat and a few indexed counts.
+
+    Returns rather than mutating the response payload: after a timeout the
+    handler has already answered, and a thread still writing into that dict
+    would be reporting into nothing.
+    """
+    db.one("SELECT 1 AS ok")
+    health = jobs.queue_health()
+    return {
+        "db_connected": True,
+        "jobs_pending": jobs.pending_count(),
+        "jobs_failed": health["failed"],
+        "jobs_waiting_retry": health["waiting_retry"],
+        "jobs_stuck": health["stuck"],
+        "jobs_running_stale": health["running_stale"],
+    }
+
+
+# The public shape. Everything else in the payload — free disk, backup age,
+# queue depth — is an ops feed and a resource-exhaustion progress meter for an
+# unauthenticated reader, so it is gated behind a bearer (security.py). What
+# stays public is exactly what an uptime monitor needs and no more: a truthful
+# 200/503 and a boolean, which is why MONITORING.md tells the monitor to assert
+# on the status code plus this key.
 def _healthz_public(payload: dict) -> dict:
     return {"ok": payload["ok"]}
 
 
 @app.get("/healthz")
 async def healthz(request: Request):
+    # Resolved before any work: a bad or disarmed bearer should answer as such
+    # rather than run a database probe first.
     detail = security.healthz_detail_authorized(request)
+    # Deliberately stays on the event loop while the rest of the app moved to
+    # the threadpool. Its whole job is to answer when things are going wrong,
+    # and a sync handler queues behind the same 40 worker slots it is trying to
+    # report on — under enough concurrent slow requests it would time out and
+    # tell the monitor "down" when the truth is "busy". The body is a stat and
+    # two indexed counts, so it costs the loop almost nothing.
     payload = {
         "ok": True,
         "service": "mise",
         "db_connected": False,
         "jobs_pending": None,
         "jobs_failed": None,
+        # A job parked behind its retry backoff is queued but not runnable yet;
+        # jobs_stuck is one that stayed that way long past its turn, i.e. the
+        # queue is not draining. Without these two the limbo is invisible here.
+        # jobs_running_stale is the other silent state: claimed, then never
+        # finished or failed, which no sweep re-offers.
+        "jobs_waiting_retry": None,
+        "jobs_stuck": None,
+        "jobs_running_stale": None,
+        "db_probe": None,
         "disk_free_gb": None,
         "disk_low": None,
         "backup_present": None,
@@ -328,14 +438,29 @@ async def healthz(request: Request):
     except Exception:
         log.exception("healthz storage check failed")
     try:
-        db.one("SELECT 1 AS ok")
-        payload["db_connected"] = True
-        payload["jobs_pending"] = jobs.pending_count()
-        payload["jobs_failed"] = db.one("SELECT COUNT(*) AS n FROM jobs WHERE status='failed'")["n"]
+        loop = asyncio.get_running_loop()
+        payload.update(
+            await asyncio.wait_for(
+                loop.run_in_executor(_HEALTHZ_POOL, _healthz_db_probe), HEALTHZ_DB_TIMEOUT
+            )
+        )
+    except TimeoutError:
+        # The scenario this endpoint exists for: SQLite wedged, every db call
+        # sitting on its 30s busy_timeout. Awaiting that inline would pin the
+        # loop for the full wait and freeze every other in-flight response, so
+        # the probe is abandoned and reported instead. Its thread keeps running
+        # to completion — the pool is size 1, so a still-wedged probe simply
+        # makes the next check time out too, which is the honest answer.
+        log.warning("healthz database probe timed out after %ss", HEALTHZ_DB_TIMEOUT)
+        payload["ok"] = False
+        payload["db_probe"] = "timeout"
+        return JSONResponse(payload if detail else _healthz_public(payload), status_code=503)
     except Exception:
         log.exception("healthz database check failed")
         payload["ok"] = False
         return JSONResponse(payload if detail else _healthz_public(payload), status_code=503)
+    # The probe still ran for everyone: the 503-when-wedged signal is what the
+    # external monitor keys on, so gating the BODY must not gate the check.
     return payload if detail else _healthz_public(payload)
 
 
@@ -371,6 +496,7 @@ for r in (
     content.router,
     portals.router,
     admin_scheduling.router,
+    admin_announcements.router,
     gallery.router,
     media.router,
     downloads.router,
@@ -382,6 +508,7 @@ for r in (
     public_scheduling.router,
     site.router,
     sms_webhook.router,
+    unsubscribe.router,
     service_api.router,
 ):
     app.include_router(r)

@@ -61,6 +61,9 @@
 
         <div class="fin-field">
           <span class="fin-field-label">Include</span>
+          {# marks a panel submit: an unchecked box here means exclude, where a
+             bare income.csv link (the topbar's) means everything #}
+          <input type="hidden" name="inc" value="1">
           <label class="fin-check">
             <input type="checkbox" name="inc_paid" value="on" checked>
             <span>Paid payments</span>

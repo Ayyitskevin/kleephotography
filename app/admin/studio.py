@@ -34,12 +34,12 @@ _SAFE_NAME = re.compile(r"[^A-Za-z0-9._ -]")
 
 
 @router.get("/playbook", response_class=HTMLResponse)
-async def studio_playbook(request: Request):
+def studio_playbook(request: Request):
     return templates.TemplateResponse(request, "admin/studio_playbook.html", {})
 
 
 @router.get("/clients", response_class=HTMLResponse)
-async def studio_clients(request: Request):
+def studio_clients(request: Request):
     clients, client_portal_hints = common._clients_with_hints()
     return templates.TemplateResponse(
         request,
@@ -49,19 +49,19 @@ async def studio_clients(request: Request):
 
 
 @router.get("", response_class=HTMLResponse)
-async def studio_home(request: Request):
+def studio_home(request: Request):
     return templates.TemplateResponse(request, "admin/studio.html", _studio_context(request))
 
 
 @router.get("/activity", response_class=HTMLResponse)
-async def studio_activity(request: Request):
+def studio_activity(request: Request):
     return templates.TemplateResponse(
         request, "admin/studio_activity.html", _studio_context(request)
     )
 
 
 @router.post("/clients")
-async def create_client(
+def create_client(
     name: str = Form(...), company: str = Form(""), email: str = Form(""), phone: str = Form("")
 ):
     cid = db.run(
@@ -82,14 +82,12 @@ def _redirect(return_to: str, default: str) -> RedirectResponse:
 
 
 @router.post("/inquiries/{inquiry_id}/unconvert")
-async def inquiry_unconvert(inquiry_id: int, return_to: str = Form("")):
+def inquiry_unconvert(inquiry_id: int, return_to: str = Form("")):
     """Clear the conversion stamps on an inquiry so it shows up as actionable
     again. INTENTIONALLY does NOT delete the spawned client/project — by the
     time Kevin clicks undo, those may already carry edits, brand assets, or
     proposals. This is a misclick fix, not a cascade delete."""
-    inq = db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
     db.run(
         """UPDATE inquiries SET converted_at=NULL,
               converted_client_id=NULL, converted_project_id=NULL
@@ -102,15 +100,13 @@ async def inquiry_unconvert(inquiry_id: int, return_to: str = Form("")):
 
 
 @router.post("/inquiries/{inquiry_id}/dismiss")
-async def inquiry_dismiss(inquiry_id: int, return_to: str = Form("")):
+def inquiry_dismiss(inquiry_id: int, return_to: str = Form("")):
     """Archive an unconverted inquiry — spam, test, or dead leads. Reversible:
     the row is kept and stamped dismissed_at, so it drops out of the active
     leads list and the home 'new inquiries' count but stays in the Inquiries
     table with an undo. Refuses once converted (that anchors a real
     client/project history)."""
-    inq = db.one("SELECT id, converted_at FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    inq = db.get_or_404("SELECT id, converted_at FROM inquiries WHERE id=?", (inquiry_id,))
     if inq["converted_at"]:
         raise HTTPException(status_code=400, detail="converted inquiries cannot be dismissed")
     db.run("UPDATE inquiries SET dismissed_at=datetime('now') WHERE id=?", (inquiry_id,))
@@ -120,12 +116,10 @@ async def inquiry_dismiss(inquiry_id: int, return_to: str = Form("")):
 
 
 @router.post("/inquiries/{inquiry_id}/undismiss")
-async def inquiry_undismiss(inquiry_id: int, return_to: str = Form("")):
+def inquiry_undismiss(inquiry_id: int, return_to: str = Form("")):
     """Undo a dismiss — clears dismissed_at so the lead returns to the active
     pipeline."""
-    inq = db.one("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM inquiries WHERE id=?", (inquiry_id,))
     db.run("UPDATE inquiries SET dismissed_at=NULL WHERE id=?", (inquiry_id,))
     jobs.enqueue("notion_sync_inquiry", {"inquiry_id": inquiry_id})
     log.info("inquiry %s undismissed (restored)", inquiry_id)
@@ -136,9 +130,7 @@ def _inquiry_and_client(inquiry_id: int) -> "tuple[db.sqlite3.Row, int]":
     """Load an inquiry (404 if gone) and find-or-create its client by email.
     Shared verbatim by the inquiry→client and inquiry→quote convert routes —
     one copy so the client-seeding fields can't drift between them."""
-    inq = db.one("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
-    if not inq:
-        raise HTTPException(status_code=404)
+    inq = db.get_or_404("SELECT * FROM inquiries WHERE id=?", (inquiry_id,))
     existing = db.one("SELECT id FROM clients WHERE email=?", (inq["email"],))
     if existing:
         return inq, existing["id"]
@@ -156,7 +148,7 @@ def _inquiry_and_client(inquiry_id: int) -> "tuple[db.sqlite3.Row, int]":
 
 
 @router.post("/inquiries/{inquiry_id}/client")
-async def inquiry_to_client(inquiry_id: int, return_to: str = Form("")):
+def inquiry_to_client(inquiry_id: int, return_to: str = Form("")):
     inq, cid = _inquiry_and_client(inquiry_id)
     pid = None
     # Bookings carry a date + service → lift straight into an 'inquiry_received' project so
@@ -182,7 +174,7 @@ async def inquiry_to_client(inquiry_id: int, return_to: str = Form("")):
 
 
 @router.post("/inquiries/{inquiry_id}/quote")
-async def inquiry_to_quote(inquiry_id: int, return_to: str = Form("")):
+def inquiry_to_quote(inquiry_id: int, return_to: str = Form("")):
     """One click from a lead to an editable draft quote: find/create the client,
     spawn an 'inquiry_received' project, and open a blank draft proposal seeded
     with the inquiry brief as the intro. Quoting-first flow — Kevin fills the
@@ -213,7 +205,7 @@ async def inquiry_to_quote(inquiry_id: int, return_to: str = Form("")):
 
 
 @router.get("/clients/{client_id}", response_class=HTMLResponse)
-async def client_detail(request: Request, client_id: int):
+def client_detail(request: Request, client_id: int):
     c = get_client(client_id)
     projects = db.all_(
         "SELECT * FROM projects WHERE client_id=? ORDER BY created_at DESC", (client_id,)
@@ -412,7 +404,7 @@ def _client_blockers(client_id: int) -> list[str]:
 
 
 @router.post("/clients/{client_id}/delete")
-async def delete_client(client_id: int, force: bool = Form(False)):
+def delete_client(client_id: int, force: bool = Form(False)):
     get_client(client_id)
     # Children are a HARD blocker: force cannot bypass it, and the DB's
     # ON DELETE RESTRICT would reject the delete anyway. Tree restructuring
@@ -447,7 +439,7 @@ async def delete_client(client_id: int, force: bool = Form(False)):
 
 
 @router.post("/clients/{client_id}")
-async def update_client(
+def update_client(
     client_id: int,
     name: str = Form(...),
     company: str = Form(""),
@@ -483,7 +475,7 @@ async def update_client(
 
 
 @router.post("/clients/{client_id}/parent")
-async def set_parent(client_id: int, parent_id: str = Form("")):
+def set_parent(client_id: int, parent_id: str = Form("")):
     """Set (or clear) a client's parent. Two cycle guards: A->A is rejected
     here (and by the DB CHECK as a backstop); A->B->A is rejected by checking
     the proposed parent against this client's descendants before the UPDATE."""
@@ -526,7 +518,7 @@ def _backfill_crops(client_id: int) -> int:
 
 
 @router.post("/clients/{client_id}/portal")
-async def create_portal(client_id: int):
+def create_portal(client_id: int):
     get_client(client_id)
     if db.one("SELECT id FROM portals WHERE client_id=?", (client_id,)):
         raise HTTPException(status_code=400, detail="portal already exists")
@@ -540,10 +532,8 @@ async def create_portal(client_id: int):
 
 
 @router.post("/clients/{client_id}/portal/publish")
-async def toggle_portal(client_id: int, published: bool = Form(False)):
-    p = db.one("SELECT id FROM portals WHERE client_id=?", (client_id,))
-    if not p:
-        raise HTTPException(status_code=404)
+def toggle_portal(client_id: int, published: bool = Form(False)):
+    p = db.get_or_404("SELECT id FROM portals WHERE client_id=?", (client_id,))
     db.run("UPDATE portals SET published=? WHERE id=?", (1 if published else 0, p["id"]))
     if published:
         _backfill_crops(client_id)
@@ -551,7 +541,7 @@ async def toggle_portal(client_id: int, published: bool = Form(False)):
 
 
 @router.post("/clients/{client_id}/projects")
-async def create_project(client_id: int, title: str = Form(...)):
+def create_project(client_id: int, title: str = Form(...)):
     get_client(client_id)
     pid = db.run("INSERT INTO projects (client_id, title) VALUES (?,?)", (client_id, title.strip()))
     log.info("project %s created for client %s", pid, client_id)
@@ -624,7 +614,7 @@ def _project_stock_chip(project_id: int) -> str:
 
 
 @router.get("/projects/{project_id}/delivery-check", response_class=HTMLResponse)
-async def project_delivery_check(request: Request, project_id: int):
+def project_delivery_check(request: Request, project_id: int):
     """Self-updating delivery workbench fragment — hx-get polled every ~8s
     while the linked gallery still has encodes running. Script-free."""
     p = get_project(project_id)
@@ -636,7 +626,7 @@ async def project_delivery_check(request: Request, project_id: int):
 
 
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
-async def project_detail(request: Request, project_id: int):
+def project_detail(request: Request, project_id: int):
     p = get_project(project_id)
     proposals = db.all_(
         "SELECT * FROM proposals WHERE project_id=? ORDER BY created_at DESC", (project_id,)
@@ -751,7 +741,7 @@ def _build_timeline(proposals, contracts, invoices, payments, emails):
 
 
 @router.post("/projects/{project_id}/workspace/publish")
-async def publish_workspace(project_id: int):
+def publish_workspace(project_id: int):
     p = get_project(project_id)
     slug = p["workspace_slug"] or security.new_slug()
     pin = p["workspace_pin"] or security.new_pin()
@@ -765,7 +755,7 @@ async def publish_workspace(project_id: int):
 
 
 @router.post("/projects/{project_id}/workspace/unpublish")
-async def unpublish_workspace(project_id: int):
+def unpublish_workspace(project_id: int):
     get_project(project_id)
     # Keep the slug/PIN so re-publishing reuses the same link; just close it.
     db.run("UPDATE projects SET workspace_published=0 WHERE id=?", (project_id,))
@@ -777,7 +767,7 @@ async def unpublish_workspace(project_id: int):
 
 
 @router.get("/testimonials", response_class=HTMLResponse)
-async def testimonials_list(request: Request):
+def testimonials_list(request: Request):
     rows = db.all_("""SELECT t.*, g.title AS gallery_title, g.slug AS gallery_slug,
                              EXISTS(SELECT 1 FROM testimonial_requests tr
                                     WHERE tr.testimonial_id=t.id) AS from_client
@@ -793,7 +783,7 @@ async def testimonials_list(request: Request):
 
 
 @router.post("/testimonials")
-async def create_testimonial(
+def create_testimonial(
     quote: str = Form(...),
     attribution_name: str = Form(...),
     business: str = Form(""),
@@ -821,7 +811,7 @@ async def create_testimonial(
 
 
 @router.post("/testimonials/{tid}")
-async def update_testimonial(
+def update_testimonial(
     tid: int,
     quote: str = Form(...),
     attribution_name: str = Form(...),
@@ -830,8 +820,7 @@ async def update_testimonial(
     position: int = Form(0),
     published: bool = Form(False),
 ):
-    if not db.one("SELECT id FROM testimonials WHERE id=?", (tid,)):
-        raise HTTPException(status_code=404)
+    db.get_or_404("SELECT id FROM testimonials WHERE id=?", (tid,))
     db.run(
         """UPDATE testimonials SET quote=?, attribution_name=?, business=?,
               gallery_id=?, position=?, published=? WHERE id=?""",
@@ -849,13 +838,13 @@ async def update_testimonial(
 
 
 @router.post("/testimonials/{tid}/delete")
-async def delete_testimonial(tid: int):
+def delete_testimonial(tid: int):
     db.run("DELETE FROM testimonials WHERE id=?", (tid,))
     return RedirectResponse("/admin/studio/testimonials", status_code=303)
 
 
 @router.post("/projects/{project_id}/testimonial-request")
-async def request_testimonial(project_id: int, gallery_id: int | None = Form(None)):
+def request_testimonial(project_id: int, gallery_id: int | None = Form(None)):
     """Raise a tokened /t/{slug} link for the client to write their own
     testimonial. Manual send (matches the email doctrine) — the project page
     shows the link to copy. The submitted quote lands unpublished for review."""
@@ -871,7 +860,7 @@ async def request_testimonial(project_id: int, gallery_id: int | None = Form(Non
 
 
 @router.post("/projects/{project_id}")
-async def update_project(
+def update_project(
     project_id: int,
     title: str = Form(...),
     status: str = Form(...),
@@ -904,7 +893,7 @@ async def update_project(
 
 
 @router.post("/projects/{project_id}/status")
-async def move_project_status(request: Request, project_id: int, status: str = Form(...)):
+def move_project_status(request: Request, project_id: int, status: str = Form(...)):
     """Kanban quick-move: change only a project's pipeline stage. The full project
     form (update_project) still owns title/notes/gallery edits; this is the
     board's drag-to-column equivalent — one field, one write, back to the board."""

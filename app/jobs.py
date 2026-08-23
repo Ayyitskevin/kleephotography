@@ -1,13 +1,24 @@
 """SQLite-backed job queue with a thread pool. Survives restarts:
-startup re-queues anything left 'running' by a crash, then drains the backlog."""
+startup re-queues anything left 'running' by a crash, then drains the backlog.
+Delivery is AT LEAST ONCE — a crashed attempt is retried, so handlers must be
+idempotent (contract: ops/AT-LEAST-ONCE.md). A failed attempt parks the row
+behind a backoff (next_attempt_at) and the queue's own sweeper thread re-offers
+it once the wait elapses; retry() is the operator's override for both a parked
+row and a dead one, and queue_health() is what /healthz and the ops heartbeat
+read so a parked or wedged queue is never invisible."""
 
+import hashlib
 import json
 import logging
+import re
+import threading
 import zipfile
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import wait as futures_wait
 from pathlib import Path
 
 from . import (
+    announcements,
     argus_analyze,
     argus_writeback,
     brand_kits,
@@ -18,14 +29,46 @@ from . import (
     notion_sync,
     plutus_recommend,
     presets,
+    proposal_notify,
     video,
 )
 
 log = logging.getLogger("mise.jobs")
 
 _pool: ThreadPoolExecutor | None = None
+_sweeper: threading.Thread | None = None
+_sweeper_stop = threading.Event()
+# Job ids currently offered to the pool, so sweep() does not hand the same
+# backlog to the executor again every tick. An OPTIMIZATION ONLY: _claim is the
+# correctness gate, and every entry is released in _execute's finally (so a
+# handler that raises, or a worker killed by BaseException, still frees its id)
+# or by stop(), which cancels futures that will never reach that finally.
+_inflight: set[int] = set()
+_inflight_lock = threading.Lock()
+
+# Live futures, so stop(wait=True) can drain rather than merely signal. Kept
+# separate from _inflight (job ids, for sweep dedup) because this answers a
+# different question: not "is this job spoken for" but "is a worker thread still
+# inside it right now".
+_futures: set[Future] = set()
+_futures_lock = threading.Lock()
 MAX_ATTEMPTS = 3
+# Delay before the Nth retry, indexed by the attempt that just failed. Bounded and
+# modest on purpose — this is a solo-operator queue, not a distributed system. It
+# only has to outlive a vendor blip (a Notion 502, a Gmail hiccup); anything longer
+# is better surfaced as a failed job in the admin than retried silently for hours.
+# The sweeper thread is the clock that picks a parked job back up, so the honest
+# gap is "backoff, plus at most one JOB_SWEEP_TICK_SECONDS, minus up to a second
+# to SQLite's whole-second datetime()" — call it 59-120s, then 299-360s at the
+# defaults. That is why the queue does NOT ride the hourly recurring scheduler:
+# an hourly clock would round both steps to "within the hour" and the numbers
+# here would be a lie.
+RETRY_BACKOFF_SECONDS = (60, 300)
 PRIMARY_ASSET_JOB_KINDS = frozenset({"image_derivatives", "video_transcode"})
+# How long a finished job stays readable in the admin before the hourly
+# scheduler drops it. Long enough to answer "did that gallery ever build?" weeks
+# later, short enough that queue_health()'s table-wide aggregates stay cheap.
+DONE_JOB_RETENTION_DAYS = 30
 
 
 # ── handlers ───────────────────────────────────────────────────────────────
@@ -173,8 +216,18 @@ def zip_entries(gallery_id: int, assets) -> list:
 
 
 def _h_zip(p: dict) -> None:
-    """Full-gallery ZIP of originals — STORE (media doesn't deflate), atomic rename."""
+    """Full-gallery ZIP of originals — STORE (media doesn't deflate), atomic rename.
+
+    A job whose rev no longer matches the gallery is dropped, not rebuilt. This
+    one can execute long after it was staged (parked behind a backoff, or just
+    queued behind a deep transcode batch), and by then an upload may have bumped
+    content_rev and built the archive for it — the prune below deletes every
+    other rev, so rebuilding the old one would take the NEWER file with it.
+    """
     gid, rev = p["gallery_id"], p["rev"]
+    gal = db.one("SELECT content_rev FROM galleries WHERE id=?", (gid,))
+    if not gal or gal["content_rev"] != rev:
+        return
     final = zip_path(gid, rev)
     if final.exists():
         return
@@ -183,6 +236,56 @@ def _h_zip(p: dict) -> None:
     for old in config.ZIP_DIR.glob(f"g{gid}-r*.zip"):
         if old != final:
             old.unlink(missing_ok=True)
+
+
+# gN-fav-<hash>.zip / gN-sM-<hash>.zip, as public/downloads mints them.
+_SUBSET_NAME = re.compile(r"\Ag\d+-(?:fav|s(\d+))-([0-9a-f]{8})\.zip\Z")
+
+
+def _subset_key(asset_ids) -> str:
+    """The content key a subset ZIP is named from. Must stay in step with
+    public/downloads.download_favorites/download_section, hash and asset order
+    both — deriving a different key here would read live bundles as stale."""
+    return hashlib.sha256(",".join(str(i) for i in asset_ids).encode()).hexdigest()[:8]
+
+
+def _subset_is_current(gallery_id: int, name: str) -> bool:
+    """Whether `name` is still the bundle the route would mint for this
+    gallery+kind, i.e. whether this job may build and prune.
+
+    The payload's asset-id list is frozen at request time, and a job parked
+    behind a retry backoff can outlive the selection that named it — the client
+    edits their favorites, the studio re-sorts the section. Since the handler
+    deletes every sibling in its family, a stale job that ran would rebuild the
+    old archive AND take out the one matching what the client actually picked.
+
+    A name shape this doesn't recognise counts as current: an in-flight job from
+    an older deploy must still build, and skipping real work is worse than the
+    prune this guards.
+    """
+    m = _SUBSET_NAME.match(name)
+    if not m:
+        return True
+    section, key = m.group(1), m.group(2)
+    if section is not None:
+        rows = db.all_(
+            "SELECT id FROM assets WHERE gallery_id=? AND section_id=? AND status='ready' "
+            "ORDER BY position, id",
+            (gallery_id, int(section)),
+        )
+        return key == _subset_key([r["id"] for r in rows])
+    # Favorites are per visitor and the name carries no visitor, so the bundle is
+    # still current while ANY visitor's live selection hashes to it.
+    rows = db.all_(
+        "SELECT f.visitor_id AS visitor_id, a.id AS id FROM favorites f "
+        "JOIN assets a ON a.id=f.asset_id "
+        "WHERE a.gallery_id=? AND a.status='ready' ORDER BY f.visitor_id, a.id",
+        (gallery_id,),
+    )
+    selections: dict[int, list[int]] = {}
+    for r in rows:
+        selections.setdefault(r["visitor_id"], []).append(r["id"])
+    return any(key == _subset_key(ids) for ids in selections.values())
 
 
 def _h_zip_subset(p: dict) -> None:
@@ -195,6 +298,9 @@ def _h_zip_subset(p: dict) -> None:
     gid, ids = p["gallery_id"], p["asset_ids"]
     final = config.ZIP_DIR / p["name"]
     if final.exists() or not ids:
+        return
+    if not _subset_is_current(gid, p["name"]):
+        log.info("zip_subset %s superseded; nothing built, nothing pruned", p["name"])
         return
     ph = ",".join("?" * len(ids))  # only ever "?,?,..." placeholders
     rows = db.all_(
@@ -219,6 +325,12 @@ HANDLERS = {
     "notion_sync_gallery": lambda p: notion_sync.sync_gallery(p["gallery_id"]),
     "notion_sync_inquiry": lambda p: notion_sync.sync_inquiry(p["inquiry_id"]),
     "inquiry_owner_email": lambda p: inquiry_notify.deliver_owner_email(p["inquiry_id"]),
+    "proposal_decision_notify": lambda p: proposal_notify.deliver_decision(
+        p["proposal_id"], p["decision"]
+    ),
+    "announcement_email": lambda p: announcements.deliver(
+        p["announcement_id"], p["email"], p.get("name", "")
+    ),
     "argus_analyze_gallery": lambda p: argus_analyze.run_for_gallery(
         p["gallery_id"], skip_dedup=bool(p.get("skip_dedup"))
     ),
@@ -245,9 +357,18 @@ def dispatch(job_ids: list[int]) -> None:
     if not pool:
         return
     for offset, job_id in enumerate(job_ids):
+        with _inflight_lock:
+            _inflight.add(job_id)
         try:
-            pool.submit(_execute, job_id)
+            fut = pool.submit(_execute, job_id)
+            with _futures_lock:
+                _futures.add(fut)
+            # discard on completion, so the set tracks what is actually running
+            # instead of growing for the life of the process
+            fut.add_done_callback(lambda f: _futures.discard(f))
         except RuntimeError:
+            with _inflight_lock:
+                _inflight.discard(job_id)
             log.warning("job pool unavailable; %d queued jobs remain", len(job_ids) - offset)
             break
 
@@ -259,12 +380,30 @@ def enqueue(kind: str, payload: dict) -> int:
     return job_id
 
 
+def _retry_delay(attempts: int) -> str:
+    """SQLite datetime modifier for the wait after `attempts` failed tries."""
+    seconds = RETRY_BACKOFF_SECONDS[min(attempts, len(RETRY_BACKOFF_SECONDS)) - 1]
+    return f"+{seconds} seconds"
+
+
+def _due_job_ids() -> list[int]:
+    """Queued jobs runnable right now — fresh work plus retries past their backoff."""
+    rows = db.all_(
+        "SELECT id FROM jobs WHERE status='queued' "
+        "AND (next_attempt_at IS NULL OR next_attempt_at <= datetime('now')) ORDER BY id"
+    )
+    return [r["id"] for r in rows]
+
+
 def _claim(job_id: int) -> "db.sqlite3.Row | None":
     con = db.connect()
     try:
+        # The single queued->running gate: it also enforces the retry backoff, so
+        # no dispatch path (pool, sweep, restart backlog) can jump a job's wait.
         cur = con.execute(
             "UPDATE jobs SET status='running', attempts=attempts+1, "
-            "updated_at=datetime('now') WHERE id=? AND status='queued'",
+            "updated_at=datetime('now') WHERE id=? AND status='queued' "
+            "AND (next_attempt_at IS NULL OR next_attempt_at <= datetime('now'))",
             (job_id,),
         )
         con.commit()
@@ -276,39 +415,81 @@ def _claim(job_id: int) -> "db.sqlite3.Row | None":
 
 
 def _execute(job_id: int) -> None:
-    job = _claim(job_id)
-    if not job:
-        return
-    payload = json.loads(job["payload"])
     try:
-        HANDLERS[job["kind"]](payload)
-        db.run(
-            "UPDATE jobs SET status='done', error=NULL, updated_at=datetime('now') WHERE id=?",
-            (job_id,),
-        )
-        log.info("job %s %s done", job_id, job["kind"])
-    except Exception as e:
-        status = "queued" if job["attempts"] < MAX_ATTEMPTS else "failed"
-        db.run(
-            "UPDATE jobs SET status=?, error=?, updated_at=datetime('now') WHERE id=?",
-            (status, str(e)[:500], job_id),
-        )
-        log.exception("job %s %s attempt %s -> %s", job_id, job["kind"], job["attempts"], status)
-        # Only primary ingest owns the canonical asset's readiness. Optional
-        # derivatives (social crops/renditions) report their own job failure
-        # without removing an already delivered asset from every reader.
-        if status == "failed" and job["kind"] in PRIMARY_ASSET_JOB_KINDS and "asset_id" in payload:
-            db.run("UPDATE assets SET status='failed' WHERE id=?", (payload["asset_id"],))
-        if status == "queued" and _pool:
-            _pool.submit(_execute, job_id)
+        job = _claim(job_id)
+        if not job:
+            return
+        # Parsed INSIDE the try: a corrupt payload is a job failure like any
+        # other. Parsed outside, it raised past the recorder and left the row
+        # 'running' forever — no retry, no sweep, no log, only a restart.
+        payload: dict = {}
+        try:
+            payload = json.loads(job["payload"])
+            HANDLERS[job["kind"]](payload)
+            db.run(
+                "UPDATE jobs SET status='done', error=NULL, next_attempt_at=NULL, "
+                "updated_at=datetime('now') WHERE id=?",
+                (job_id,),
+            )
+            log.info("job %s %s done", job_id, job["kind"])
+        except Exception as e:
+            status = "queued" if job["attempts"] < MAX_ATTEMPTS else "failed"
+            # Park the retry behind a backoff instead of resubmitting it here: an
+            # immediate resubmit burned every attempt inside a second, so a vendor
+            # blip looked identical to a permanent failure. The sweeper thread picks
+            # it back up once the wait elapses, and retry() can force it sooner.
+            # datetime('now', NULL) is NULL, so a terminal failure clears the column
+            # in the same statement.
+            retry_in = _retry_delay(job["attempts"]) if status == "queued" else None
+            db.run(
+                "UPDATE jobs SET status=?, error=?, updated_at=datetime('now'), "
+                "next_attempt_at=datetime('now', ?) WHERE id=?",
+                (status, str(e)[:500], retry_in, job_id),
+            )
+            log.exception(
+                "job %s %s attempt %s -> %s%s",
+                job_id,
+                job["kind"],
+                job["attempts"],
+                status,
+                f" (retry {retry_in})" if retry_in else "",
+            )
+            # Only primary ingest owns the canonical asset's readiness. Optional
+            # derivatives (social crops/renditions) report their own job failure
+            # without removing an already delivered asset from every reader.
+            if (
+                status == "failed"
+                and job["kind"] in PRIMARY_ASSET_JOB_KINDS
+                and "asset_id" in payload
+            ):
+                db.run("UPDATE assets SET status='failed' WHERE id=?", (payload["asset_id"],))
+    finally:
+        with _inflight_lock:
+            _inflight.discard(job_id)
 
 
 def retry(job_id: int) -> bool:
+    """Force a job to run NOW — the admin Jobs button, and the operator's only
+    hands-on control over a stuck queue.
+
+    It has to match TWO states, not just the terminal one. A failed attempt now
+    parks the row as queued-with-a-future-next_attempt_at, and _claim refuses a
+    parked row on purpose; if retry() only looked for status='failed', pressing
+    retry during a backoff window would 404 and Kevin would have no way to jump
+    the wait. Clearing next_attempt_at (and the attempt count) is exactly what
+    unparks it, so the same statement serves both cases.
+
+    A plain queued row with no next_attempt_at is deliberately NOT matched: it
+    has never failed, the pool or the next sweep already owns it, and there is
+    no button for it in the admin.
+    """
     con = db.connect()
     try:
         cur = con.execute(
             "UPDATE jobs SET status='queued', attempts=0, error=NULL, "
-            "updated_at=datetime('now') WHERE id=? AND status='failed'",
+            "next_attempt_at=NULL, updated_at=datetime('now') "
+            "WHERE id=? AND (status='failed' OR "
+            "(status='queued' AND next_attempt_at IS NOT NULL))",
             (job_id,),
         )
         con.commit()
@@ -317,9 +498,127 @@ def retry(job_id: int) -> bool:
     if cur.rowcount != 1:
         return False
     log.info("job %s retried by admin", job_id)
-    if _pool:
-        _pool.submit(_execute, job_id)
+    dispatch([job_id])
     return True
+
+
+def queue_health() -> dict:
+    """The four numbers that tell you whether the queue is actually moving.
+
+    `failed` is the old signal (dead, awaiting a human). `waiting_retry` is the
+    limbo the backoff introduced — queued, but deliberately not runnable yet.
+    `stuck` is the one that means something is wrong: a retry whose
+    next_attempt_at passed over JOB_STUCK_AFTER_SECONDS ago and still has not
+    been claimed, so the sweeper thread or the pool is not doing its job (or the
+    timestamp itself is bad). `running_stale` is the other wrong: a row _claim
+    flipped to 'running' (which is what sets updated_at) more than
+    JOB_STUCK_AFTER_SECONDS ago and never moved off it — a worker that died
+    mid-handler, or one still grinding a genuinely long transcode. Nothing else
+    reports it: sweep() only re-offers queued rows, so a wedged 'running' row
+    waits for a restart. Read by /healthz and by the ops heartbeat — a parked or
+    wedged queue must never be invisible.
+
+    Deliberately NOT counted as stuck: a never-attempted queued job, however
+    old. Two workers chewing through a batch of video transcodes leave fresh
+    work queued for an hour as a matter of course, and alerting on that would
+    cry wolf on a healthy queue — `jobs_pending` is the number for depth. Same
+    reason the running ceiling is generous: it is not a per-job SLA, it is the
+    line past which "still working" stops being the likely explanation.
+    """
+    window = f"-{config.JOB_STUCK_AFTER_SECONDS} seconds"
+    row = db.one(
+        "SELECT "
+        "SUM(status='failed') AS failed, "
+        "SUM(status='queued' AND next_attempt_at IS NOT NULL) AS waiting_retry, "
+        "SUM(status='queued' AND next_attempt_at IS NOT NULL "
+        "    AND next_attempt_at <= datetime('now', ?)) AS stuck, "
+        "SUM(status='running' AND updated_at <= datetime('now', ?)) AS running_stale "
+        "FROM jobs",
+        (window, window),
+    )
+    return {k: int(row[k] or 0) for k in ("failed", "waiting_retry", "stuck", "running_stale")}
+
+
+def prune_done(days: int = DONE_JOB_RETENTION_DAYS) -> int:
+    """Drop finished jobs past the retention window; returns how many went.
+
+    Nothing else has ever pruned this table, and every done row is dead weight
+    under queue_health()'s table-wide aggregates and the admin Jobs listing.
+
+    ONLY status='done' is eligible, and age alone never qualifies anything else:
+    a 'failed' row is the operator's evidence that something still needs a human
+    (admin Jobs, the ops heartbeat), a 'running' row may be a live worker, and a
+    'queued' row is either backlog or a retry parked behind its backoff. Runs
+    off the hourly scheduler, so it must be cheap and never touch live work.
+
+    updated_at is NULL until a row is first claimed, so age falls back to
+    created_at rather than reading an unstamped row as infinitely old.
+    """
+    con = db.connect()
+    try:
+        cur = con.execute(
+            "DELETE FROM jobs WHERE status='done' "
+            "AND COALESCE(updated_at, created_at) < datetime('now', ?)",
+            (f"-{days} days",),
+        )
+        con.commit()
+    finally:
+        con.close()
+    if cur.rowcount:
+        log.info("pruned %d done jobs older than %d days", cur.rowcount, days)
+    return cur.rowcount
+
+
+def sweep() -> None:
+    """Re-offer due queued jobs the pool is not already holding — the queue's
+    only self-heal.
+
+    Two ways a durable row strands with the process still up: dispatch found no
+    pool (see dispatch()), or a failed attempt parked it behind its backoff.
+    Neither is re-drained by anything else short of a restart.
+
+    Skipping ids in _inflight is throughput, not correctness — _claim is still
+    the one queued->running gate. Without the skip, a backlog deeper than the
+    worker count got re-submitted whole on every tick: each duplicate future
+    ran _claim, a write transaction that no-ops, so a 200-job queue spent
+    thousands of write-lock acquisitions an hour contending with request-path
+    writes, and the executor's deque grew without bound. A missed skip only
+    costs one of those no-ops.
+    """
+    if not _pool:
+        return
+    candidates = _due_job_ids()
+    with _inflight_lock:
+        due = [job_id for job_id in candidates if job_id not in _inflight]
+    if due:
+        dispatch(due)
+        log.info("job sweep re-dispatched %d queued jobs", len(due))
+
+
+def _sweep_loop() -> None:
+    """The queue's clock. Reads the tick every pass so it can be tuned live."""
+    while not _sweeper_stop.wait(config.JOB_SWEEP_TICK_SECONDS):
+        try:
+            sweep()
+        except Exception:
+            log.exception("job sweep failed")
+
+
+def _start_sweeper() -> None:
+    global _sweeper
+    if _sweeper and _sweeper.is_alive():
+        return
+    _sweeper_stop.clear()
+    _sweeper = threading.Thread(target=_sweep_loop, name="mise-job-sweep", daemon=True)
+    _sweeper.start()
+
+
+def _stop_sweeper() -> None:
+    global _sweeper
+    _sweeper_stop.set()
+    if _sweeper:
+        _sweeper.join(timeout=2)
+        _sweeper = None
 
 
 def pending_count() -> int:
@@ -331,15 +630,60 @@ def start() -> None:
     global _pool
     db.run("UPDATE jobs SET status='queued' WHERE status='running'")
     _pool = ThreadPoolExecutor(max_workers=config.JOB_WORKERS, thread_name_prefix="mise-job")
-    backlog = db.all_("SELECT id FROM jobs WHERE status='queued' ORDER BY id")
-    for row in backlog:
-        _pool.submit(_execute, row["id"])
+    backlog = _due_job_ids()
+    dispatch(backlog)
     if backlog:
         log.info("re-queued %d jobs from previous run", len(backlog))
+    # Anything not due yet (a retry parked mid-crash) is the sweeper's job.
+    _start_sweeper()
+    log.info(
+        "job queue up (%s workers, sweep every %ss)",
+        config.JOB_WORKERS,
+        config.JOB_SWEEP_TICK_SECONDS,
+    )
 
 
-def stop() -> None:
+def stop(*, wait: bool = False, timeout: float = 10.0) -> None:
+    """Shut the queue down.
+
+    `wait=False` (the default, and what app shutdown uses) signals and returns
+    immediately: a restart must not block behind a long transcode, and it is
+    safe to drop in-flight work because start() re-queues anything left in
+    'running'.
+
+    `wait=True` drains first, and exists for callers that are about to change
+    the ground the workers stand on — chiefly tests, which repoint
+    config.DB_PATH at a fresh database between cases. A worker that outlives
+    stop() reads that module global at its next db.connect(), so it stops
+    talking to the database it was started against and starts talking to the
+    NEXT test's, mid-migrate. That is the "database is locked" flake in
+    test_smoke_argus: the job survives, the path moves under it, and the two
+    collide. The window is small, which is why it only appeared in some runs.
+
+    Bounded on purpose: a wedged job should cost a warning, not a hung suite.
+    """
     global _pool
-    if _pool:
-        _pool.shutdown(wait=False, cancel_futures=True)
-        _pool = None
+    _stop_sweeper()
+    pool = _pool
+    _pool = None
+    if pool:
+        if wait:
+            with _futures_lock:
+                pending = [f for f in _futures if not f.done()]
+            if pending:
+                _, not_done = futures_wait(pending, timeout=timeout)
+                if not_done:
+                    log.warning(
+                        "jobs.stop(wait=True): %d job(s) still running after %ss — "
+                        "they may now write against whatever DB_PATH is current",
+                        len(not_done),
+                        timeout,
+                    )
+        pool.shutdown(wait=False, cancel_futures=True)
+    # cancel_futures drops submissions that will never reach _execute's finally,
+    # so their ids have to be released here or the next pool in this process
+    # (a test restarting the queue) would treat them as permanently in flight.
+    with _inflight_lock:
+        _inflight.clear()
+    with _futures_lock:
+        _futures.clear()

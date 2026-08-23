@@ -24,6 +24,7 @@ import logging
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, db, security
@@ -101,7 +102,7 @@ def _parse(form) -> dict:
 
 
 @router.get("/presets", response_class=HTMLResponse)
-async def presets_list(request: Request):
+def presets_list(request: Request):
     rows = db.all_("SELECT * FROM crop_presets ORDER BY active DESC, sort, id")
     trail = db.all_(
         """SELECT entity_id, action, actor, diff_json, created_at FROM audit_log
@@ -125,6 +126,10 @@ async def presets_list(request: Request):
 @router.post("/presets")
 async def create_preset(request: Request):
     form = await request.form()
+    return await run_in_threadpool(_create_preset, form)
+
+
+def _create_preset(form):
     slug = (form.get("slug") or "").strip().lower()
     if not SLUG_RE.match(slug):
         raise HTTPException(
@@ -160,8 +165,12 @@ async def create_preset(request: Request):
 
 @router.post("/presets/{preset_id}")
 async def update_preset(request: Request, preset_id: int):
-    p = get_preset(preset_id)
+    p = await run_in_threadpool(get_preset, preset_id)
     form = await request.form()
+    return await run_in_threadpool(_update_preset, p, form, preset_id)
+
+
+def _update_preset(p: "db.sqlite3.Row", form, preset_id: int):
     new = _parse(form)
     diff = {f: [p[f], new[f]] for f in _EDIT_FIELDS if p[f] != new[f]}
     if not diff:
@@ -188,7 +197,7 @@ async def update_preset(request: Request, preset_id: int):
 
 
 @router.post("/presets/{preset_id}/active")
-async def toggle_active(preset_id: int):
+def toggle_active(preset_id: int):
     p = get_preset(preset_id)
     new = 0 if p["active"] else 1
     with db.tx() as con:
@@ -201,7 +210,7 @@ async def toggle_active(preset_id: int):
 
 
 @router.post("/presets/{preset_id}/overlay")
-async def toggle_overlay(preset_id: int):
+def toggle_overlay(preset_id: int):
     p = get_preset(preset_id)
     new = 0 if p["brand_overlay"] else 1
     with db.tx() as con:

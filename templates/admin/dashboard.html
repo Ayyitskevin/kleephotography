@@ -6,7 +6,7 @@
     <h1>Galleries</h1>
     <p class="pgtop-sub">
       <b>{{ totals.n }}</b> galler{{ "ies" if totals.n != 1 else "y" }} ·
-      {{ totals.size }} · {{ totals.published }} live links · {{ totals.assets }} photos
+      {{ totals.size }} originals · {{ totals.published }} live links · {{ totals.assets }} photos
       {% if failed_jobs %}· <a class="neg" href="/admin/jobs">{{ failed_jobs }} job{{ "s" if failed_jobs != 1 }} failed</a>{% endif %}
     </p>
   </div>

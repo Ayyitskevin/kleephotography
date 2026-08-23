@@ -31,7 +31,18 @@ def telegram_enabled() -> bool:
 
 
 def healthz_detail_enabled() -> bool:
+    """Whether the full /healthz payload can be unlocked with a bearer."""
     return bool(config.HEALTHZ_TOKEN)
+
+
+def review_engine_enabled() -> bool:
+    """Post-delivery Google review asks. Dormant without the review URL."""
+    return bool(config.GOOGLE_REVIEW_URL)
+
+
+def deadman_enabled() -> bool:
+    """External dead-man's switch. Independent of telegram_enabled on purpose."""
+    return bool(config.HEARTBEAT_PING_URL)
 
 
 def sms_enabled() -> bool:
@@ -55,3 +66,8 @@ def screening_room() -> bool:
 def aerials_live() -> bool:
     """Aerial (drone) deliverables — flips on when the Part 107 cert lands."""
     return bool(config.AERIALS_LIVE)
+
+
+def invoice_dunning_enabled() -> bool:
+    """Client-facing overdue-invoice chasing. Owner-armed; OFF by default."""
+    return bool(config.INVOICE_DUNNING)

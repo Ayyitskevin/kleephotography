@@ -245,7 +245,7 @@ def test_canonical_origin_redirects_browser_routes(client, monkeypatch):
 
     canonical = client.get("https://kleephotography.com/contact", follow_redirects=False)
     assert canonical.status_code == 200
-    assert canonical.headers["strict-transport-security"] == "max-age=300"
+    assert canonical.headers["strict-transport-security"] == f"max-age={config.HSTS_MAX_AGE}"
 
     default_port = client.get("https://kleephotography.com:443/contact", follow_redirects=False)
     assert default_port.status_code == 200

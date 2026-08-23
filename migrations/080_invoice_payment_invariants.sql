@@ -27,8 +27,8 @@ UPDATE invoices
  WHERE stripe_session_id IS NOT NULL
    AND status != 'paid';
 
--- Fail the migration loudly if historic rows already violate either invariant;
--- deployment must reconcile them rather than silently discarding money records.
+-- Fail loudly if historic data already violates either invariant. A deployment
+-- must reconcile those rows; silently discarding money records is forbidden.
 CREATE UNIQUE INDEX ux_payments_invoice_kind
     ON payments(invoice_id, kind);
 CREATE UNIQUE INDEX ux_payments_stripe_session

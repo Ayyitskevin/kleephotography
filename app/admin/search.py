@@ -22,7 +22,7 @@ def _like(q: str) -> str:
 
 
 @router.get("", response_class=HTMLResponse)
-async def search(request: Request, q: str = ""):
+def search(request: Request, q: str = ""):
     q = q.strip()
     groups: list[dict] = []
     if q:

@@ -57,7 +57,6 @@ def _claim_send(inquiry_id: int) -> bool:
     """Atomically claim the right to send. Returns False if already delivered
     or another worker holds a fresh in_flight claim."""
     with db.tx() as con:
-        con.execute("BEGIN IMMEDIATE")
         row = con.execute(
             """SELECT owner_email_delivered_at, owner_email_status,
                       owner_email_last_attempted_at, emailed

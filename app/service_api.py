@@ -21,6 +21,7 @@ import datetime as dt
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 
 from . import argus_analyze, config, db, plutus_recommend, security
 
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/api")
 
 
 @router.get("/shots", dependencies=[Depends(security.require_shots_token)])
-async def shots(session: str = ""):
+def shots(session: str = ""):
     session = (session or "").strip()
     if not session:
         raise HTTPException(status_code=400, detail="session required")
@@ -55,7 +56,7 @@ async def shots(session: str = ""):
 
 
 @router.get("/galleries/expiring", dependencies=[Depends(security.require_shots_token)])
-async def galleries_expiring(days: int = 7):
+def galleries_expiring(days: int = 7):
     """Published galleries expiring within `days` days. For Odysseus gallery_expiration_warn."""
     if days < 1 or days > 30:
         raise HTTPException(status_code=400, detail="days must be 1-30")
@@ -73,7 +74,7 @@ async def galleries_expiring(days: int = 7):
 
 
 @router.get("/press/recent", dependencies=[Depends(security.require_shots_token)])
-async def press_recent(days: int = 30):
+def press_recent(days: int = 30):
     """Press hits with publish_date in the last `days` days. For Odysseus press_to_outreach."""
     if days < 1 or days > 90:
         raise HTTPException(status_code=400, detail="days must be 1-90")
@@ -91,7 +92,7 @@ async def press_recent(days: int = 30):
 
 
 @router.get("/galleries", dependencies=[Depends(security.require_argus_token)])
-async def galleries(published: bool = True):
+def galleries(published: bool = True):
     """Read-only published gallery index for Argus (Phase 6 slice 1)."""
     if published:
         rows = db.all_(
@@ -131,20 +132,33 @@ async def galleries(published: bool = True):
     }
 
 
+def _require_gallery(gallery_id: int) -> None:
+    if not db.one("SELECT 1 AS x FROM galleries WHERE id=?", (gallery_id,)):
+        raise HTTPException(status_code=404, detail="gallery not found")
+
+
+# Both callbacks stay `async def` only for `await request.json()`. Everything
+# else they touch blocks: the existence check and apply_callback are SQLite with
+# a 30s busy_timeout, and argus_analyze.apply_callback also fans out to
+# platekit.notify_argus_complete, a blocking urlopen (MISE_PLATEKIT_TIMEOUT,
+# default 10s). Run on the loop, any of it stalls every other response the
+# process is writing — so each blocking segment gets a threadpool hop, and the
+# functions behind those hops must stay sync.
+
+
 @router.post("/argus/callback", dependencies=[Depends(security.require_argus_token)])
 async def argus_callback(request: Request, gallery_id: int):
     """Argus job completion webhook — updates argus_last_* on the gallery row."""
     if gallery_id <= 0:
         raise HTTPException(status_code=400, detail="gallery_id required")
-    if not db.one("SELECT 1 AS x FROM galleries WHERE id=?", (gallery_id,)):
-        raise HTTPException(status_code=404, detail="gallery not found")
+    await run_in_threadpool(_require_gallery, gallery_id)
     try:
         payload = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="json body required")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="json object required")
-    argus_analyze.apply_callback(gallery_id, payload)
+    await run_in_threadpool(argus_analyze.apply_callback, gallery_id, payload)
     return {"ok": True, "gallery_id": gallery_id}
 
 
@@ -153,13 +167,12 @@ async def plutus_callback(request: Request, gallery_id: int):
     """Argus/Plutus hand-off completion — updates plutus_last_* on the gallery row."""
     if gallery_id <= 0:
         raise HTTPException(status_code=400, detail="gallery_id required")
-    if not db.one("SELECT 1 AS x FROM galleries WHERE id=?", (gallery_id,)):
-        raise HTTPException(status_code=404, detail="gallery not found")
+    await run_in_threadpool(_require_gallery, gallery_id)
     try:
         payload = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="json body required")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="json object required")
-    plutus_recommend.apply_callback(gallery_id, payload)
+    await run_in_threadpool(plutus_recommend.apply_callback, gallery_id, payload)
     return {"ok": True, "gallery_id": gallery_id}

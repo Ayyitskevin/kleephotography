@@ -1,0 +1,12 @@
+[Unit]
+Description=Mise off-host encrypted backup (restic)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mise
+# RESTIC_REPOSITORY, RESTIC_PASSWORD_FILE and any provider credentials live here.
+# Without it the run skips loudly and this host has no off-host copy.
+EnvironmentFile=-/opt/mise/.env
+ExecStart=/opt/mise/ops/offsite-backup.sh

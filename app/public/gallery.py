@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from .. import audit, config, db, features, jobs, reopen_notify, security
+from .. import audit, config, db, features, inquiry_notify, jobs, reopen_notify, security
 from ..gallery_comments import cascade_status, resolve_comment_parent, video_comment_thread
 from ..render import templates
 
@@ -52,7 +52,7 @@ def _proof_status_for_visitor(gallery_id: int, visitor_id: int) -> dict | None:
 
 
 @router.get("/{slug}", response_class=HTMLResponse)
-async def view(request: Request, slug: str):
+def view(request: Request, slug: str):
     g = get_live_gallery(slug)
     if is_expired(g):
         return templates.TemplateResponse(request, "public/expired.html", {"g": g}, status_code=410)
@@ -165,7 +165,7 @@ def _view_drop(request: Request, g):
 
 
 @router.post("/{slug}/pin")
-async def check_pin(request: Request, slug: str, pin: str = Form(...)):
+def check_pin(request: Request, slug: str, pin: str = Form(...)):
     g = get_live_gallery(slug)
     if is_expired(g):
         raise HTTPException(status_code=410)
@@ -177,7 +177,7 @@ async def check_pin(request: Request, slug: str, pin: str = Form(...)):
             {"g": g, "error": f"Too many tries — wait {config.PIN_LOCKOUT_MIN} minutes."},
             status_code=429,
         )
-    if pin.strip() != g["pin"]:
+    if not security.pin_matches(pin, g["pin"]):
         security.pin_fail(ip, g["id"])
         return templates.TemplateResponse(
             request, "public/pin.html", {"g": g, "error": "Wrong PIN."}, status_code=401
@@ -244,8 +244,144 @@ def _progress_oob(g, section_id: int | None, visitor_id: int) -> str:
     return progress + status
 
 
+@router.post("/{slug}/prints", response_class=HTMLResponse)
+def request_prints(
+    request: Request,
+    slug: str,
+    email: str = Form(""),
+    note: str = Form(""),
+    website: str = Form(""),
+):
+    """Prints, phase one (revenue roadmap 6): the ask, not the store.
+
+    Working photographers are unanimous that digital-only leaves money on the
+    table, but a print STORE (lab APIs, carts, fulfilment) is a big bet on
+    unproven demand. This is the cheap experiment that decides it: a request
+    from inside the gallery becomes an inquiry Kevin quotes by hand. If these
+    convert, the store earns its spec; if they don't, a week was risked, not a
+    quarter.
+
+    PIN-gated like every gallery action; the visitor's gate email is reused so
+    most clients never retype anything.
+    """
+    g = get_live_gallery(slug)
+    if is_expired(g):
+        raise HTTPException(status_code=410)
+    visitor = security.require_visitor(request, g["id"])
+    if website.strip():  # honeypot
+        return RedirectResponse(f"/g/{slug}?prints=1", status_code=303)
+    ip = security.client_ip(request)
+    if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_FORM):
+        raise HTTPException(status_code=429, detail="too many requests — try again shortly")
+    email = (email or visitor["email"] or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="an email is needed for the quote")
+    # Count the REQUESTER's favourites, not the gallery's. A visitor row is
+    # minted per device (every PIN success), so `f.visitor_id=?` alone would
+    # miss the phone picks behind a laptop request — the gate email is the only
+    # cross-device identity. Match it, plus the device making this request
+    # (whose fresh row may carry no email yet); DISTINCT so a photo circled on
+    # two devices counts once. Picks from a device that never left an email are
+    # unattributable, so the gallery-wide total rides along whenever it differs.
+    favs = db.one(
+        "SELECT COUNT(DISTINCT f.asset_id) AS n FROM favorites f "
+        "JOIN visitors v ON v.id=f.visitor_id "
+        "WHERE v.gallery_id=? AND (v.id=? OR v.email=?)",
+        (g["id"], visitor["id"], email),
+    )["n"]
+    total = db.one(
+        "SELECT COUNT(DISTINCT f.asset_id) AS n FROM favorites f "
+        "JOIN assets a ON a.id=f.asset_id WHERE a.gallery_id=?",
+        (g["id"],),
+    )["n"]
+    note = note.strip()[:1000]
+    plural = "s" if favs != 1 else ""
+    lines = [
+        f'Print request from gallery "{g["title"]}" — {favs} favorite{plural} circled by {email}.'
+    ]
+    if total != favs:
+        lines.append(
+            f"Gallery-wide: {total} favorite{'s' if total != 1 else ''} circled "
+            "across all visitors."
+        )
+    if note:
+        lines.append(f"Their note: {note}")
+    lines.append(f"Gallery: {config.BASE_URL}/g/{g['slug']}")
+    lines.append(f"Admin: {config.BASE_URL}/admin/galleries/{g['id']}")
+    message = "\n\n".join(lines)
+    security.inquiry_record(ip, security.INQUIRY_BUCKET_FORM)
+    iid = db.run(
+        """INSERT INTO inquiries (name, email, message, kind, service)
+           VALUES (?,?,?,?,?)""",
+        (g["client_name"] or "Gallery client", email, message, "prints", g["title"]),
+    )
+    inquiry_notify.enqueue_owner_email(iid)
+    log.info("print request for gallery %s (inquiry %s)", g["id"], iid)
+    return RedirectResponse(f"/g/{slug}?prints=1", status_code=303)
+
+
+@router.post("/{slug}/reactivate", response_class=HTMLResponse)
+def request_reactivation(
+    request: Request,
+    slug: str,
+    email: str = Form(...),
+    note: str = Form(""),
+    website: str = Form(""),
+):
+    """Reactivation (revenue roadmap 7): the expired page stops being a dead end.
+
+    Returning clients are usually returning to SPEND — a print, a re-download,
+    a share with family — and the old page's answer was a mailto link. This
+    works ONLY on an expired gallery (a live one 404s the route): expiry gates
+    the PIN page itself, so this form is necessarily open — hence the honeypot,
+    the throttle, and a required email rather than a free ride.
+
+    Kevin restores by extending the expiry date on the admin gallery page —
+    which also re-arms the expiry reminder (see admin.galleries).
+    """
+    g = get_live_gallery(slug)
+    if not is_expired(g):
+        raise HTTPException(status_code=404)
+    done_ctx = {"g": g, "sent": True}
+    if website.strip():  # honeypot — pretend success
+        return templates.TemplateResponse(request, "public/expired.html", done_ctx)
+    ip = security.client_ip(request)
+    if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_FORM):
+        return templates.TemplateResponse(
+            request,
+            "public/expired.html",
+            {"g": g, "error": "A few requests came through just now — try again shortly."},
+            status_code=429,
+        )
+    email = email.strip().lower()
+    if not email or "@" not in email:
+        return templates.TemplateResponse(
+            request,
+            "public/expired.html",
+            {"g": g, "error": "Please enter the email you'd like the gallery sent to."},
+            status_code=400,
+        )
+    note = note.strip()[:1000]
+    lines = [f'Reactivation request for expired gallery "{g["title"]}".']
+    if note:
+        lines.append(f"Their note: {note}")
+    lines.append(
+        f"Restore it by extending the expiry date: {config.BASE_URL}/admin/galleries/{g['id']}"
+    )
+    message = "\n\n".join(lines)
+    security.inquiry_record(ip, security.INQUIRY_BUCKET_FORM)
+    iid = db.run(
+        """INSERT INTO inquiries (name, email, message, kind, service)
+           VALUES (?,?,?,?,?)""",
+        (g["client_name"] or "Past client", email, message, "reactivation", g["title"]),
+    )
+    inquiry_notify.enqueue_owner_email(iid)
+    log.info("reactivation request for gallery %s (inquiry %s)", g["id"], iid)
+    return templates.TemplateResponse(request, "public/expired.html", done_ctx)
+
+
 @router.post("/{slug}/fav/{asset_id}", response_class=HTMLResponse)
-async def toggle_fav(request: Request, slug: str, asset_id: int):
+def toggle_fav(request: Request, slug: str, asset_id: int):
     g = get_live_gallery(slug)
     # Once a gallery expires it 410s everywhere else; without this a visitor
     # holding a live cookie could keep changing their proofing picks after the
@@ -300,7 +436,7 @@ async def toggle_fav(request: Request, slug: str, asset_id: int):
 
 
 @router.get("/{slug}/rendition-tile/{rendition_id}", response_class=HTMLResponse)
-async def rendition_tile(request: Request, slug: str, rendition_id: int):
+def rendition_tile(request: Request, slug: str, rendition_id: int):
     """Self-updating REC tile on the premiere's reel row: polled via hx-get
     every 8s while a social cut renders, swapping to the download chip when the
     encode lands (same pattern as the ZIP wait). Script-free fragment; same
@@ -365,30 +501,38 @@ def _maybe_reopen_on_reply(con, reply_id: int):
     return {"root_id": root["id"], "asset_id": root["asset_id"], "cause_reply_id": reply_id}
 
 
-def _live_video_asset(request: Request, slug: str, asset_id: int):
+def _live_commentable_asset(request: Request, slug: str, asset_id: int):
     """Shared gate for the client comment routes: live + unexpired gallery,
-    valid visitor cookie, and a ready video asset in that gallery."""
+    valid visitor cookie, and a ready photo or video asset in that gallery.
+
+    Photos were excluded only by this WHERE clause — `video_comments` never had
+    a kind constraint (migrations/026), the thread/resolve/reply/reopen machinery
+    is kind-agnostic, and for a studio whose deliverable is usually stills, "the
+    client can annotate the film but not the frames" was the wrong way round.
+    Returns the asset kind so the caller can decide what a timecode means.
+    """
     g = get_live_gallery(slug)
     if is_expired(g):
         raise HTTPException(status_code=410)
     visitor = security.require_visitor(request, g["id"])
     a = db.one(
-        "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='video' AND status='ready'",
+        """SELECT kind FROM assets
+           WHERE id=? AND gallery_id=? AND kind IN ('photo','video') AND status='ready'""",
         (asset_id, g["id"]),
     )
     if not a:
         raise HTTPException(status_code=404)
-    return g, visitor
+    return g, visitor, a["kind"]
 
 
 @router.get("/{slug}/comments/{asset_id}")
-async def list_comments(request: Request, slug: str, asset_id: int):
-    _live_video_asset(request, slug, asset_id)
+def list_comments(request: Request, slug: str, asset_id: int):
+    _live_commentable_asset(request, slug, asset_id)
     return JSONResponse(video_comment_thread(asset_id))
 
 
 @router.post("/{slug}/comments/{asset_id}")
-async def add_comment(
+def add_comment(
     request: Request,
     slug: str,
     asset_id: int,
@@ -396,12 +540,17 @@ async def add_comment(
     timecode: float = Form(0.0),
     parent_id: str = Form(""),
 ):
-    g, visitor = _live_video_asset(request, slug, asset_id)
+    g, visitor, kind = _live_commentable_asset(request, slug, asset_id)
     body = body.strip()
     if not body:
         raise HTTPException(status_code=400, detail="comment body required")
     parent, inherited = resolve_comment_parent(asset_id, parent_id)
-    tc = inherited if parent is not None else max(0.0, timecode)
+    # A still has no playhead, so its notes are pinned at 0 whatever the form
+    # sent — the column stays NOT NULL and the ordering index still applies.
+    if kind == "photo":
+        tc = 0.0
+    else:
+        tc = inherited if parent is not None else max(0.0, timecode)
     reopened = None
     with db.tx() as con:
         cur = con.execute(

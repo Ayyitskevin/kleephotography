@@ -33,6 +33,16 @@
       <div class="ib-empty-list">No messages in this view.</div>
       {% endfor %}
     </div>
+    {# Without this the tab badge counts threads the list can no longer reach. #}
+    {% if counts[tab] > page_size %}
+    <p class="muted" style="padding: 0 18px 14px">
+      Showing {{ offset + 1 }}&ndash;{{ [offset + page_size, counts[tab]]|min }} of {{ counts[tab] }}
+      {% if offset > 0 %} ·
+      <a href="/admin/inbox?tab={{ tab }}&amp;offset={{ [offset - page_size, 0]|max }}">&larr; Newer</a>{% endif %}
+      {% if offset + page_size < counts[tab] %} ·
+      <a href="/admin/inbox?tab={{ tab }}&amp;offset={{ offset + page_size }}">Older &rarr;</a>{% endif %}
+    </p>
+    {% endif %}
   </div>
 
   {# ── PANE 2: the two-way conversation thread + composer ── #}

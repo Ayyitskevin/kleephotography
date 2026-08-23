@@ -1,0 +1,12 @@
+[Unit]
+Description=Mise off-host encrypted backup — nightly at 03:30
+
+[Timer]
+# An hour after mise-backup.timer (02:30 + up to 5 min jitter), so the local
+# snapshot it ships already exists and has been integrity-checked.
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

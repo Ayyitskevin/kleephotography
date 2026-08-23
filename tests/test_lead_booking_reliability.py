@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 from app import config, db, jobs, mailer, notion_sync, scheduling
 from app.gcal import FreeBusyQuery
 from app.main import app
-from tests.jobtest import freeze_job_pool
+from tests.jobtest import elapse_backoff, freeze_job_pool
 
 pytestmark = pytest.mark.integration
 
@@ -285,6 +285,7 @@ def test_failed_notion_sync_inquiry_surfaces_and_admin_retry_recovers(admin_clie
     try:
         job_id = jobs.enqueue("notion_sync_inquiry", {"inquiry_id": iid})
         for attempt in range(1, jobs.MAX_ATTEMPTS + 1):
+            elapse_backoff(job_id)
             jobs._execute(job_id)
             job = db.one("SELECT status, attempts, error FROM jobs WHERE id=?", (job_id,))
             expected = "failed" if attempt == jobs.MAX_ATTEMPTS else "queued"

@@ -1,21 +1,30 @@
 """Shared admin helpers (start of module splits for large admin files)."""
 
 import datetime as dt
+from collections.abc import Callable
 from pathlib import Path
+
+from fastapi.concurrency import run_in_threadpool
 
 from .. import db
 
 
 async def save_upload(file, dest: Path) -> int:
     """Stream an UploadFile to `dest` in 1 MiB chunks; return bytes written.
-    The gallery, brand-asset, brand-kit-logo, and expense-receipt upload handlers
-    all repeated this exact loop — one implementation keeps the streaming + size
-    accounting in a single place."""
+
+    The read is the await — it cannot leave the loop. Each disk write hops to
+    the threadpool so a multi-megabyte receipt or gallery original cannot stall
+    every other request. The gallery, brand-asset, brand-kit-logo, and
+    expense-receipt handlers all share this.
+    """
     size = 0
-    with dest.open("wb") as out:
+    out = await run_in_threadpool(dest.open, "wb")
+    try:
         while chunk := await file.read(1 << 20):
-            out.write(chunk)
+            await run_in_threadpool(out.write, chunk)
             size += len(chunk)
+    finally:
+        await run_in_threadpool(out.close)
     return size
 
 
@@ -48,10 +57,124 @@ def open_invoice_balance():
     )
 
 
+def doc_emails_on_record(doc_kind: str, doc_id: int) -> int:
+    """How many sends Mise has on record for one studio doc.
+
+    For doc_kind 'proposal'/'contract'/'invoice', emails_log rows come only
+    from the in-app "Email to client" send (after SMTP succeeds) — the table
+    itself has other writers (gallery delivery, inbox replies) but they write
+    doc_kind 'other', so the filter below is load-bearing. A copy Kevin mailed
+    from his own client, or a link he texted, leaves no row here. Callers
+    therefore say "no send recorded", never "never sent".
+    The three doc detail pages and the Home no-send nudge all read this one
+    query so they can never disagree about the same doc."""
+    return db.one(
+        "SELECT COUNT(*) AS n FROM emails_log WHERE doc_kind=? AND doc_id=?",
+        (doc_kind, doc_id),
+    )["n"]
+
+
+def collected_by_month() -> dict[str, dict[str, int]]:
+    """Cash collected per YYYY-MM from Stripe payment events (the source of
+    truth for revenue — an invoice total stamped by paid_at counts a
+    deposit-paid-but-still-open invoice as zero).
+
+    Maps 'YYYY-MM' to {"cents": ..., "n": ...}. The count rides along because
+    Home prints "N payments" beside the figure and used to fetch it with a second
+    query carrying its own copy of the bucketing expression below — the fourth
+    copy of a rule that had already drifted once (see month_money_series).
+
+    created_at is stored UTC, but the month is decided on the operator's wall
+    clock ('localtime'): a 9 PM payment on the last of the month is already the
+    first of the next month in UTC, and it belongs to the month he collected
+    it. Months with no cash are simply absent from the mapping."""
+    return {
+        r["ym"]: {"cents": r["cents"], "n": r["n"]}
+        for r in db.all_(
+            """SELECT strftime('%Y-%m', created_at, 'localtime') AS ym,
+                      COALESCE(SUM(amount_cents), 0) AS cents,
+                      COUNT(*) AS n
+               FROM payments GROUP BY ym"""
+        )
+    }
+
+
+# Months with no cash are absent from the mapping; this is what they look like.
+NO_CASH = {"cents": 0, "n": 0}
+
+
+def month_money_series(
+    today: dt.date,
+    months: int,
+    label: Callable[[dt.date], str],
+    *,
+    goal_cents: int = 0,
+    bars: bool = True,
+    by_ym: dict[str, dict[str, int]] | None = None,
+) -> tuple[list[dict], int]:
+    """The trailing `months` months of collected cash ending with `today`'s
+    month, oldest first, plus the scale their bars are drawn against.
+
+    Home's revenue reel, the Financials month reel and the Reports chart are all
+    this computation. They were three copies once and drifted, so what genuinely
+    differs between them is a parameter here: `months` is the window, `label`
+    turns a first-of-month date into that caller's bar caption, `goal_cents`
+    folds a target into the scale so a goal silhouette stays the tallest thing
+    on the card (Home alone sets one), and `bars` adds the per-month height and
+    current-month flag the two six-month reels read — Reports draws its own
+    bars from the returned scale instead.
+
+    Both halves land on the operator's calendar: the window is built from the
+    caller's `today` (a studio wall-clock date) and the buckets convert with
+    'localtime'. Bucketing on UTC instead would move an evening payment into
+    the following month. An empty month still gets a 4% stub so it draws as a
+    flat bar rather than vanishing from the reel."""
+    first_of_month = today.replace(day=1)
+    window, cursor = [], first_of_month
+    for _ in range(months):
+        window.append(cursor)
+        cursor = (cursor - dt.timedelta(days=1)).replace(day=1)
+    window.reverse()
+    # `by_ym` lets a caller that already holds the mapping pass it in — Home
+    # renders both this reel and the month-to-date figure, and would otherwise
+    # run the same GROUP BY twice for one page.
+    by_ym = collected_by_month() if by_ym is None else by_ym
+    cents = [by_ym.get(m.strftime("%Y-%m"), NO_CASH)["cents"] for m in window]
+    # The 1 floor keeps a studio with no cash yet from dividing by zero.
+    scale = max(cents + [goal_cents or 0, 1])
+    series = []
+    for month, amount in zip(window, cents, strict=True):
+        row = {"label": label(month), "cents": amount}
+        if bars:
+            row["pct"] = max(4, round(amount * 100 / scale))
+            row["current"] = month == first_of_month
+        series.append(row)
+    return series, scale
+
+
 def dir_size(path: Path) -> int:
     if not path.exists():
         return 0
     return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+
+
+def original_bytes_by_gallery(gallery_type: str) -> dict[int, int]:
+    """Per-gallery SUM of assets.bytes for one gallery type, in one grouped query.
+
+    assets.bytes is the ORIGINAL upload size, and nothing records the size of a
+    derivative (web, thumb, crops, renditions). So this is the size of what a
+    client actually downloads — the ZIP is built from the originals — and NOT
+    on-disk usage: the library strips that show it say "originals" for that
+    reason. A gallery with no assets is absent from the mapping."""
+    return {
+        r["gallery_id"]: r["bytes"]
+        for r in db.all_(
+            """SELECT a.gallery_id AS gallery_id, COALESCE(SUM(a.bytes), 0) AS bytes
+               FROM assets a JOIN galleries g ON g.id = a.gallery_id
+               WHERE g.type = ? GROUP BY a.gallery_id""",
+            (gallery_type,),
+        )
+    }
 
 
 def fmt_size(n: int) -> str:

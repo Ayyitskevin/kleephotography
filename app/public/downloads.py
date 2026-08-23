@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+import mimetypes
 import re
 import shutil
 from pathlib import Path
@@ -9,7 +10,8 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from .. import config, db, jobs, security
+from .. import config, db, jobs, security, zip_cache
+from ..http_cache import conditional_file
 from ..render import templates
 from .gallery import get_live_gallery, is_expired
 
@@ -109,7 +111,7 @@ def _target(
 
 
 @router.get("/{slug}/download", response_class=HTMLResponse)
-async def download_page(
+def download_page(
     request: Request,
     slug: str,
     asset_id: int | None = None,
@@ -135,7 +137,7 @@ async def download_page(
 
 
 @router.post("/{slug}/email", response_class=HTMLResponse)
-async def capture_email(
+def capture_email(
     request: Request,
     slug: str,
     email: str = Form(...),
@@ -166,7 +168,20 @@ async def capture_email(
 
 
 @router.get("/{slug}/download/asset/{asset_id}")
-async def download_asset(request: Request, slug: str, asset_id: int):
+def download_asset(request: Request, slug: str, asset_id: int):
+    """One original, as an attachment — the per-file save path.
+
+    This is the route the lightbox Save button fetches on phones, where a
+    multi-hundred-MB ZIP is exactly what iOS Safari handles worst. The real
+    media type matters there: `application/octet-stream` made the shared blob
+    a nameless "file" instead of an image the share sheet can put in Photos.
+    Same gates and per-visitor download log as every sibling route; the 304
+    path (http_cache) means a re-save of bytes the client already holds costs
+    nothing — and logs nothing, because no file was delivered. A fully-fresh
+    cache hit inside the 24h window is the same class (browser serves it, no
+    server hit, no row) — the log counts deliveries, not saves. Any request
+    that DOES reach the server re-runs every gate before the 304 branch.
+    """
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download?asset_id={asset_id}", status_code=303)
@@ -178,15 +193,18 @@ async def download_asset(request: Request, slug: str, asset_id: int):
     path = config.MEDIA_DIR / str(g["id"]) / "original" / a["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
-    db.run(
-        "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,?)",
-        (g["id"], visitor["id"], asset_id),
-    )
-    return FileResponse(path, filename=a["filename"], media_type="application/octet-stream")
+    media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+    resp = conditional_file(request, path, media_type, filename=a["filename"])
+    if resp.status_code != 304:
+        db.run(
+            "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,?)",
+            (g["id"], visitor["id"], asset_id),
+        )
+    return resp
 
 
 @router.get("/{slug}/download/web/{asset_id}")
-async def download_web_video(request: Request, slug: str, asset_id: int):
+def download_web_video(request: Request, slug: str, asset_id: int):
     """Web-ready MP4 for a delivered video — the same transcoded H.264 the
     gallery streams, offered as a download so clients get a post-anywhere file
     without pulling the multi-GB camera original."""
@@ -212,7 +230,7 @@ async def download_web_video(request: Request, slug: str, asset_id: int):
 
 
 @router.get("/{slug}/download/rendition/{rendition_id}")
-async def download_rendition(request: Request, slug: str, rendition_id: int):
+def download_rendition(request: Request, slug: str, rendition_id: int):
     """A ready social-cut rendition (9:16 / 1:1) as an attachment. Same gates
     as every other download; the tile only links renditions once they're ready,
     so the email-gate redirect just returns the visitor to the gallery flow."""
@@ -242,7 +260,7 @@ async def download_rendition(request: Request, slug: str, rendition_id: int):
 
 
 @router.get("/{slug}/download/favorites")
-async def download_favorites(request: Request, slug: str):
+def download_favorites(request: Request, slug: str):
     g, visitor = _gate(request, slug)
     # Match download_asset/download_zip: only email-gate when this gallery type
     # actually requires it. A drop (transfer) skips the gate, and the plain
@@ -280,7 +298,7 @@ async def download_favorites(request: Request, slug: str):
 
 
 @router.get("/{slug}/download/section/{section_id}")
-async def download_section(request: Request, slug: str, section_id: int):
+def download_section(request: Request, slug: str, section_id: int):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download?section={section_id}", status_code=303)
@@ -309,12 +327,16 @@ async def download_section(request: Request, slug: str, section_id: int):
 
 
 @router.get("/{slug}/download/zip")
-async def download_zip(request: Request, slug: str):
+def download_zip(request: Request, slug: str):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
         return RedirectResponse(f"/g/{slug}/download", status_code=303)
     path = jobs.zip_path(g["id"], g["content_rev"])
     if path.is_file():
+        # Refresh the archive's clock so ZIP_DIR eviction measures idleness
+        # rather than age — a gallery a client keeps coming back to must not
+        # age out from under them (app/zip_cache.py).
+        zip_cache.touch(path)
         db.run(
             "INSERT INTO downloads (gallery_id, visitor_id, asset_id) VALUES (?,?,NULL)",
             (g["id"], visitor["id"]),
@@ -342,7 +364,7 @@ async def download_zip(request: Request, slug: str):
 
 
 @router.get("/{slug}/download/zip/status")
-async def zip_status(request: Request, slug: str, name: str | None = None):
+def zip_status(request: Request, slug: str, name: str | None = None):
     # Same gates as the sibling download routes — without them this was an
     # unauthenticated status oracle for any known slug.
     g, _ = _gate(request, slug)

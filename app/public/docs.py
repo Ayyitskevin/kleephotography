@@ -7,8 +7,9 @@ import logging
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import db, security
+from .. import db, proposal_notify, security
 from ..render import templates
+from . import telemetry
 
 log = logging.getLogger("mise.public.docs")
 router = APIRouter()
@@ -29,9 +30,11 @@ def _proposal_or_404(slug: str) -> "db.sqlite3.Row":
 
 
 @router.get("/p/{slug}", response_class=HTMLResponse)
-async def view_proposal(request: Request, slug: str):
+def view_proposal(request: Request, slug: str):
     d = _proposal_or_404(slug)
-    if d["status"] == "sent":
+    # Read telemetry only — see app/public/telemetry.py for why a bare GET is
+    # not proof that a person opened the document.
+    if d["status"] == "sent" and telemetry.is_human_view(request):
         db.run(
             "UPDATE proposals SET status='viewed', viewed_at=datetime('now') WHERE id=?", (d["id"],)
         )
@@ -42,7 +45,7 @@ async def view_proposal(request: Request, slug: str):
 
 
 @router.post("/p/{slug}/accept")
-async def accept_proposal(request: Request, slug: str):
+def accept_proposal(request: Request, slug: str):
     d = _proposal_or_404(slug)
     if d["status"] not in ("sent", "viewed"):
         if request.headers.get("hx-request") == "true":
@@ -56,6 +59,9 @@ async def accept_proposal(request: Request, slug: str):
         "UPDATE proposals SET status='accepted', accepted_at=datetime('now') WHERE id=?", (d["id"],)
     )
     log.info("proposal %s ACCEPTED from %s", d["id"], security.client_ip(request))
+    # Owner nudge rides the job queue AFTER the commit and never raises — a down
+    # notify channel must not fail the client's acceptance (app/proposal_notify.py).
+    proposal_notify.enqueue_decision(d["id"], "accepted")
     if request.headers.get("hx-request") == "true":
         return templates.TemplateResponse(
             request, "public/_proposal_state.html", {"d": _proposal_or_404(slug)}
@@ -64,7 +70,7 @@ async def accept_proposal(request: Request, slug: str):
 
 
 @router.post("/p/{slug}/decline")
-async def decline_proposal(request: Request, slug: str):
+def decline_proposal(request: Request, slug: str):
     d = _proposal_or_404(slug)
     if d["status"] not in ("sent", "viewed"):
         if request.headers.get("hx-request") == "true":
@@ -76,6 +82,8 @@ async def decline_proposal(request: Request, slug: str):
         raise HTTPException(status_code=400, detail="proposal is not open")
     db.run("UPDATE proposals SET status='declined' WHERE id=?", (d["id"],))
     log.info("proposal %s declined from %s", d["id"], security.client_ip(request))
+    # Same shape as accept: staged, post-commit, can never fail the client's action.
+    proposal_notify.enqueue_decision(d["id"], "declined")
     if request.headers.get("hx-request") == "true":
         return templates.TemplateResponse(
             request, "public/_proposal_state.html", {"d": _proposal_or_404(slug)}
@@ -98,9 +106,11 @@ def _contract_or_404(slug: str) -> "db.sqlite3.Row":
 
 
 @router.get("/c/{slug}", response_class=HTMLResponse)
-async def view_contract(request: Request, slug: str):
+def view_contract(request: Request, slug: str):
     d = _contract_or_404(slug)
-    if d["status"] == "sent":
+    # Read telemetry only — see app/public/telemetry.py. A contract reading
+    # "viewed" because a scanner touched the link is a claim about a client.
+    if d["status"] == "sent" and telemetry.is_human_view(request):
         db.run(
             "UPDATE contracts SET status='viewed', viewed_at=datetime('now') WHERE id=?", (d["id"],)
         )
@@ -109,7 +119,7 @@ async def view_contract(request: Request, slug: str):
 
 
 @router.post("/c/{slug}/sign")
-async def sign_contract(
+def sign_contract(
     request: Request, slug: str, signer_name: str = Form(...), agree: str = Form(...)
 ):
     d = _contract_or_404(slug)
@@ -172,7 +182,7 @@ def _testimonial_request_or_404(slug: str) -> "db.sqlite3.Row":
 
 
 @router.get("/t/{slug}", response_class=HTMLResponse)
-async def view_testimonial_form(request: Request, slug: str):
+def view_testimonial_form(request: Request, slug: str):
     r = _testimonial_request_or_404(slug)
     return templates.TemplateResponse(
         request, "public/testimonial.html", {"r": r, "submitted": bool(r["submitted_at"])}
@@ -180,7 +190,7 @@ async def view_testimonial_form(request: Request, slug: str):
 
 
 @router.post("/t/{slug}", response_class=HTMLResponse)
-async def submit_testimonial(
+def submit_testimonial(
     request: Request,
     slug: str,
     quote: str = Form(...),

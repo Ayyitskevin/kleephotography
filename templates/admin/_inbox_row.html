@@ -2,7 +2,15 @@
    to the inbox HX fragment (admin/_inbox_frag.html) with hx-swap-oob (inert
    on the full render) so a reply/health POST re-trues the active row (unread
    dot clears, preview). The include site owns the first line's indent — keep
-   this partial's inner indentation in lockstep with inbox.html. #}<a href="/admin/inbox?tab={{ tab }}&sel={{ t.id }}" class="ib-row {{ 'is-active' if t.active }}" id="ib-row-{{ t.id }}" hx-swap-oob="outerHTML">
+   this partial's inner indentation in lockstep with inbox.html.
+
+   The link carries the page it was clicked from, so opening a thread off page 2
+   does not silently rewind the list to page 1 — `sel` alone would still select
+   the thread (inbox.py fetches an out-of-window selection and prepends it), but
+   the operator would lose their place in the list beside it. Omitted at offset 0
+   so the common link stays the short one. The POST fork re-renders a row without
+   an offset: it fetches by id below whichever page the thread lives on, and the
+   swap replaces one row in a list the operator has not navigated away from. #}<a href="/admin/inbox?tab={{ tab }}&sel={{ t.id }}{% if offset %}&offset={{ offset }}{% endif %}" class="ib-row {{ 'is-active' if t.active }}" id="ib-row-{{ t.id }}" hx-swap-oob="outerHTML">
         <span class="ib-av-wrap">
           <span class="ib-av" style="background: {{ t.av_bg }}; color: {{ t.av_color }};">{{ t.initials }}</span>
           {% if t.unread %}<span class="ib-dot"></span>{% endif %}

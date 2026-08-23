@@ -18,11 +18,19 @@ import logging
 import threading
 
 from . import (
+    anniversary_nudges,
     booking_reminders,
     config,
     contract_reminders,
+    deadman,
+    digest,
     gallery_reminders,
+    invoice_dunning,
+    jobs,
     ops_monitor,
+    review_requests,
+    scheduling,
+    zip_cache,
 )
 from .admin import recurring
 
@@ -47,13 +55,49 @@ def _loop() -> None:
         except Exception:
             log.exception("gallery reminder sweep failed")
         try:
+            review_requests.sweep()
+        except Exception:
+            log.exception("review ask sweep failed")
+        try:
+            invoice_dunning.sweep()
+        except Exception:
+            log.exception("invoice dunning sweep failed")
+        try:
             contract_reminders.sweep()
         except Exception:
             log.exception("contract reminder sweep failed")
         try:
+            anniversary_nudges.sweep()
+        except Exception:
+            log.exception("anniversary nudge sweep failed")
+        try:
             ops_monitor.sweep()
         except Exception:
             log.exception("ops monitor sweep failed")
+        try:
+            jobs.prune_done()
+        except Exception:
+            log.exception("job retention sweep failed")
+        try:
+            zip_cache.sweep()
+        except Exception:
+            log.exception("zip cache sweep failed")
+        try:
+            scheduling.expire_pending_payments()
+        except Exception:
+            log.exception("booking payment-hold sweep failed")
+        try:
+            digest.sweep()
+        except Exception:
+            log.exception("weekly digest sweep failed")
+        # Last, and outside every sweep's own try: reaching here means the loop
+        # itself completed a pass. Individual sweeps failing is what Telegram is
+        # for; this answers the different question of whether anything is
+        # running at all, which nothing on this host can answer about itself.
+        try:
+            deadman.ping()
+        except Exception:
+            log.exception("dead-man ping failed")
 
 
 def start() -> None:

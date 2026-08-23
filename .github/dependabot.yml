@@ -1,7 +1,8 @@
-# Dependabot — weekly dependency PRs for the Python stack. Minor/patch bumps are
-# grouped into one low-noise PR; majors come separately so breaking changes get a
-# closer look. Security fixes (CVE-driven) arrive on their own regardless of this
-# schedule once Dependabot security updates are enabled on the repo.
+# Dependabot — weekly dependency PRs for the Python stack and the workflow
+# actions. Minor/patch bumps are grouped into one low-noise PR; majors come
+# separately so breaking changes get a closer look. Security fixes (CVE-driven)
+# arrive on their own regardless of this schedule once Dependabot security
+# updates are enabled on the repo.
 version: 2
 updates:
   - package-ecosystem: "pip"
@@ -18,6 +19,28 @@ updates:
       - "dependencies"
     groups:
       python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Workflow actions are tag- and SHA-pinned by hand, so without this they only
+  # move when someone remembers. The SHA pin in opencode.yml carries a trailing
+  # version comment, which is what lets Dependabot bump the pin and the comment
+  # together.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+    groups:
+      actions-minor-patch:
         update-types:
           - "minor"
           - "patch"

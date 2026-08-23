@@ -2,6 +2,19 @@
 
 from .. import config
 
+# "How did you hear about us?" answer set — the contact AND booking forms offer
+# exactly these, and the handlers store the value only when it is in this list,
+# so free text can never pollute the admin rollup (admin/reports.py). Optional
+# everywhere: an unanswered lead stores NULL, never a guess.
+REFERRAL_SOURCES = [
+    "Google / search",
+    "Instagram / social media",
+    "Referral / word of mouth",
+    "Saw my work somewhere",
+    "Returning client",
+    "Other",
+]
+
 MARKETING_PAGE_META = {
     "/": {
         "title": "{site_name} — Real Estate · Portraits · Food & Beverage",

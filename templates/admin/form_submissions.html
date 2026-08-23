@@ -1,11 +1,12 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_pager.html" import pager %}
 {% block title %}{{ f.title }} · Submissions · Mise{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
   <div class="pgtop-lead">
     <h1>{{ f.title }} — submissions</h1>
     <p class="pgtop-sub">
-      <b>{{ subs | length }}</b> total · {{ "lead form" if f.kind == "lead" else "questionnaire" }}
+      <b>{{ total }}</b> total · {{ "lead form" if f.kind == "lead" else "questionnaire" }}
     </p>
   </div>
   <div class="pgtop-actions">
@@ -47,6 +48,8 @@
     {% endfor %}
   </div>
   <p class="studio-empty" id="sub-empty" hidden>No submissions match.</p>
+  {{ pager("/admin/forms/" ~ f.id ~ "/submissions", offset, page_size, subs|length,
+           total=total, note="— search filters this page") }}
   <script nonce="{{ csp_nonce }}">
   (function () {
     var search = document.getElementById('sub-search');

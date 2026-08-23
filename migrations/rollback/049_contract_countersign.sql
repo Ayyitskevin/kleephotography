@@ -1,0 +1,11 @@
+-- Rollback for 049_contract_countersign.sql — no-op on purpose.
+--
+-- Two additive columns (contracts.countersigner_name, countersigned_at). Older
+-- code ignores them; they go inert.
+--
+-- DROP COLUMN is emphatically not the undo. A non-NULL countersigned_at is the
+-- record that a contract was executed by BOTH parties — typed name plus
+-- timestamp, the same ESIGN basis as the client's own signature. Dropping the
+-- column destroys evidence about an executed agreement, which is a materially
+-- worse outcome than an unused column.
+SELECT 1;

@@ -1,11 +1,12 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_pager.html" import pager %}
 {% block title %}Bookings · Mise{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
   <div class="pgtop-lead">
     <h1>Bookings</h1>
     <p class="pgtop-sub">
-      <b>{{ upcoming|length }}</b> upcoming · <b>{{ past|length }}</b> past &amp; cancelled · times in {{ tz }}
+      <b>{{ upcoming|length }}</b> upcoming · <b>{{ past_total }}</b> past &amp; cancelled · times in {{ tz }}
     </p>
   </div>
   <div class="pgtop-actions">
@@ -18,12 +19,16 @@
 <main class="admin-main">
   <div class="cal-nav">
     <div class="studio-view-toggle book-viewtoggle" role="group" aria-label="View">
-      <button type="button" data-bview="upcoming" class="is-active" aria-pressed="true">Upcoming</button>
-      <button type="button" data-bview="past" aria-pressed="false">Past &amp; cancelled</button>
+      {# A past-page link lands here with the past pane already open — otherwise
+         the pager would bounce the operator back to Upcoming every click. #}
+      <button type="button" data-bview="upcoming" class="{{ '' if past_offset else 'is-active' }}"
+              aria-pressed="{{ 'false' if past_offset else 'true' }}">Upcoming</button>
+      <button type="button" data-bview="past" class="{{ 'is-active' if past_offset }}"
+              aria-pressed="{{ 'true' if past_offset else 'false' }}">Past &amp; cancelled</button>
     </div>
   </div>
 
-  <section class="sched-block" data-bview-pane="upcoming">
+  <section class="sched-block" data-bview-pane="upcoming"{% if past_offset %} hidden{% endif %}>
     <h2>Upcoming</h2>
     {% if upcoming %}
     <table class="sched-table">
@@ -33,6 +38,8 @@
         <tr>
           <td>{{ b.start_utc | localtime }}</td>
           <td>{{ b.event_name }}
+            {% if b.paid_cents %}<span class="sched-paid" title="Reservation payment received">PAID ${{ '%.2f'|format(b.paid_cents / 100) }}</span>{% endif %}
+            {% if b.status == 'pending_payment' %}<span class="sched-hold" title="Slot held — awaiting Stripe payment">AWAITING PAYMENT</span>{% endif %}
             {% if b.notes and 'AERIAL PASS' in b.notes %}
             <span class="sr-preflight" title="Aerial Pass requested — preflight before the day">&#9650; Aerial &middot; LAANC &middot; batt &times;3</span>
             {% endif %}</td>
@@ -40,7 +47,7 @@
           <td><a href="mailto:{{ b.email }}">{{ b.email }}</a>{% if b.phone %}<br>{{ b.phone }}{% endif %}</td>
           <td>
             <form method="post" action="/admin/scheduling/booking/{{ b.id }}/cancel"
-                  data-confirm="Cancel this booking and email the client?">
+                  data-confirm="Cancel this booking and email the client?{% if b.paid_cents %} They PAID ${{ '%.2f'|format(b.paid_cents / 100) }} to reserve — refund it from the Stripe dashboard; Mise never refunds automatically.{% endif %}">
               <button class="linkbtn danger">Cancel</button>
             </form>
           </td>
@@ -54,7 +61,7 @@
     {% endif %}
   </section>
 
-  <section class="sched-block" data-bview-pane="past" hidden>
+  <section class="sched-block" data-bview-pane="past"{% if not past_offset %} hidden{% endif %}>
     <h2>Past &amp; cancelled</h2>
     {% if past %}
     <table class="sched-table sched-past">
@@ -65,11 +72,13 @@
           <td>{{ b.start_utc | localtime }}</td>
           <td>{{ b.event_name }}</td>
           <td>{{ b.name }}</td>
-          <td>{{ b.status }}</td>
+          <td>{{ b.status }}{% if b.paid_cents %} · paid ${{ '%.2f'|format(b.paid_cents / 100) }}{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
+    {{ pager("/admin/scheduling/bookings", past_offset, page_size, past|length,
+             total=past_total, offset_param="past_offset") }}
     {% else %}
     <p class="muted">Nothing here yet.</p>
     {% endif %}

@@ -64,8 +64,16 @@ def test_csp_header(client):
         "form-action 'self'",
     ):
         assert needed in csp, needed
-    # analytics is the only off-origin asset, allowed for script + connect
-    assert "https://plausible.io" in csp
+    # Analytics is the only off-origin asset, and now allowed ONLY when it is
+    # actually configured — asserted in full by
+    # test_csp_allows_plausible_only_when_analytics_is_on. Here the header is
+    # read from a live response, whose CSP was built at import from whatever
+    # PLAUSIBLE_DOMAIN the environment had, so this pins the invariant that
+    # holds either way: no off-origin destination beyond plausible.io.
+    for directive in ("script-src", "connect-src"):
+        d = next(x for x in csp.split("; ") if x.startswith(directive + " "))
+        offsite = [t for t in d.split() if t.startswith("http")]
+        assert offsite in ([], ["https://plausible.io"]), (directive, offsite)
     # indexable marketing pages carry the policy too
     assert "content-security-policy" in client.get("/").headers
 
@@ -160,13 +168,16 @@ def test_unhandled_exception_alerts_and_500(monkeypatch):
         assert r.status_code == 500
         assert "Something went wrong" in r.text
         assert "kaboom-secret-detail" not in r.text  # detail never leaks to client
+        assert r.headers.get("x-request-id")
         r = c.get("/__test_boom", headers={"accept": "application/json"})
         assert r.status_code == 500 and r.json()["detail"] == "internal server error"
+        assert r.headers.get("x-request-id")
     finally:
         app.router.routes = [
             rt for rt in app.router.routes if getattr(rt, "path", None) != "/__test_boom"
         ]
     assert fired and "RuntimeError" in fired[0][0]
+    assert "id=" in fired[0][1]
 
 
 def test_branded_error_pages(client):
@@ -293,9 +304,12 @@ def test_full_gallery_flow(admin):
             follow_redirects=False,
         )
         assert r.status_code == 303
-        # single download works now
+        # single download works now — real image type (the share-sheet save
+        # path needs it; octet-stream made the blob a nameless "file"), still
+        # an attachment with the client's filename
         r = pub.get(f"/g/{g['slug']}/download/asset/{a['id']}")
-        assert r.status_code == 200 and r.headers["content-type"] == "application/octet-stream"
+        assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+        assert r.headers["content-disposition"] == 'attachment; filename="dish.jpg"'
         # Range request honored (email now on file)
         r = pub.get(f"/media/{g['slug']}/original/{a['id']}", headers={"Range": "bytes=0-99"})
         assert r.status_code == 206 and len(r.content) == 100
@@ -503,7 +517,8 @@ def test_video_comments_flow(admin):
     leaves a note anchored to a playhead second; replies thread under it and
     inherit the parent's timecode; the admin authors + threads too; admin hide
     soft-deletes the comment AND its replies and writes one audit row. The gate
-    rejects non-visitors and non-video assets."""
+    rejects non-visitors and unknown assets. Stills carry notes too, pinned at
+    timecode 0, and the studio sees and can answer them."""
     g, vid, photo = _ready_video(admin, title="Reel Review A")
 
     # the client gallery page ships the lightbox comment wiring
@@ -549,7 +564,7 @@ def test_video_comments_flow(admin):
         apage = admin.get(f"/admin/galleries/{g['id']}").text
         assert "Tighten this cut" in apage and "agreed" in apage
 
-        # gate: empty body 400, bogus reply target 400, photo/asset are not video → 404
+        # gate: empty body 400, bogus reply target 400
         assert (
             pub.post(f"/g/{g['slug']}/comments/{vid['id']}", data={"body": "   "}).status_code
             == 400
@@ -560,11 +575,44 @@ def test_video_comments_flow(admin):
             ).status_code
             == 400
         )
-        assert pub.get(f"/g/{g['slug']}/comments/{photo['id']}").status_code == 404
-        assert (
-            pub.post(f"/g/{g['slug']}/comments/{photo['id']}", data={"body": "x"}).status_code
-            == 404
+        # Stills are commentable too — this used to assert 404 on both, which
+        # made "annotate the film but not the frames" the contract for a studio
+        # that mostly delivers frames. A still has no playhead, so whatever
+        # timecode the form sends is pinned to 0.
+        assert pub.get(f"/g/{g['slug']}/comments/{photo['id']}").status_code == 200
+        posted = pub.post(
+            f"/g/{g['slug']}/comments/{photo['id']}",
+            data={"body": "Crop tighter on the left", "timecode": 12.5},
         )
+        assert posted.status_code == 200
+        still_thread = posted.json()
+        assert [c["body"] for c in still_thread] == ["Crop tighter on the left"]
+        assert still_thread[0]["timecode"] == 0
+        # A reply on a still threads exactly as it does on a film.
+        replied = pub.post(
+            f"/g/{g['slug']}/comments/{photo['id']}",
+            data={"body": "will do", "parent_id": still_thread[0]["id"]},
+        ).json()
+        assert [c["parent_id"] for c in replied] == [None, still_thread[0]["id"]]
+        # An asset that is neither photo nor video is still 404.
+        assert pub.get(f"/g/{g['slug']}/comments/999999").status_code == 404
+        assert pub.post(f"/g/{g['slug']}/comments/999999", data={"body": "x"}).status_code == 404
+
+        # the studio sees the client's note on the still, and can answer it
+        apage = admin.get(f"/admin/galleries/{g['id']}").text
+        assert "Crop tighter on the left" in apage, "client note on a still is invisible to admin"
+        assert (
+            admin.post(
+                f"/admin/galleries/{g['id']}/comments/{photo['id']}",
+                data={"body": "Recropped", "timecode": 9},
+                follow_redirects=False,
+            ).status_code
+            == 303
+        )
+        studio = pub.get(f"/g/{g['slug']}/comments/{photo['id']}").json()
+        assert "Recropped" in [c["body"] for c in studio]
+        # the studio side pins a still's note at 0 as well
+        assert [c["timecode"] for c in studio if c["body"] == "Recropped"] == [0]
 
     # gate: a visitor cookie is required (no PIN → 403 on read and write)
     with TestClient(app) as anon:

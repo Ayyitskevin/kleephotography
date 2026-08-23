@@ -2,15 +2,29 @@
 Inquiry form emails Kevin's inbox so Odysseus inquiry_intake picks it up unchanged."""
 
 import logging
+import time
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
-from .. import config, db, features, imaging, inquiry_notify, jobs, mailer, security, specialties
-from ..render import ROOT, _static_rev, templates
+from .. import (
+    config,
+    db,
+    features,
+    imaging,
+    inquiry_notify,
+    jobs,
+    mailer,
+    scheduling,
+    security,
+    specialties,
+)
+from ..http_cache import PUBLIC_24H, conditional_file
+from ..render import ROOT, _reel_description, _reel_title, _static_rev, templates
 from . import site_catalog as _site_catalog
 
 BOOK_ACTIVE_PROMISES = _site_catalog.BOOK_ACTIVE_PROMISES
@@ -481,7 +495,7 @@ def _specialty_doors() -> list[dict]:
 
 
 @router.get("/", response_class=HTMLResponse)
-async def home(request: Request):
+def home(request: Request):
     featured = _portfolio_assets()[:6]
     reels = _portfolio_reels()
     hero_reel = reels[0] if reels else None
@@ -492,6 +506,7 @@ async def home(request: Request):
         "site/home.html",
         {
             "featured": featured,
+            "asset_images": {a["id"]: _public_photo_spec(a) for a in featured},
             "reels": reels,
             "hero_reel": hero_reel,
             "hero_image": hero_image,
@@ -505,7 +520,7 @@ async def home(request: Request):
 
 
 @router.get("/portfolio", response_class=HTMLResponse)
-async def portfolio(request: Request):
+def portfolio(request: Request):
     # photos AND starred videos share the masonry — /services sells motion, so
     # the archive shouldn't be stills-only. Videos play in the same lightbox.
     assets = sorted(
@@ -569,7 +584,7 @@ def _about_portrait_static() -> str | None:
 
 
 @router.get("/about", response_class=HTMLResponse)
-async def about(request: Request):
+def about(request: Request):
     # Only a dedicated studio portrait stands in as "Meet Kevin" — never a random
     # portfolio still (that read as a mismatched hero when the asset was a dish).
     portrait_static = _about_portrait_static()
@@ -583,12 +598,12 @@ async def about(request: Request):
 
 
 @router.get("/press", response_class=HTMLResponse)
-async def press(request: Request):
+def press(request: Request):
     return templates.TemplateResponse(request, "site/press.html", {"press": _press_features()})
 
 
 @router.get("/services", response_class=HTMLResponse)
-async def services(request: Request):
+def services(request: Request):
     return templates.TemplateResponse(
         request,
         "site/services.html",
@@ -597,7 +612,7 @@ async def services(request: Request):
 
 
 @router.get("/contact", response_class=HTMLResponse)
-async def contact(request: Request):
+def contact(request: Request):
     """Optional ?prefill=<kind>&service=&tier= for cross-surface deep links
     (parsed in _contact_prefill straight off the query string)."""
     pf = _contact_prefill(request)
@@ -609,10 +624,12 @@ async def contact(request: Request):
         {
             "sent": False,
             "error": None,
+            "error_fields": (),
             "prefill": pf,
             "scope_label": scope_label,
             "scope_placeholder": scope_placeholder,
             "service_options": contact_service_options(),
+            "referral_sources": _site_catalog.REFERRAL_SOURCES,
             "specialty_paths": [
                 {"slug": m["slug"], "name": m["name"]} for m in specialties.SPECIALTIES.values()
             ],
@@ -625,7 +642,7 @@ async def contact(request: Request):
 
 
 @router.post("/contact", response_class=HTMLResponse)
-async def submit_inquiry(
+def submit_inquiry(
     request: Request,
     name: str = Form(...),
     email: str = Form(...),
@@ -638,6 +655,7 @@ async def submit_inquiry(
     phone: str = Form(""),
     usage: str = Form(""),
     budget: str = Form(""),
+    referral: str = Form(""),
 ):
     # Honeypot: real visitors never see the "website" field — bots fill it.
     if website.strip():
@@ -652,10 +670,13 @@ async def submit_inquiry(
             },
         )
 
-    def _error(msg: str, status: int):
+    def _error(msg: str, status: int, error_fields: tuple[str, ...] = ()):
         # Re-render with an error AND every submitted value echoed back, so a
         # typo or throttle never wipes a visitor's typed quote request (the
-        # template reads these off `prefill`).
+        # template reads these off `prefill`). error_fields carries the control
+        # names that came back bad so the template can mark them individually
+        # (same contract as the custom forms in public/forms.py); a throttle
+        # blames no field and passes none.
         scope_label, scope_placeholder = _contact_scope(service.strip())
         featured = _portfolio_assets()[:1]
         return templates.TemplateResponse(
@@ -664,6 +685,7 @@ async def submit_inquiry(
             {
                 "sent": False,
                 "error": msg,
+                "error_fields": error_fields,
                 "prefill": {
                     "name": name.strip(),
                     "email": email.strip(),
@@ -675,10 +697,12 @@ async def submit_inquiry(
                     "phone": phone.strip(),
                     "usage": usage.strip(),
                     "budget": budget.strip(),
+                    "referral": referral.strip(),
                 },
                 "scope_label": scope_label,
                 "scope_placeholder": scope_placeholder,
                 "service_options": contact_service_options(),
+                "referral_sources": _site_catalog.REFERRAL_SOURCES,
                 "specialty_paths": [
                     {"slug": m["slug"], "name": m["name"]} for m in specialties.SPECIALTIES.values()
                 ],
@@ -702,8 +726,15 @@ async def submit_inquiry(
             429,
         )
     name, email, message = name.strip(), email.strip(), message.strip()
-    if not (name and message and "@" in email and "." in email.rsplit("@", 1)[-1]):
-        return _error("Please add your name, a valid email, and a short message.", 400)
+    bad = []
+    if not name:
+        bad.append("name")
+    if not ("@" in email and "." in email.rsplit("@", 1)[-1]):
+        bad.append("email")
+    if not message:
+        bad.append("message")
+    if bad:
+        return _error("Please add your name, a valid email, and a short message.", 400, tuple(bad))
     # Optional scope fields from the quote-request form. service + target date
     # get their own inquiry columns (so the inquiry→quote button can lift them
     # into a project without re-typing); the rest fold into the message + email
@@ -728,8 +759,9 @@ async def submit_inquiry(
     security.inquiry_record(ip, security.INQUIRY_BUCKET_CONTACT)
     iid = db.run(
         """INSERT INTO inquiries
-                    (name, email, business, message, service, shoot_date, phone)
-                    VALUES (?,?,?,?,?,?,?)""",
+                    (name, email, business, message, service, shoot_date, phone,
+                     referral_source)
+                    VALUES (?,?,?,?,?,?,?,?)""",
         (
             name,
             email,
@@ -738,6 +770,10 @@ async def submit_inquiry(
             service or None,
             shoot_date or None,
             phone,
+            # Only a value from the fixed set reaches the column — anything else
+            # (a tampered POST, a stale option) stores NULL, so the rollup in
+            # admin/reports.py can trust every non-NULL row.
+            referral.strip() if referral.strip() in _site_catalog.REFERRAL_SOURCES else None,
         ),
     )
     # Owner notify is async + idempotent via jobs (survives SMTP outages).
@@ -772,7 +808,7 @@ async def submit_inquiry(
 
 
 @router.get("/work", response_class=HTMLResponse)
-async def work_index(request: Request):
+def work_index(request: Request):
     studies = [_case_study_view(study) for study in _case_studies()]
     csmap = _cs_specialty_map()
     # Group by derived specialty (SPECIALTIES order). Headings only render
@@ -790,7 +826,7 @@ async def work_index(request: Request):
 
 
 @router.get("/work/{slug}", response_class=HTMLResponse)
-async def work_detail(request: Request, slug: str):
+def work_detail(request: Request, slug: str):
     g = db.one("SELECT * FROM galleries WHERE slug=? AND cs_published=1", (slug,))
     if not g:
         raise HTTPException(status_code=404)
@@ -859,7 +895,7 @@ async def work_detail(request: Request, slug: str):
 
 
 @router.get("/reels", response_class=HTMLResponse)
-async def reels(request: Request):
+def reels(request: Request):
     vids = _portfolio_reels()
     sp_counts = Counter(specialties.specialty_key(r["portfolio_tag"]) for r in vids)
     sp_chips = [
@@ -883,6 +919,43 @@ async def reels(request: Request):
     )
 
 
+# Real availability on a marketing page: worth showing, never worth blocking on.
+# days_with_slots consults Google free/busy when the calendar is connected — a
+# network call — so the strip is cached briefly per event type. Staleness is
+# benign: the deep link lands on the live picker, which tells the truth.
+_AVAIL_TTL_SECONDS = 300.0
+_AVAIL_SCAN_DAYS = 45
+_avail_cache: dict[str, tuple[float, list]] = {}
+
+
+def _next_open_days(et, limit: int = 3) -> list[dict]:
+    """The next few days with open slots for `et`, as picker deep links —
+    [{'iso', 'label', 'url'}]. Empty on any scheduling hiccup: the specialty
+    page renders without the strip rather than failing over a teaser."""
+    now = time.monotonic()
+    hit = _avail_cache.get(et["slug"])
+    if hit and now < hit[0]:
+        return hit[1]
+    days: list[dict] = []
+    try:
+        today = datetime.now(UTC).astimezone(ZoneInfo(config.TIMEZONE)).date()
+        scan = min(_AVAIL_SCAN_DAYS, et["booking_window_days"])
+        for iso in sorted(scheduling.days_with_slots(et, today, scan))[:limit]:
+            d = date.fromisoformat(iso)
+            days.append(
+                {
+                    "iso": iso,
+                    "label": d.strftime("%a, %b %-d").replace(" 0", " "),
+                    "url": f"/book/{et['slug']}?year={d.year}&month={d.month}&day={iso}",
+                }
+            )
+    except Exception:
+        log.warning("availability strip failed for %s", et["slug"], exc_info=True)
+        days = []
+    _avail_cache[et["slug"]] = (now + _AVAIL_TTL_SECONDS, days)
+    return days
+
+
 def _specialty_page(request: Request, key: str):
     """Shared renderer for the three specialty spokes — same anatomy, distinct
     copy (SPECIALTY_PAGES) and specialty-filtered work/reels/studies."""
@@ -890,8 +963,10 @@ def _specialty_page(request: Request, key: str):
     # CTA deep-link: the moment Kevin creates the conventional event type in
     # the live admin (ops/SPECIALTY-LAUNCH.md slugs), spokes route straight to
     # its picker; until then they land on the /book index. No code redeploy.
-    et = db.one("SELECT slug FROM event_types WHERE slug=? AND active=1", (page["book_slug"],))
+    # The full row (not just slug) so the availability strip can compute slots.
+    et = db.one("SELECT * FROM event_types WHERE slug=? AND active=1", (page["book_slug"],))
     book_url = f"/book/{et['slug']}" if et else "/book"
+    open_days = _next_open_days(et) if et else []
     photos = [
         a for a in _portfolio_assets() if specialties.specialty_key(a["portfolio_tag"]) == key
     ]
@@ -916,14 +991,16 @@ def _specialty_page(request: Request, key: str):
             "sp_key": key,
             "page": page,
             "photos": photos,
+            "asset_images": {a["id"]: _public_portfolio_tile_spec(a) for a in (*photos, *vids)},
             "reels": vids,
             "hero_reel": hero_reel,
             "hero_image": hero_image,
             "hero_poster": hero_poster,
-            "studies": studies[:4],
+            "studies": [_case_study_view(s) for s in studies[:4]],
             "testimonials": quotes[:3],
             "demo_gallery": _demo_gallery(),
             "book_url": book_url,
+            "open_days": open_days,
             "faqs": page["faqs"],
             "faq_heading": "Good to know",
             "rates": _sr_rate_cells(key),
@@ -933,22 +1010,32 @@ def _specialty_page(request: Request, key: str):
 
 
 @router.get("/real-estate", response_class=HTMLResponse)
-async def specialty_real_estate(request: Request):
+def specialty_real_estate(request: Request):
     return _specialty_page(request, "re")
 
 
 @router.get("/portraits", response_class=HTMLResponse)
-async def specialty_portraits(request: Request):
+def specialty_portraits(request: Request):
     return _specialty_page(request, "pl")
 
 
 @router.get("/food-beverage", response_class=HTMLResponse)
-async def specialty_food_beverage(request: Request):
+def specialty_food_beverage(request: Request):
     return _specialty_page(request, "fb")
 
 
+def _negotiated_file(request: Request, jpeg_path: Path):
+    """Serve the best still encoding this caller accepts, or the JPEG.
+
+    `Vary: Accept` rides every response — including the 304s — or Cloudflare's
+    edge would hand an AVIF to the next visitor that cannot decode one.
+    """
+    served, served_type = imaging.negotiate(jpeg_path, request.headers.get("accept"))
+    return conditional_file(request, served, served_type, PUBLIC_24H, {"Vary": "Accept"})
+
+
 @router.get("/site/img/{asset_id}")
-async def portfolio_image(asset_id: int, variant: str = "web"):
+def portfolio_image(request: Request, asset_id: int, variant: str = "web"):
     """Unauthenticated — serves ONLY portfolio-flagged, ready photos."""
     if variant not in ("web", "thumb"):
         raise HTTPException(status_code=404)
@@ -964,15 +1051,11 @@ async def portfolio_image(asset_id: int, variant: str = "web"):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / variant / f"{Path(a['stored']).stem}.jpg"
-    if not path.is_file():
-        raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"}
-    )
+    return _negotiated_file(request, path)
 
 
 @router.get("/site/vid/{asset_id}")
-async def portfolio_video(asset_id: int):
+def portfolio_video(request: Request, asset_id: int):
     """Unauthenticated — serves ONLY portfolio-flagged, ready videos (the /reels
     showcase). FileResponse handles HTTP Range, so iOS scrubbing works."""
     a = db.one(
@@ -983,15 +1066,11 @@ async def portfolio_video(asset_id: int):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / "web" / f"{Path(a['stored']).stem}.mp4"
-    if not path.is_file():
-        raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="video/mp4", headers={"Cache-Control": "public, max-age=86400"}
-    )
+    return conditional_file(request, path, "video/mp4", PUBLIC_24H)
 
 
 @router.get("/site/poster/{asset_id}")
-async def portfolio_video_poster(asset_id: int):
+def portfolio_video_poster(request: Request, asset_id: int):
     """Poster frame for a portfolio video — same public portfolio gate."""
     a = db.one(
         """SELECT * FROM assets WHERE id=? AND portfolio=1
@@ -1001,15 +1080,11 @@ async def portfolio_video_poster(asset_id: int):
     if not a:
         raise HTTPException(status_code=404)
     path = config.MEDIA_DIR / str(a["gallery_id"]) / "web" / f"{Path(a['stored']).stem}_poster.jpg"
-    if not path.is_file():
-        raise HTTPException(status_code=404)
-    return FileResponse(
-        path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"}
-    )
+    return _negotiated_file(request, path)
 
 
 @router.get("/favicon.ico", include_in_schema=False)
-async def favicon():
+def favicon():
     """Old crawlers and share scrapers request /favicon.ico directly, ignoring
     the <link rel=icon> tags — serve the real file instead of a 404."""
     return FileResponse(
@@ -1020,7 +1095,7 @@ async def favicon():
 
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
-async def robots():
+def robots():
     return (
         "User-agent: *\n"
         "Disallow: /g/\nDisallow: /portal/\nDisallow: /media/\n"
@@ -1031,7 +1106,7 @@ async def robots():
 
 
 @router.get("/.well-known/security.txt", response_class=PlainTextResponse)
-async def security_txt():
+def security_txt():
     """RFC 9116 — tells security researchers where to report vulnerabilities
     instead of leaving them to guess (or post publicly). Expires is required by
     the RFC and must stay under a year out; rendering it live keeps the file
@@ -1065,12 +1140,63 @@ def _sitemap_day(value) -> str:
         return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
-def _sitemap_url(path: str, lastmod: str) -> str:
-    return f"<url><loc>{config.BASE_URL}{path}</loc><lastmod>{lastmod}</lastmod></url>"
+# Google caps a sitemap URL at 1000 images. The portfolio is nowhere near that,
+# but an unbounded loop over a growing table is how a sitemap silently becomes
+# invalid years later.
+SITEMAP_MAX_IMAGES = 1000
+
+
+def _xml_escape(value: str) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _image_entries(assets) -> str:
+    """<image:image> children for one <url>, capped at Google's per-URL limit."""
+    return "".join(
+        f"<image:image><image:loc>{config.BASE_URL}/site/img/{a['id']}</image:loc></image:image>"
+        for a in assets[:SITEMAP_MAX_IMAGES]
+    )
+
+
+def _video_entries(reels) -> str:
+    """<video:video> children for one <url>.
+
+    Title and description come from app/render.py, the same helpers /reels uses
+    for its VideoObject JSON-LD — Google cross-checks the two and a forked
+    formula would make them disagree.
+    """
+    out = []
+    for r in reels[:SITEMAP_MAX_IMAGES]:
+        duration = ""
+        if r["duration"]:
+            seconds = int(round(float(r["duration"])))
+            # Google rejects a video:duration outside 1..28800 seconds.
+            if 1 <= seconds <= 28800:
+                duration = f"<video:duration>{seconds}</video:duration>"
+        out.append(
+            "<video:video>"
+            f"<video:thumbnail_loc>{config.BASE_URL}/site/poster/{r['id']}</video:thumbnail_loc>"
+            f"<video:title>{_xml_escape(_reel_title(r))}</video:title>"
+            f"<video:description>{_xml_escape(_reel_description(r))}</video:description>"
+            f"<video:content_loc>{config.BASE_URL}/site/vid/{r['id']}</video:content_loc>"
+            f"{duration}"
+            "</video:video>"
+        )
+    return "".join(out)
+
+
+def _sitemap_url(path: str, lastmod: str, children: str = "") -> str:
+    return f"<url><loc>{config.BASE_URL}{path}</loc><lastmod>{lastmod}</lastmod>{children}</url>"
 
 
 @router.get("/sitemap.xml")
-async def sitemap():
+def sitemap():
     # Static marketing paths share the newest /static asset mtime — a cheap
     # freshness signal that moves on every CSS/JS deploy without inventing
     # per-page edit dates we don't store.
@@ -1089,7 +1215,25 @@ async def sitemap():
         "/reels",
         "/press",
     ]
-    urls = "".join(_sitemap_url(p, shell_day) for p in paths)
+    # Image and video children: the frames are the product, and a photographer
+    # who does not appear in Google Images is invisible in half the search
+    # surface. Each page carries exactly the assets it actually renders, so the
+    # sitemap never promises a crawler a frame the page does not show.
+    photos = _portfolio_assets()
+    reels = _portfolio_reels()
+    by_specialty = {
+        meta["slug"]: [a for a in photos if specialties.specialty_key(a["portfolio_tag"]) == key]
+        for key, meta in specialties.SPECIALTIES.items()
+    }
+    children = {
+        "/": _image_entries(photos[:6]),  # the home filmstrip renders six
+        "/portfolio": _image_entries(photos),
+        "/reels": _video_entries(reels),
+    }
+    for slug, mine in by_specialty.items():
+        children[f"/{slug}"] = _image_entries(mine)
+
+    urls = "".join(_sitemap_url(p, shell_day, children.get(p, "")) for p in paths)
     # Case-study detail pages are also surfaced on /portfolio (Featured clients)
     # but get their own crawlable URLs here (/work index + /work/{slug} details).
     # Prefer created_at so publishing a study bumps lastmod for crawlers.
@@ -1097,6 +1241,9 @@ async def sitemap():
         urls += _sitemap_url(f"/work/{g['slug']}", _sitemap_day(g["created_at"]))
     return Response(
         content='<?xml version="1.0" encoding="UTF-8"?>'
-        f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
+        ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"'
+        ' xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">'
+        f"{urls}</urlset>",
         media_type="application/xml",
     )

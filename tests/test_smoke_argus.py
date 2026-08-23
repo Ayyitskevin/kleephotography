@@ -14,7 +14,11 @@ pytestmark = pytest.mark.integration
 def _configure_tmp_db(tmp_path, monkeypatch):
     # Stop leftover workers from earlier module-scoped TestClients before we
     # swap DB_PATH — otherwise they race migrate() on the new file (locked DB).
-    jobs.stop()
+    # wait=True because signalling is not enough: shutdown(wait=False) returns
+    # while a worker is still inside a job, and that worker re-reads DB_PATH at
+    # its next db.connect() — so it follows us onto the new database instead of
+    # staying on the old one. Draining first is what actually closes the race.
+    jobs.stop(wait=True)
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "mise.db")
     monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
@@ -34,7 +38,10 @@ def admin_client(tmp_path, monkeypatch):
         r = client.post("/admin/login", data={"password": "test-pw"}, follow_redirects=False)
         assert r.status_code == 303
         yield client
-    jobs.stop()
+    # Drain here too, while DB_PATH still points at THIS test's database: a job
+    # finishing now writes where it was started, instead of following the next
+    # test onto its fresh file.
+    jobs.stop(wait=True)
 
 
 @pytest.fixture(autouse=True)

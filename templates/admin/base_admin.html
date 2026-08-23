@@ -4,12 +4,18 @@
    The redesign CSS is scoped under .admin-shell, so only pages wearing this
    shell pick it up — the client-facing money docs never do. #}
 {% block cream_head %}
+{# The .admin-shell half of the legacy stylesheet, loaded only by the shell that
+   can match it (~226 KB the marketing and client surfaces never fetch). Same
+   layer(mise) as base.html's mise.css import — a plain <link> cannot declare a
+   layer — so the unlayered Screening Room sheets keep out-ranking both, and the
+   admin sheet still lands after mise.css inside the layer. #}
+<style>@import url("/static/mise-admin.css?v={{ static_rev }}") layer(mise);</style>
 {# Self-hosted typefaces — no Google Fonts CDN (no third-party request, no
    layout-shift wait on a remote stylesheet). fonts.css is loaded once for
    every surface by base.html; these preloads jump the queue for the two
    latin files the admin paints with first. #}
-<link rel="preload" href="/static/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/newsreader-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/archivo-latin.v1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/newsreader-latin.v1.woff2" as="font" type="font/woff2" crossorigin>
 {# Set the saved theme on <html> before first paint so dark mode never flashes
    light on load. Only the .admin-shell surface reacts to data-theme. #}
 {# data-confirm / data-print / data-autosubmit / data-goto behaviors live in

@@ -1,0 +1,15 @@
+-- Rollback for 002_studio.sql — DELIBERATELY NOT EXECUTABLE.
+--
+-- 002 creates the whole money model: clients, projects, proposals, contracts,
+-- invoices, payments, emails_log. The mechanical "undo" is DROP TABLE, and that
+-- does not undo a migration — it destroys every client record, every signed
+-- contract, and every payment the business has ever taken. A file that appears
+-- to offer a safe rollback and instead deletes the ledger is worse than no file
+-- at all, so this one refuses to be that.
+--
+-- The real rollback for a money migration is restoring a snapshot: see
+-- "Rolling back a money migration" in ops/MIGRATIONS.md, procedure in
+-- ops/BACKUP.md. 002 in particular is foundational — every later migration
+-- assumes these tables exist, so nothing after it can run against a database
+-- where this was undone.
+SELECT 1;

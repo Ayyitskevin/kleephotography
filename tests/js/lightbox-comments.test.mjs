@@ -107,10 +107,14 @@ function fixture() {
     return { tile: tileEl, image };
   };
   const a = tile("A"), b = tile("B"), calls = [], reloads = [];
+  // A still. Kept last so A and B stay adjacent for the prev/next round trips.
+  const still = tile("S");
+  still.tile.dataset = { id: "S", kind: "photo", web: "/photo/S" };
+  still.image.alt = "Photo S";
   const document = {
     body: { style: {} }, activeElement: el("focus"),
     getElementById: (id) => id === "lightbox" ? lb : null,
-    querySelectorAll: (selector) => selector === ".tile" ? [a.tile, b.tile] : [],
+    querySelectorAll: (selector) => selector === ".tile" ? [a.tile, b.tile, still.tile] : [],
     createElement: (tag) => el(tag), addEventListener() {},
   };
   class FakeFormData { constructor() { this.entries = []; } append(k, v) { this.entries.push([k, v]); } }
@@ -123,7 +127,7 @@ function fixture() {
     window: { location: { reload: () => reloads.push(true) } },
     htmx: { ajax: () => Promise.resolve() }, setInterval: () => 1, clearInterval() {} },
   { filename: "static/lightbox.js" });
-  return { a, b, body, form, list, prev, next, calls, reloads };
+  return { a, b, still, body, form, list, wrap, at, tc, calls, reloads, prev, next };
 }
 
 function callsFor(ui, method, asset) {
@@ -380,4 +384,73 @@ test("a non-ok get never renders an array-shaped error body", async () => {
   await flush();
   assert.deepEqual(commentBodies(ui.list), []);
   assert.match(ui.form.querySelector(".vc-error")?.textContent || "", /Comments couldn't load/);
+});
+
+// ── Stills carry notes too ───────────────────────────────────────────────────
+//
+// video_comments never had a kind constraint (migrations/026); photos were
+// excluded by one WHERE clause and by this viewer showing the panel only in the
+// video branch. For a studio whose deliverable is usually stills, "annotate the
+// film but not the frames" was the wrong way round.
+
+test("opening a still shows the notes panel and loads its thread", async () => {
+  const ui = fixture();
+  await ui.still.image.fire("click");
+  assert.equal(ui.wrap.hidden, false);
+  assert.equal(callsFor(ui, "GET", "S").length, 1);
+});
+
+test("a still has no timecode chrome", async () => {
+  const ui = fixture();
+  await ui.still.image.fire("click");
+  // No playhead, so no "Comment at 0:00" affordance...
+  assert.equal(ui.at.hidden, true);
+  // ...and the composer says frame, not moment.
+  assert.match(ui.body.placeholder, /this frame/);
+
+  // A film still gets both back.
+  await ui.a.image.fire("click");
+  assert.equal(ui.at.hidden, false);
+  assert.match(ui.body.placeholder, /this moment/);
+});
+
+test("a still's notes render without a seek chip", async () => {
+  const ui = fixture();
+  await ui.still.image.fire("click");
+  callsFor(ui, "GET", "S")[0].pending.resolve(response(200, [note("crop tighter", 7)]));
+  await flush();
+  assert.deepEqual(commentBodies(ui.list), ["crop tighter"]);
+  // The chip is a seek control; on a still it would be a button that does
+  // nothing, announced to every screen-reader user.
+  const chips = [];
+  const visit = (n) => {
+    if (!(n instanceof El)) return;
+    if (n.className.split(" ").includes("vc-tc")) chips.push(n);
+    n.children.forEach(visit);
+  };
+  visit(ui.list);
+  assert.equal(chips.length, 0);
+});
+
+test("a film's notes still render their seek chip", async () => {
+  const ui = fixture();
+  await ui.a.image.fire("click");
+  callsFor(ui, "GET", "A")[0].pending.resolve(response(200, [note("fix the audio", 9)]));
+  await flush();
+  const chips = [];
+  const visit = (n) => {
+    if (!(n instanceof El)) return;
+    if (n.className.split(" ").includes("vc-tc")) chips.push(n);
+    n.children.forEach(visit);
+  };
+  visit(ui.list);
+  assert.equal(chips.length, 1);
+});
+
+test("switching from a film to a still does not carry the film's timecode over", async () => {
+  const ui = fixture();
+  await ui.a.image.fire("click");
+  ui.tc.value = "12.5";
+  await ui.still.image.fire("click");
+  assert.equal(ui.tc.value, "0");
 });

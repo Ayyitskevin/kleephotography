@@ -5,14 +5,26 @@
   const favBtn = lb.querySelector(".lb-fav");
   const dlLink = lb.querySelector(".lb-dl");
   const dlMp4 = lb.querySelector(".lb-dl-mp4");
+  const saveBtn = lb.querySelector(".lb-save");
   const playBtn = lb.querySelector(".lb-play");
+  // Save-to-device is only offered where the Web Share API can hand a File to
+  // the OS sheet (iOS/Android — "Save Image" lands the original in Photos,
+  // which a plain attachment download never does; it lands in Files). The
+  // typeof guard keeps the Node contract harness (no navigator) loading.
+  const canShareFiles = (function () {
+    try {
+      return typeof navigator !== "undefined" && !!navigator.canShare &&
+        navigator.canShare({ files: [new File(["x"], "x.jpg", { type: "image/jpeg" })] });
+    } catch (err) { return false; }
+  })();
   const proofLabel = lb.querySelector(".lb-proof");
   const live = lb.querySelector(".lb-live");
   const tiles = Array.from(document.querySelectorAll(".tile"));
   let idx = -1;
   let timer = null;
 
-  // ── Timecoded review comments (only present on the client gallery) ──────────
+  // ── Review comments (only present on the client gallery) ───────────────────
+  // Timecoded on films, pinned at 0 on stills — see openCommentPanel().
   const slug = lb.dataset.slug;
   const cWrap = lb.querySelector(".lb-comments");
   const cList = cWrap && cWrap.querySelector(".vc-list");
@@ -26,6 +38,9 @@
   const cFilter = cWrap && cWrap.querySelector(".vc-filter");
   let activeVideo = null;
   let activeAsset = null;
+  // Stills carry notes too, but they have no playhead: no timecode chrome, no
+  // seek-on-click, and every note pinned at 0. See app/public/gallery.py.
+  let activeIsStill = false;
   let lastComments = [];
   let commentLoadVersion = 0;
   const commentDrafts = new Map();
@@ -63,9 +78,9 @@
 
   function commentLoadErrorMessage(status) {
     if (status === 410) return "This gallery has expired — comments are no longer available.";
-    if (status === 429) return "Comments are temporarily rate-limited — wait a moment, then reopen this video.";
-    if (status === 403) return "We couldn't confirm gallery access — refresh before reopening this video.";
-    return "Comments couldn't load — reopen this video or refresh.";
+    if (status === 429) return "Comments are temporarily rate-limited — wait a moment, then reopen it.";
+    if (status === 403) return "We couldn't confirm gallery access — refresh before reopening it.";
+    return "Comments couldn't load — reopen it or refresh.";
   }
 
   function fmtTC(s) {
@@ -140,14 +155,17 @@
         const li = document.createElement("li");
         li.className = "vc" + (resolved ? " vc-resolved" : "");
         li.style.marginLeft = (depth * 1.1) + "rem";
-        const tc = document.createElement("button");
-        tc.type = "button";
-        tc.className = "vc-tc";
-        tc.textContent = fmtTC(c.timecode);
-        // The seek payoff: clicking a timecode jumps the player there.
-        tc.addEventListener("click", () => {
-          if (activeVideo) { activeVideo.currentTime = c.timecode; activeVideo.play().catch(() => {}); }
-        });
+        let tc = null;
+        if (!activeIsStill) {
+          tc = document.createElement("button");
+          tc.type = "button";
+          tc.className = "vc-tc";
+          tc.textContent = fmtTC(c.timecode);
+          // The seek payoff: clicking a timecode jumps the player there.
+          tc.addEventListener("click", () => {
+            if (activeVideo) { activeVideo.currentTime = c.timecode; activeVideo.play().catch(() => {}); }
+          });
+        }
         const role = document.createElement("span");
         role.className = "vc-role" + (c.author_role === "admin" ? " studio" : "");
         role.textContent = c.author_role === "admin" ? "Studio" : "You";
@@ -243,6 +261,15 @@
   // (.pf-hidden or any display:none) are skipped, so arrows/swipe/slideshow
   // only visit what the visitor can currently see in the grid.
   function visibleTile(t) { return t.offsetParent !== null; }
+  // Announce a position the visitor can actually reach: with a filter on, the
+  // unfiltered index skips numbers (arrows hop over hidden tiles) and the total
+  // counts tiles that aren't on screen. A tile outside the visible set falls
+  // back to the whole grid rather than announcing "0 of N".
+  function livePosition(t) {
+    const shown = tiles.filter(visibleTile);
+    const at = shown.indexOf(t);
+    return at < 0 ? (idx + 1) + " of " + tiles.length : (at + 1) + " of " + shown.length;
+  }
   function step(dir) {
     let i = idx;
     for (let n = 0; n < tiles.length; n++) {
@@ -254,6 +281,36 @@
   function mediaName(t, fallback) {
     const source = t && t.querySelector("img");
     return (source && source.alt) || fallback;
+  }
+
+  // One opener for both stage kinds. The only difference a still makes is the
+  // timecode chrome: no "Comment at 0:00" button (there is no playhead to tag),
+  // and the composer says "note", not "note at this moment".
+  function openCommentPanel() {
+    if (!cWrap) return;
+    commentLoadVersion += 1;
+    cWrap.hidden = false;
+    if (cAt) cAt.hidden = false;
+    if (cBody) {
+      cBody.placeholder = activeIsStill
+        ? "Leave a note on this frame\u2026"
+        : "Leave a note at this moment\u2026";
+    }
+    lastComments = [];
+    if (cList) cList.innerHTML = "";
+    if (cCount) {
+      cCount.textContent = "";
+      cCount.classList.remove("ok");
+    }
+    restoreCommentFeedback(activeAsset);
+    restoreCommentDraft(activeAsset);
+    // Applied AFTER the restore: the draft helpers are deliberately
+    // asset-owned and must not read ambient state like activeIsStill.
+    if (activeIsStill) {
+      if (cTc) cTc.value = "0";
+      if (cAt) cAt.hidden = true;
+    }
+    loadComments(activeAsset);
   }
 
   function render(i) {
@@ -268,6 +325,9 @@
       if (t.dataset.dlWeb) { dlMp4.href = t.dataset.dlWeb; dlMp4.hidden = false; }
       else { dlMp4.hidden = true; dlMp4.href = "#"; }
     }
+    // Save-to-Photos: stills only — piping a multi-GB camera original through
+    // a blob is exactly the transfer this button exists to avoid.
+    if (saveBtn) saveBtn.hidden = !(canShareFiles && t.dataset.dl && t.dataset.kind !== "video");
     stage.innerHTML = "";
     if (t.dataset.kind === "video") {
       const v = document.createElement("video");
@@ -280,18 +340,8 @@
       stage.appendChild(v);
       activeVideo = v;
       activeAsset = t.dataset.id;
-      if (cWrap) {
-        cWrap.hidden = false;
-        lastComments = [];
-        if (cList) cList.innerHTML = "";
-        if (cCount) {
-          cCount.textContent = "";
-          cCount.classList.remove("ok");
-        }
-        restoreCommentFeedback(activeAsset);
-        restoreCommentDraft(activeAsset);
-        loadComments(activeAsset);
-      }
+      activeIsStill = false;
+      openCommentPanel();
     } else {
       const img = document.createElement("img");
       img.src = t.dataset.web;
@@ -300,19 +350,15 @@
       img.alt = mediaName(t, "");
       stage.appendChild(img);
       activeVideo = null;
-      activeAsset = null;
-      commentLoadVersion += 1;
-      if (cWrap) {
-        cWrap.hidden = true;
-        restoreCommentFeedback(null);
-        restoreCommentDraft(null);
-      }
+      activeAsset = t.dataset.id;
+      activeIsStill = true;
+      openCommentPanel();
     }
     // Announce the stage change — the dialog is modal, so without a live
     // region arrow/slideshow navigation is silent to screen readers.
     if (live) {
       const kindFallback = t.dataset.kind === "video" ? "Video" : "Photo";
-      live.textContent = mediaName(t, kindFallback) + " — " + (idx + 1) + " of " + tiles.length;
+      live.textContent = mediaName(t, kindFallback) + " — " + livePosition(t);
     }
   }
 
@@ -436,7 +482,7 @@
         const commentsValid = Array.isArray(comments);
         const draftCleared = clearSubmittedDraft(assetId, submittedRevision);
         if (draftCleared && activeAsset === assetId) restoreCommentDraft(assetId);
-        setCommentFeedback(assetId, commentsValid ? "" : "Your note was posted, but comments couldn't refresh — reopen this video or refresh.", !commentsValid);
+        setCommentFeedback(assetId, commentsValid ? "" : "Your note was posted, but comments couldn't refresh — reopen it or refresh.", !commentsValid);
         if (activeAsset !== assetId) return;
         commentLoadVersion += 1;
         if ((commentServerActivityVersions.get(assetId) || 0) !== submittedActivityVersion) {
@@ -554,4 +600,31 @@
       }
     }
   }, { passive: true });
+
+  // Per-file save (mobile's path around the ZIP). The fetch rides the SAME
+  // gated /download?asset_id= URL the ↓ anchor navigates to, so the PIN
+  // session, email gate and per-visitor download log all apply unchanged. If
+  // the gate intercepts (any non-image response), fall through to a plain
+  // navigation so the visitor actually sees it; ditto when sharing itself
+  // fails. A share sheet the visitor dismissed (AbortError) is not a failure.
+  if (saveBtn) saveBtn.addEventListener("click", async () => {
+    const url = dlLink && dlLink.getAttribute("href");
+    if (!url || url === "#") return;
+    saveBtn.disabled = true;
+    try {
+      const res = await fetch(url);
+      const type = (res.headers.get("content-type") || "").split(";")[0].trim();
+      if (!res.ok || !type.startsWith("image/")) { window.location.href = url; return; }
+      const cd = res.headers.get("content-disposition") || "";
+      const star = cd.match(/filename\*=utf-8''([^;]+)/i);
+      const plain = cd.match(/filename="([^"]+)"/i);
+      const name = star ? decodeURIComponent(star[1]) : plain ? plain[1] : "photo.jpg";
+      const file = new File([await res.blob()], name, { type: type });
+      await navigator.share({ files: [file] });
+    } catch (err) {
+      if (!err || err.name !== "AbortError") window.location.href = url;
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
 })();

@@ -28,6 +28,16 @@ log = logging.getLogger("mise.scheduling")
 _UTC = dt.UTC
 
 
+def _pending_ttl() -> str:
+    """SQLite datetime modifier for the payment-hold window.
+
+    The conflict queries treat a pending_payment hold as occupying its slot only
+    while it is younger than this — so an abandoned checkout releases its slot
+    the moment the window passes, exactly, without waiting for the hourly sweep
+    (which merely tidies the expired rows afterwards)."""
+    return f"-{config.BOOKING_PAY_TTL_MIN} minutes"
+
+
 class SlotTaken(Exception):
     """Raised when a slot is no longer bookable (gone, blocked, or out of policy)."""
 
@@ -121,11 +131,12 @@ def _overlaps(
     row = con.execute(
         """SELECT COUNT(*) AS n FROM bookings b
            JOIN event_types e ON e.id=b.event_type_id
-           WHERE b.status='confirmed'
+           WHERE (b.status='confirmed'
+                  OR (b.status='pending_payment' AND b.created_at >= datetime('now', ?)))
              AND datetime(b.start_utc, '-'||e.buffer_before_min||' minutes') < ?
              AND datetime(b.end_utc,   '+'||e.buffer_after_min ||' minutes') > ?
              AND (? IS NULL OR b.id != ?)""",
-        (hi, lo, exclude_id, exclude_id),
+        (_pending_ttl(), hi, lo, exclude_id, exclude_id),
     ).fetchone()
     return row["n"] > 0
 
@@ -151,10 +162,12 @@ def _day_count(con, et, day: dt.date, exclude_id: int | None = None) -> int:
     end = start + dt.timedelta(days=1)
     row = con.execute(
         """SELECT COUNT(*) AS n FROM bookings
-           WHERE status='confirmed' AND event_type_id=?
+           WHERE (status='confirmed'
+                  OR (status='pending_payment' AND created_at >= datetime('now', ?)))
+             AND event_type_id=?
              AND start_utc >= ? AND start_utc < ?
              AND (? IS NULL OR id != ?)""",
-        (et["id"], _fmt_utc(start), _fmt_utc(end), exclude_id, exclude_id),
+        (_pending_ttl(), et["id"], _fmt_utc(start), _fmt_utc(end), exclude_id, exclude_id),
     ).fetchone()
     return row["n"]
 
@@ -322,6 +335,8 @@ def book(
     notes: str,
     visitor_tz: str,
     exclude_id: int | None = None,
+    referral: str | None = None,
+    status: str = "confirmed",
 ) -> tuple[int, str]:
     """Atomically claim a slot. Returns (booking_id, manage_token).
 
@@ -382,8 +397,9 @@ def book(
         if original is None:
             cur = con.execute(
                 """INSERT INTO bookings (token, event_type_id, name, email, phone,
-                                         notes, start_utc, end_utc, tz, reschedule_of)
-                   VALUES (?,?,?,?,?,?,?,?,?,NULL)""",
+                                         notes, start_utc, end_utc, tz, reschedule_of,
+                                         referral_source, status)
+                   VALUES (?,?,?,?,?,?,?,?,?,NULL,?,?)""",
                 (
                     token,
                     et["id"],
@@ -394,6 +410,8 @@ def book(
                     start_utc_str,
                     _fmt_utc(end_utc),
                     visitor_tz,
+                    referral,
+                    status,
                 ),
             )
         else:
@@ -404,8 +422,9 @@ def book(
                       inquiry_id, google_event_id, notion_page_id,
                       notion_session_id, client_id, project_id,
                       venue_address, dish_count, parking_notes, style_refs,
-                      onsite_contact)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                      onsite_contact, referral_source, paid_cents, paid_at,
+                      stripe_session_id)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     token,
                     et["id"],
@@ -428,6 +447,12 @@ def book(
                     original["parking_notes"],
                     original["style_refs"],
                     original["onsite_contact"],
+                    original["referral_source"],
+                    # A reschedule is the same purchase at a new time — the
+                    # payment moves with it, and no second charge is ever made.
+                    original["paid_cents"],
+                    original["paid_at"],
+                    original["stripe_session_id"],
                 ),
             )
         bid = cur.lastrowid
@@ -465,6 +490,37 @@ def book(
         raise
     finally:
         con.close()
+
+
+def expire_pending_payments() -> int:
+    """Release slots held by checkouts that never paid.
+
+    A pending_payment row occupies its slot (the conflict queries count it), so
+    an abandoned Stripe checkout would otherwise block real bookings forever.
+    Runs from the scheduler sweep. The webhook handles the race where payment
+    lands AFTER expiry: money against a cancelled hold is treated as an anomaly
+    (ack + audit + operator alert to refund), never a silent re-confirmation of
+    a slot that may have been re-sold in between.
+    """
+    # db.run returns lastrowid, which is meaningless for an UPDATE — count via
+    # the cursor so the log (and tests) report what actually happened.
+    con = db.connect()
+    try:
+        cur = con.execute(
+            """UPDATE bookings SET status='cancelled',
+                      cancel_reason='Payment not completed',
+                      cancelled_at=datetime('now')
+                WHERE status='pending_payment'
+                  AND created_at < datetime('now', ?)""",
+            (f"-{config.BOOKING_PAY_TTL_MIN} minutes",),
+        )
+        con.commit()
+        n = cur.rowcount
+    finally:
+        con.close()
+    if n:
+        log.info("released %d unpaid booking hold(s)", n)
+    return n
 
 
 def booking_by_token(token: str):

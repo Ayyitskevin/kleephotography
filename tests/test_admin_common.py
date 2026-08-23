@@ -54,3 +54,19 @@ def test_clients_with_hints_moved():
     assert hasattr(common, "_clients_with_hints")
     # basic callable
     assert callable(common._clients_with_hints)
+
+
+@pytest.mark.unit
+def test_save_upload_writes_every_chunk(tmp_path):
+    """Reads stay on the loop; the bytes still have to land on disk."""
+    import asyncio
+    from io import BytesIO
+
+    from starlette.datastructures import UploadFile
+
+    payload = b"x" * (1 << 20) + b"tail"
+    upload = UploadFile(filename="shot.bin", file=BytesIO(payload))
+    dest = tmp_path / "shot.bin"
+    written = asyncio.run(common.save_upload(upload, dest))
+    assert written == len(payload)
+    assert dest.read_bytes() == payload

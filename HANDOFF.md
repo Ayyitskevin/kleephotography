@@ -150,7 +150,9 @@ The audit remediation and the follow-up queue finished as:
   sessions (migration 065 + `admin_sessions`), `COOKIE_SECURE` derives from an
   https BASE_URL, cross-IP per-target PIN cap (`PIN_TARGET_MAX_FAILS`), Stripe
   `?thanks=1` return acknowledged (#17), `/c/ /w/ /t/` now rate-metered, admin
-  password compare is bytes-safe. HSTS ships at `max-age=300` when COOKIE_SECURE.
+  password compare is bytes-safe. HSTS ships at `max-age=15552000` (180d, `MISE_HSTS_MAX_AGE`) when COOKIE_SECURE,
+  root-only — no `includeSubDomains`/preload pending a subdomain TLS inventory
+  (ops/TRUTHFUL-HTTPS.md).
 - **Security follow-ups:** Permissions-Policy header + RFC 9116 security.txt (#16);
   CSP `script-src` has NO `unsafe-inline` — per-request nonces + delegated
   `static/behaviors.js` (data-confirm / data-print / data-autosubmit / data-goto),
@@ -282,7 +284,21 @@ gate · drop-gallery favorites/section redirect-loop · `/static` immutable cach
 portfolio CLS width/height · press-marquee aria-hidden · about h1→h2 · expired.html
 contact link · book_index copy contradiction. Each has a smoke/unit test.
 
-### 6b-remaining. GREEN — still open (verify code, fix, test, gate, commit)
+### 6b-remaining. GREEN — **mostly closed; re-verified 2026-08-09**
+
+> **Do not re-verify this list from scratch.** A full review re-checked all 18
+> findings below against `main`: **13 were already fixed**, 2 are partially fixed
+> (inbox's 100-thread cap still has no pager; the `db.get_or_404` sweep reached 14
+> files but ~22 hand-rolled sites remain), 2 were not-found because the code was
+> removed or refactored away, and **1 is still genuinely open** (the gallery
+> "Photos" stat tile counts videos too — the count moved to
+> `templates/admin/_gd_stats.html`). The two client-facing items at the top of the
+> list — portal crop 404s while processing, and lightbox paging through
+> filtered-out tiles — are both fixed. The HELD money-document item is still held.
+> Current findings and the work queue that replaced this list live in
+> [`UPGRADE-BRIEF.md`](UPGRADE-BRIEF.md).
+
+
 
 - **[minor·green]** portal crop links 404 while the crop is still processing
   `portal.py:205` — check crop file existence per asset, render unready ratios as a
@@ -348,9 +364,12 @@ created by earlier tests), TODO/FIXME grep, mailer/gcal/notion failure modes.
   commits (client-flow correctness + perf/a11y/copy). Full smoke suite: 164 passed.
 - Remaining green work: §6b-remaining (portal-crop-processing, portfolio filter+lightbox
   aria-pressed), §6c sweeps (perf N+1s, test-ordering brittleness, features), and the
-  admin/code-quality UNVERIFIED lists (verify each before touching). The two
-  ordering-brittle tests (`test_expired_gallery`, `test_gallery_notion_writeback`) fail
-  under `-k` subsets because they read the newest gallery/project from earlier tests —
-  a good §6c test-hardening target (make them self-sufficient).
+  admin/code-quality UNVERIFIED lists (see the verdict block in §6b-remaining —
+  they were re-verified 2026-08-09, don't redo that work). The two ordering-brittle
+  tests named here (`test_expired_gallery`, `test_gallery_notion_writeback`) are
+  **fixed** — both now seed their own rows. The real remaining coupling is the
+  studio lifecycle chain in `tests/smoke/test_02_studio_docs.py`
+  (proposal → contract → invoice → notion each read the newest row an earlier test
+  left behind).
 - Deploy remains BLOCKED from this env (no prod-host access) — Kevin deploys merged main via
   `scripts/deploy-flow.sh`; post-deploy spot-check `/work/{slug}` (fonts+menu+hero).

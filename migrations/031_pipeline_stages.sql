@@ -6,8 +6,9 @@
 -- consultation_call is net-new (reached manually). Changing a CHECK constraint
 -- requires a table rebuild; child tables FK-reference projects(id), so we disable
 -- FK enforcement around the swap. ids are preserved → referential integrity holds.
--- (db.migrate uses executescript, which commits first, so the leading PRAGMA
---  takes effect outside any transaction.)
+-- (db.migrate runs a file's leading and trailing PRAGMAs outside the migration
+--  transaction, so this toggle actually takes effect — SQLite silently ignores
+--  PRAGMA foreign_keys inside a transaction.)
 PRAGMA foreign_keys=OFF;
 BEGIN;
 CREATE TABLE projects_new (

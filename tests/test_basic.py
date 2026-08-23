@@ -26,6 +26,22 @@ def client():
         yield c
 
 
+@pytest.mark.integration
+def test_boot_refuses_without_a_secret_key(monkeypatch):
+    """No signing key = refuse the boot, don't come up healthy and 500 later.
+
+    The check runs before db.migrate()/jobs.start(), so a failed startup here
+    leaves the module-shared job pool alone.
+    """
+    from app import config
+
+    monkeypatch.setattr(config, "SECRET_KEY", "")
+    with pytest.raises(RuntimeError, match="MISE_SECRET_KEY is not set"):
+        with TestClient(app):
+            pass
+
+
+# The full payload now needs a bearer; see security.healthz_detail_authorized.
 _HZ_TOKEN = "healthz-test-token"
 
 
@@ -36,9 +52,16 @@ def _hz_auth(monkeypatch):
 
 @pytest.mark.integration
 def test_healthz_public_body_is_minimal(client):
+    """Unauthenticated callers get liveness and nothing else.
+
+    Free disk, backup age and queue depth told any anonymous reader how close
+    the box was to falling over — reconnaissance, and a live progress meter
+    during a resource-exhaustion attempt.
+    """
     r = client.get("/healthz")
-    assert r.status_code == 200
-    assert r.json() == {"ok": True}
+    body = r.json()
+    assert r.status_code == 200 and body["ok"] is True
+    assert set(body) == {"ok"}, f"public /healthz leaked keys: {sorted(set(body) - {'ok'})}"
 
 
 @pytest.mark.integration
@@ -55,11 +78,25 @@ def test_healthz_full_payload_with_bearer(client, monkeypatch):
 
 
 @pytest.mark.integration
-def test_healthz_rejects_wrong_or_disarmed_bearer(client, monkeypatch):
+def test_healthz_rejects_wrong_bearer(client, monkeypatch):
     monkeypatch.setattr(config, "HEALTHZ_TOKEN", _HZ_TOKEN)
-    assert client.get("/healthz", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    r = client.get("/healthz", headers={"Authorization": "Bearer wrong"})
+    assert r.status_code == 401
+    assert "disk_free_gb" not in r.json()
+
+
+@pytest.mark.integration
+def test_healthz_detail_disarmed_when_token_unset(client, monkeypatch):
+    """Presenting a bearer at a host with no token reads as disarmed, not denied.
+
+    Same doctrine as the other bearer gates: an arming caller needs to tell
+    "not provisioned yet" apart from "wrong token".
+    """
     monkeypatch.setattr(config, "HEALTHZ_TOKEN", "")
-    assert client.get("/healthz", headers={"Authorization": "Bearer anything"}).status_code == 503
+    r = client.get("/healthz", headers={"Authorization": "Bearer anything"})
+    assert r.status_code == 503
+    assert "disk_free_gb" not in r.json()
+    # ...while the monitor's unauthenticated path still works on that same host.
     assert client.get("/healthz").json() == {"ok": True}
 
 
@@ -75,12 +112,17 @@ def test_healthz_returns_503_only_for_database_failure(client, monkeypatch):
         return real_one(sql, params)
 
     monkeypatch.setattr(db, "one", fail_probe)
+    # Public path: the monitor must still see the failure in the STATUS CODE,
+    # which is the whole contract MONITORING.md tells it to assert on. Gating
+    # the body must never gate the check that produces it.
     r = client.get("/healthz")
     assert r.status_code == 503
     assert r.json() == {"ok": False}
-    detailed = client.get("/healthz", headers=_hz_auth(monkeypatch))
-    assert detailed.status_code == 503
-    assert detailed.json()["db_connected"] is False
+    # Authorized path keeps the diagnosis.
+    r = client.get("/healthz", headers=_hz_auth(monkeypatch))
+    assert r.status_code == 503
+    assert r.json()["ok"] is False
+    assert r.json()["db_connected"] is False
 
 
 @pytest.mark.integration
@@ -102,6 +144,8 @@ def test_healthz_reports_storage_warning_without_failing(client, monkeypatch):
     assert r.status_code == 200 and r.json()["ok"] is True
     assert r.json()["disk_low"] is True
     assert r.json()["backup_stale"] is True
+    # A degraded box still looks plainly "ok" to the public — storage warnings
+    # were never meant to fail the endpoint, and now they do not leak either.
     assert client.get("/healthz").json() == {"ok": True}
 
 
@@ -150,11 +194,14 @@ def test_hsts_tracks_cookie_secure(monkeypatch):
 
     # HSTS ships only when the site knows it's on TLS (same signal as Secure
     # cookies) — never for a plain-http dev origin, which would pin localhost.
-    # Keep the first production rollout short and root-only so it is reversible.
+    # Root-only: includeSubDomains and preload both need a subdomain TLS
+    # inventory, and preload is materially harder to undo than max-age.
     monkeypatch.setattr(config, "COOKIE_SECURE", True)
     with TestClient(app) as c:
         h = c.get("/healthz").headers["strict-transport-security"]
-        assert h == "max-age=300"
+        assert h == f"max-age={config.HSTS_MAX_AGE}"
+        assert config.HSTS_MAX_AGE >= 15552000, "HSTS ratcheted back below 180 days"
+        assert "includeSubDomains" not in h and "preload" not in h
     monkeypatch.setattr(config, "COOKIE_SECURE", False)
     with TestClient(app) as c:
         assert "strict-transport-security" not in c.get("/healthz").headers
@@ -181,12 +228,24 @@ def test_admin_logout_revokes_session(client):
     assert r.status_code == 303
     raw = r.cookies.get(security.ADMIN_COOKIE)
     token = security.unsign(raw)
-    assert token and db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (token,))
+    assert token and db.one(
+        "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+        (security._admin_token_hash(token),),
+    )
+    # the raw token must exist ONLY in the cookie — never at rest, because the
+    # nightly snapshot copies whatever is at rest (migrations/071)
+    assert db.one("SELECT COUNT(*) n FROM admin_sessions WHERE token_hash=?", (token,))["n"] == 0
     # authenticated request passes the require_admin gate
     assert client.get("/admin/home", follow_redirects=False).status_code == 200
     # logout deletes the server-side row → real revocation
     assert client.post("/admin/logout", follow_redirects=False).status_code == 303
-    assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (token,)) is None
+    assert (
+        db.one(
+            "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+            (security._admin_token_hash(token),),
+        )
+        is None
+    )
     # replaying the OLD signed cookie is now dead — bounced to login, not admitted
     client.cookies.clear()
     client.cookies.set(security.ADMIN_COOKIE, raw)
@@ -207,9 +266,14 @@ def test_admin_sign_out_everywhere_requires_auth(client):
         assert r.status_code == 303
         assert r.headers["location"] == "/admin/login"
         assert db.one("SELECT COUNT(*) AS n FROM admin_sessions")["n"] == before
-        assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (other,))
+        assert db.one(
+            "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+            (security._admin_token_hash(other),),
+        )
     finally:
-        db.run("DELETE FROM admin_sessions WHERE token=?", (other,))
+        db.run(
+            "DELETE FROM admin_sessions WHERE token_hash=?", (security._admin_token_hash(other),)
+        )
 
 
 @pytest.mark.integration
@@ -225,7 +289,13 @@ def test_admin_sign_out_everywhere_kills_all_sessions(client):
     r = client.post("/admin/logout", data={"everywhere": "1"}, follow_redirects=False)
     assert r.status_code == 303
     assert db.one("SELECT COUNT(*) AS n FROM admin_sessions")["n"] == 0
-    assert db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (other,)) is None
+    assert (
+        db.one(
+            "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+            (security._admin_token_hash(other),),
+        )
+        is None
+    )
     client.cookies.clear()
 
 
@@ -316,8 +386,16 @@ def test_csp_header(client):
     # pervasive and style injection is a far weaker vector than script)
     style_src = next(d for d in csp.split("; ") if d.startswith("style-src "))
     assert "'unsafe-inline'" in style_src
-    # analytics is the only off-origin asset, allowed for script + connect
-    assert "https://plausible.io" in csp
+    # Analytics is the only off-origin asset, and now allowed ONLY when it is
+    # actually configured — asserted in full by
+    # test_csp_allows_plausible_only_when_analytics_is_on. Here the header is
+    # read from a live response, whose CSP was built at import from whatever
+    # PLAUSIBLE_DOMAIN the environment had, so this pins the invariant that
+    # holds either way: no off-origin destination beyond plausible.io.
+    for directive in ("script-src", "connect-src"):
+        d = next(x for x in csp.split("; ") if x.startswith(directive + " "))
+        offsite = [t for t in d.split() if t.startswith("http")]
+        assert offsite in ([], ["https://plausible.io"]), (directive, offsite)
     # indexable marketing pages carry the policy too
     assert "content-security-policy" in client.get("/").headers
 
@@ -502,8 +580,18 @@ def test_access_routes_use_shared_session_cookie_policy(client, monkeypatch):
     assert admin.status_code == 303
     # the admin cookie now carries a per-login server-side session token (not a
     # signed constant); it must resolve to a live row in admin_sessions
-    admin_token = security.unsign(assert_session_cookie(admin, security.ADMIN_COOKIE).value)
-    assert admin_token and db.one("SELECT 1 AS x FROM admin_sessions WHERE token=?", (admin_token,))
+    # The admin cookie deliberately carries a SHORTER lifetime than client
+    # cookies: 90 days suits a client browsing their own photos, but applied to
+    # admin it meant one stolen laptop session stayed valid for a quarter.
+    admin_morsel = assert_session_cookie(
+        admin, security.ADMIN_COOKIE, max_age=config.ADMIN_SESSION_MAX_AGE
+    )
+    assert config.ADMIN_SESSION_MAX_AGE < config.SESSION_MAX_AGE
+    admin_token = security.unsign(admin_morsel.value, max_age=config.ADMIN_SESSION_MAX_AGE)
+    assert admin_token and db.one(
+        "SELECT 1 AS x FROM admin_sessions WHERE token_hash=?",
+        (security._admin_token_hash(admin_token),),
+    )
 
     db.run(
         "INSERT INTO galleries (slug,title,pin,published) VALUES (?,?,?,1)",
@@ -580,28 +668,35 @@ def test_static_asset_cache_and_font_preload_identity(client):
     assert fonts_css_response.headers["cache-control"] == r.headers["cache-control"]
     fonts_css = fonts_css_response.text
 
-    # Font filenames are stable and unversioned in fonts.css. They must revalidate
-    # on a short cadence, and preload URLs must be byte-for-byte identical so the
-    # browser can reuse each preload for the later @font-face request.
-    font_urls = (
-        "/static/fonts/newsreader-latin.woff2",
-        "/static/fonts/archivo-latin.woff2",
+    # Font filenames carry a version infix so they can be cached forever.
+    # Preload URLs must be byte-for-byte identical so the browser can reuse
+    # each preload for the later @font-face request. The marketing shell also
+    # preloads the Newsreader italic — every site page paints it (sr-beat and
+    # friends) and it is the largest font shipped (147 KB); the admin shell
+    # stays at two (italic there is one reference page, not worth the bytes).
+    site_font_urls = (
+        "/static/fonts/newsreader-latin.v1.woff2",
+        "/static/fonts/archivo-latin.v1.woff2",
+        "/static/fonts/newsreader-italic-latin.v1.woff2",
     )
-    for url in font_urls:
+    admin_font_urls = (
+        "/static/fonts/newsreader-latin.v1.woff2",
+        "/static/fonts/archivo-latin.v1.woff2",
+    )
+    for url in site_font_urls:  # superset of admin_font_urls
         font = client.get(url)
         assert font.status_code == 200
-        assert font.headers["cache-control"] == "public, max-age=86400"
-        assert "immutable" not in font.headers["cache-control"]
+        assert font.headers["cache-control"] == "public, max-age=31536000, immutable"
         assert f"url({url})" in fonts_css
 
-    def assert_font_preloads(page):
+    def assert_font_preloads(page, font_urls):
         assert page.count('rel="preload" href="/static/fonts/') == len(font_urls)
         for url in font_urls:
             tag = f'<link rel="preload" href="{url}" as="font" type="font/woff2" crossorigin>'
             assert page.count(tag) == 1
 
     home = client.get("/").text
-    assert_font_preloads(home)
+    assert_font_preloads(home, site_font_urls)
 
     from app import config
 
@@ -611,7 +706,7 @@ def test_static_asset_cache_and_font_preload_identity(client):
     assert login.status_code == 303
     admin = client.get("/admin/home")
     assert admin.status_code == 200
-    assert_font_preloads(admin.text)
+    assert_font_preloads(admin.text, admin_font_urls)
 
     # non-static responses must NOT get the immutable header
     assert "immutable" not in client.get("/healthz").headers.get("cache-control", "")
@@ -702,13 +797,16 @@ def test_unhandled_exception_alerts_and_500(monkeypatch):
         assert r.status_code == 500
         assert "Something went wrong" in r.text
         assert "kaboom-secret-detail" not in r.text  # detail never leaks to client
+        assert r.headers.get("x-request-id")
         r = c.get("/__test_boom", headers={"accept": "application/json"})
         assert r.status_code == 500 and r.json()["detail"] == "internal server error"
+        assert r.headers.get("x-request-id")
     finally:
         app.router.routes = [
             rt for rt in app.router.routes if getattr(rt, "path", None) != "/__test_boom"
         ]
     assert fired and "RuntimeError" in fired[0][0]
+    assert "id=" in fired[0][1]
 
 
 @pytest.mark.integration

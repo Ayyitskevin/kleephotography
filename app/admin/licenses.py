@@ -11,6 +11,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, clients, config, db, pricing, security
@@ -186,7 +187,7 @@ def _parse_form(form) -> dict:
 
 
 @router.post("/clients/{client_id}/licenses")
-async def create_license(client_id: int, title: str = Form(...)):
+def create_license(client_id: int, title: str = Form(...)):
     get_client(client_id)
     if not title.strip():
         raise HTTPException(status_code=400, detail="title required")
@@ -208,7 +209,7 @@ async def create_license(client_id: int, title: str = Form(...)):
 
 
 @router.get("/licenses", response_class=HTMLResponse)
-async def licenses_list(request: Request):
+def licenses_list(request: Request):
     rows = db.all_(
         """SELECT l.id, l.title, l.usage_tier, l.exclusivity, l.status,
                   l.published, l.fee_cents, l.starts_on, l.ends_on, l.perpetual,
@@ -230,7 +231,7 @@ async def licenses_list(request: Request):
 
 
 @router.get("/licenses/{license_id}", response_class=HTMLResponse)
-async def license_detail(request: Request, license_id: int):
+def license_detail(request: Request, license_id: int):
     # Deferred import breaks the licenses<->press cycle: press.py imports
     # effective_coverage from this module at load time, so this module can't
     # import press at the top. By request time both are fully loaded.
@@ -299,8 +300,12 @@ async def license_detail(request: Request, license_id: int):
 
 @router.post("/licenses/{license_id}")
 async def update_license(request: Request, license_id: int):
-    d = get_license(license_id)
+    d = await run_in_threadpool(get_license, license_id)
     form = await request.form()
+    return await run_in_threadpool(_update_license, d, form, license_id)
+
+
+def _update_license(d: "db.sqlite3.Row", form, license_id: int):
     new = _parse_form(form)
     if not new["title"]:
         raise HTTPException(status_code=400, detail="title required")
@@ -356,7 +361,7 @@ async def update_license(request: Request, license_id: int):
 
 
 @router.post("/licenses/{license_id}/status")
-async def change_status(license_id: int, status: str = Form(...)):
+def change_status(license_id: int, status: str = Form(...)):
     d = get_license(license_id)
     if status not in STATUSES:
         raise HTTPException(status_code=400, detail="bad status")
@@ -375,7 +380,7 @@ async def change_status(license_id: int, status: str = Form(...)):
 
 
 @router.post("/licenses/{license_id}/delete")
-async def delete_license(license_id: int):
+def delete_license(license_id: int):
     d = get_license(license_id)
     with db.tx() as con:
         con.execute("UPDATE licenses SET deleted_at=datetime('now') WHERE id=?", (license_id,))

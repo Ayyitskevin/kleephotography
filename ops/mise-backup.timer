@@ -1,5 +1,5 @@
 [Unit]
-Description=Mise nightly SQLite snapshot (02:30)
+Description=Mise nightly backup — SQLite snapshot + durable files (02:30)
 
 [Timer]
 OnCalendar=*-*-* 02:30:00

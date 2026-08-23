@@ -1,5 +1,6 @@
 """Mise configuration — env-driven, .env loaded if present (systemd uses EnvironmentFile)."""
 
+import math
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -81,6 +82,42 @@ SITE_NAME = os.environ.get("MISE_SITE_NAME", "Kevin Lee Photography")
 INSTAGRAM_URL = os.environ.get("MISE_INSTAGRAM_URL") or None
 # Optional Google Business Profile URL for LocalBusiness sameAs (schema.org).
 GOOGLE_BUSINESS_URL = os.environ.get("MISE_GOOGLE_BUSINESS_URL") or None
+# Optional LocalBusiness entity facts for the marketing pages' JSON-LD
+# (templates/site/_schema_local.html). Unset = the matching property is OMITTED
+# from the markup — a real value comes from env, never invented in code.
+# Phone: E.164 recommended (+1XXXXXXXXXX). Hours: comma-separated schema.org
+# openingHours tokens ("Mo-Fr 09:00-17:00,Sa 10:00-14:00"). Geo: BOTH lat and
+# lng (decimal degrees) or the pair stays off; a malformed number fails loud at
+# startup rather than shipping broken structured data.
+BUSINESS_PHONE = (os.environ.get("MISE_BUSINESS_PHONE") or "").strip() or None
+BUSINESS_HOURS = tuple(
+    h.strip() for h in (os.environ.get("MISE_BUSINESS_HOURS") or "").split(",") if h.strip()
+)
+
+
+def _parse_coord(name: str, raw: str) -> float:
+    # float() alone accepts "nan"/"inf", which would ship literally invalid
+    # JSON-LD ("latitude": NaN) — the one malformed-number class that does NOT
+    # fail json.dumps. Reject the whole class here, loudly, naming the var.
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"{name} is not a decimal-degrees number: {raw!r}") from None
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be a finite coordinate, got: {raw!r}")
+    return value
+
+
+_business_lat = (os.environ.get("MISE_BUSINESS_LAT") or "").strip()
+_business_lng = (os.environ.get("MISE_BUSINESS_LNG") or "").strip()
+BUSINESS_GEO = (
+    (
+        _parse_coord("MISE_BUSINESS_LAT", _business_lat),
+        _parse_coord("MISE_BUSINESS_LNG", _business_lng),
+    )
+    if _business_lat and _business_lng
+    else None
+)
 # Optional filename under /static for the About page studio portrait
 # (e.g. about-portrait.jpg). Empty = auto-detect about-portrait.{jpg,jpeg,png,webp}
 # if present; otherwise the page falls back to the newest starred portfolio still.
@@ -197,6 +234,7 @@ QUO_NUMBER = os.environ.get("MISE_QUO_NUMBER", "")
 QUO_WEBHOOK_SECRET = os.environ.get("MISE_QUO_WEBHOOK_SECRET", "")
 QUO_API_BASE = os.environ.get("MISE_QUO_API_BASE", "https://api.openphone.com/v1")
 QUO_TIMEOUT = int(os.environ.get("MISE_QUO_TIMEOUT", "20"))
+QUO_WEBHOOK_TOLERANCE_SEC = int(os.environ.get("MISE_QUO_WEBHOOK_TOLERANCE_SEC", "300"))
 
 # Shot-list read API (Domain F / B-Direct integration). Odysseus's preshoot_pack
 # reads Mise's local shot list over GET /api/shots?session=<notion_page_id> with a
@@ -221,10 +259,51 @@ PLATEKIT_TIMEOUT = int(
 WEB_MAX_PX = int(os.environ.get("MISE_WEB_MAX_PX", "2048"))
 THUMB_MAX_PX = int(os.environ.get("MISE_THUMB_MAX_PX", "480"))
 JPEG_QUALITY = int(os.environ.get("MISE_JPEG_QUALITY", "85"))
+
+# Modern still formats written ALONGSIDE the JPEG (never instead of it), picked
+# per-request from the browser's Accept header. Order is preference order.
+# Kill switch: MISE_MODERN_IMAGE_FORMATS= (empty) serves nothing but JPEG, and
+# any siblings already on disk are simply ignored.
+MODERN_IMAGE_FORMATS = tuple(
+    fmt
+    for fmt in (
+        f.strip().lower()
+        for f in os.environ.get("MISE_MODERN_IMAGE_FORMATS", "avif,webp").split(",")
+    )
+    if fmt in ("avif", "webp")
+)
+# Quality scales are not comparable across codecs — these are the values that
+# hold roughly the JPEG q85 appearance, not the same number.
+WEBP_QUALITY = int(os.environ.get("MISE_WEBP_QUALITY", "80"))
+AVIF_QUALITY = int(os.environ.get("MISE_AVIF_QUALITY", "63"))
+
 VIDEO_MAX_W = int(os.environ.get("MISE_VIDEO_MAX_W", "1920"))
 VIDEO_CRF = int(os.environ.get("MISE_VIDEO_CRF", "23"))
 
+# ZIP_DIR eviction. Archives are a rebuildable cache (ops/backup.sh excludes
+# /zips/ for exactly this reason, and a missing one re-enqueues its build), but
+# nothing ever swept the directory as a whole, so a delivered gallery's archive
+# lived forever. Idleness, not age: serving one refreshes its clock.
+# 0 disables eviction entirely.
+ZIP_CACHE_TTL_DAYS = int(os.environ.get("MISE_ZIP_CACHE_TTL_DAYS", "30"))
+
 JOB_WORKERS = int(os.environ.get("MISE_JOB_WORKERS", "2"))
+
+# The job queue's OWN clock (jobs._sweep_loop), deliberately separate from the
+# hourly recurring scheduler below: it is what re-offers a job parked behind its
+# retry backoff, so the tick has to be finer than the backoff or the backoff
+# becomes decorative. A failed job therefore retries between its backoff and its
+# backoff + one tick (60s → 60-120s). Raising this past RETRY_BACKOFF_SECONDS[0]
+# makes the first retry step meaningless; lower it, don't raise it.
+JOB_SWEEP_TICK_SECONDS = int(os.environ.get("MISE_JOB_SWEEP_TICK_SECONDS", "60"))
+
+# A RETRY still sitting there this long past its next_attempt_at is not waiting,
+# it is wedged (sweeper thread dead, pool never came back, a bad timestamp).
+# ops_monitor alerts on it and /healthz reports it. 15 min is ~15 missed sweep
+# ticks — long enough not to trip over a slow handler, short enough that Kevin
+# hears about a dead queue the same hour. Never-attempted work is excluded from
+# the count on purpose (jobs.queue_health); a deep backlog is normal.
+JOB_STUCK_AFTER_SECONDS = int(os.environ.get("MISE_JOB_STUCK_AFTER_SECONDS", "900"))
 
 # Recurring-plan scheduler: how often the in-process thread sweeps for due
 # retainer drafts. Generates DRAFTS only (never sends/charges). The sweep is
@@ -279,17 +358,24 @@ RATE_LIMITS = {
 TELEGRAM_TOKEN = os.environ.get("MISE_TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("MISE_TELEGRAM_CHAT_ID", "")
 
-# Bearer that unlocks detailed operational fields on /healthz. Unset keeps the
-# public liveness response available while making the detail unreachable.
+# Bearer that unlocks the FULL /healthz payload. Unset -> the detail is simply
+# unreachable over HTTP and the endpoint answers the public shape to everyone;
+# the same facts stay visible to Kevin in Admin -> Settings. See ops/MONITORING.md.
 HEALTHZ_TOKEN = os.environ.get("MISE_HEALTHZ_TOKEN", "")
+
+# Dead-man's switch: an external URL pinged once per scheduler tick. Unset ->
+# dormant. This is the only alarm that survives the host itself dying, so it is
+# deliberately not gated on Telegram — see ops/MONITORING.md.
+HEARTBEAT_PING_URL = os.environ.get("MISE_HEARTBEAT_PING_URL", "")
 
 # Refuse uploads when free disk drops below this (GB) — fail loud, not full.
 MIN_FREE_GB = int(os.environ.get("MISE_MIN_FREE_GB", "10"))
 
 # Favorites / per-section ZIPs are built INLINE while the client waits — a
-# STORED copy, so it costs one read+write of every byte, and because the
-# download handlers are async that copy blocks the whole event loop, not just
-# the one request. Above either ceiling the bundle goes to the job queue and the
+# STORED copy, so it costs one read+write of every byte. The download handlers
+# are sync, so that copy now occupies a threadpool worker rather than the whole
+# event loop; it still holds one of only ~40 slots for its duration, which is
+# why the ceiling stays. Above either ceiling the bundle goes to the job queue and the
 # client gets the same wait/poll page the full-gallery ZIP has always used.
 #   bytes: 150 MB is ~1s of copying on a modest SSD (the longest stall worth
 #          taking in-request) and 3x the 50 MB at which the gallery export rail
@@ -309,6 +395,74 @@ MILEAGE_RATE_CENTS = int(os.environ.get("MISE_MILEAGE_RATE_CENTS", "70"))
 MONTHLY_GOAL_CENTS = int(os.environ.get("MISE_MONTHLY_GOAL", "0")) * 100
 
 SESSION_MAX_AGE = int(os.environ.get("MISE_SESSION_MAX_AGE", str(60 * 60 * 24 * 90)))
+
+# How stale visitors.last_seen may get before a request refreshes it. Every
+# thumbnail request used to rewrite it, so one 60-photo gallery load meant 60
+# serialized writes on the hottest, rate-limit-exempt path in the app — for a
+# column nothing reads. 10 minutes keeps "when did they last look" useful at a
+# fraction of the cost.
+VISITOR_LAST_SEEN_DEBOUNCE_SECONDS = int(
+    os.environ.get("MISE_VISITOR_LAST_SEEN_DEBOUNCE_SECONDS", "600")
+)
+
+# SQLite durability. NORMAL is the standard WAL pairing: commits stop fsyncing
+# individually and are flushed at checkpoint instead. A process crash is still
+# safe (the WAL survives in the page cache); an OS crash or power loss can lose
+# the most recent commits. FULL restores fsync-per-commit. Only these two are
+# accepted — OFF is a footgun with no use here. See ops/BACKUP.md.
+SQLITE_SYNCHRONOUS = os.environ.get("MISE_SQLITE_SYNCHRONOUS", "NORMAL").strip().upper()
+
+# HSTS lifetime, seconds. Sent only when COOKIE_SECURE (i.e. we know we are on
+# TLS). 300 was July's deliberately reversible starting value and then sat there;
+# 15552000 (180 days) is the normal production figure and what preload lists
+# expect. Configurable because ratcheting HSTS is the one header you cannot take
+# back quickly: a browser that has cached a long max-age will refuse to reach the
+# site in plaintext for that long, so if TLS ever breaks the lockout lasts as
+# long as this number. Keep includeSubDomains/preload OFF until a subdomain TLS
+# inventory exists — see ops/TRUTHFUL-HTTPS.md.
+HSTS_MAX_AGE = int(os.environ.get("MISE_HSTS_MAX_AGE", "15552000"))
+
+# Google review engine (revenue roadmap item 2). URL unset = dormant. The URL
+# is the direct "write a review" link from the Google Business Profile share
+# button. ASK_DAYS: how long after a gallery goes up before the ask (seen the
+# photos, delight still fresh). COOLDOWN_DAYS: minimum gap between asks to the
+# SAME client across all their galleries — review fatigue makes happy clients
+# annoyed ones, which is worse than no ask.
+GOOGLE_REVIEW_URL = os.environ.get("MISE_GOOGLE_REVIEW_URL", "")
+REVIEW_ASK_DAYS = int(os.environ.get("MISE_REVIEW_ASK_DAYS", "3"))
+REVIEW_COOLDOWN_DAYS = int(os.environ.get("MISE_REVIEW_COOLDOWN_DAYS", "180"))
+
+# Session-anniversary nudges: how many days after a client's latest project
+# closes before Kevin gets the "invite them back" Telegram line. ~11 months —
+# timed to land the rebooking conversation before the year mark. The nudge is
+# to Kevin only; no client is ever auto-emailed.
+ANNIVERSARY_NUDGE_DAYS = int(os.environ.get("MISE_ANNIVERSARY_NUDGE_DAYS", "335"))
+
+# Weekly owner digest: the Monday-morning "what did the machine do last week"
+# email to Kevin. HOUR is the earliest local hour it may go out on Monday; a
+# host asleep at that hour catches up on its next sweep that week. On by
+# default — it only ever mails GMAIL_USER, so there is nothing to arm.
+WEEKLY_DIGEST = _b("MISE_WEEKLY_DIGEST", "true")
+DIGEST_HOUR = int(os.environ.get("MISE_DIGEST_HOUR", "7"))
+
+# Invoice dunning (enhancement brief R1): the overdue-invoice chase emails to
+# CLIENTS at due+3 / due+7 / due+14. OFF by default and only armed here — a
+# deploy never starts emailing clients about money until Kevin flips this,
+# which keeps the manual-send doctrine honest (he sent the invoice; arming
+# this only delegates the chasing). Notification-only either way: the sweep
+# never touches payments or invoice status.
+INVOICE_DUNNING = _b("MISE_INVOICE_DUNNING", "false")
+
+# How long an unpaid pay-to-book hold keeps its slot before the sweeper releases
+# it (minutes). Long enough to type card details twice; short enough that an
+# abandoned checkout cannot squat on a mini-session slot all afternoon.
+BOOKING_PAY_TTL_MIN = int(os.environ.get("MISE_BOOKING_PAY_TTL_MIN", "30"))
+
+# Admin sessions expire far sooner than client ones. 90 days suits a client who
+# should not have to re-enter a PIN to look at their own photos; applied to the
+# admin cookie it meant a single stolen laptop session stayed valid for a
+# quarter. These are different risks and no longer share a number.
+ADMIN_SESSION_MAX_AGE = int(os.environ.get("MISE_ADMIN_SESSION_MAX_AGE", str(60 * 60 * 24 * 14)))
 
 
 def _cookie_secure_default(base_url: str) -> str:

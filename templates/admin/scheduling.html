@@ -123,6 +123,32 @@
           <button type="submit">Add</button>
         </form>
       </section>
+
+      <section class="sch-card" id="google-calendar">
+        <h2 class="sch-h2">Google Calendar</h2>
+        <p class="sch-sub">Busy times on your calendar hide booking slots; confirmed bookings sync back as events</p>
+        {% if not gcal.configured %}
+        <div class="sch-day sch-day-ov is-off" data-gcal="unset">
+          <span class="sch-day-label">Not set up</span>
+          <span class="sch-day-hours">Add <code>MISE_GOOGLE_CLIENT_ID</code> and <code>MISE_GOOGLE_CLIENT_SECRET</code> to the server's <code>.env</code></span>
+        </div>
+        {% elif gcal.connected %}
+        <div class="sch-day sch-day-ov" data-gcal="connected">
+          <span class="sch-day-label">Connected</span>
+          <span class="sch-day-hours">{{ gcal.calendar_id }}{% if gcal.connected_at %} &middot; since {{ gcal.connected_at | localtime("%b %-d, %Y") }}{% endif %}</span>
+          <form method="post" action="/admin/scheduling/google/disconnect">
+            <button type="submit" class="sr-btn sr-btn--sm sr-btn--danger" data-confirm-danger
+                    data-confirm="Disconnect Google Calendar? Busy times stop hiding booking slots and confirmed bookings stop syncing."><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-x"/></svg> Disconnect</button>
+          </form>
+        </div>
+        {% else %}
+        <div class="sch-day sch-day-ov" data-gcal="ready">
+          <span class="sch-day-label">Not connected</span>
+          <span class="sch-day-hours">{{ gcal.calendar_id }} &middot; nothing hidden, nothing synced</span>
+          <a class="sr-btn sr-btn--sm" href="/admin/scheduling/google/connect"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-calendar"/></svg> Connect</a>
+        </div>
+        {% endif %}
+      </section>
     </div>
 
     <div class="sch-col sch-rail">

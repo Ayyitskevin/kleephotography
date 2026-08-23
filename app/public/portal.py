@@ -5,6 +5,8 @@ import hashlib
 import logging
 import mimetypes
 import re
+import shutil
+import threading
 from pathlib import Path
 from urllib.parse import quote
 
@@ -45,13 +47,44 @@ def _pin_bucket(portal_id: int) -> int:
     return PIN_OFFSET - portal_id
 
 
-def _crop_link_status(asset: "db.sqlite3.Row", ratio_slugs: list[str]) -> list[dict]:
+def _stalled_crop_assets(asset_ids: list[int]) -> set[int]:
+    """Assets whose social_crops encode exhausted its retries with nothing
+    queued behind it. Readiness alone can't tell "still encoding" from "never
+    coming", so without this the portal promises a file that no longer has a
+    job to produce it — and the fragment below polls for it forever. Only a
+    failure nothing supersedes counts: the operator's retry re-queues the same
+    asset_id, and that live row must win over the dead one."""
+    if not asset_ids:
+        return set()
+    ph = ",".join("?" * len(asset_ids))  # only ever "?,?,…" placeholders
+    rows = db.all_(
+        f"""SELECT DISTINCT json_extract(j.payload,'$.asset_id') AS asset_id
+              FROM jobs j
+             WHERE j.kind='social_crops' AND j.status='failed'
+               AND json_extract(j.payload,'$.asset_id') IN ({ph})
+               AND NOT EXISTS (
+                     SELECT 1 FROM jobs live
+                      WHERE live.kind='social_crops'
+                        AND live.status IN ('queued','running')
+                        AND json_extract(live.payload,'$.asset_id')
+                            = json_extract(j.payload,'$.asset_id'))""",
+        tuple(asset_ids),
+    )
+    return {r["asset_id"] for r in rows}
+
+
+def _crop_link_status(
+    asset: "db.sqlite3.Row", ratio_slugs: list[str], stalled: set[int]
+) -> list[dict]:
     """Per-ratio readiness for portal crop links — avoids 404s while jobs run."""
     base = jobs.crops_dir(asset["gallery_id"])
     stem = Path(asset["stored"]).stem
-    return [
-        {"slug": slug, "ready": (base / f"{stem}_{slug}.jpg").is_file()} for slug in ratio_slugs
-    ]
+    dead = asset["id"] in stalled
+    links = []
+    for slug in ratio_slugs:
+        ready = (base / f"{stem}_{slug}.jpg").is_file()
+        links.append({"slug": slug, "ready": ready, "stalled": dead and not ready})
+    return links
 
 
 def _crops_ctx(p: dict) -> dict:
@@ -82,16 +115,23 @@ def _crops_ctx(p: dict) -> dict:
         (p["client_id"],),
     )
     ratio_slugs = [ps["slug"] for ps in presets.active()]
+    stalled = _stalled_crop_assets([a["id"] for a in crops])
     crop_tiles = []
     for a in crops:
         tile = dict(a)
-        tile["crop_links"] = _crop_link_status(a, ratio_slugs)
+        tile["crop_links"] = _crop_link_status(a, ratio_slugs, stalled)
         crop_tiles.append(tile)
     return {
         "crops": crop_tiles,
         "ratios": ratio_slugs,
         "fav_summary": fav_summary,
-        "crops_pending": any(not link["ready"] for t in crop_tiles for link in t["crop_links"]),
+        # A stalled ratio is not pending: leaving it in would keep the fragment
+        # polling for a file no job is going to write.
+        "crops_pending": any(
+            not link["ready"] and not link["stalled"]
+            for t in crop_tiles
+            for link in t["crop_links"]
+        ),
     }
 
 
@@ -110,7 +150,7 @@ def _require_access(request: Request, portal_id: int) -> None:
 
 
 @router.get("/{slug}", response_class=HTMLResponse)
-async def view(request: Request, slug: str):
+def view(request: Request, slug: str):
     p = get_live_portal(slug)
     if not _has_access(request, p["id"]):
         return templates.TemplateResponse(
@@ -203,7 +243,7 @@ async def view(request: Request, slug: str):
 
 
 @router.get("/{slug}/crops", response_class=HTMLResponse)
-async def crops_fragment(request: Request, slug: str):
+def crops_fragment(request: Request, slug: str):
     """Self-polling social-crops fragment — while any crop is still encoding the
     block carries hx-get/every-8s and swaps whole, so "preparing…" chips turn
     into real download links without the client reloading (REC-tile pattern)."""
@@ -215,7 +255,7 @@ async def crops_fragment(request: Request, slug: str):
 
 
 @router.post("/{slug}/pin")
-async def check_pin(request: Request, slug: str, pin: str = Form(...)):
+def check_pin(request: Request, slug: str, pin: str = Form(...)):
     p = get_live_portal(slug)
     ip = security.client_ip(request)
     bucket = _pin_bucket(p["id"])
@@ -226,7 +266,7 @@ async def check_pin(request: Request, slug: str, pin: str = Form(...)):
             {"p": p, "error": f"Too many tries — wait {config.PIN_LOCKOUT_MIN} minutes."},
             status_code=429,
         )
-    if pin.strip() != p["pin"]:
+    if not security.pin_matches(pin, p["pin"]):
         security.pin_fail(ip, bucket)
         return templates.TemplateResponse(
             request, "public/portal_pin.html", {"p": p, "error": "Wrong PIN."}, status_code=401
@@ -249,7 +289,7 @@ def _client_asset(portal: "db.sqlite3.Row", asset_id: int) -> "db.sqlite3.Row":
 
 
 @router.get("/{slug}/thumb/{asset_id}")
-async def thumb(request: Request, slug: str, asset_id: int):
+def thumb(request: Request, slug: str, asset_id: int):
     p = get_live_portal(slug)
     _require_access(request, p["id"])
     a = _client_asset(p, asset_id)
@@ -262,7 +302,7 @@ async def thumb(request: Request, slug: str, asset_id: int):
 
 
 @router.get("/{slug}/crop/{asset_id}/{ratio}")
-async def crop(request: Request, slug: str, asset_id: int, ratio: str):
+def crop(request: Request, slug: str, asset_id: int, ratio: str):
     # `ratio` is an untrusted URL token. Only resolve it to a file if it names
     # an active preset; any other value (unknown or inactive) → clean 404 so a
     # token can't be steered toward a path outside the intended crop set.
@@ -282,8 +322,17 @@ async def crop(request: Request, slug: str, asset_id: int, ratio: str):
     )
 
 
+# The crops archive is built in the request thread (there is no portal-wide job
+# kind to hand it to), and build_zip stages every archive through a `.part`
+# sibling of its destination. Two clicks on the same portal would therefore
+# write one temp file from two threads and hand a torn ZIP to whoever lost the
+# rename. One build at a time across the process — a portal crop pack is small
+# and this is a solo-operator install, so the queue behind the lock stays short.
+_zip_build_lock = threading.Lock()
+
+
 @router.get("/{slug}/crops.zip")
-async def crops_zip(request: Request, slug: str):
+def crops_zip(request: Request, slug: str):
     p = get_live_portal(slug)
     _require_access(request, p["id"])
     rows = db.all_(
@@ -308,26 +357,34 @@ async def crops_zip(request: Request, slug: str):
     key = hashlib.sha256("|".join(f"{a['id']}:{r}" for a, r, _ in files).encode()).hexdigest()[:8]
     out = config.ZIP_DIR / f"p{p['id']}-{key}.zip"
     if not out.is_file():
-        seen: set[str] = set()
-        entries = []
-        for a, ratio, path in files:
-            arc = f"{Path(a['filename']).stem}_{ratio}.jpg"
-            if arc in seen:
-                arc = f"{Path(a['filename']).stem}_{ratio}_{a['id']}.jpg"
-            seen.add(arc)
-            entries.append((path, arc))
-        jobs.build_zip(out, entries)
-        for old in config.ZIP_DIR.glob(f"p{p['id']}-*.zip"):
-            if old != out:
-                old.unlink(missing_ok=True)
-        log.info("portal %s crops zip built: %d files", p["slug"], len(files))
+        # Same pre-write disk floor as the gallery bundles — a client click must
+        # not be able to force an unbounded ZIP build on a full disk.
+        if shutil.disk_usage(config.DATA_DIR).free / 1e9 < config.MIN_FREE_GB:
+            raise HTTPException(status_code=507, detail="low disk space — download refused")
+        with _zip_build_lock:
+            # Re-check under the lock: whoever built while we waited already
+            # produced this exact archive (the name is a hash of its contents).
+            if not out.is_file():
+                seen: set[str] = set()
+                entries = []
+                for a, ratio, path in files:
+                    arc = f"{Path(a['filename']).stem}_{ratio}.jpg"
+                    if arc in seen:
+                        arc = f"{Path(a['filename']).stem}_{ratio}_{a['id']}.jpg"
+                    seen.add(arc)
+                    entries.append((path, arc))
+                jobs.build_zip(out, entries)
+                for old in config.ZIP_DIR.glob(f"p{p['id']}-*.zip"):
+                    if old != out:
+                        old.unlink(missing_ok=True)
+                log.info("portal %s crops zip built: %d files", p["slug"], len(files))
 
     dl = re.sub(r"[^A-Za-z0-9._-]+", "_", f"{p['company'] or p['client_name']}-social-crops")
     return FileResponse(out, media_type="application/zip", filename=f"{dl}.zip")
 
 
 @router.get("/{slug}/brand/{ba_id}")
-async def brand_file(request: Request, slug: str, ba_id: int):
+def brand_file(request: Request, slug: str, ba_id: int):
     p = get_live_portal(slug)
     _require_access(request, p["id"])
     b = db.one("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, p["client_id"]))

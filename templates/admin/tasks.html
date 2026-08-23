@@ -44,6 +44,10 @@
               {% if t.project_id %}<a class="tk-chip" href="/admin/studio/projects/{{ t.project_id }}">{{ t.project }}</a>
               {% else %}<span class="tk-chip">{{ t.project }}</span>{% endif %}
               {% if t.due %}<span class="tk-due{% if t.urgent %} is-urgent{% endif %}">{{ t.due }}</span>{% endif %}
+              <button type="submit" class="link danger"
+                      formaction="/admin/tasks/{{ t.id }}/delete"
+                      data-confirm="Delete this task? It disappears from the board for good."
+                      aria-label="Delete task">Delete</button>
             </div>
           </div>
         </form>

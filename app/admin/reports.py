@@ -1,4 +1,6 @@
+import csv
 import datetime as dt
+import io
 import logging
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -12,20 +14,6 @@ from .lookups import PROJECT_STATUSES
 
 log = logging.getLogger("mise.admin.reports")
 router = APIRouter(prefix="/admin/reports", dependencies=[Depends(security.require_admin)])
-
-
-def _months_back(n=12):
-    """List of (YYYY-MM, 'Mon YY') from oldest to newest, ending this month."""
-    today = studio._today().replace(day=1)
-    out = []
-    y, m = today.year, today.month
-    for _ in range(n):
-        out.append((f"{y:04d}-{m:02d}", dt.date(y, m, 1).strftime("%b %y")))
-        m -= 1
-        if m == 0:
-            y, m = y - 1, 12
-    out.reverse()
-    return out
 
 
 def _prior_bounds(key: str) -> tuple[str, str]:
@@ -64,18 +52,8 @@ def _trend(cur: int, prior: int) -> dict:
     return {"text": "▬ 0%", "tone": "flat"}
 
 
-def _collected_by_month():
-    """Cash collected per YYYY-MM from Stripe payment events (source of truth)."""
-    rows = db.all_(
-        """SELECT strftime('%Y-%m', created_at) AS ym,
-                  COALESCE(SUM(amount_cents), 0) AS cents
-           FROM payments GROUP BY ym"""
-    )
-    return {r["ym"]: r["cents"] for r in rows}
-
-
 @router.get("", response_class=HTMLResponse)
-async def reports(request: Request, period: str = Query("ytd", alias="range")):
+def reports(request: Request, period: str = Query("ytd", alias="range")):
     """Read-only business analytics — the HoneyBook 'Reports' tab. Cash from
     the payments (Stripe webhook) table is the truth for collected revenue;
     invoices give booked value and AR; inquiries give leads/conversion.
@@ -145,11 +123,13 @@ async def reports(request: Request, period: str = Query("ytd", alias="range")):
         },
     ]
 
-    # rolling 12-month collected revenue (Python buckets so empty months show 0)
-    by_month = _collected_by_month()
-    months = _months_back(12)
-    chart = [{"label": lbl, "cents": by_month.get(ym, 0)} for ym, lbl in months]
-    chart_max = max((m["cents"] for m in chart), default=0) or 1
+    # rolling 12-month collected revenue (Python buckets so empty months show 0).
+    # Twelve months wrap the calendar, so the label carries the year the two
+    # six-month reels can leave off. The template sizes the bars from chart_max,
+    # so no per-month percentage is asked for here — one bar-height rule.
+    chart, chart_max = common.month_money_series(
+        studio._today(), 12, lambda m: m.strftime("%b %y"), bars=False
+    )
 
     # pipeline: projects by status with booked (non-draft) invoice value, plus
     # the longest-sitting project per stage. stage_changed_at (migration 032) is
@@ -214,6 +194,19 @@ async def reports(request: Request, period: str = Query("ytd", alias="range")):
            GROUP BY COALESCE(kind, 'contact')
            ORDER BY n DESC"""
     )
+    # Where leads come FROM (revenue roadmap item 3). Answered is split from
+    # unanswered so the share is honest: 6 of 40 saying "Google" is a hint, not
+    # a landslide. Values are constrained to REFERRAL_SOURCES at the form
+    # handlers, so this GROUP BY can never sprout attacker-typed rows.
+    leads_by_source = db.all_(
+        """SELECT referral_source AS source, COUNT(*) AS n
+           FROM inquiries
+           WHERE dismissed_at IS NULL AND referral_source IS NOT NULL
+           GROUP BY referral_source ORDER BY n DESC"""
+    )
+    leads_unattributed = db.one(
+        "SELECT COUNT(*) AS n FROM inquiries WHERE dismissed_at IS NULL AND referral_source IS NULL"
+    )["n"]
 
     # delivery & engagement (all-time)
     delivery = {
@@ -270,6 +263,8 @@ async def reports(request: Request, period: str = Query("ytd", alias="range")):
             "leads_converted": leads_converted,
             "conv_rate": conv_rate,
             "leads_by_kind": leads_by_kind,
+            "leads_by_source": leads_by_source,
+            "leads_unattributed": leads_unattributed,
             "delivery": delivery,
             "top_clients": top_clients,
         },
@@ -277,13 +272,19 @@ async def reports(request: Request, period: str = Query("ytd", alias="range")):
 
 
 @router.get("/revenue.csv", response_class=PlainTextResponse)
-async def revenue_csv():
-    """Collected cash per month, all-time — for the accountant/spreadsheet."""
-    rows = db.all_(
-        """SELECT strftime('%Y-%m', created_at) AS month,
-                  COALESCE(SUM(amount_cents), 0) AS cents
-           FROM payments GROUP BY month ORDER BY month"""
-    )
-    lines = ["month,collected_usd"]
-    lines += [f"{r['month']},{r['cents'] / 100:.2f}" for r in rows]
-    return "\n".join(lines) + "\n"
+def revenue_csv():
+    """Collected cash per month, all-time — for the accountant/spreadsheet.
+
+    Reads common.collected_by_month rather than re-issuing the query. The comment
+    below used to promise "the same wall-clock bucketing as the on-page chart";
+    it was a second copy of that SQL keeping the promise by hand, which is how
+    the earlier three copies drifted (see month_money_series). Now the file the
+    accountant receives and the chart on screen cannot disagree, because there
+    is one query."""
+    by_ym = common.collected_by_month()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["month", "collected_usd"])
+    for month in sorted(by_ym):
+        w.writerow([month, f"{by_ym[month]['cents'] / 100:.2f}"])
+    return buf.getvalue()

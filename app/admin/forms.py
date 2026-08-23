@@ -47,7 +47,7 @@ def _parse_options(raw: str) -> str | None:
 
 
 @router.get("", response_class=HTMLResponse)
-async def forms_list(request: Request):
+def forms_list(request: Request):
     rows = db.all_(
         """SELECT f.*,
                   (SELECT COUNT(*) FROM form_fields ff WHERE ff.form_id=f.id) AS n_fields,
@@ -71,7 +71,7 @@ async def forms_list(request: Request):
 
 
 @router.post("")
-async def form_create(title: str = Form(...), kind: str = Form("lead")):
+def form_create(title: str = Form(...), kind: str = Form("lead")):
     title = title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="title required")
@@ -84,7 +84,7 @@ async def form_create(title: str = Form(...), kind: str = Form("lead")):
 
 
 @router.get("/{form_id}", response_class=HTMLResponse)
-async def form_builder(request: Request, form_id: int):
+def form_builder(request: Request, form_id: int):
     f = get_form(form_id)
     fields = db.all_(
         "SELECT * FROM form_fields WHERE form_id=? ORDER BY sort_order, id", (form_id,)
@@ -115,7 +115,7 @@ async def form_builder(request: Request, form_id: int):
 
 
 @router.post("/{form_id}")
-async def form_update(
+def form_update(
     form_id: int, title: str = Form(...), intro: str = Form(""), active: bool = Form(False)
 ):
     get_form(form_id)
@@ -131,7 +131,7 @@ async def form_update(
 
 
 @router.post("/{form_id}/delete")
-async def form_delete(form_id: int):
+def form_delete(form_id: int):
     get_form(form_id)
     db.run("DELETE FROM forms WHERE id=?", (form_id,))
     log.info("form %s deleted", form_id)
@@ -139,7 +139,7 @@ async def form_delete(form_id: int):
 
 
 @router.post("/{form_id}/fields")
-async def field_add(
+def field_add(
     form_id: int,
     label: str = Form(...),
     ftype: str = Form("short_text"),
@@ -166,7 +166,7 @@ async def field_add(
 
 
 @router.post("/fields/{field_id}")
-async def field_update(
+def field_update(
     field_id: int,
     label: str = Form(...),
     ftype: str = Form("short_text"),
@@ -189,7 +189,7 @@ async def field_update(
 
 
 @router.post("/fields/{field_id}/delete")
-async def field_delete(field_id: int):
+def field_delete(field_id: int):
     fld = get_field(field_id)
     db.run("DELETE FROM form_fields WHERE id=?", (field_id,))
     log.info("field %s deleted", field_id)
@@ -197,7 +197,7 @@ async def field_delete(field_id: int):
 
 
 @router.post("/fields/{field_id}/move")
-async def field_move(field_id: int, dir: str = Form(...)):
+def field_move(field_id: int, dir: str = Form(...)):
     fld = get_field(field_id)
     if dir not in ("up", "down"):
         raise HTTPException(status_code=400, detail="bad direction")
@@ -219,15 +219,20 @@ async def field_move(field_id: int, dir: str = Form(...)):
 
 
 @router.get("/{form_id}/submissions", response_class=HTMLResponse)
-async def form_submissions(request: Request, form_id: int):
+def form_submissions(request: Request, form_id: int, offset: int = 0):
     f = get_form(form_id)
     fields = db.all_(
         "SELECT id, label FROM form_fields WHERE form_id=? ORDER BY sort_order, id", (form_id,)
     )
+    # A live form collects submissions indefinitely, and each card unpacks its own
+    # JSON answers — render one page, count them all.
+    offset = max(0, offset)
+    page_size = 50
+    total = db.one("SELECT COUNT(*) AS n FROM form_submissions WHERE form_id=?", (form_id,))["n"]
     rows = db.all_(
         """SELECT * FROM form_submissions WHERE form_id=?
-           ORDER BY created_at DESC""",
-        (form_id,),
+           ORDER BY created_at DESC LIMIT ? OFFSET ?""",
+        (form_id, page_size, offset),
     )
     subs = []
     for r in rows:
@@ -238,5 +243,14 @@ async def form_submissions(request: Request, form_id: int):
             d["answers"] = {}
         subs.append(d)
     return templates.TemplateResponse(
-        request, "admin/form_submissions.html", {"f": f, "fields": fields, "subs": subs}
+        request,
+        "admin/form_submissions.html",
+        {
+            "f": f,
+            "fields": fields,
+            "subs": subs,
+            "total": total,
+            "offset": offset,
+            "page_size": page_size,
+        },
     )

@@ -34,7 +34,11 @@ def _integrations() -> list[dict]:
     if g["connected"]:
         google = {"status": "connected", "label": "Connected"}
     elif g["configured"]:
-        google = {"status": "ready", "label": "Connect", "href": "/admin/scheduling"}
+        google = {
+            "status": "ready",
+            "label": "Connect",
+            "href": "/admin/scheduling/google/connect",
+        }
     else:
         google = {"status": "off", "label": "Not set"}
 
@@ -216,7 +220,7 @@ def _storage() -> dict:
 
 
 @router.get("", response_class=HTMLResponse)
-async def settings(request: Request):
+def settings(request: Request):
     return templates.TemplateResponse(
         request,
         "admin/settings.html",

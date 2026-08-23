@@ -14,7 +14,7 @@
     <h1>{{ greeting }}, Kevin</h1>
     <p class="v4-summary">
       {% if queue %}
-        <b>{{ queue|length }} inquir{{ "ies are" if queue|length != 1 else "y is" }} waiting on a reply</b>
+        <b>{{ new_inquiries }} inquir{{ "ies are" if new_inquiries != 1 else "y is" }} waiting on a reply</b>
         — the oldest for {{ oldest_wait_days }} day{{ "s" if oldest_wait_days != 1 }}.
       {% endif %}
       {% if upcoming_n %}
@@ -224,11 +224,11 @@
         {% set live_stages = pipeline | selectattr("n") | list %}
         {% if not live_stages and queue %}
         <p class="v4-pipeline-note">Nothing in play yet this month — <b>your
-          {{ queue|length }} inquir{{ "ies are" if queue|length != 1 else "y is" }} the pipeline.</b>
+          {{ new_inquiries }} inquir{{ "ies are" if new_inquiries != 1 else "y is" }} the pipeline.</b>
           Convert one to start the funnel.</p>
         {% endif %}
         <div class="v4-funnel" role="img" aria-label="Pipeline stages">
-          {% if queue %}<span class="v4-fcell is-in" style="flex: {{ [queue|length, 2]|max }};">{{ queue|length }} inquir{{ "ies" if queue|length != 1 else "y" }}</span>{% endif %}
+          {% if queue %}<span class="v4-fcell is-in" style="flex: {{ [new_inquiries, 2]|max }};">{{ new_inquiries }} inquir{{ "ies" if new_inquiries != 1 else "y" }}</span>{% endif %}
           {% if live_stages %}
             {% for s in live_stages %}
             <span class="v4-fcell is-live" style="flex: {{ [s.n, 2]|max }};">{{ s.n }} {{ s.label|lower }}</span>
@@ -253,7 +253,8 @@
         </div>
         <ul class="dash-activity">
           {% for a in activity_24h %}
-          {% set adot = {'paid':'var(--ok)','viewed':'var(--honey)','booking':'var(--clay)'}.get(a.kind, 'var(--neutral)') %}
+          {# favorite = a buying signal, note = something waiting on a reply #}
+          {% set adot = {'paid':'var(--ok)','viewed':'var(--honey)','booking':'var(--clay)','favorite':'var(--honey)','note':'var(--clay)'}.get(a.kind, 'var(--neutral)') %}
           <li>
             <span class="dash-dot" style="background: {{ adot }};"></span>
             <div class="dash-act-text"><b>{{ a.who }}</b> {{ a.detail or a.kind }}</div>
@@ -265,8 +266,8 @@
       {% else %}
       <section class="v4-activity-strip" aria-label="Activity">
         <span class="v4-idle-dot" aria-hidden="true"></span>
-        <p>Quiet for 24 hours — activity lands here the moment a client opens a
-           gallery, pays, or books.</p>
+        <p>Quiet for 24 hours — activity lands here the moment a client circles a
+           take, leaves a note, downloads, pays, or books.</p>
         <a class="link" href="/admin/today">Today &rarr;</a>
       </section>
       {% endif %}

@@ -104,7 +104,7 @@ def _pricing_rows() -> list[dict]:
 
 
 @router.get("", response_class=HTMLResponse)
-async def reference(request: Request):
+def reference(request: Request):
     return templates.TemplateResponse(
         request,
         "admin/reference.html",

@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import security
+from .. import config, security
 from ..render import templates
 
 log = logging.getLogger("mise.admin.auth")
@@ -11,12 +11,12 @@ router = APIRouter(prefix="/admin")
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_form(request: Request):
+def login_form(request: Request):
     return templates.TemplateResponse(request, "admin/login.html", {"error": None})
 
 
 @router.post("/login")
-async def login(request: Request, password: str = Form(...)):
+def login(request: Request, password: str = Form(...)):
     ip = security.client_ip(request)
     if security.pin_locked(ip, 0):
         return templates.TemplateResponse(
@@ -32,13 +32,15 @@ async def login(request: Request, password: str = Form(...)):
     # Sign a per-login server-side session token into the cookie (not a constant),
     # so this session can be revoked independently at logout.
     token = security.create_admin_session()
-    security.set_signed_session_cookie(resp, security.ADMIN_COOKIE, token)
+    security.set_signed_session_cookie(
+        resp, security.ADMIN_COOKIE, token, max_age=config.ADMIN_SESSION_MAX_AGE
+    )
     log.info("admin login from %s", ip)
     return resp
 
 
 @router.post("/logout", dependencies=[Depends(security.require_admin)])
-async def logout(request: Request, everywhere: str = Form("")):
+def logout(request: Request, everywhere: str = Form("")):
     # Real revocation: delete this session's server-side row so the cookie is dead
     # even if it was copied elsewhere. `everywhere` kills ALL admin sessions (the
     # emergency switch for a known-leaked cookie on a device you can't reach).

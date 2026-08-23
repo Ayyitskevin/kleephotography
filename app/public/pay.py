@@ -5,10 +5,12 @@ import logging
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import alerts, config, db, features, jobs, security
+from .. import alerts, audit, config, db, features, jobs, security
 from ..render import templates
+from . import telemetry
 
 log = logging.getLogger("mise.public.pay")
 router = APIRouter()
@@ -46,9 +48,12 @@ def next_payment(d: "db.sqlite3.Row") -> tuple[int, str]:
 
 
 @router.get("/i/{slug}", response_class=HTMLResponse)
-async def view_invoice(request: Request, slug: str, thanks: str = ""):
+def view_invoice(request: Request, slug: str, thanks: str = ""):
     d = _invoice_or_404(slug)
-    if d["status"] == "sent":
+    # Read telemetry only — never payment state. Gated so a mail scanner or a
+    # HEAD probe cannot fabricate "the client has seen this invoice"
+    # (app/public/telemetry.py).
+    if d["status"] == "sent" and telemetry.is_human_view(request):
         db.run(
             "UPDATE invoices SET status='viewed', viewed_at=datetime('now') WHERE id=?", (d["id"],)
         )
@@ -99,7 +104,7 @@ async def view_invoice(request: Request, slug: str, thanks: str = ""):
 
 
 @router.get("/i/{slug}/receipt", response_class=HTMLResponse)
-async def view_receipt(request: Request, slug: str):
+def view_receipt(request: Request, slug: str):
     """Printable receipt — a read-only render of payments Stripe already
     recorded, so it can never disagree with what was charged. 404 until at
     least one payment exists."""
@@ -136,7 +141,6 @@ def _invoice_checkout(d, amount: int, kind: str, slug: str):
     """Return one authoritative Checkout Session for this invoice installment."""
     currency = "usd"
     prior_id = d["stripe_session_id"]
-    prior = None
     if prior_id:
         try:
             prior = stripe.checkout.Session.retrieve(
@@ -153,8 +157,23 @@ def _invoice_checkout(d, amount: int, kind: str, slug: str):
             and d["stripe_checkout_currency"] == currency
         )
         status = _stripe_value(prior, "status")
-        if snapshot_matches and status in ("open", "complete"):
+        payment_status = _stripe_value(prior, "payment_status")
+        if snapshot_matches and status == "open":
             return prior
+        if status == "complete":
+            # Checkout marks delayed methods complete before the bank transfer
+            # settles. That session is still collectible: replacing it could
+            # let both the old ACH debit and a new session take money. An unpaid
+            # one stays bound until async_payment_failed explicitly releases it.
+            if payment_status == "unpaid":
+                raise HTTPException(status_code=409, detail="payment is still processing")
+            if payment_status != "paid":
+                raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+            # A matching paid session is terminal/reusable while its webhook
+            # catches up. A paid *previous installment* (deposit before balance)
+            # is safe to supersede and must not block the remainder Checkout.
+            if snapshot_matches:
+                return prior
         if status == "open":
             try:
                 stripe.checkout.Session.expire(
@@ -170,6 +189,11 @@ def _invoice_checkout(d, amount: int, kind: str, slug: str):
                     exc,
                 )
                 raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+        elif status not in ("expired", "complete"):
+            # Stripe currently documents open, complete, and expired. Never
+            # mint another payable session if it introduces a new state we do
+            # not understand.
+            raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
 
     label = {"deposit": "Deposit", "balance": "Balance", "full": "Payment"}[kind]
     predecessor = prior_id or "initial"
@@ -205,7 +229,7 @@ def _invoice_checkout(d, amount: int, kind: str, slug: str):
 
 
 @router.post("/i/{slug}/pay")
-async def pay_invoice(request: Request, slug: str):
+def pay_invoice(request: Request, slug: str):
     d = _invoice_or_404(slug)
     amount, kind = next_payment(d)
     if not amount:
@@ -225,49 +249,306 @@ class _PaymentStateConflict(Exception):
     pass
 
 
-def _ack_unapplied(event_id: str, invoice_id: int, code: str, detail: str) -> dict:
-    log.error(
-        "stripe payment unapplied invoice=%s event=%s code=%s: %s",
-        invoice_id,
-        event_id,
-        code,
-        detail,
-    )
-    alerts.security_alert(f"Stripe payment requires review for invoice {invoice_id}: {code}")
+def _ack_unapplied(
+    event_id: str, invoice_id, code: str, detail: str, diff: dict, *, entity: str = "invoice"
+) -> dict:
+    """Acknowledge a webhook that can never be applied, instead of 4xx-ing it.
+
+    Stripe treats ANY non-2xx as a failed delivery, retries for ~3 days, and
+    counts the failures toward auto-disabling the endpoint — after which real
+    payment events stop arriving and the first symptom is missing money. The
+    conditions below are permanent: retrying cannot un-settle an invoice, cannot
+    change what a stale Checkout session charged, and cannot conjure an invoice
+    row. So the 409/404 bought nothing — none of these record a payment either
+    way — while spending the endpoint's health and firing one unthrottled alert
+    per delivery for three days.
+
+    Stripe's retries were also the only thing keeping such an anomaly persistent,
+    so acknowledging moves the record somewhere durable: an append-only audit row
+    that outlives the process and survives Telegram being unconfigured. The alert
+    is best-effort on top of that, not the system of record.
+    """
+    try:
+        with db.tx() as con:
+            audit.log(con, entity, invoice_id, f"stripe_{code}", diff=diff, actor="stripe")
+    except Exception:
+        # The audit row is the durable half, but failing to write it must not
+        # resurrect the retry storm — log loudly and still acknowledge.
+        log.exception("could not audit stripe anomaly invoice=%s event=%s", invoice_id, event_id)
+    alerts.payment_anomaly(invoice_id, event_id, code, detail, entity=entity)
     return {"ok": True, "unapplied": code}
+
+
+def _handle_invoice_async_payment_failed(event, session, metadata) -> dict:
+    """Release only the authoritative invoice session after delayed payment fails."""
+    if ("kind" in metadata and metadata["kind"] == "booking") or "booking_id" in metadata:
+        # Pay-to-book is card-only. Do not let an impossible/malformed delayed
+        # event mutate a booking hold.
+        return {"ok": True, "ignored": "booking_async_payment_failed"}
+
+    invoice_id = metadata["invoice_id"] if "invoice_id" in metadata else None
+    if not invoice_id or not str(invoice_id).isdigit():
+        return {"ok": True, "ignored": "no invoice_id"}
+    invoice_id = int(invoice_id)
+    session_id = str(_stripe_value(session, "id", "") or "")
+    d = db.one("SELECT * FROM invoices WHERE id=?", (invoice_id,))
+    if not d:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "unknown_invoice",
+            f"failed session {session_id} names invoice {invoice_id}, which does not exist",
+            {"session_id": session_id},
+        )
+    if d["stripe_session_id"] != session_id:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "stale_session",
+            f"failed session {session_id} is not authoritative for this invoice",
+            {"session_id": session_id, "expected_session_id": d["stripe_session_id"]},
+        )
+    if db.one("SELECT id FROM payments WHERE stripe_session_id=?", (session_id,)):
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "failed_after_payment",
+            f"session {session_id} reported failure after its payment was recorded",
+            {"session_id": session_id},
+        )
+
+    try:
+        with db.tx() as con:
+            changed = con.execute(
+                """UPDATE invoices
+                      SET stripe_session_id=NULL, stripe_checkout_amount_cents=NULL,
+                          stripe_checkout_kind=NULL, stripe_checkout_currency=NULL
+                    WHERE id=? AND stripe_session_id=?""",
+                (invoice_id, session_id),
+            )
+            if changed.rowcount != 1:
+                raise _PaymentStateConflict
+            audit.log(
+                con,
+                "invoice",
+                invoice_id,
+                "stripe_async_payment_failed",
+                diff={"event_id": event["id"], "session_id": session_id},
+                actor="stripe",
+            )
+    except _PaymentStateConflict:
+        return _ack_unapplied(
+            event["id"],
+            invoice_id,
+            "state_conflict",
+            "invoice Checkout binding changed while applying the payment failure",
+            {"session_id": session_id},
+        )
+
+    detail = f"delayed payment failed for session {session_id}; Checkout binding released"
+    alerts.payment_anomaly(invoice_id, event["id"], "async_payment_failed", detail)
+    log.warning("invoice %s checkout %s async payment failed", invoice_id, session_id)
+    return {"ok": True, "payment_failed": True}
+
+
+def _apply_booking_payment(event, session, metadata) -> dict:
+    """Confirm exactly one authorized payment for a pay-to-book hold."""
+    from .. import booking_notify
+
+    booking_id = metadata["booking_id"] if "booking_id" in metadata else None
+    if not booking_id or not str(booking_id).isdigit():
+        return {"ok": True, "ignored": "no booking_id"}
+    booking_id = int(booking_id)
+    session_id = str(_stripe_value(session, "id", "") or "")
+    amount_total = int(_stripe_value(session, "amount_total", 0) or 0)
+    currency = str(_stripe_value(session, "currency", "") or "").lower()
+    b = db.one("SELECT * FROM bookings WHERE id=?", (booking_id,))
+    if not b:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "unknown_booking",
+            f"session {session_id} names booking {booking_id}, which does not exist",
+            {"session_id": session_id, "amount_total": amount_total, "currency": currency},
+            entity="booking",
+        )
+    if db.one("SELECT id FROM booking_payments WHERE stripe_event_id=?", (event["id"],)):
+        return {"ok": True, "duplicate": True}
+
+    expected_session = b["stripe_session_id"]
+    expected_amount = b["stripe_checkout_amount_cents"]
+    expected_currency = b["stripe_checkout_currency"]
+    if not expected_session or expected_amount is None or not expected_currency:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "checkout_not_bound",
+            "booking has no complete authoritative Checkout snapshot",
+            {"session_id": session_id, "amount_total": amount_total, "currency": currency},
+            entity="booking",
+        )
+    if session_id != expected_session:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "stale_session",
+            f"session {session_id} is not authoritative for this booking",
+            {"session_id": session_id, "expected_session_id": expected_session},
+            entity="booking",
+        )
+    if amount_total != expected_amount or currency != expected_currency:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "checkout_mismatch",
+            "session amount or currency differs from the authorized Checkout snapshot",
+            {
+                "session_id": session_id,
+                "got_amount": amount_total,
+                "got_currency": currency,
+                "expected_amount": expected_amount,
+                "expected_currency": expected_currency,
+            },
+            entity="booking",
+        )
+    if b["status"] == "cancelled":
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "paid_after_release",
+            f"{amount_total} cents arrived for a booking hold that was already "
+            f"released ({b['cancel_reason'] or 'cancelled'}) — the slot may have "
+            f"been re-sold; refund or re-book by hand",
+            {"amount_total": amount_total, "session_id": session_id},
+            entity="booking",
+        )
+    if b["status"] == "confirmed":
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "already_settled",
+            "a distinct paid Checkout arrived after this booking was confirmed",
+            {"amount_total": amount_total, "session_id": session_id},
+            entity="booking",
+        )
+    if b["status"] != "pending_payment":
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "state_conflict",
+            f"booking state {b['status']} cannot accept payment",
+            {"amount_total": amount_total, "session_id": session_id},
+            entity="booking",
+        )
+
+    try:
+        with db.tx() as con:
+            con.execute(
+                """INSERT INTO booking_payments
+                       (booking_id, stripe_event_id, stripe_session_id, amount_cents)
+                   VALUES (?,?,?,?)""",
+                (booking_id, event["id"], session_id, amount_total),
+            )
+            changed = con.execute(
+                """UPDATE bookings
+                      SET status='confirmed', paid_cents=?, paid_at=datetime('now')
+                    WHERE id=? AND status='pending_payment'""",
+                (amount_total, booking_id),
+            )
+            if changed.rowcount != 1:
+                raise _PaymentStateConflict
+    except _PaymentStateConflict:
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "state_conflict",
+            "booking state changed while applying the payment",
+            {"amount_total": amount_total, "session_id": session_id},
+            entity="booking",
+        )
+    except db.sqlite3.IntegrityError:
+        if db.one("SELECT id FROM booking_payments WHERE stripe_event_id=?", (event["id"],)):
+            return {"ok": True, "duplicate": True}
+        prior = db.one(
+            """SELECT id FROM booking_payments
+                 WHERE booking_id=? OR stripe_session_id=?""",
+            (booking_id, session_id),
+        )
+        return _ack_unapplied(
+            event["id"],
+            booking_id,
+            "duplicate_payment" if prior else "constraint_conflict",
+            "a distinct Stripe event conflicts with an existing booking payment",
+            {"amount_total": amount_total, "session_id": session_id},
+            entity="booking",
+        )
+    # Side-effects only after the money and state transition are durable.
+    booking_notify.confirm(booking_id)
+    log.info(
+        "booking %s confirmed by payment: %s cents (event %s)",
+        booking_id,
+        amount_total,
+        event["id"],
+    )
+    return {"ok": True}
 
 
 @router.post("/webhooks/stripe")
 async def stripe_webhook(request: Request):
-    if not features.stripe_webhook_enabled():
-        raise HTTPException(status_code=503, detail="webhook not configured")
+    """Read the body, then get off the loop.
+
+    Everything past the read is blocking: signature verification is HMAC over
+    the payload, and the handler then makes roughly six database round-trips
+    (invoice lookup, idempotency probe, the payment transaction, the staged job)
+    before it answers. On the event loop those stall EVERY other in-flight
+    request — and this is the one route whose caller is a machine that retries,
+    so a slow database here turns into Stripe redelivering into a server already
+    struggling.
+
+    The body read itself cannot move: it is the await. Same split as the rest of
+    the de-async sweep (see the fence in tests/test_deasync.py); the size checks
+    stay here because they touch nothing but the request.
+    """
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > _MAX_BODY:
         raise HTTPException(status_code=413, detail="payload too large")
     payload = await request.body()
     if len(payload) > _MAX_BODY:
         raise HTTPException(status_code=413, detail="payload too large")
+    signature = request.headers.get("stripe-signature", "")
+    return await run_in_threadpool(_process_stripe_webhook, payload, signature)
+
+
+def _process_stripe_webhook(payload: bytes, signature: str):
+    # The configured check moved in here with the rest of the app-code calls, so
+    # an oversized body on an unconfigured host now answers 413 before 503. Both
+    # are refusals and the combination cannot arise from Stripe.
+    if not features.stripe_webhook_enabled():
+        raise HTTPException(status_code=503, detail="webhook not configured")
     try:
-        event = stripe.Webhook.construct_event(
-            payload, request.headers.get("stripe-signature", ""), config.STRIPE_WEBHOOK_SECRET
-        )
+        event = stripe.Webhook.construct_event(payload, signature, config.STRIPE_WEBHOOK_SECRET)
     except (ValueError, stripe.SignatureVerificationError):
         raise HTTPException(status_code=400, detail="bad signature")
 
     if event["type"] not in (
         "checkout.session.completed",
         "checkout.session.async_payment_succeeded",
+        "checkout.session.async_payment_failed",
     ):
         return {"ok": True, "ignored": event["type"]}
     session = event["data"]["object"]
-    if session["payment_status"] != "paid":  # ACH settles via the async event
-        return {"ok": True, "pending": True}
-
     # StripeObject has no .get() — `in` + [] is the equivalent. A foreign/stray
     # checkout session on the same Stripe account carries no usable invoice_id:
     # ack and ignore instead of KeyError → 500, which makes Stripe retry and
     # eventually disable the webhook endpoint.
     metadata = (session["metadata"] if "metadata" in session else None) or {}
+    if event["type"] == "checkout.session.async_payment_failed":
+        return _handle_invoice_async_payment_failed(event, session, metadata)
+    if session["payment_status"] != "paid":  # ACH settles via the async event
+        return {"ok": True, "pending": True}
+
+    if ("kind" in metadata and metadata["kind"] == "booking") or "booking_id" in metadata:
+        return _apply_booking_payment(event, session, metadata)
     invoice_id = metadata["invoice_id"] if "invoice_id" in metadata else None
     if not invoice_id or not str(invoice_id).isdigit():
         return {"ok": True, "ignored": "no invoice_id"}
@@ -279,13 +560,14 @@ async def stripe_webhook(request: Request):
             event["id"],
             invoice_id,
             "unknown_invoice",
-            "Checkout metadata names an invoice that does not exist",
+            f"session {session['id']} names invoice {invoice_id}, which does not exist",
+            {"session_id": session["id"], "amount_total": int(session["amount_total"] or 0)},
         )
     # Stripe retries the same event_id after a 5xx / timeout. Honor idempotency
-    # before state checks because a successful installment changes what is owed.
+    # BEFORE amount/kind checks — a successful deposit changes what is "owed",
+    # so a retry would otherwise look like a mismatch and 409 forever.
     if db.one("SELECT id FROM payments WHERE stripe_event_id=?", (event["id"],)):
         return {"ok": True, "duplicate": True}
-
     session_id = str(_stripe_value(session, "id", "") or "")
     amount_total = int(_stripe_value(session, "amount_total", 0) or 0)
     currency = str(_stripe_value(session, "currency", "") or "").lower()
@@ -304,21 +586,32 @@ async def stripe_webhook(request: Request):
             event["id"],
             invoice_id,
             "checkout_not_bound",
-            "Invoice has no complete authoritative Checkout snapshot",
+            "invoice has no complete authoritative Checkout snapshot",
+            {"session_id": session_id, "amount_total": amount_total, "currency": currency},
         )
     if session_id != expected_session:
         return _ack_unapplied(
             event["id"],
             invoice_id,
             "stale_session",
-            f"Session {session_id} is not authoritative for this invoice",
+            f"session {session_id} is not authoritative for this invoice",
+            {"session_id": session_id, "expected_session_id": expected_session},
         )
     if kind != expected_kind or amount_total != expected_amount or currency != expected_currency:
         return _ack_unapplied(
             event["id"],
             invoice_id,
             "checkout_mismatch",
-            "Session kind, amount, or currency differs from the authoritative snapshot",
+            "session kind, amount, or currency differs from the authorized Checkout snapshot",
+            {
+                "got_kind": kind,
+                "got_amount": amount_total,
+                "got_currency": currency,
+                "expected_kind": expected_kind,
+                "expected_amount": expected_amount,
+                "expected_currency": expected_currency,
+                "session_id": session_id,
+            },
         )
 
     owed_cents, owed_kind = next_payment(d)
@@ -327,14 +620,22 @@ async def stripe_webhook(request: Request):
             event["id"],
             invoice_id,
             "already_settled",
-            "A separate paid Checkout arrived after the invoice settled",
+            f"invoice is fully settled but a payment of {amount_total} cents arrived",
+            {"amount_total": amount_total, "kind": kind, "session_id": session_id},
         )
     if kind != owed_kind or amount_total != owed_cents:
         return _ack_unapplied(
             event["id"],
             invoice_id,
             "invoice_changed",
-            "The invoice changed after Checkout creation",
+            "invoice state changed after Checkout creation",
+            {
+                "got_kind": kind,
+                "got_amount": amount_total,
+                "owed_kind": owed_kind,
+                "owed_amount": owed_cents,
+                "session_id": session_id,
+            },
         )
     # Record the payment and advance invoice + project state as one atomic unit:
     # a crash between these writes would otherwise leave the payment logged but the
@@ -378,17 +679,25 @@ async def stripe_webhook(request: Request):
                                      'proposal_sent','contract_signed')""",
                 (d["project_id"],),
             )
+            # Staged INSIDE the transaction, not enqueued after it. jobs.enqueue
+            # writes its own row in a separate transaction, so a crash, a restart,
+            # or a killed worker between the commit above and that call left the
+            # payment recorded with no sync job and nothing to notice it: Stripe's
+            # retry short-circuits on the duplicate event id, the sweeper only
+            # re-offers rows that exist, and Notion stays silently stale. Staging
+            # makes the job as durable as the payment — they commit together or
+            # not at all, which is the pattern uploads.py already uses for work
+            # far less important than this.
+            notion_job = jobs.stage(con, "notion_sync_invoice", {"invoice_id": invoice_id})
     except _PaymentStateConflict:
         return _ack_unapplied(
             event["id"],
             invoice_id,
             "state_conflict",
-            "Invoice state changed while applying the payment",
+            "invoice state changed while applying the payment",
+            {"session_id": session_id, "kind": kind, "amount_total": amount_total},
         )
     except db.sqlite3.IntegrityError:
-        # A retry of the same Stripe event is benign. A second event for an
-        # already-recorded installment/session is not: acknowledge so Stripe
-        # stops retrying, but raise a security alert for manual reconciliation.
         if db.one("SELECT id FROM payments WHERE stripe_event_id=?", (event["id"],)):
             return {"ok": True, "duplicate": True}
         prior = db.one(
@@ -400,9 +709,13 @@ async def stripe_webhook(request: Request):
             event["id"],
             invoice_id,
             "duplicate_installment" if prior else "constraint_conflict",
-            "A distinct Stripe event conflicts with an existing payment invariant",
+            "a distinct Stripe event conflicts with an existing payment invariant",
+            {"session_id": session_id, "kind": kind, "amount_total": amount_total},
         )
-    jobs.enqueue("notion_sync_invoice", {"invoice_id": invoice_id})
+    # Offer it to the pool only after the commit: a durable row means a lost
+    # dispatch is recoverable (the sweeper picks it up), while dispatching a row
+    # that might still roll back is not.
+    jobs.dispatch([notion_job])
     log.info(
         "invoice %s payment recorded: %s %s cents (event %s)",
         invoice_id,

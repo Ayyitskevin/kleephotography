@@ -30,6 +30,7 @@ if (!BASE || !OUT) {
 const PUBLIC_PAGES = [
   ["home", "/"],
   ["portfolio", "/portfolio"],
+  ["work", "/work"],
   ["real-estate", "/real-estate"],
   ["portraits", "/portraits"],
   ["food-beverage", "/food-beverage"],
@@ -56,6 +57,12 @@ const PROFILES = [
   ["desktop", { viewport: { width: 1440, height: 900 } }],
   ["mobile", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }],
 ];
+
+// Every shooting context stills its animations: the home ticker is a 26s loop
+// and the status dots blink, so a fullPage capture otherwise freezes whatever
+// frame it happened to land on and before/after diffs disagree about pixels
+// nobody touched. Side benefit: this is the prefers-reduced-motion path.
+const STILL = { reducedMotion: "reduce" };
 
 mkdirSync(OUT, { recursive: true });
 const results = [];
@@ -120,12 +127,12 @@ try {
 
   for (const [profile, opts] of PROFILES) {
     console.log(`==> ${profile} public`);
-    const pub = await browser.newContext(opts);
+    const pub = await browser.newContext({ ...opts, ...STILL });
     for (const [name, path] of PUBLIC_PAGES) await shoot(pub, name, path, profile);
     await pub.close();
 
     console.log(`==> ${profile} admin`);
-    const adm = await browser.newContext({ ...opts, storageState: adminState });
+    const adm = await browser.newContext({ ...opts, ...STILL, storageState: adminState });
     for (const [name, path] of ADMIN_PAGES) await shoot(adm, name, path, profile);
     await adm.close();
   }

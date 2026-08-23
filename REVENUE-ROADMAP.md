@@ -1,0 +1,82 @@
+# Revenue roadmap
+
+The working plan from the August 2026 business review ("Mise, Graded"): the
+platform graded **B+ — an A− platform carrying a C− revenue engine** — and this
+file is the engine build-out, ranked by revenue per unit of work. Research
+grounding (working photographers' checklists, income breakdowns, platform
+complaints) lives in the review artifact; the grades and reasoning are summarized
+there. Every item that touches money or schema is red-light per AGENTS.md: PR +
+Kevin's merge, no exceptions.
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | **Pay-to-book** — Stripe reservation fee holds the slot; the mini-session engine | **built** (this PR) |
+| 2 | **Google review engine** — automated post-delivery review ask | **built** (this PR) |
+| 3 | **Lead attribution** — "how did you hear about me?" + reports rollup | **built** (this PR) |
+| 4 | **List announcements** — one-shot campaigns to past clients + gallery-gate emails | **built** (this PR) |
+| 5 | **Session-anniversary nudges** — "invite them back" Telegram line at ~11 months | **built** (this PR) |
+| 6 | **Prints, phase one** — "request a print quote" from inside the gallery | **built** (this PR) |
+| 7 | **Expired galleries → reactivation pages** — "request re-opening" instead of a dead end | **built** (this PR) |
+
+## Built in this PR
+
+**1 — Pay-to-book.** `event_types.booking_fee_cents` (admin: "Reservation fee");
+fee'd types hold the slot as `status='pending_payment'` and redirect to Stripe
+Checkout. The hold occupies the slot in every conflict query but only while
+younger than `MISE_BOOKING_PAY_TTL_MIN` (default 30) — expiry is exact and lazy,
+the hourly sweep just tidies rows. The shared Stripe webhook confirms the hold
+(idempotent via `booking_payments.stripe_event_id UNIQUE`), and only then do
+confirmation emails / calendar / Notion fire. Money on an already-released hold
+is acked + audited + alerted for a manual refund — never silently re-confirmed,
+because the slot may have been re-sold. Free event types are byte-for-byte
+unchanged. Refunds are always manual, from the Stripe dashboard; the admin
+cancel dialog says so.
+
+**3 — Lead attribution.** Optional "How did you hear about me?" select on the
+contact and booking forms, answers constrained to `REFERRAL_SOURCES`
+(`app/public/site_catalog.py`) so free text never reaches the rollup. Stored on
+`inquiries.referral_source` (and `bookings.referral_source`, because a paid
+booking's inquiry row is created at webhook time). Reports gains "How they found
+you" with an honest unattributed count.
+
+## Design notes for what's queued
+
+**2 — Review engine — built.** `app/review_requests.py`, fired from the
+recurring sweep like the gallery reminders. One warm email per delivered
+gallery (`MISE_REVIEW_ASK_DAYS` after it goes up, skipping expired galleries),
+one-shot via `galleries.review_requested_at`, with a per-CLIENT cooldown
+(`MISE_REVIEW_COOLDOWN_DAYS`, default 180) across all their galleries. The
+unhappy are invited to reply privately; the delighted get the direct
+`MISE_GOOGLE_REVIEW_URL` link. Dormant until the URL is set.
+
+**4 — Announcements — built.** Admin → Announcements: audience = past clients ∪
+gallery-gate emails (deduped case-insensitively, minus `unsubscribes`), one
+plain-text message, one send. Deliveries are one durable job per recipient
+(staged with the paper-trail row in one transaction, per-recipient jitter so a
+burst trickles through Gmail), each re-checking the ledger at send time. Every
+email carries `/u/{signed-email}` — a GET-safe confirm page + POST record, so
+mail-client prefetch can never unsubscribe anyone. `unsubscribes` is a legal
+ledger; its rollback is deliberately inert.
+
+**5 — Anniversary nudges — built.** `app/anniversary_nudges.py`, mirroring
+contract_reminders: a Telegram line to KEVIN (never the client — the machine
+remembers, the invitation is his) when a client's latest project closed
+`MISE_ANNIVERSARY_NUDGE_DAYS` (~11 months) ago. Bounded window so enabling it
+never floods with ancient history; clients already back in the funnel (a newer
+project in any stage, or an upcoming confirmed booking) are left alone; one
+nudge per yearly cycle via `clients.anniversary_nudged_at`; nothing is stamped
+while alerts are disabled, so enabling Telegram later still catches the
+current window.
+
+**6 — Prints phase one — built.** "Want prints of your favorites?" in the
+gallery export rail (PIN-gated; the gate email is reused so most clients type
+nothing). The request lands as inquiry kind `prints` with the favorite count,
+their note, and the admin gallery link — a quote conversation, not a cart. If
+these convert, THEN the store earns its spec; a week was risked, not a quarter.
+
+**7 — Reactivation — built.** The expired page offers "request re-opening"
+(inquiry kind `reactivation`) instead of a mailto dead end. The route exists
+ONLY for expired galleries; since expiry gates the PIN page itself the form is
+necessarily open, so honeypot + throttle + required email carry the abuse load.
+Restore = extend the expiry date on the admin gallery page, which also re-arms
+the expiry reminder.

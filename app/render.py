@@ -49,6 +49,18 @@ templates.env.globals["base_url"] = config.BASE_URL
 templates.env.globals["static_rev"] = _static_rev()
 
 
+# These two run per render of the marketing base, and a plan once existed to
+# TTL-cache them (brief item B6) because each opened its own connection —
+# ~0.9 ms apiece, so ~1.8 ms a page. Thread-local read connections removed that:
+# measured together they now cost 0.005 ms per render.
+#
+# So do not cache them. A TTL would buy five microseconds and cost a staleness
+# window on exactly the writes an operator checks immediately — a newly starred
+# portfolio photo, a press hit cleared for the footer — which is why the first
+# attempt broke three smoke tests. Making it safe needs invalidation wired into
+# the admin write paths: a cross-cutting change, now for no measurable gain.
+
+
 def _og_image_id() -> int | None:
     """Newest starred ready photo — stronger share cards than the oldest id."""
     row = db.one("""SELECT id FROM assets WHERE portfolio=1 AND status='ready'
@@ -75,6 +87,12 @@ templates.env.globals["has_press_features"] = _has_press_features
 templates.env.globals["instagram_url"] = config.INSTAGRAM_URL
 templates.env.globals["google_business_url"] = config.GOOGLE_BUSINESS_URL
 templates.env.globals["contact_email"] = config.CONTACT_EMAIL
+# LocalBusiness facts for the marketing JSON-LD. Callables (not frozen values)
+# so they read current config per render — tests monkeypatch app.config
+# BUSINESS_* and see it stick, same idiom as the feature flags below.
+templates.env.globals["business_phone"] = lambda: config.BUSINESS_PHONE
+templates.env.globals["business_hours"] = lambda: config.BUSINESS_HOURS
+templates.env.globals["business_geo"] = lambda: config.BUSINESS_GEO
 templates.env.globals["plausible_domain"] = config.PLAUSIBLE_DOMAIN
 # Callables (not frozen bools) so the flags read current config per render —
 # tests monkeypatch app.config.SCREENING_ROOM / AERIALS_LIVE and see it stick.
@@ -86,18 +104,65 @@ templates.env.globals["aerial_pass_display"] = specialties.aerial_pass_display
 templates.env.globals["marketing_meta"] = marketing_meta
 
 
-def _portfolio_alt(asset, site_name: str | None = None) -> str:
-    """Accessible alt text from portfolio_tag when present. The craft phrase
-    follows the tag's specialty prefix (app/specialties.py); untagged assets
-    stay 'food & beverage' — everything starred before the revamp is F&B."""
-    name = site_name or config.SITE_NAME
-    tag = ""
-    try:  # works for dict and sqlite3.Row (which lacks .get)
+ALT_MAX_CHARS = 160
+
+
+def _asset_field(asset, key: str) -> str:
+    """One column off a dict or a sqlite3.Row (which lacks .get), or ""."""
+    try:
         keys = asset.keys() if hasattr(asset, "keys") else ()
-        if "portfolio_tag" in keys:
-            tag = (asset["portfolio_tag"] or "").strip()
+        if key in keys:
+            return (asset[key] or "").strip()
     except (TypeError, KeyError, IndexError):
-        tag = ""
+        pass
+    return ""
+
+
+def _described_alt(asset) -> str:
+    """The Argus per-frame description, normalised — or "" when there is none.
+
+    Whitespace is collapsed and the result capped at ALT_MAX_CHARS: assistive
+    tech announces alt as one unbroken run, and Argus is a remote service whose
+    output length is not ours to trust.
+    """
+    described = _asset_field(asset, "argus_alt_text")
+    if not described:
+        return ""
+    described = " ".join(described.split())
+    if len(described) > ALT_MAX_CHARS:
+        described = described[: ALT_MAX_CHARS - 1].rstrip(" ,;:.—-") + "…"
+    return described
+
+
+def _frame_alt(asset, fallback: str) -> str:
+    """Alt text for one client-gallery frame: the description, else `fallback`.
+
+    The client gallery's fallback is positional ("Title — frame 0042"), which
+    is why it cannot share _portfolio_alt's craft-phrase fallback.
+    """
+    return _described_alt(asset) or fallback
+
+
+def _portfolio_alt(asset, site_name: str | None = None) -> str:
+    """Accessible alt text: the per-frame description when Argus wrote one,
+    otherwise the portfolio_tag craft phrase.
+
+    Argus already writes a real description of each analyzed frame to
+    `assets.argus_alt_text` (app/argus_writeback.py), and until now the only
+    thing that read it was an admin hover overlay — so every food photo on the
+    public site shipped the identical string. A tag-derived phrase describes a
+    *category*, not a picture; it is the fallback, not the answer.
+
+    The studio name is deliberately NOT appended to a real description: it is
+    already in the page's LocalBusiness JSON-LD and the <title>, and repeating
+    it on every frame is alt-text keyword stuffing that a screen-reader user
+    hears once per image. The tag fallback keeps it, because a bare craft
+    phrase is generic enough to need the attribution.
+    """
+    name = site_name or config.SITE_NAME
+    if described := _described_alt(asset):
+        return described
+    tag = _asset_field(asset, "portfolio_tag")
     if tag:
         key, label = specialties.split_tag(tag)
         craft = specialties.SPECIALTIES[key]["craft"]
@@ -108,6 +173,7 @@ def _portfolio_alt(asset, site_name: str | None = None) -> str:
 
 
 templates.env.filters["portfolio_alt"] = _portfolio_alt
+templates.env.filters["frame_alt"] = _frame_alt
 
 
 def _tag_label(tag: str | None) -> str:
@@ -117,6 +183,30 @@ def _tag_label(tag: str | None) -> str:
 
 
 templates.env.filters["tag_label"] = _tag_label
+
+
+def _reel_title(reel, site_name: str | None = None) -> str:
+    """Display name for one portfolio reel.
+
+    Shared with the sitemap: /reels emits a VideoObject and sitemap.xml emits a
+    <video:video> for the same asset, and Google cross-checks the two. A forked
+    formula would make them disagree the first time either is edited.
+    """
+    name = site_name or config.SITE_NAME
+    tag = _asset_field(reel, "portfolio_tag")
+    return f"{_tag_label(tag) if tag else 'Reel'} — {name}"
+
+
+def _reel_description(reel, site_name: str | None = None) -> str:
+    """Description for one portfolio reel — see _reel_title on why this is shared."""
+    name = site_name or config.SITE_NAME
+    tag = _asset_field(reel, "portfolio_tag")
+    kind = _tag_label(tag).lower() if tag else "social"
+    return f"Short-form {kind} video by {name}, Asheville NC."
+
+
+templates.env.filters["reel_title"] = _reel_title
+templates.env.filters["reel_description"] = _reel_description
 # 're/exteriors' → 're'; unprefixed → 'fb' (legacy F&B). Drives the data-sp
 # specialty-filter attribute on portfolio/reels tiles.
 templates.env.filters["tag_specialty"] = specialties.specialty_key

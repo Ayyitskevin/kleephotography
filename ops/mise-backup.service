@@ -1,8 +1,11 @@
 [Unit]
-Description=Mise nightly SQLite snapshot
+Description=Mise nightly backup (SQLite snapshot + durable files)
 After=network.target
 
 [Service]
 Type=oneshot
 User=mise
+# Optional (the leading '-'): the durable-file stage reads MISE_FILE_BACKUP_DIR
+# from here. Without it that stage skips loudly and only the database is copied.
+EnvironmentFile=-/opt/mise/.env
 ExecStart=/opt/mise/ops/backup.sh

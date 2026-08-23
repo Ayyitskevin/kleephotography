@@ -49,7 +49,7 @@ def _rel(ts: str | None) -> str:
 
 
 @router.get("", response_class=HTMLResponse)
-async def portals(request: Request):
+def portals(request: Request):
     rows = db.all_(
         """SELECT po.id, po.slug, po.pin, po.published, po.visits, po.last_visit,
                   po.client_id, c.name AS client_name, c.company, c.usage_rights,

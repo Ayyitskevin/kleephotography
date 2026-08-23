@@ -12,11 +12,13 @@ import datetime as dt
 import logging
 from zoneinfo import ZoneInfo
 
+import stripe
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
-from .. import booking_notify, config, db, features, ics, scheduling, security, specialties
+from .. import alerts, booking_notify, config, db, features, ics, scheduling, security, specialties
 from ..render import templates
+from .site_catalog import REFERRAL_SOURCES
 
 log = logging.getLogger("mise.public.scheduling")
 router = APIRouter()
@@ -104,6 +106,7 @@ def _picker_ctx(
         "sel_start": None,
         "selected_slot_label": "",
         "submitted": {},
+        "referral_sources": REFERRAL_SOURCES,
     }
     ctx.update(_month_ctx(et, year, month, today, visitor_tz, exclude_id))
 
@@ -131,7 +134,7 @@ def _picker_ctx(
 
 
 @router.get("/book", response_class=HTMLResponse)
-async def book_index(request: Request):
+def book_index(request: Request):
     from .site import _portfolio_assets, _public_photo_spec
     from .site_catalog import BOOK_ACTIVE_PROMISES, BOOK_FAQS, BOOK_PROMISES
 
@@ -153,7 +156,7 @@ async def book_index(request: Request):
 
 
 @router.get("/book/{slug}", response_class=HTMLResponse)
-async def book_event(request: Request, slug: str):
+def book_event(request: Request, slug: str):
     et = scheduling.event_by_slug(slug)
     if not et:
         raise HTTPException(status_code=404)
@@ -167,7 +170,7 @@ async def book_event(request: Request, slug: str):
 
 
 @router.post("/book/{slug}", response_class=HTMLResponse)
-async def confirm_booking(
+def confirm_booking(
     request: Request,
     slug: str,
     name: str = Form(...),
@@ -183,6 +186,7 @@ async def confirm_booking(
     style_refs: str = Form(""),
     onsite_contact: str = Form(""),
     aerial_pass: str = Form(""),
+    referral: str = Form(""),
 ):
     et = scheduling.event_by_slug(slug)
     if not et:
@@ -201,6 +205,7 @@ async def confirm_booking(
         "style_refs": style_refs,
         "onsite_contact": onsite_contact,
         "aerial_pass": aerial_pass,
+        "referral": referral,
     }
     name, email = name.strip(), email.strip().lower()
     phone, notes = phone.strip()[:40], notes.strip()[:2000]
@@ -225,8 +230,31 @@ async def confirm_booking(
         )
     if not (name and _valid_email(email)):
         return repicker("Please enter your name and a valid email.", fields=("name", "email"))
+    fee = et["booking_fee_cents"]
+    if fee and not features.stripe_enabled():
+        # Fail LOUD, not free: silently confirming a paid session type would give
+        # away the exact revenue the fee exists to collect, and nothing would
+        # ever say so. The visitor gets an honest retry; Kevin gets pinged.
+        log.error("event %s has a booking fee but Stripe is not configured", et["slug"])
+        alerts.ops_alert(
+            f"booking_fee_unconfigured:{et['slug']}",
+            f"'{et['name']}' has a booking fee set but Stripe is not configured — "
+            f"paid bookings are being refused. Set MISE_STRIPE_SECRET_KEY or clear the fee.",
+        )
+        return repicker("Online payment is temporarily unavailable — please try again soon.", 503)
+    referral = referral.strip() if referral.strip() in REFERRAL_SOURCES else None
     try:
-        bid, token = scheduling.book(et, start, name, email, phone, notes, tz)
+        bid, token = scheduling.book(
+            et,
+            start,
+            name,
+            email,
+            phone,
+            notes,
+            tz,
+            referral=referral,
+            status="pending_payment" if fee else "confirmed",
+        )
     except scheduling.CalendarUnavailable:
         return repicker(
             "Calendar sync is temporarily unavailable — please try again in a few minutes.",
@@ -250,6 +278,26 @@ async def confirm_booking(
             ),
         )
     security.inquiry_record(ip, security.INQUIRY_BUCKET_BOOK)
+    if fee:
+        # The slot is HELD, not confirmed: no emails, no calendar, no Notion —
+        # those all fire from the Stripe webhook when the money lands. If the
+        # visitor abandons checkout, the hold expires and the slot frees itself.
+        try:
+            url = _booking_checkout_url(bid, token, et, email, fee)
+        except stripe.StripeError as e:
+            # Release the hold immediately — a slot must never stay pinned to a
+            # checkout that was never created.
+            db.run(
+                """UPDATE bookings SET status='cancelled',
+                          cancel_reason='Payment could not be started',
+                          cancelled_at=datetime('now')
+                    WHERE id=? AND status='pending_payment'""",
+                (bid,),
+            )
+            log.error("booking %s checkout creation failed: %s", bid, e)
+            return repicker("Online payment is temporarily unavailable — please try again.", 503)
+        log.info("booking %s held pending payment (%s, %s cents)", bid, slug, fee)
+        return RedirectResponse(url, status_code=303)
     booking_notify.confirm(bid)
     log.info("booking %s confirmed (%s)", bid, slug)
     return RedirectResponse(f"/booking/{token}", status_code=303)
@@ -258,11 +306,125 @@ async def confirm_booking(
 # ── manage: confirmation page, cancel, reschedule, invite download ───────────
 
 
+def _session_value(session, key: str, default=None):
+    try:
+        return session[key]
+    except (KeyError, TypeError):
+        return getattr(session, key, default)
+
+
+def _booking_checkout_url(bid: int, token: str, et, email: str, fee: int) -> str:
+    """Return one authoritative Checkout Session for this booking hold."""
+    currency = "usd"
+    b = db.one("SELECT * FROM bookings WHERE id=?", (bid,))
+    if not b or b["status"] != "pending_payment":
+        raise HTTPException(status_code=404)
+
+    # The quote freezes when the booking is created. A later event-type price
+    # edit must not change what this client is asked to pay.
+    amount = b["stripe_checkout_amount_cents"]
+    if amount is None:
+        amount = fee
+        db.run(
+            """UPDATE bookings
+                  SET stripe_checkout_amount_cents=?, stripe_checkout_currency=?
+                WHERE id=? AND stripe_checkout_amount_cents IS NULL""",
+            (amount, currency, bid),
+        )
+    else:
+        currency = b["stripe_checkout_currency"] or currency
+
+    prior_id = b["stripe_session_id"]
+    if prior_id:
+        prior = stripe.checkout.Session.retrieve(
+            prior_id,
+            api_key=config.STRIPE_SECRET_KEY,
+        )
+        status = _session_value(prior, "status")
+        snapshot_matches = (
+            int(_session_value(prior, "amount_total", 0) or 0) == amount
+            and str(_session_value(prior, "currency", "") or "").lower() == currency
+        )
+        if snapshot_matches and status == "open":
+            url = _session_value(prior, "url")
+            if url:
+                return url
+            raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+        if snapshot_matches and status == "complete":
+            return f"{config.BASE_URL}/booking/{token}?paid=1"
+        if status == "open":
+            stripe.checkout.Session.expire(
+                prior_id,
+                api_key=config.STRIPE_SECRET_KEY,
+                idempotency_key=f"mise:booking:{bid}:expire:{prior_id}",
+            )
+
+    predecessor = prior_id or "initial"
+    session = stripe.checkout.Session.create(
+        api_key=config.STRIPE_SECRET_KEY,
+        idempotency_key=f"mise:booking:{bid}:{amount}:{currency}:{predecessor}",
+        mode="payment",
+        payment_method_types=["card"],
+        line_items=[
+            {
+                "quantity": 1,
+                "price_data": {
+                    "currency": currency,
+                    "unit_amount": amount,
+                    "product_data": {"name": f"Session reservation — {et['name']}"},
+                },
+            }
+        ],
+        customer_email=email or None,
+        metadata={"kind": "booking", "booking_id": str(bid)},
+        success_url=f"{config.BASE_URL}/booking/{token}?paid=1",
+        cancel_url=f"{config.BASE_URL}/booking/{token}",
+        expires_at=int(dt.datetime.now(dt.UTC).timestamp())
+        + max(config.BOOKING_PAY_TTL_MIN, 30) * 60,
+    )
+    db.run(
+        """UPDATE bookings
+              SET stripe_session_id=?, stripe_checkout_amount_cents=?,
+                  stripe_checkout_currency=?
+            WHERE id=? AND status='pending_payment'""",
+        (session.id, amount, currency, bid),
+    )
+    url = _session_value(session, "url")
+    if not url:
+        raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+    return url
+
+
+@router.post("/booking/{token}/pay")
+def pay_booking(token: str):
+    """Restart checkout for a live hold — the cancel_url lands back on the
+    manage page, and this button is how the visitor tries again."""
+    b = scheduling.booking_by_token(token)
+    if not b or b["status"] != "pending_payment":
+        raise HTTPException(status_code=404)
+    et = scheduling.event_by_slug(b["event_slug"])
+    if not et or not et["booking_fee_cents"] or not features.stripe_enabled():
+        raise HTTPException(status_code=503, detail="online payment is not configured")
+    try:
+        url = _booking_checkout_url(b["id"], token, et, b["email"], et["booking_fee_cents"])
+    except stripe.StripeError as e:
+        log.error("booking %s re-checkout failed: %s", b["id"], e)
+        raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
+    return RedirectResponse(url, status_code=303)
+
+
 @router.get("/booking/{token}", response_class=HTMLResponse)
-async def manage(request: Request, token: str):
+def manage(request: Request, token: str, paid: str = ""):
     b = scheduling.booking_by_token(token)
     if not b:
         raise HTTPException(status_code=404)
+    # Pay-to-book states. `paid=1` is only a hint from Stripe's success redirect:
+    # the truth arrives via webhook, so the page says "finalizing" rather than
+    # promising a confirmation the money may still be racing to deliver.
+    fee_cents = 0
+    if b["status"] == "pending_payment":
+        et = scheduling.event_by_slug(b["event_slug"])
+        fee_cents = et["booking_fee_cents"] if et else 0
     gcal = ""
     if b["status"] == "confirmed":
         summary = f"{b['event_name']} · {config.SITE_NAME}"
@@ -280,12 +442,18 @@ async def manage(request: Request, token: str):
     return templates.TemplateResponse(
         request,
         "public/booking_manage.html",
-        {"b": b, "gcal": gcal, "tz_name": tz_name},
+        {
+            "b": b,
+            "gcal": gcal,
+            "tz_name": tz_name,
+            "fee_cents": fee_cents,
+            "finalizing": bool(paid) and b["status"] == "pending_payment",
+        },
     )
 
 
 @router.get("/booking/{token}/invite.ics")
-async def invite(token: str):
+def invite(token: str):
     b = scheduling.booking_by_token(token)
     if not b:
         raise HTTPException(status_code=404)
@@ -318,7 +486,7 @@ async def invite(token: str):
 
 
 @router.post("/booking/{token}/cancel")
-async def cancel_booking(request: Request, token: str, reason: str = Form("")):
+def cancel_booking(request: Request, token: str, reason: str = Form("")):
     b = scheduling.booking_by_token(token)
     if not b:
         raise HTTPException(status_code=404)
@@ -328,7 +496,7 @@ async def cancel_booking(request: Request, token: str, reason: str = Form("")):
 
 
 @router.get("/booking/{token}/reschedule", response_class=HTMLResponse)
-async def reschedule_form(request: Request, token: str):
+def reschedule_form(request: Request, token: str):
     b = scheduling.booking_by_token(token)
     if not b or b["status"] != "confirmed":
         raise HTTPException(status_code=404)
@@ -344,7 +512,7 @@ async def reschedule_form(request: Request, token: str):
 
 
 @router.post("/booking/{token}/reschedule")
-async def do_reschedule(request: Request, token: str, start: str = Form(...), tz: str = Form("")):
+def do_reschedule(request: Request, token: str, start: str = Form(...), tz: str = Form("")):
     b = scheduling.booking_by_token(token)
     if not b or b["status"] != "confirmed":
         raise HTTPException(status_code=404)

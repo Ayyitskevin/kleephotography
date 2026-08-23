@@ -23,7 +23,10 @@
   {{ cp.copy_link(base_url ~ "/p/" ~ d.slug) }}
   {% if d.sent_at %}<span class="muted">· sent {{ d.sent_at }}</span>{% endif %}
   {% if d.viewed_at %}<span class="muted">· viewed {{ d.viewed_at }}</span>{% endif %}
-  {% if d.accepted_at %}<span class="muted">· accepted {{ d.accepted_at }}</span>{% endif %}</p>
+  {% if d.accepted_at %}<span class="muted">· accepted {{ d.accepted_at }}</span>{% endif %}
+  {# marked sent, never viewed, and Mise holds no send for it — the client may
+     never have received it. Only what Mise sent is knowable, hence "recorded". #}
+  {% if d.status == 'sent' and not email_sends %}<span class="warn" data-no-send-recorded>· no send recorded — email it below or share the link yourself</span>{% endif %}</p>
 
   {% if d.status == 'draft' %}
   <form method="post" action="/admin/studio/proposals/{{ d.id }}" class="stack-form" style="max-width:680px">

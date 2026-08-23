@@ -77,7 +77,9 @@
     {% for v in motion %}
     <figure class="tile sr-skel">
       <a href="/g/{{ v.gallery_slug }}" title="Open {{ v.gallery_title }}">
-        <img src="/portal/{{ p.slug }}/thumb/{{ v.id }}" loading="lazy" alt="{{ v.gallery_title }} — reel">
+        <img src="/portal/{{ p.slug }}/thumb/{{ v.id }}" loading="lazy"
+             {% if v.width and v.height %}width="{{ v.width }}" height="{{ v.height }}"{% endif %}
+             alt="{{ v.gallery_title }} — reel">
         <span class="play-badge">&#9654;</span>
         {% if v.duration and v.duration|hms %}<span class="dur-badge">{{ v.duration|hms }}</span>{% endif %}
       </a>
