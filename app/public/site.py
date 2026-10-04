@@ -141,6 +141,16 @@ def _sr_rate_cells(key: str) -> list[dict]:
     ]
 
 
+def _specialty_package_groups(key: str) -> list[dict]:
+    """Existing service groups for read-only specialty package comparison."""
+    group_keys = {
+        "re": ("real_estate",),
+        "pl": ("portraits",),
+        "fb": ("photography", "videography", "brand_partner"),
+    }[key]
+    return [group for group in SERVICES if group["key"] in group_keys]
+
+
 def _portfolio_assets() -> list:
     return db.all_("""SELECT a.*, g.client_name, g.title AS gallery_title
                       FROM assets a
@@ -1004,6 +1014,7 @@ def _specialty_page(request: Request, key: str):
             "faqs": page["faqs"],
             "faq_heading": "Good to know",
             "rates": _sr_rate_cells(key),
+            "package_groups": _specialty_package_groups(key),
             "aerial_rate": specialties.aerial_pass_display(),
         },
     )
