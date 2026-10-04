@@ -576,6 +576,16 @@ html.nav-menu-enhanced .sr .nav-mobile {
   text-transform: uppercase; padding: 12px 18px; box-shadow: none; }
 .sr .svc-cta:hover, .sr .svc-tier-mid .svc-cta:hover { background: var(--sr-amber);
   color: var(--sr-house); }
+/* Specialty package enhancements are scoped to Screening Room.
+   The base service-card structure and legacy behavior remain in mise.css;
+   these overrides do not apply when Screening Room is off. */
+.sr .sp-packages .svc-head { flex-wrap: wrap; }
+.sr .sp-packages .svc-tier-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr));
+}
+.sr .sp-packages .svc-tier { min-width: 0; transition: none; }
+.sr .sp-packages .svc-tier:hover { transform: none; }
+
 /* press list */
 .sr .press-list { border-top: 1px solid var(--sr-line); }
 .sr .press-item { border-bottom: 1px solid var(--sr-line); }

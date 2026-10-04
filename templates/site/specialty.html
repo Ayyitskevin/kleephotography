@@ -4,7 +4,7 @@
    three Screening Room features (3b The Space · 3k The Face · 3c+3l The
    Plate). One route + context per spoke (site.SPECIALTY_PAGES, .sr = the
    Screening Room copy), three hero anatomies below; everything downstream
-   (filmstrip/grids, rates rail, case studies, FAQ) is shared. #}
+   (filmstrip/grids, package comparison, case studies, FAQ) is shared. #}
 {# Top-level so the og block AND site_content both see it — a {% set %} inside
    one block is invisible to the others (Jinja block scoping). #}
 {% set og_asset = photos[0] if photos else None %}
@@ -52,7 +52,8 @@
 <section class="sr-wrap sr-section" aria-label="Listing premiere" data-seek-scope>
   <div class="sr-featurehead">
     <h1>{{ page.sr.h2a }} <em>{{ page.sr.h2b }}</em></h1>
-    <p class="sr-specline">{% for s in page.sr.spec %}{{ s }} &middot; {% endfor %}{% if aerials_live() %}<b>{{ page.sr.spec_aerial.format(rate=aerial_rate) }}</b> &middot; {% endif %}From {{ rates[0].price }}</p>
+    <p class="sr-specline">{% for s in page.sr.spec %}{{ s }} &middot; {% endfor %}From {{ rates[0].price }}</p>
+    <p class="sr-mono">Aerial coverage is planned for launch with FAA Part 107 — not available to book today.</p>
   </div>
   <div class="sr-premiere">
     <figure class="sr-screen sr-screen--film" data-sr-player>
@@ -77,7 +78,7 @@
         <span class="sr-tc-play">&#9654;</span>
         <span data-sr-tc>00:00:00:00</span>
         <i class="sr-progress"><b data-sr-bar></b>
-          {%- if hero_reel.duration %}{% for ch in page.sr.chapters if ch.at > 0 and (not ch.aerial or aerials_live()) %}<i style="left: {{ (ch.at * 100)|round|int }}%;"></i>{% endfor %}{% endif -%}
+          {%- if hero_reel.duration %}{% for ch in page.sr.chapters if ch.at > 0 and not ch.aerial %}<i style="left: {{ (ch.at * 100)|round|int }}%;"></i>{% endfor %}{% endif -%}
         </i>
         {% if hero_reel.duration and hero_reel.duration|hms %}<span>{{ hero_reel.duration|hms }}</span>{% endif %}
       </div>
@@ -86,24 +87,23 @@
     <div class="sr-chapters">
       {% if hero_reel and hero_reel.duration %}
       <p class="sr-mono">Chapters</p>
-      {% for ch in page.sr.chapters if not ch.aerial or aerials_live() %}
-      <button type="button" class="sr-chapter{% if ch.aerial %} sr-chapter--marked{% endif %}"
+      {% for ch in page.sr.chapters if not ch.aerial %}
+      <button type="button" class="sr-chapter"
               data-seek="{{ (hero_reel.duration * ch.at)|round|int }}">
         <i>{{ ((hero_reel.duration * ch.at)|round|int)|hms if ch.at > 0 else "0:00" }}</i>
         {{ ch.label }}
-        {% if ch.aerial %}<i class="sr-chapter-badge">Drone</i>{% endif %}
       </button>
       {% endfor %}
       {% endif %}
       <div class="sr-agentcut">
-        <b>Agent's cut:</b> {{ page.sr.agents_cut_aerial if aerials_live() else page.sr.agents_cut }}
+        <b>Agent's cut:</b> {{ page.sr.agents_cut }}
       </div>
     </div>
   </div>
 </section>
 
 {% if aerials_live() %}
-{# ═══ THE AERIAL PASS — steel-bordered, launches with the Part 107 cert ══════ #}
+{# Planned aerial coverage only; the feature flag is not proof of availability. #}
 {% set aerial_leads = [] %}
 {% for a in photos %}{% if a.portfolio_tag and "aerial" in a.portfolio_tag %}{% set _ = aerial_leads.append(a) %}{% endif %}{% endfor %}
 <section class="sr-wrap" aria-label="The Aerial Pass">
@@ -123,17 +123,17 @@
         <span class="sr-screenbadge">&#9650; The Aerial Pass</span>
       </figure>
       <div class="sr-aerialpass-copy">
-        <p class="sr-mono">The Aerial Pass — new</p>
+        <p class="sr-mono">The Aerial Pass — planned</p>
         <h3>The lot, the roofline, <em>the whole street.</em></h3>
-        <p>Drone stills and orbit clips flown the same visit as the interiors —
-           acreage, roof condition, and how the property sits in its
-           neighborhood. Cut straight into the walkthrough film.</p>
+        <p>Aerial coverage is planned, not available to book today.
+           Launch requires an FAA Part 107-certified operator and permitted
+           local airspace. Confirm future availability before quoting aerials.</p>
         <ul class="sr-aerialpass-checks">
-          <li><b>&#10003;</b> FAA Part 107 certified pilot</li>
-          <li><b>&#10003;</b> LAANC airspace clearance, handled</li>
-          <li><b>&#10003;</b> {{ aerial_rate }} add-on to any tier &middot; included in Premier</li>
+          <li>Part 107 launch requirement</li>
+          <li>Local airspace must permit the flight</li>
+          <li>Availability confirmed before any aerial quote</li>
         </ul>
-        <a class="sr-btn sr-btn--ghost" href="{{ book_url }}">Add aerials to a booking &rarr;</a>
+        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Ask about the aerial launch &rarr;</a>
       </div>
     </div>
   </div>
@@ -363,22 +363,8 @@
 </section>
 {% endif %}
 
-{# ═══ SHARED: RATES RAIL — figures come from site.py SERVICES ════════════════ #}
-<section class="sr-wrap" aria-label="Rates" id="rates">
-  <div class="sr-tiers">
-    {% for r in rates %}
-    <div class="sr-tier{% if r.pick %} sr-tier--pick{% endif %}">
-      <b>{{ r.price }}{% if r.unit %}<span>{{ r.unit }}</span>{% endif %}</b>
-      <small>{{ r.label }}</small>
-    </div>
-    {% endfor %}
-    <div class="sr-tier sr-stat--cta"><a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta_final or page.sr.cta }} &rarr;</a></div>
-  </div>
-  <p class="sr-kickrow sr-kickrow--mt12">
-    <a class="sr-mono" href="/services">Every tier, in detail &rarr;</a>
-    {% if sp_key == "re" and aerials_live() %}<span class="sr-mono sr-mono--stock">Aerial Pass {{ aerial_rate }} on any tier</span>{% endif %}
-  </p>
-</section>
+{# Shared current-catalog packages; an inquiry is not a booking or payment. #}
+{% include "site/_specialty_packages.html" %}
 
 {# ═══ SHARED: IN THE WILD — case studies for this feature ════════════════════ #}
 {% if studies %}
