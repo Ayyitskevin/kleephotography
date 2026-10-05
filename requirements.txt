@@ -5,4 +5,4 @@ itsdangerous==2.2.0
 pillow==12.3.0
 pillow-heif==1.5.0
 python-multipart==0.0.32
-stripe==15.5.1
+stripe==16.0.0
