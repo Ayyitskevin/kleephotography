@@ -2,10 +2,11 @@ import datetime as dt
 import logging
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from .. import audit, config, db, features, inquiry_notify, jobs, reopen_notify, security
 from ..gallery_comments import cascade_status, resolve_comment_parent, video_comment_thread
+from ..redirects import redirect_local
 from ..render import templates
 
 log = logging.getLogger("mise.public.gallery")
@@ -184,7 +185,7 @@ def check_pin(request: Request, slug: str, pin: str = Form(...)):
         )
     security.pin_clear(ip, g["id"])
     _, cookie_val = security.create_visitor(g["id"])
-    resp = RedirectResponse(f"/g/{slug}", status_code=303)
+    resp = redirect_local(f"/g/{slug}")
     security.set_session_cookie(resp, security.visitor_cookie_name(g["id"]), cookie_val)
     return resp
 
@@ -269,7 +270,7 @@ def request_prints(
         raise HTTPException(status_code=410)
     visitor = security.require_visitor(request, g["id"])
     if website.strip():  # honeypot
-        return RedirectResponse(f"/g/{slug}?prints=1", status_code=303)
+        return redirect_local(f"/g/{slug}?prints=1")
     ip = security.client_ip(request)
     if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_FORM):
         raise HTTPException(status_code=429, detail="too many requests — try again shortly")
@@ -317,7 +318,7 @@ def request_prints(
     )
     inquiry_notify.enqueue_owner_email(iid)
     log.info("print request for gallery %s (inquiry %s)", g["id"], iid)
-    return RedirectResponse(f"/g/{slug}?prints=1", status_code=303)
+    return redirect_local(f"/g/{slug}?prints=1")
 
 
 @router.post("/{slug}/reactivate", response_class=HTMLResponse)

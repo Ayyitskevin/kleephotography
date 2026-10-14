@@ -11,9 +11,10 @@ import logging
 from urllib.parse import quote
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from .. import config, db, security
+from ..redirects import redirect_local
 from ..render import templates
 from . import gallery as public_gallery
 
@@ -125,6 +126,6 @@ def check_pin(request: Request, slug: str, pin: str = Form(...)):
             request, "public/workspace_pin.html", {"p": p, "error": "Wrong PIN."}, status_code=401
         )
     security.pin_clear(ip, key)
-    resp = RedirectResponse(f"/w/{slug}", status_code=303)
+    resp = redirect_local(f"/w/{slug}")
     security.set_signed_session_cookie(resp, _cookie_name(p["id"]), f"workspace:{p['id']}")
     return resp

@@ -17,6 +17,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .. import alerts, booking_notify, config, db, features, ics, scheduling, security, specialties
+from ..redirects import STRIPE_CHECKOUT_HOSTS, redirect_https_allowlist, redirect_local
 from ..render import templates
 from .site_catalog import REFERRAL_SOURCES
 
@@ -300,7 +301,7 @@ def confirm_booking(
         return RedirectResponse(url, status_code=303)
     booking_notify.confirm(bid)
     log.info("booking %s confirmed (%s)", bid, slug)
-    return RedirectResponse(f"/booking/{token}", status_code=303)
+    return redirect_local(f"/booking/{token}")
 
 
 # ── manage: confirmation page, cancel, reschedule, invite download ───────────
@@ -410,7 +411,7 @@ def pay_booking(token: str):
     except stripe.StripeError as e:
         log.error("booking %s re-checkout failed: %s", b["id"], e)
         raise HTTPException(status_code=503, detail="payment is temporarily unavailable")
-    return RedirectResponse(url, status_code=303)
+    return redirect_https_allowlist(url, STRIPE_CHECKOUT_HOSTS)
 
 
 @router.get("/booking/{token}", response_class=HTMLResponse)
@@ -492,7 +493,7 @@ def cancel_booking(request: Request, token: str, reason: str = Form("")):
         raise HTTPException(status_code=404)
     if b["status"] == "confirmed" and scheduling.cancel(token, reason.strip()[:500]):
         booking_notify.cancelled(b["id"])
-    return RedirectResponse(f"/booking/{token}", status_code=303)
+    return redirect_local(f"/booking/{token}")
 
 
 @router.get("/booking/{token}/reschedule", response_class=HTMLResponse)

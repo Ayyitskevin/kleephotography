@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import db, security
+from ..redirects import redirect_local
 from ..render import templates
 
 log = logging.getLogger("mise.admin.forms")
@@ -127,7 +128,7 @@ def form_update(
         (title, intro.strip() or None, 1 if active else 0, form_id),
     )
     log.info("form %s updated (active=%s)", form_id, active)
-    return RedirectResponse(f"/admin/forms/{form_id}", status_code=303)
+    return redirect_local(f"/admin/forms/{form_id}")
 
 
 @router.post("/{form_id}/delete")
@@ -162,7 +163,7 @@ def field_add(
         (form_id, label, ftype, 1 if required else 0, opts, nxt),
     )
     log.info("form %s + field '%s' (%s)", form_id, label, ftype)
-    return RedirectResponse(f"/admin/forms/{form_id}", status_code=303)
+    return redirect_local(f"/admin/forms/{form_id}")
 
 
 @router.post("/fields/{field_id}")

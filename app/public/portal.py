@@ -11,10 +11,12 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from .. import config, db, jobs, presets, security
+from ..redirects import redirect_local
 from ..render import templates
+from ..safe_path import path_within
 from . import gallery
 
 log = logging.getLogger("mise.public.portal")
@@ -272,7 +274,7 @@ def check_pin(request: Request, slug: str, pin: str = Form(...)):
             request, "public/portal_pin.html", {"p": p, "error": "Wrong PIN."}, status_code=401
         )
     security.pin_clear(ip, bucket)
-    resp = RedirectResponse(f"/portal/{slug}", status_code=303)
+    resp = redirect_local(f"/portal/{slug}")
     security.set_signed_session_cookie(resp, _cookie_name(p["id"]), f"portal:{p['id']}")
     return resp
 
@@ -311,7 +313,7 @@ def crop(request: Request, slug: str, asset_id: int, ratio: str):
     p = get_live_portal(slug)
     _require_access(request, p["id"])
     a = _client_asset(p, asset_id)
-    path = jobs.crops_dir(a["gallery_id"]) / f"{Path(a['stored']).stem}_{ratio}.jpg"
+    path = path_within(jobs.crops_dir(a["gallery_id"]), f"{Path(a['stored']).stem}_{ratio}.jpg")
     if not path.is_file():
         raise HTTPException(status_code=404, detail="crop still processing")
     return FileResponse(

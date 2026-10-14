@@ -22,7 +22,9 @@ from .. import (
     video,
 )
 from ..gallery_comments import cascade_status, resolve_comment_parent, video_comment_threads
+from ..redirects import redirect_local
 from ..render import templates
+from ..safe_path import path_within
 from . import common, studio
 
 log = logging.getLogger("mise.admin.galleries")
@@ -607,7 +609,7 @@ def update_gallery(
         and (not old["published"] or old["project_id"] != project_id)
     ):
         jobs.enqueue("plutus_recommend_gallery", {"gallery_id": gallery_id})
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/argus-analyze")
@@ -622,7 +624,7 @@ def argus_analyze_now(gallery_id: int):
         raise HTTPException(status_code=503, detail="Argus is not configured")
     jobs.enqueue("argus_analyze_gallery", {"gallery_id": gallery_id, "skip_dedup": True})
     log.info("argus analyze manually queued for gallery %s", gallery_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/plutus-recommend")
@@ -637,7 +639,7 @@ def plutus_recommend_now(gallery_id: int):
         raise HTTPException(status_code=503, detail="Plutus is not configured")
     jobs.enqueue("plutus_recommend_gallery", {"gallery_id": gallery_id})
     log.info("plutus recommend manually queued for gallery %s", gallery_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 # Project statuses that pre-date 'delivered' on the studio pipeline. Sending
@@ -696,7 +698,7 @@ def email_gallery(
                 g["project_id"],
                 p["status"],
             )
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.get("/thumb/{gallery_id}/{asset_id}")
@@ -704,7 +706,7 @@ def admin_thumb(gallery_id: int, asset_id: int):
     a = db.get_or_404(
         "SELECT stored FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id)
     )
-    path = config.MEDIA_DIR / str(gallery_id) / "thumb" / f"{Path(a['stored']).stem}.jpg"
+    path = path_within(config.MEDIA_DIR, str(gallery_id), "thumb", f"{Path(a['stored']).stem}.jpg")
     if not path.is_file():
         raise HTTPException(status_code=404)
     return FileResponse(path, media_type="image/jpeg")
@@ -750,7 +752,7 @@ def _bulk_star_tag(request: Request, form, gallery_id: int):
                 )
     if request.headers.get("hx-request") == "true":
         return _bench_fragment(request, gallery_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/move")
@@ -776,7 +778,7 @@ def reorder_asset(request: Request, gallery_id: int, asset_id: int, dir: str = F
                 con.execute("UPDATE assets SET position=? WHERE id=?", (pos, aid))
     if request.headers.get("hx-request") == "true":
         return _bench_fragment(request, gallery_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/cover")
@@ -789,7 +791,7 @@ def set_cover(request: Request, gallery_id: int, asset_id: int):
     db.run("UPDATE galleries SET cover_asset_id=? WHERE id=?", (new, gallery_id))
     if request.headers.get("hx-request") == "true":
         return _tile_fragment(request, gallery_id, asset_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/renditions")
@@ -817,7 +819,7 @@ def build_renditions(request: Request, gallery_id: int, asset_id: int):
     log.info("renditions queued for asset %s (gallery %s)", asset_id, gallery_id)
     if request.headers.get("hx-request") == "true":
         return _tile_fragment(request, gallery_id, asset_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/portfolio")
@@ -828,7 +830,7 @@ def toggle_portfolio(request: Request, gallery_id: int, asset_id: int):
     )
     if request.headers.get("hx-request") == "true":
         return _tile_fragment(request, gallery_id, asset_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/tag")
@@ -841,7 +843,7 @@ def set_portfolio_tag(
     )
     if request.headers.get("hx-request") == "true":
         return _tile_fragment(request, gallery_id, asset_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 def _portal_fav_count(gallery_id: int, client_id: int | None) -> int:
@@ -883,7 +885,7 @@ def delete_gallery(gallery_id: int, force: bool = Form(False)):
     with db.tx() as con:
         con.execute("DELETE FROM galleries WHERE id=?", (gallery_id,))  # FKs cascade the rest
         con.execute("DELETE FROM pin_attempts WHERE gallery_id=?", (gallery_id,))
-    shutil.rmtree(config.MEDIA_DIR / str(gallery_id), ignore_errors=True)
+    shutil.rmtree(path_within(config.MEDIA_DIR, str(gallery_id)), ignore_errors=True)
     for z in config.ZIP_DIR.glob(f"g{gallery_id}-r*.zip"):
         z.unlink(missing_ok=True)
     for z in config.ZIP_DIR.glob(f"g{gallery_id}-v*.zip"):
@@ -899,7 +901,7 @@ def delete_gallery(gallery_id: int, force: bool = Form(False)):
 def delete_asset(request: Request, gallery_id: int, asset_id: int):
     a = db.one("SELECT * FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
     if a:
-        base = config.MEDIA_DIR / str(gallery_id)
+        base = path_within(config.MEDIA_DIR, str(gallery_id))
         stem = a["stored"].rsplit(".", 1)[0]
         for sub in ("original", "web", "thumb", "crops"):
             for f in (base / sub).glob(f"{stem}*"):
@@ -919,7 +921,7 @@ def delete_asset(request: Request, gallery_id: int, asset_id: int):
         return templates.TemplateResponse(
             request, "admin/_gd_delete_frag.html", _counts_context(get_gallery(gallery_id))
         )
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 # ── Review comments (Domain C slice 3) — stills and films alike ──────────────
@@ -956,7 +958,7 @@ def admin_add_comment(
               VALUES (?,?,?,NULL,'admin',?,?)""",
         (asset_id, gallery_id, parent, tc, body),
     )
-    return RedirectResponse(f"/admin/galleries/{gallery_id}#asset-{asset_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}#asset-{asset_id}")
 
 
 @router.post("/comments/{comment_id}/hide")

@@ -331,8 +331,9 @@ SWEPT = (
 )
 
 # The only app-level calls an async handler may make on the loop. save_upload is
-# the streaming read itself — it cannot move, it IS the await.
-LOOP_SAFE_CALLS = frozenset({"common.save_upload"})
+# the streaming read itself — it cannot move, it IS the await. redirect_local
+# only parses a URL and builds a response; it does not touch the database or disk.
+LOOP_SAFE_CALLS = frozenset({"common.save_upload", "redirect_local"})
 
 
 def _route_decorated(node) -> bool:

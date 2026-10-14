@@ -20,6 +20,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, caption_ai, config, db, security
+from ..redirects import redirect_local
 from ..render import templates
 from . import studio
 from .lookups import get_project
@@ -208,7 +209,7 @@ def _update_plan(d: "db.sqlite3.Row", form, plan_id: int):
             "update",
             diff={"total_cents": total, "anchor_day": anchor, "active": active},
         )
-    return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
+    return redirect_local(f"/admin/studio/recurring/{plan_id}")
 
 
 @router.post("/recurring/{plan_id}/deliveries")
@@ -252,7 +253,7 @@ def log_delivery(
         qty,
         period,
     )
-    return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
+    return redirect_local(f"/admin/studio/recurring/{plan_id}")
 
 
 @router.post("/recurring/{plan_id}/deliveries/{delivery_id}/delete")
@@ -271,7 +272,7 @@ def delete_delivery(plan_id: int, delivery_id: int):
                 "delivery_deleted",
                 diff={"delivery_id": delivery_id},
             )
-    return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
+    return redirect_local(f"/admin/studio/recurring/{plan_id}")
 
 
 @router.post("/recurring/{plan_id}/calendar")
@@ -311,7 +312,7 @@ def add_calendar_slot(
         label,
         slot_date,
     )
-    return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
+    return redirect_local(f"/admin/studio/recurring/{plan_id}")
 
 
 @router.post("/recurring/{plan_id}/calendar/{slot_id}/status")
@@ -356,7 +357,7 @@ def set_calendar_status(plan_id: int, slot_id: int, status: str = Form(...)):
     url = f"/admin/studio/recurring/{plan_id}"
     if prefill:
         url += "?" + urlencode(prefill) + "#log-delivery"
-    return RedirectResponse(url, status_code=303)
+    return redirect_local(url)
 
 
 @router.post("/recurring/{plan_id}/calendar/{slot_id}/delete")
@@ -370,7 +371,7 @@ def delete_calendar_slot(plan_id: int, slot_id: int):
             audit.log(
                 con, "recurring_plan", plan_id, "calendar_slot_deleted", diff={"slot_id": slot_id}
             )
-    return RedirectResponse(f"/admin/studio/recurring/{plan_id}", status_code=303)
+    return redirect_local(f"/admin/studio/recurring/{plan_id}")
 
 
 def _caption_slot_id(plan_id: int, raw: str) -> int | None:
@@ -424,7 +425,7 @@ def add_caption(
             diff={"caption_id": cur.lastrowid, "period": period, "label": label},
         )
     log.info("retainer plan %s added caption %s (%s, %s)", plan_id, cur.lastrowid, label, period)
-    return RedirectResponse(f"/admin/studio/recurring/{plan_id}#captions", status_code=303)
+    return redirect_local(f"/admin/studio/recurring/{plan_id}#captions")
 
 
 @router.post("/recurring/{plan_id}/captions/{caption_id}")
@@ -456,7 +457,7 @@ def update_caption(
                 "caption_updated",
                 diff={"caption_id": caption_id, "label": label},
             )
-    return RedirectResponse(f"/admin/studio/recurring/{plan_id}#captions", status_code=303)
+    return redirect_local(f"/admin/studio/recurring/{plan_id}#captions")
 
 
 @router.post("/recurring/{plan_id}/captions/{caption_id}/status")
@@ -500,7 +501,7 @@ def set_caption_status(plan_id: int, caption_id: int, status: str = Form(...)):
         url += "?" + urlencode(prefill) + "#log-delivery"
     else:
         url += "#captions"
-    return RedirectResponse(url, status_code=303)
+    return redirect_local(url)
 
 
 @router.post("/recurring/{plan_id}/captions/{caption_id}/delete")
@@ -514,7 +515,7 @@ def delete_caption(plan_id: int, caption_id: int):
             audit.log(
                 con, "recurring_plan", plan_id, "caption_deleted", diff={"caption_id": caption_id}
             )
-    return RedirectResponse(f"/admin/studio/recurring/{plan_id}#captions", status_code=303)
+    return redirect_local(f"/admin/studio/recurring/{plan_id}#captions")
 
 
 def _is_human_body(cap: "db.sqlite3.Row") -> bool:
@@ -547,7 +548,7 @@ def draft_caption(plan_id: int, caption_id: int, replace: str = Form("")):
     def _back(error: str = "") -> RedirectResponse:
         url = f"/admin/studio/recurring/{plan_id}"
         url += ("?" + urlencode({"caption_error": error}) if error else "") + "#captions"
-        return RedirectResponse(url, status_code=303)
+        return redirect_local(url)
 
     if _is_human_body(cap) and not replace:
         return _back("This caption has your edits — use Replace to overwrite with an AI draft.")

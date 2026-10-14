@@ -11,9 +11,11 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 
 from .. import config, db, security
+from ..redirects import redirect_local
+from ..safe_path import path_within
 from . import common
 from .lookups import get_client
 
@@ -68,13 +70,13 @@ async def upload_brand(client_id: int, files: list[UploadFile]):
         )
     if rejected:
         log.info("client %s brand upload: rejected %s", client_id, rejected)
-    return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+    return redirect_local(f"/admin/studio/clients/{client_id}")
 
 
 @router.get("/clients/{client_id}/brand/{ba_id}")
 def admin_brand_file(client_id: int, ba_id: int):
     b = db.get_or_404("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, client_id))
-    path = config.BRAND_DIR / str(client_id) / b["stored"]
+    path = path_within(config.BRAND_DIR, str(client_id), b["stored"])
     if not path.is_file():
         raise HTTPException(status_code=404)
     return FileResponse(path, filename=b["filename"])
@@ -84,9 +86,9 @@ def admin_brand_file(client_id: int, ba_id: int):
 def delete_brand(client_id: int, ba_id: int):
     b = db.one("SELECT * FROM brand_assets WHERE id=? AND client_id=?", (ba_id, client_id))
     if b:
-        (config.BRAND_DIR / str(client_id) / b["stored"]).unlink(missing_ok=True)
+        path_within(config.BRAND_DIR, str(client_id), b["stored"]).unlink(missing_ok=True)
         db.run("DELETE FROM brand_assets WHERE id=?", (ba_id,))
-    return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+    return redirect_local(f"/admin/studio/clients/{client_id}")
 
 
 # ── Brand kits (Slice 3 — composite overlay) ───────────────────────────────
@@ -132,7 +134,7 @@ async def upload_kit(
             max(0, min(50, margin_pct)),
         ),
     )
-    return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+    return redirect_local(f"/admin/studio/clients/{client_id}")
 
 
 @router.post("/clients/{client_id}/kits/{kit_id}")
@@ -162,13 +164,13 @@ def update_kit(
             kit_id,
         ),
     )
-    return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+    return redirect_local(f"/admin/studio/clients/{client_id}")
 
 
 @router.get("/clients/{client_id}/kits/{kit_id}/logo")
 def admin_kit_logo(client_id: int, kit_id: int):
     k = db.get_or_404("SELECT * FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
-    path = config.BRAND_DIR / str(client_id) / k["stored"]
+    path = path_within(config.BRAND_DIR, str(client_id), k["stored"])
     if not path.is_file():
         raise HTTPException(status_code=404)
     return FileResponse(path)
@@ -178,6 +180,6 @@ def admin_kit_logo(client_id: int, kit_id: int):
 def delete_kit(client_id: int, kit_id: int):
     k = db.one("SELECT * FROM brand_kits WHERE id=? AND client_id=?", (kit_id, client_id))
     if k:
-        (config.BRAND_DIR / str(client_id) / k["stored"]).unlink(missing_ok=True)
+        path_within(config.BRAND_DIR, str(client_id), k["stored"]).unlink(missing_ok=True)
         db.run("DELETE FROM brand_kits WHERE id=?", (kit_id,))
-    return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+    return redirect_local(f"/admin/studio/clients/{client_id}")
