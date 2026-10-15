@@ -9,25 +9,19 @@
   var reduceMotion = window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // --- fixed nav scroll state + scroll progress ---
+  // --- sticky nav state: no scroll listener (D-8) ---
+  // A 1px sentinel sits 24px down the page (base_site.html, .nav-sentinel);
+  // once it leaves the viewport the nav has scrolled and takes its shadow.
+  // IntersectionObserver fires on observe, so the initial state needs no call.
   var nav = document.querySelector("[data-nav]");
-  var progressBar = document.querySelector("[data-progress-bar]");
-  var ticking = false;
-  function onScroll() {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(function () {
-      var y = window.scrollY;
-      if (nav) nav.classList.toggle("scrolled", y > 24);
-      if (progressBar) {
-        var h = document.documentElement.scrollHeight - window.innerHeight;
-        progressBar.style.width = (h > 0 ? (y / h) * 100 : 0) + "%";
-      }
-      ticking = false;
-    });
+  var navSentinel = document.querySelector("[data-nav-sentinel]");
+  if (nav && navSentinel && "IntersectionObserver" in window) {
+    new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        nav.classList.toggle("scrolled", !e.isIntersecting);
+      });
+    }, { threshold: 0 }).observe(navSentinel);
   }
-  window.addEventListener("scroll", onScroll, { passive: true });
-  onScroll();
 
   // Reduced motion: ambient autoplay videos stop too — show the poster and
   // hand playback to the visitor instead of forcing motion on them.
