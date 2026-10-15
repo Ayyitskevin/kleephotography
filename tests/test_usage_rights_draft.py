@@ -110,15 +110,59 @@ def test_a_tier_with_its_entry_removed_renders_none(client, monkeypatch):
     assert by_tier["Tier III"] == [TIER_USAGE["portraits"]["Tier III"]]
 
 
-def test_draft_lines_stay_consistent_with_the_catalog_and_contracts():
-    # Premium tiers already promise a licence in their includes; the line must agree.
-    assert "Commercial usage license" in catalog_group("photography")["tiers"][2]["includes"]
-    assert "commercial usage license" in TIER_USAGE["photography"]["Premium"].lower()
-    assert "Full usage license" in catalog_group("videography")["tiers"][2]["includes"]
-    assert "full usage license" in TIER_USAGE["videography"]["Premium"].lower()
-    for tiers in TIER_USAGE.values():
-        for line in tiers.values():
+# Independent witnesses for what a draft line may not say (review r1, P2-1..P2-5, P3-2/P3-3).
+THIRD_PARTY = re.compile(
+    r"\bmls\b|portal|zillow|realtor|airbnb|vrbo|delivery app|doordash|uber ?eats|grubhub|"
+    r"yelp|linkedin|instagram|facebook|tiktok|google"
+)
+OVERREACH = re.compile(r"no end date|paid ad|campaign|press|speaker|for as long as|personal brand")
+GRANT = re.compile(r"usage licen[cs]e|licensed|commercial use")
+LIVE_OWNERSHIP_ANSWER = (
+    "You get a clear commercial usage license for your marketing and social. "
+    "Licensing terms are spelled out in your gallery and proposal — no surprises."
+)
+
+
+def tier_includes(group_key, tier_name):
+    group = catalog_group(group_key)
+    return next(t["includes"] for t in group["tiers"] if t["name"] == tier_name)
+
+
+def test_draft_lines_say_no_more_than_the_catalog_and_contracts():
+    for group_key, tiers in TIER_USAGE.items():
+        for tier_name, line in tiers.items():
+            low = line.lower()
+            where = (group_key, tier_name, line)
             # Deliverables stay the studio's property: a line licenses use, never ownership.
-            assert not re.search(r"\byou own\b|\bownership\b|copyright", line.lower()), line
-    for line in TIER_USAGE["real_estate"].values():
-        assert "listing" in line.lower()
+            assert not re.search(r"\byou own\b|\bownership\b|copyright", low), where
+            # The default grant is non-sublicensable: no third-party platform is named.
+            assert not THIRD_PARTY.search(low), where
+            # No duration, paid-media, press or brand-tier promise the catalog does not make.
+            assert not OVERREACH.search(low), where
+            assert line.endswith("Terms are in your proposal."), where
+            includes = [item.lower() for item in tier_includes(group_key, tier_name)]
+            if GRANT.search(low):
+                # Only a tier whose includes already name a usage license may name one,
+                # restated as written and with the contract's payment condition.
+                listed = [item for item in includes if "usage license" in item]
+                assert listed, where
+                assert low.startswith(listed[0]), where
+                assert "once paid in full" in low, where
+            if "music license" in low:
+                assert group_key == "videography", where
+
+
+def test_cards_agree_with_the_live_ownership_answer():
+    from app.public.site_catalog import CONTACT_FAQS
+
+    # The live /contact promise is the baseline; this PR must not narrow it.
+    answers = dict(CONTACT_FAQS)
+    assert answers["Who owns the photos?"] == LIVE_OWNERSHIP_ANSWER
+    for group_key, tiers in TIER_USAGE.items():
+        for tier_name, line in tiers.items():
+            low = line.lower()
+            assert "personal and profile use" not in low, (group_key, tier_name)
+            if group_key == "real_estate":
+                assert "marketing this listing" in low, (group_key, tier_name)
+            elif not GRANT.search(low):
+                assert "marketing and social" in low, (group_key, tier_name)

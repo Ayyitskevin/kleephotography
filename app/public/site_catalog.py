@@ -350,38 +350,46 @@ SERVICES = [
 ]
 
 # Usage line per package card (brief R11). DRAFT wording awaiting Kevin's
-# legal review: a line licenses use, it never transfers ownership, and the
-# signed proposal governs. Keyed by SERVICES group key, then tier name — kept
-# out of the tier dicts so price and package edits never touch it. A tier
-# with no entry shows no line (Brand Partner, until its terms are set).
+# legal review. Each line says no more than the tier's own includes and the
+# live /contact answer to "Who owns the photos?" (CONTACT_FAQS): use for the
+# client's marketing and social, terms in the proposal. A line licenses use,
+# never ownership; a line that names a licence also carries the contract's
+# payment condition (subject to final payment). Third-party platforms are not
+# named: the default grant is non-sublicensable. Keyed by SERVICES group key,
+# then tier name, and kept out of the tier dicts. A tier with no entry shows
+# no line (Brand Partner, until its terms are set).
 TIER_USAGE = {
     "real_estate": {
-        "Essentials": "Licensed to market this listing — MLS, portals, social and "
-        "print — for as long as it's listed.",
-        "Signature": "Licensed to market this listing — MLS, portals, social and "
-        "print, reel included — for as long as it's listed.",
-        "Premier": "Licensed to market this listing — MLS, portals, social, print "
-        "and the film — for as long as it's listed.",
+        "Essentials": "For marketing this listing, online and in print. Terms are in "
+        "your proposal.",
+        "Signature": "For marketing this listing, online and in print, reel included. "
+        "Terms are in your proposal.",
+        "Premier": "For marketing this listing, online and in print, film included. "
+        "Terms are in your proposal.",
     },
     "portraits": {
-        "Tier I": "Personal and profile use — LinkedIn, your bio, your own site, prints.",
-        "Tier II": "Personal and profile use — LinkedIn, your bio, your own site, prints.",
-        "Tier III": "Commercial use for your personal brand — your business site, "
-        "marketing, press and speaker kits.",
+        "Tier I": "For your profiles, your site, your marketing and social, and prints. "
+        "Terms are in your proposal.",
+        "Tier II": "For your profiles, your site, your marketing and social, and prints. "
+        "Terms are in your proposal.",
+        "Tier III": "For your profiles, your site, your marketing and social, and prints. "
+        "Terms are in your proposal.",
     },
     "photography": {
-        "Starter": "Commercial use on your own channels — site, menus, social and "
-        "delivery apps, with no end date.",
-        "Standard": "Commercial use on your own channels — site, menus, social, "
-        "delivery apps, email and print, with no end date.",
-        "Premium": "Commercial usage license — your own channels plus paid ads and "
-        "campaigns, with no end date.",
+        "Starter": "For your marketing and social; the crops above are sized for it. "
+        "Terms are in your proposal.",
+        "Standard": "For your marketing and social; the full crop pack is sized for it. "
+        "Terms are in your proposal.",
+        "Premium": "Commercial usage license, as listed above, once paid in full. Terms "
+        "are in your proposal.",
     },
     "videography": {
-        "Starter": "Your own channels — site and organic social, with no end date.",
-        "Standard": "Your own channels — site, organic social and email, with no end date.",
-        "Premium": "Full usage license — your own channels plus paid ads and "
-        "campaigns, with no end date.",
+        "Starter": "For your marketing and social; the audio stays within its music "
+        "license. Terms are in your proposal.",
+        "Standard": "For your marketing and social; the audio stays within its music "
+        "license. Terms are in your proposal.",
+        "Premium": "Full usage license, as listed above, once paid in full; the audio "
+        "stays within its music license. Terms are in your proposal.",
     },
 }
 
