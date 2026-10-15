@@ -738,7 +738,8 @@ SPECIALTY_PAGES = {
                 "inquiry.",
             ),
             "cta": "Ask about a rental shoot",
-            "price": "From $450 per property; 3+ properties at $400 each, one invoice",
+            "price": "From $450 per property (twilight set + 40 images); 3+ properties at "
+            "$400 each, one invoice",
         },
         "contact_service": "Real Estate",
         "book_slug": "re-shoot",

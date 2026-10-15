@@ -96,7 +96,7 @@ def test_catalog_carries_the_approved_real_estate_figures():
     re_page = SPECIALTY_PAGES["re"]
     assert re_page["twilight"]["addon_price"] == "+$150"
     assert re_page["str"]["price"] == (
-        "From $450 per property; 3+ properties at $400 each, one invoice"
+        "From $450 per property (twilight set + 40 images); 3+ properties at $400 each, one invoice"
     )
     # "From $450" is Signature's published price (the approved Signature scope).
     signature = next(t for t in catalog_group("real_estate")["tiers"] if t["name"] == "Signature")

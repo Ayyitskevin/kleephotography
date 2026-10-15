@@ -511,11 +511,17 @@ def test_real_estate_rental_copy_binds_no_tier_or_deliverable(client, theme):
     group = catalog_group("real_estate")
     for tier in group["tiers"]:
         assert tier["name"].lower() not in text
-    # no tier deliverable is presented as part of the rental set
+    # Ruling 1 (line 8) adopted exactly two deliverables with the rental price:
+    # a twilight set and 40 images. They appear once, together, and nowhere else.
+    adopted = "twilight set + 40 images"
+    assert text.count(adopted) == 1
+    rest = text.replace(adopted, "")
     for word in ("reel", "film", "walkthrough", "twilight", "mls", "images"):
-        assert word not in text
+        assert word not in rest
     for line in (inc for t in group["tiers"] for inc in t["includes"]):
         assert line.lower() not in text
+    cta = [a for a in rental.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
+    assert len(cta) == 1 and "tier=" not in cta[0].attrs["href"]
 
 
 def test_real_estate_twilight_and_rental_sections_sit_before_the_proof_band(client, theme):
