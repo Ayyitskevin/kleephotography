@@ -649,7 +649,7 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .req { color: var(--sr-warn); }
 /* stack forms (contact / booking / public forms) */
 .sr .stack-form label { color: var(--sr-ink-soft); }
-.sr .stack-form input, .sr .stack-form select, .sr .stack-form textarea { font-size: var(--sr-t-base); }
+.site-body.sr .stack-form input, .site-body.sr .stack-form select, .site-body.sr .stack-form textarea { font-size: var(--sr-t-base); }
 .sr .stack-form button[type="submit"], .sr button[type="submit"] {
   background: var(--sr-stock); color: var(--sr-house); border: 0; border-radius: 0;
   font: 700 12px/1 var(--sr-sans); letter-spacing: 0.1em; text-transform: uppercase;

@@ -39,8 +39,10 @@ def font_sizes_px(body: str):
     """Every px font size a rule declares (font-size and the font shorthand)."""
     for m in re.finditer(r"(?<![-\w])font-size\s*:\s*(\d+(?:\.\d+)?)px", body):
         yield float(m.group(1))
-    for m in re.finditer(r"(?<![-\w])font\s*:\s*[^;}]*?\s(\d+(?:\.\d+)?)px(?=\s*/)", body):
-        yield float(m.group(1))
+    # any px inside a font shorthand, with or without a line-height (r1, review P3-1 / mutant B3)
+    for m in re.finditer(r"(?<![-\w])font\s*:\s*([^;}]*)", body):
+        for px in re.finditer(r"(?<![\w.])(\d+(?:\.\d+)?)px", m.group(1)):
+            yield float(px.group(1))
     for m in re.finditer(r"(?<![-\w])font-size\s*:\s*(\d*\.?\d+)(?:rem|em)", body):
         yield float(m.group(1)) * 16
 
@@ -273,5 +275,6 @@ def test_the_form_field_size_is_scoped_to_the_marketing_shell():
             if not ({"font", "font-size"} & set(decl_values(r.body))):
                 continue
             for part in lib.split_commas(r.prelude):
-                if "stack-form" in part:
+                # the field selectors only: the submit-button rule predates W2A and is out of P2-1's scope
+                if re.search(r"\.stack-form\s+(?:input|select|textarea)\b", part):
                     assert part.split()[0].startswith(".site-body"), (name, r.line, part)
