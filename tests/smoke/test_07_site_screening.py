@@ -459,6 +459,82 @@ def test_aerial_pass_booking_addon(monkeypatch, admin):
         db.run("DELETE FROM event_types WHERE id=?", (eid,))
 
 
+def test_booking_details_form_asks_the_property_address_first(admin):
+    """R21: on real-estate booking types the property address is the first field of
+    the details form, ahead of the generic name/email fields. Other types keep
+    name first. The submitted order still books and stores the address."""
+    import datetime as dt
+
+    from app import scheduling as S
+
+    def make(slug):
+        eid = db.run(
+            """INSERT INTO event_types
+            (slug, name, duration_min, min_notice_hours, booking_window_days,
+             max_per_day, creates_notion_session, location, active)
+            VALUES (?,?,?,?,?,?,?,?,1)""",
+            (slug, slug, 60, 1, 60, 0, 1, "On-site"),
+        )
+        for wd in range(5):
+            db.run(
+                "INSERT INTO availability_rules (event_type_id, weekday, start_min, "
+                "end_min) VALUES (?,?,?,?)",
+                (eid, wd, 540, 1020),
+            )
+        return eid
+
+    def field_order(slug, day, start):
+        with TestClient(app) as pub:
+            page = pub.get(
+                f"/book/{slug}?year={day.year}&month={day.month}"
+                f"&day={day.isoformat()}&start={start}&tz=America/New_York"
+            ).text
+        form = page.split('class="stack-form book-confirm"')[1].split("</form>")[0]
+        return [
+            n
+            for t, n in re.findall(r'<(input|textarea|select)[^>]*\bname="([^"]+)"', form)
+            if n not in {"start", "tz", "website"}
+        ]
+
+    ids = [make("re-addr-test"), make("pl-addr-test")]
+    try:
+        et = S.event_by_slug("re-addr-test")
+        day = dt.date.today() + dt.timedelta(days=3)
+        while day.weekday() >= 5:
+            day += dt.timedelta(days=1)
+        slots = S.slots_for_day(et, day)
+        assert slots
+        start = slots[0]["utc"]
+        re_order = field_order("re-addr-test", day, start)
+        assert re_order[0] == "venue_address", re_order
+        assert re_order.index("venue_address") < re_order.index("name")
+        assert re_order.count("venue_address") == 1
+        pl_slots = S.slots_for_day(S.event_by_slug("pl-addr-test"), day)
+        pl_order = field_order("pl-addr-test", day, pl_slots[0]["utc"])
+        assert pl_order[0] == "name", pl_order
+
+        with TestClient(app) as pub:
+            r = pub.post(
+                "/book/re-addr-test",
+                data={
+                    "name": "Agent Ada",
+                    "email": "ada+addr@brokerage.com",
+                    "start": start,
+                    "tz": "America/New_York",
+                    "venue_address": "12 Example Lane, Asheville",
+                },
+                follow_redirects=False,
+            )
+            assert r.status_code == 303, r.text
+        booking = db.one("SELECT * FROM bookings ORDER BY id DESC LIMIT 1")
+        assert booking["venue_address"] == "12 Example Lane, Asheville"
+    finally:
+        for eid in ids:
+            db.run("DELETE FROM bookings WHERE event_type_id=?", (eid,))
+            db.run("DELETE FROM availability_rules WHERE event_type_id=?", (eid,))
+            db.run("DELETE FROM event_types WHERE id=?", (eid,))
+
+
 def test_screening_room_behavior_hooks(admin, monkeypatch):
     """The Screening Room behaviors ship as delegated, CSP-safe hooks: chapter
     seeking + bench culling live in behaviors.js (no inline handlers), the
