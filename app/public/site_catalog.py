@@ -166,6 +166,7 @@ SERVICES = [
                 "price_cents": 35000,
                 "includes": [
                     "~1 hour session, one look",
+                    "Up to 2 people",
                     "10 edited portraits",
                     "Studio or on-location",
                     "Private gallery delivery",
@@ -178,6 +179,7 @@ SERVICES = [
                 "price_cents": 60000,
                 "includes": [
                     "~2 hour session, two looks",
+                    "Up to 5 people",
                     "25 edited portraits",
                     "Wardrobe + location guidance",
                     "Private gallery delivery",
@@ -190,25 +192,28 @@ SERVICES = [
                 "price_cents": 85000,
                 "includes": [
                     "~3 hour session, multiple looks",
+                    "Up to 8 people",
                     "40 edited portraits",
                     "On-location options",
                     "Rush turnaround available",
                 ],
             },
         ],
-        # Team and family offers. Price-gated: a line renders on the spoke only
-        # once its display_price is set from Kevin's price sheet, and with none
-        # set nothing renders at all — no placeholder figure, ever. Kept out of
-        # `tiers` on purpose: /services, its Offer JSON-LD, the rate cells and
-        # the proposal presets read tiers only.
-        "lines_title": "Teams & families",
+        # Team offers, priced from the approved price sheet (ruling 1,
+        # 2026-10-15). Price-gated: a line renders (spoke, /services and its
+        # Offer JSON-LD) only while its display_price is set — no placeholder
+        # figure, ever. Kept out of `tiers` on purpose: the rate cells and the
+        # proposal presets read tiers only. `minimum` marks a floor price.
+        "lines_title": "Teams",
         "lines": [
             {
                 "name": "Team headshots",
                 "subtitle": "Per person",
-                "display_price": None,
+                "display_price": "$125",
                 "price_unit": "/person",
+                "price_cents": 12500,
                 "includes": [
+                    "One look, ~15-minute slot, 2 retouched finals",
                     "In the studio or at your office",
                     "Matched lighting and framing across the team",
                     "New hires book later and match the set",
@@ -217,10 +222,11 @@ SERVICES = [
             },
             {
                 "name": "Small-team pack",
-                "subtitle": "One booking for the group",
-                "display_price": None,
+                "subtitle": "Five people, one booking",
+                "display_price": "$550",
+                "price_cents": 55000,
                 "includes": [
-                    "The whole group in one visit",
+                    "Five people in one visit",
                     "Matched lighting and framing",
                     "New hires book later and match the set",
                     "Private gallery delivery",
@@ -229,22 +235,15 @@ SERVICES = [
             {
                 "name": "On-site team day",
                 "subtitle": "The studio comes to you",
-                "display_price": None,
+                "display_price": "$750",
+                "price_unit": " minimum",
+                "price_cents": 75000,
+                "minimum": True,
                 "includes": [
                     "Lighting set up at your office",
                     "People step in on their own schedule",
                     "New hires book later and match the set",
                     "Private gallery delivery",
-                ],
-            },
-            {
-                "name": "Family session",
-                "subtitle": "Families & couples",
-                "display_price": None,
-                "includes": [
-                    "Everyone in one directed session",
-                    "Studio or on-location",
-                    "Private gallery to share and print",
                 ],
             },
         ],
