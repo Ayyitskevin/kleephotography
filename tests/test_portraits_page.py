@@ -6,6 +6,8 @@ names, the Portraits scope placeholder). Where a test pins a template-to-catalog
 binding (the process strip, a priced line's includes) it says so.
 """
 
+import json
+import re
 import socket
 from urllib.parse import urlsplit
 
@@ -83,3 +85,22 @@ def test_portraits_render_the_session_in_three_steps_after_the_frames(client):
     assert frames_or_empty, "the frames block (or its empty state) must render"
     rates = main.one("section", id="rates")
     assert position[id(frames_or_empty[-1])] < position[id(strip)] < position[id(rates)]
+
+
+def test_portraits_faq_answers_practical_prep(client):
+    page = rendered(client, "/portraits")
+    faq = page.one("section", **{"aria-label": "Frequently asked questions"})
+    summaries = [summary.text() for summary in faq.find("summary")]
+    for question in PREP_QUESTIONS:
+        assert question in summaries
+    structured = [
+        json.loads("".join(c for c in script.children if isinstance(c, str)))
+        for script in page.find("script", type="application/ld+json")
+    ]
+    faq_pages = [d for d in structured if d.get("@type") == "FAQPage"]
+    assert len(faq_pages) == 1
+    answers = {e["name"]: e["acceptedAnswer"]["text"] for e in faq_pages[0]["mainEntity"]}
+    for question in PREP_QUESTIONS:
+        assert answers[question]
+        # Usage/ownership answers belong to the legal-gated usage-rights change.
+        assert not re.search(r"licen|rights|copyright|own the", answers[question].lower())

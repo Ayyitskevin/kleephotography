@@ -703,6 +703,34 @@ SPECIALTY_PAGES = {
                 "matched lighting and framing, so the site looks unified even "
                 "as new people join.",
             ),
+            (
+                "I wear glasses — will they catch the light?",
+                "Wear them if you wear them every day; they're part of how "
+                "people know you. I set the lights and the angle of your frames "
+                "so the lenses stay clear. If you own a pair with an "
+                "anti-reflective coating, bring that one too.",
+            ),
+            (
+                "Can I bring a second look?",
+                "Yes. Tier II and Tier III are built for more than one look. On "
+                "Tier I, bring a backup anyway — we'll choose the stronger one "
+                "before we start.",
+            ),
+            (
+                "Should I get hair and makeup done?",
+                "It's optional. Come the way you'd want to be seen on a good "
+                "day — hair as you usually wear it, makeup if it's part of your "
+                "routine, and no new haircut or skincare experiment that week. "
+                "If you'd like a professional artist there, tell me when we plan "
+                "and I'll set the timing around them.",
+            ),
+            (
+                "How should I arrive?",
+                "A few minutes early, with outfits on hangers rather than folded "
+                "in a bag. For the hour before, skip anything that leaves a mark "
+                "— tight collars, watch straps — and give yourself a minute to "
+                "settle in; we start easy.",
+            ),
         ],
         "contact_service": "Portraits",
         "book_slug": "pl-session",
