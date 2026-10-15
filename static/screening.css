@@ -569,6 +569,7 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .svc-price .per { font-size: 12px; color: var(--sr-ink-faint); }
 .sr .svc-tier ul li { color: var(--sr-ink-mute); }
 .sr .svc-tier ul li::marker { color: var(--sr-stock); }
+.sr .svc-tier .svc-usage { margin: 0; font-size: 12px; line-height: 1.5; color: var(--sr-ink-faint); }
 .sr .svc-cta, .sr .svc-tier-mid .svc-cta { display: inline-flex; align-items: center;
   justify-content: center; gap: 8px; background: none; border: 1px solid
   color-mix(in srgb, var(--sr-amber) 45%, transparent); border-radius: 0;
