@@ -190,7 +190,7 @@
   <div class="sr-kickrow">
     <p class="sr-mono">{{ page.twilight.kicker }}</p>
   </div>
-  <h2 class="sr-title">{{ page.twilight.heading }}</h2>
+  <h2 class="sr-h2">{{ page.twilight.heading }}</h2>
   <p class="sr-lede">{{ page.twilight.body }}</p>
   <div class="sr-3up">
     {% for kick, body in page.twilight.points %}
@@ -211,7 +211,7 @@
   <div class="sr-kickrow">
     <p class="sr-mono">{{ page.str.kicker }}</p>
   </div>
-  <h2 class="sr-title">{{ page.str.heading }}</h2>
+  <h2 class="sr-h2">{{ page.str.heading }}</h2>
   <p class="sr-lede">{{ page.str.body }}</p>
   <div class="sr-3up">
     {% for kick, body in page.str.points %}
@@ -436,7 +436,7 @@
 {% if page.brand_lane %}
 <section class="sr-wrap sr-section sp-brandlane" aria-labelledby="brandlane-heading">
   <p class="sr-mono">{{ page.brand_lane.kicker }}</p>
-  <h2 id="brandlane-heading" class="sr-title">{{ page.brand_lane.heading }}</h2>
+  <h2 id="brandlane-heading" class="sr-h2">{{ page.brand_lane.heading }}</h2>
   <p class="sr-lede">{{ page.brand_lane.intro }}</p>
   <div class="sr-3up">
     {% for kick, body in page.brand_lane["items"] %}
@@ -507,7 +507,7 @@
 {# ═══ SHARED: CLOSING CTA ════════════════════════════════════════════════════ #}
 <section class="sr-wrap sr-section" aria-label="Book">
   <div class="sr-pagehead sr-pagehead--edgeless sr-cta-final">
-    <h2 class="sr-title">{{ page.cta_h1 }} <span class="sr-em">{{ page.cta_h2 }}</span></h2>
+    <h2 class="sr-h2">{{ page.cta_h1 }} <span class="sr-em">{{ page.cta_h2 }}</span></h2>
     {% if open_days %}
     <p class="sr-mono sr-availstrip">Next openings:
       {% for d in open_days %}<a href="{{ d.url }}">{{ d.label }}</a>{% if not loop.last %} <span aria-hidden="true">&middot;</span> {% endif %}{% endfor %}
