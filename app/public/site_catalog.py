@@ -349,6 +349,42 @@ SERVICES = [
     },
 ]
 
+# Usage line per package card (brief R11). DRAFT wording awaiting Kevin's
+# legal review: a line licenses use, it never transfers ownership, and the
+# signed proposal governs. Keyed by SERVICES group key, then tier name — kept
+# out of the tier dicts so price and package edits never touch it. A tier
+# with no entry shows no line (Brand Partner, until its terms are set).
+TIER_USAGE = {
+    "real_estate": {
+        "Essentials": "Licensed to market this listing — MLS, portals, social and "
+        "print — for as long as it's listed.",
+        "Signature": "Licensed to market this listing — MLS, portals, social and "
+        "print, reel included — for as long as it's listed.",
+        "Premier": "Licensed to market this listing — MLS, portals, social, print "
+        "and the film — for as long as it's listed.",
+    },
+    "portraits": {
+        "Tier I": "Personal and profile use — LinkedIn, your bio, your own site, prints.",
+        "Tier II": "Personal and profile use — LinkedIn, your bio, your own site, prints.",
+        "Tier III": "Commercial use for your personal brand — your business site, "
+        "marketing, press and speaker kits.",
+    },
+    "photography": {
+        "Starter": "Commercial use on your own channels — site, menus, social and "
+        "delivery apps, with no end date.",
+        "Standard": "Commercial use on your own channels — site, menus, social, "
+        "delivery apps, email and print, with no end date.",
+        "Premium": "Commercial usage license — your own channels plus paid ads and "
+        "campaigns, with no end date.",
+    },
+    "videography": {
+        "Starter": "Your own channels — site and organic social, with no end date.",
+        "Standard": "Your own channels — site, organic social and email, with no end date.",
+        "Premium": "Full usage license — your own channels plus paid ads and "
+        "campaigns, with no end date.",
+    },
+}
+
 # Project-type options on /contact — single source for labels, progressive-
 # disclosure scope copy, and specialty deep links. Values match SERVICES
 # contact_service strings so spokes, pricing board, and the inquiry form stay
