@@ -11,6 +11,22 @@
         <h2 id="packages-{{ s.key }}-heading">{{ s.title }}</h2>
         <span class="svc-tag">{{ 'Monthly retainer' if s.monthly else 'Per project' }}</span>
       </div>
+      {% if sp_key == 'fb' and s.key == 'photography' %}
+      <aside class="sp-included" aria-label="What's included and what's quoted separately">
+        <div>
+          <p class="sr-mono">Included, from {{ s.tiers[0].name }} up</p>
+          <ul>
+            {% for line in s.tiers[0].includes %}<li>{{ line }}</li>{% endfor %}
+          </ul>
+        </div>
+        <div>
+          <p class="sr-mono">Quoted separately</p>
+          <ul>
+            {% for line in page.quoted_separately %}<li>{{ line }}</li>{% endfor %}
+          </ul>
+        </div>
+      </aside>
+      {% endif %}
       <div class="svc-tier-grid">
         {% for t in s.tiers %}
         {% set inquiry_tier = s.title ~ ' — ' ~ t.name if sp_key == 'fb' else t.name %}

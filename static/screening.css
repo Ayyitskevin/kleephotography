@@ -585,6 +585,14 @@ html.nav-menu-enhanced .sr .nav-mobile {
 }
 .sr .sp-packages .svc-tier { min-width: 0; transition: none; }
 .sr .sp-packages .svc-tier:hover { transform: none; }
+/* F&B: included / quoted-separately strip and the drinks-and-food-brand lane. */
+.sr .sp-packages .sp-included { display: grid; gap: 18px 36px; margin: 0 0 18px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  padding: 16px 20px; border: 1px solid var(--sr-line); }
+.sr .sp-packages .sp-included p { margin: 0 0 8px; }
+.sr .sp-packages .sp-included ul { margin: 0; padding-left: 18px; font-size: 12.5px;
+  line-height: 1.68; color: var(--sr-ink-mute); }
+.sr .sp-brandlane .sr-3up { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
 
 /* press list */
 .sr .press-list { border-top: 1px solid var(--sr-line); }

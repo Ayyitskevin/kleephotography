@@ -833,7 +833,59 @@ SPECIALTY_PAGES = {
                 "feed, plus brand films for launches. Photo and motion in the "
                 "same visit is the most efficient way to buy either.",
             ),
+            (
+                "Can you shoot for our delivery app listings?",
+                "Yes — it's a common reason to shoot a menu. "
+                "I plan those dishes into the shot list and cut them to the "
+                "sizes your delivery app listings ask for, alongside the menu "
+                "and social crops, so nothing gets re-cropped later.",
+            ),
+            (
+                "Can the photos be used for social and paid ads?",
+                "Every shoot comes with social crops in 1:1, 4:5, and 9:16. "
+                "If the images will run as paid ads, say so when you ask for a "
+                "quote — the quote form has a usage field for exactly that — "
+                "and what your shoot covers goes in your proposal.",
+            ),
+            (
+                "When does a dish need a food stylist?",
+                "Most dishes don't — I work with your kitchen on how each "
+                "plate is built for camera. A dish that has to hold for an "
+                "hour under lights, like a stacked build, melting cheese, or "
+                "foam, is worth a stylist. I'll flag it when we go through "
+                "the menu, and the cost goes into your quote.",
+            ),
         ],
+        "quoted_separately": [
+            "Elaborate set styling — a hired stylist, folded into your quote",
+        ],
+        "brand_lane": {
+            "kicker": "For drinks & food brands",
+            "heading": "Making a product, not just a menu?",
+            "intro": "Cans, bottles, jars, and packaging — shot here in Western "
+            "North Carolina, on site or in the studio, with the files your "
+            "site, listings, and feed need.",
+            "items": [
+                (
+                    "Cans & bottles",
+                    "Hero shots and pours, lit to read clean on a shelf page or a listing.",
+                ),
+                (
+                    "Packaging & e-commerce",
+                    "Consistent product frames for your site and marketplace listings.",
+                ),
+                (
+                    "Social, same visit",
+                    "Vertical reels and 1:1, 4:5, 9:16 crops from the same setup.",
+                ),
+                (
+                    "A steady feed",
+                    "New flavors and seasonal drops are easier on a monthly "
+                    "rhythm — Brand Partner keeps the calendar.",
+                ),
+            ],
+            "cta": "See the monthly Brand Partner plans",
+        },
         "contact_service": "Food & Beverage",
         "book_slug": "fb-shoot",
         "empty_head": "New food & beverage work is being curated for the site.",
@@ -844,6 +896,7 @@ SPECIALTY_PAGES = {
         # grid, the process told as courses.
         "sr": {
             "cta": "Book a shoot",
+            "quote_ask": "For a quote, tell me how many dishes, your date, and where.",
             "presents": "Kevin Lee presents — Food & Beverage",
             "h2a": "Your menu,",
             "h2b": "selling itself.",
