@@ -190,9 +190,14 @@
   </div>
   <h2 class="sr-title">{{ page.twilight.heading }}</h2>
   <p class="sr-lede">{{ page.twilight.body }}</p>
-  <ul class="sr-aerialpass-checks">
-    {% for line in page.twilight.points %}<li>{{ line }}</li>{% endfor %}
-  </ul>
+  <div class="sr-3up">
+    {% for kick, body in page.twilight.points %}
+    <div>
+      <p class="sr-3up-kick">{{ kick }}</p>
+      <p>{{ body }}</p>
+    </div>
+    {% endfor %}
+  </div>
   {% if page.twilight.addon_price %}
   <p class="sr-mono">Twilight set on its own &middot; {{ page.twilight.addon_price }}</p>
   {% endif %}
@@ -218,7 +223,7 @@
   <p class="sr-mono">Rental set &middot; {{ page.str.price }}</p>
   {% endif %}
   <p class="sr-kickrow sr-kickrow--mt12">
-    <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}&amp;tier=Signature">{{ page.str.cta }} &rarr;</a>
+    <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">{{ page.str.cta }} &rarr;</a>
   </p>
 </section>
 

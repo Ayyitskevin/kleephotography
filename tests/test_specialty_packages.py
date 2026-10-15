@@ -477,7 +477,30 @@ def test_real_estate_twilight_and_str_sections_render_without_prices(client, the
     assert any(a.attrs.get("href") == "#short-term-rentals" for a in twilight.find("a"))
     cta = [a for a in rental.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
     assert len(cta) == 1
-    assert parse_qs(urlsplit(cta[0].attrs["href"]).query)["service"] == ["Real Estate"]
+    # generic quote only: no tier is pre-selected (the rental package/price is Kevin's call)
+    assert parse_qs(urlsplit(cta[0].attrs["href"]).query) == {"service": ["Real Estate"]}
+
+
+def test_real_estate_rental_copy_binds_no_tier_or_deliverable(client, theme):
+    _, rental, _ = _re_sections(client)
+    text = rental.text().lower()
+    group = catalog_group("real_estate")
+    for tier in group["tiers"]:
+        assert tier["name"].lower() not in text
+    # no tier deliverable is presented as part of the rental set
+    for word in ("reel", "film", "walkthrough", "twilight", "mls", "images"):
+        assert word not in text
+    for line in (inc for t in group["tiers"] for inc in t["includes"]):
+        assert line.lower() not in text
+
+
+def test_real_estate_twilight_and_rental_sections_sit_before_the_proof_band(client, theme):
+    markup = client.get("/real-estate").text
+    work = max(markup.find('id="work"'), markup.find("empty-state"))
+    twilight = markup.index('id="twilight"')
+    rental = markup.index('id="short-term-rentals"')
+    proof = markup.index("Turnaround", rental)
+    assert 0 < work < twilight < rental < proof
 
 
 def test_real_estate_price_lines_appear_only_once_priced(client, theme, monkeypatch):

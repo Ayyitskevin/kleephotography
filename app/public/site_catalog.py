@@ -692,9 +692,18 @@ SPECIALTY_PAGES = {
             "house photographed on site as the light drops, windows glowing, "
             "so the listing's lead image works after the sun is gone.",
             "points": [
-                "Shot at the property, in the dusk window, not added afterwards",
-                "Picked for the exterior that earns it: the front, the porch, the pool",
-                "Tell me the go-live date and I will work the evening around it",
+                (
+                    "Shot on site",
+                    "At the property, in the dusk window, not added afterwards.",
+                ),
+                (
+                    "Chosen frames",
+                    "Picked for the exterior that earns it: the front, the porch, the pool.",
+                ),
+                (
+                    "Your date",
+                    "Tell me the go-live date and I will work the evening around it.",
+                ),
             ],
             "addon_price": None,
         },
@@ -709,18 +718,18 @@ SPECIALTY_PAGES = {
                 (
                     "Guest-first order",
                     "Exterior and entry, living and kitchen, each bedroom and "
-                    "bath, then the outdoor space and what is nearby worth "
-                    "showing.",
+                    "bath, then the outdoor space.",
                 ),
                 (
-                    "Evening included where it fits",
-                    "The Signature set adds a twilight exterior, which suits a "
-                    "porch, a hot tub, or a fire pit lit up.",
+                    "Evening, if it suits",
+                    "A porch, a hot tub, or a fire pit can look best lit up at "
+                    "dusk. Say so and we will plan for it.",
                 ),
                 (
-                    "Motion for the listing",
-                    "A short vertical walkthrough reel cut from the same visit "
-                    "for the platforms and social.",
+                    "Scoped to the property",
+                    "Rentals vary, so use the scope field on the inquiry to tell "
+                    "me the rooms, the outdoor space, and where it is listed, and "
+                    "I will quote the right fit.",
                 ),
             ],
             "cta": "Ask about a rental shoot",
