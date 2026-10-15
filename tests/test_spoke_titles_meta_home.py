@@ -17,6 +17,7 @@ from app.main import app
 from app.public import site_catalog
 
 CITY = "Asheville"
+HOME_LINE = "Photography & film for real estate, portraits, and food & beverage — Asheville & Western North Carolina."
 # The catalog groups each spoke's package comparison shows (site.py _specialty_package_groups).
 SPOKE_GROUPS = {
     "re": ("real_estate",),
@@ -78,3 +79,13 @@ def test_spoke_rendered_meta_carries_the_catalog_price_floor(client, key):
     r = client.get(f"/{slug}")
     assert r.status_code == 200
     assert f"From {_floor_text(key)}." in _rendered_meta(r.text)
+
+
+@pytest.mark.integration
+def test_home_keeps_the_brand_h1_and_says_what_and_where_under_it(client):
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "<h1>The space. The face.<br>The plate.</h1>" in r.text
+    text = html.unescape(r.text)
+    assert HOME_LINE in text
+    assert text.index(HOME_LINE) > text.index("The plate.")
