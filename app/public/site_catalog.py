@@ -196,6 +196,58 @@ SERVICES = [
                 ],
             },
         ],
+        # Team and family offers. Price-gated: a line renders on the spoke only
+        # once its display_price is set from Kevin's price sheet, and with none
+        # set nothing renders at all — no placeholder figure, ever. Kept out of
+        # `tiers` on purpose: /services, its Offer JSON-LD, the rate cells and
+        # the proposal presets read tiers only.
+        "lines_title": "Teams & families",
+        "lines": [
+            {
+                "name": "Team headshots",
+                "subtitle": "Per person",
+                "display_price": None,
+                "price_unit": "/person",
+                "includes": [
+                    "In the studio or at your office",
+                    "Matched lighting and framing across the team",
+                    "New hires book later and match the set",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "Small-team pack",
+                "subtitle": "One booking for the group",
+                "display_price": None,
+                "includes": [
+                    "The whole group in one visit",
+                    "Matched lighting and framing",
+                    "New hires book later and match the set",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "On-site team day",
+                "subtitle": "The studio comes to you",
+                "display_price": None,
+                "includes": [
+                    "Lighting set up at your office",
+                    "People step in on their own schedule",
+                    "New hires book later and match the set",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "Family session",
+                "subtitle": "Families & couples",
+                "display_price": None,
+                "includes": [
+                    "Everyone in one directed session",
+                    "Studio or on-location",
+                    "Private gallery to share and print",
+                ],
+            },
+        ],
     },
     {
         "key": "photography",
@@ -705,6 +757,34 @@ SPECIALTY_PAGES = {
                 "matched lighting and framing, so the site looks unified even "
                 "as new people join.",
             ),
+            (
+                "I wear glasses — will they catch the light?",
+                "Wear them if you wear them every day; they're part of how "
+                "people know you. I set the lights and the angle of your frames "
+                "so the lenses stay clear. If you own a pair with an "
+                "anti-reflective coating, bring that one too.",
+            ),
+            (
+                "Can I bring a second look?",
+                "Yes. Tier II and Tier III are built for more than one look. On "
+                "Tier I, bring a backup anyway — we'll choose the stronger one "
+                "before we start.",
+            ),
+            (
+                "Should I get hair and makeup done?",
+                "It's optional. Come the way you'd want to be seen on a good "
+                "day — hair as you usually wear it, makeup if it's part of your "
+                "routine, and no new haircut or skincare experiment that week. "
+                "If you'd like a professional artist there, tell me when we plan "
+                "and I'll set the timing around them.",
+            ),
+            (
+                "How should I arrive?",
+                "A few minutes early, with outfits on hangers rather than folded "
+                "in a bag. For the hour before, skip anything that leaves a mark "
+                "— tight collars, watch straps — and give yourself a minute to "
+                "settle in; we start easy.",
+            ),
         ],
         "contact_service": "Portraits",
         "book_slug": "pl-session",
@@ -717,6 +797,11 @@ SPECIALTY_PAGES = {
         # front, the nerves named and answered in the client's own words.
         "sr": {
             "cta": "Book a session",
+            # Second door for teams: the existing ?service=&tier= contact
+            # prefill, so the inquiry arrives naming the team line it is about.
+            # team_tier must stay a SERVICES "portraits" line name.
+            "team_cta": "Plan a team day",
+            "team_tier": "Team headshots",
             "beat": "directed, never posed — you'll always know what to do with your hands",
             "body": "Headshots, personal branding, families, and the moments "
             "in between. Every frame is coached — where to look, when to "

@@ -196,7 +196,7 @@
       <p class="sr-lede">{{ page.sr.body }}</p>
       <div class="sr-herosplit-actions">
         <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
-        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}&amp;tier={{ page.sr.team_tier|urlencode }}">{{ page.sr.team_cta }} &rarr;</a>
       </div>
       <div class="sr-stats">
         {% for n, label in page.sr.stats %}
@@ -269,11 +269,23 @@
     <p class="muted">{{ page.empty_body }}</p>
     <div class="empty-state-actions">
       <a class="sr-btn btn-pill" href="{{ book_url }}">{{ page.sr.cta }} <span>&rarr;</span></a>
-      <a class="sr-btn btn-ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+      <a class="sr-btn btn-ghost" href="/contact?service={{ page.contact_service|urlencode }}&amp;tier={{ page.sr.team_tier|urlencode }}">{{ page.sr.team_cta }} <span>&rarr;</span></a>
     </div>
   </div>
 </section>
 {% endif %}
+
+{# ═══ THE SESSION, IN THREE STEPS ════════════════════════════════════════════ #}
+<section class="sr-wrap sr-section" aria-label="How a session runs">
+  <div class="sr-3up">
+    {% for kick, body in page.process %}
+    <div>
+      <p class="sr-3up-kick">{{ kick }}</p>
+      <p>{{ body }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
 
 {% else %}
 {# ═══ 3c · THE PLATE — full-bleed opening title card ═════════════════════════ #}
@@ -431,7 +443,11 @@
     {% endif %}
     <div class="sr-titlecard-actions">
       <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
+      {% if sp_key == "pl" %}
+      <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}&amp;tier={{ page.sr.team_tier|urlencode }}">{{ page.sr.team_cta }} &rarr;</a>
+      {% else %}
       <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+      {% endif %}
     </div>
   </div>
 </section>
