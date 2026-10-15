@@ -269,6 +269,18 @@
 </section>
 {% endif %}
 
+{# ═══ THE SESSION, IN THREE STEPS ════════════════════════════════════════════ #}
+<section class="sr-wrap sr-section" aria-label="How a session runs">
+  <div class="sr-3up">
+    {% for kick, body in page.process %}
+    <div>
+      <p class="sr-3up-kick">{{ kick }}</p>
+      <p>{{ body }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
 {% else %}
 {# ═══ 3c · THE PLATE — full-bleed opening title card ═════════════════════════ #}
 <section aria-label="Food &amp; beverage">
