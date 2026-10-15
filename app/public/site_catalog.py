@@ -196,6 +196,58 @@ SERVICES = [
                 ],
             },
         ],
+        # Team and family offers. Price-gated: a line renders on the spoke only
+        # once its display_price is set from Kevin's price sheet, and with none
+        # set nothing renders at all — no placeholder figure, ever. Kept out of
+        # `tiers` on purpose: /services, its Offer JSON-LD, the rate cells and
+        # the proposal presets read tiers only.
+        "lines_title": "Teams & families",
+        "lines": [
+            {
+                "name": "Team headshots",
+                "subtitle": "Per person",
+                "display_price": None,
+                "price_unit": "/person",
+                "includes": [
+                    "In the studio or at your office",
+                    "Matched lighting and framing across the team",
+                    "New hires book later and match the set",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "Small-team pack",
+                "subtitle": "One booking for the group",
+                "display_price": None,
+                "includes": [
+                    "The whole group in one visit",
+                    "Matched lighting and framing",
+                    "New hires book later and match the set",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "On-site team day",
+                "subtitle": "The studio comes to you",
+                "display_price": None,
+                "includes": [
+                    "Lighting set up at your office",
+                    "People step in on their own schedule",
+                    "New hires book later and match the set",
+                    "Private gallery delivery",
+                ],
+            },
+            {
+                "name": "Family session",
+                "subtitle": "Families & couples",
+                "display_price": None,
+                "includes": [
+                    "Everyone in one directed session",
+                    "Studio or on-location",
+                    "Private gallery to share and print",
+                ],
+            },
+        ],
     },
     {
         "key": "photography",

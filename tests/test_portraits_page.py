@@ -18,7 +18,7 @@ from app import jobs, scheduler, scheduling
 from app.main import app
 from app.public import site
 from app.public.site_catalog import SPECIALTY_PAGES
-from tests.test_specialty_packages import rendered
+from tests.test_specialty_packages import catalog_group, inquiry_link, rendered
 
 pytestmark = pytest.mark.integration
 
@@ -104,3 +104,48 @@ def test_portraits_faq_answers_practical_prep(client):
         assert answers[question]
         # Usage/ownership answers belong to the legal-gated usage-rights change.
         assert not re.search(r"licen|rights|copyright|own the", answers[question].lower())
+
+
+def test_team_and_family_lines_stay_hidden_until_priced(client):
+    group = catalog_group("portraits")
+    assert [line["name"] for line in group["lines"]] == [*TEAM_LINES, FAMILY_LINE]
+    assert all(not line["display_price"] for line in group["lines"])
+    rates = rendered(client, "/portraits").one(id="rates")
+    assert [s for s in rates.find("section") if s.attrs.get("id", "").startswith("lines-")] == []
+    for name in (*TEAM_LINES, FAMILY_LINE):
+        assert name not in rates.text()
+    # Nothing price-shaped beyond the three published tiers.
+    assert svc_prices(rates) == TIER_PRICES
+    assert "$" not in rates.text().replace("$350", "").replace("$600", "").replace("$850", "")
+    for other in ("/real-estate", "/food-beverage"):
+        other_rates = rendered(client, other).one(id="rates")
+        assert not [
+            s for s in other_rates.find("section") if s.attrs.get("id", "").startswith("lines-")
+        ]
+
+
+@pytest.mark.parametrize("priced", [*TEAM_LINES, FAMILY_LINE])
+def test_a_priced_line_renders_alone_with_its_inquiry(client, monkeypatch, priced):
+    group = catalog_group("portraits")
+    line = next(item for item in group["lines"] if item["name"] == priced)
+    monkeypatch.setitem(line, "display_price", "$123")  # synthetic fixture figure
+    rates = rendered(client, "/portraits").one(id="rates")
+    section = rates.one("section", id="lines-portraits")
+    assert section.one("h2").text() == group["lines_title"]
+    articles = section.find("article")
+    assert len(articles) == 1
+    article = articles[0]
+    assert article.one("h3").text() == priced
+    unit = line.get("price_unit")
+    assert svc_prices(article) == ["$123" + (" " + unit if unit else "")]
+    # Binding pin: the card lists the line's catalog includes.
+    assert [li.text() for li in article.find("li")] == line["includes"]
+    if priced in TEAM_LINES:
+        assert any("new hires" in li.text().lower() for li in article.find("li"))
+    _link, query = inquiry_link(article)
+    assert query == {"service": ["Portraits"], "tier": [priced]}
+    for other in (*TEAM_LINES, FAMILY_LINE):
+        if other != priced:
+            assert other not in section.text()
+    # The per-group tier pin keeps seeing exactly three tier cards.
+    assert len(rates.one("section", id="packages-portraits").find("article")) == 3
