@@ -41,6 +41,9 @@
           <ul>
             {% for line in t.includes %}<li>{{ line }}</li>{% endfor %}
           </ul>
+          {# Usage line (site_catalog.TIER_USAGE, draft pending legal review); none without an entry. #}
+          {% set usage = (tier_usage.get(s.key) or {}).get(t.name) %}
+          {% if usage %}<p class="svc-usage">{{ usage }}</p>{% endif %}
           <a class="svc-cta" href="/contact?service={{ s.contact_service|urlencode }}&amp;tier={{ inquiry_tier|urlencode }}"
              aria-label="Inquire about {{ t.name }} — {{ s.title }}"
              data-analytics-event="Service Tier CTA"

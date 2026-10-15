@@ -42,6 +42,7 @@ log = logging.getLogger("mise.public.site")
 router = APIRouter()
 
 templates.env.globals["faqs"] = FAQS
+templates.env.globals["tier_usage"] = _site_catalog.TIER_USAGE
 
 # Paths the noindex middleware leaves crawlable (matched by exact path or prefix "/").
 INDEXABLE = {
