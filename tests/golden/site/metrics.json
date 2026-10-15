@@ -1,6 +1,6 @@
 {
  "about__legacy__empty": {
-  "bytes": 8094,
+  "bytes": 8165,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -17,7 +17,7 @@
   "sr_mono": 4
  },
  "about__legacy__seeded": {
-  "bytes": 8252,
+  "bytes": 8323,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -34,7 +34,7 @@
   "sr_mono": 4
  },
  "about__screening__empty": {
-  "bytes": 8097,
+  "bytes": 8168,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -51,7 +51,7 @@
   "sr_mono": 4
  },
  "about__screening__seeded": {
-  "bytes": 8255,
+  "bytes": 8326,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -68,7 +68,7 @@
   "sr_mono": 4
  },
  "book__legacy__empty": {
-  "bytes": 9687,
+  "bytes": 9758,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -84,7 +84,7 @@
   "sr_mono": 1
  },
  "book__legacy__seeded": {
-  "bytes": 10053,
+  "bytes": 10124,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -100,7 +100,7 @@
   "sr_mono": 1
  },
  "book__screening__empty": {
-  "bytes": 9690,
+  "bytes": 9761,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -116,7 +116,7 @@
   "sr_mono": 1
  },
  "book__screening__seeded": {
-  "bytes": 10056,
+  "bytes": 10127,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -132,7 +132,7 @@
   "sr_mono": 1
  },
  "contact__legacy__empty": {
-  "bytes": 13928,
+  "bytes": 13999,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -148,7 +148,7 @@
   "sr_mono": 1
  },
  "contact__legacy__seeded": {
-  "bytes": 14303,
+  "bytes": 14374,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -164,7 +164,7 @@
   "sr_mono": 1
  },
  "contact__screening__empty": {
-  "bytes": 13931,
+  "bytes": 14002,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -180,7 +180,7 @@
   "sr_mono": 1
  },
  "contact__screening__seeded": {
-  "bytes": 14306,
+  "bytes": 14377,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -196,7 +196,7 @@
   "sr_mono": 1
  },
  "food-beverage__legacy__empty": {
-  "bytes": 28201,
+  "bytes": 28355,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -210,7 +210,7 @@
    "See the Brand Partner plans \u2192",
    "See the monthly Brand Partner plans \u2192"
   ],
-  "emdash": 28,
+  "emdash": 29,
   "h1": 1,
   "h2": 6,
   "h3": 10,
@@ -219,10 +219,10 @@
   "img_noalt": 0,
   "middot": 24,
   "sections": 11,
-  "sr_mono": 9
+  "sr_mono": 10
  },
  "food-beverage__legacy__seeded": {
-  "bytes": 29234,
+  "bytes": 29388,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
@@ -235,7 +235,7 @@
    "See the Brand Partner plans \u2192",
    "See the monthly Brand Partner plans \u2192"
   ],
-  "emdash": 30,
+  "emdash": 31,
   "h1": 1,
   "h2": 6,
   "h3": 10,
@@ -244,10 +244,10 @@
   "img_noalt": 0,
   "middot": 25,
   "sections": 11,
-  "sr_mono": 11
+  "sr_mono": 12
  },
  "food-beverage__screening__empty": {
-  "bytes": 28210,
+  "bytes": 28364,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -261,7 +261,7 @@
    "See the Brand Partner plans \u2192",
    "See the monthly Brand Partner plans \u2192"
   ],
-  "emdash": 28,
+  "emdash": 29,
   "h1": 1,
   "h2": 6,
   "h3": 10,
@@ -270,10 +270,10 @@
   "img_noalt": 0,
   "middot": 24,
   "sections": 11,
-  "sr_mono": 9
+  "sr_mono": 10
  },
  "food-beverage__screening__seeded": {
-  "bytes": 29243,
+  "bytes": 29397,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
@@ -286,7 +286,7 @@
    "See the Brand Partner plans \u2192",
    "See the monthly Brand Partner plans \u2192"
   ],
-  "emdash": 30,
+  "emdash": 31,
   "h1": 1,
   "h2": 6,
   "h3": 10,
@@ -295,10 +295,10 @@
   "img_noalt": 0,
   "middot": 25,
   "sections": 11,
-  "sr_mono": 11
+  "sr_mono": 12
  },
  "home__legacy__empty": {
-  "bytes": 9482,
+  "bytes": 9468,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -315,7 +315,7 @@
   "sr_mono": 6
  },
  "home__legacy__seeded": {
-  "bytes": 12831,
+  "bytes": 12817,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -332,7 +332,7 @@
   "sr_mono": 8
  },
  "home__screening__empty": {
-  "bytes": 9485,
+  "bytes": 9471,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -349,7 +349,7 @@
   "sr_mono": 6
  },
  "home__screening__seeded": {
-  "bytes": 12834,
+  "bytes": 12820,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -366,7 +366,7 @@
   "sr_mono": 8
  },
  "portfolio__legacy__empty": {
-  "bytes": 7136,
+  "bytes": 7207,
   "cta_labels": [
    "Add your shoot to the archive \u2192",
    "Book a shoot \u2192",
@@ -384,7 +384,7 @@
   "sr_mono": 1
  },
  "portfolio__legacy__seeded": {
-  "bytes": 10613,
+  "bytes": 10684,
   "cta_labels": [
    "Add your shoot to the archive \u2192",
    "Book a shoot \u2192"
@@ -401,7 +401,7 @@
   "sr_mono": 4
  },
  "portfolio__screening__empty": {
-  "bytes": 7139,
+  "bytes": 7210,
   "cta_labels": [
    "Add your shoot to the archive \u2192",
    "Book a shoot \u2192",
@@ -419,7 +419,7 @@
   "sr_mono": 1
  },
  "portfolio__screening__seeded": {
-  "bytes": 10616,
+  "bytes": 10687,
   "cta_labels": [
    "Add your shoot to the archive \u2192",
    "Book a shoot \u2192"
@@ -436,10 +436,13 @@
   "sr_mono": 4
  },
  "portraits__legacy__empty": {
-  "bytes": 18827,
+  "bytes": 21945,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
+   "Inquire about On-site team day \u2192",
+   "Inquire about Small-team pack \u2192",
+   "Inquire about Team headshots \u2192",
    "Inquire about Tier I \u2192",
    "Inquire about Tier II \u2192",
    "Inquire about Tier III \u2192",
@@ -448,19 +451,22 @@
   ],
   "emdash": 23,
   "h1": 1,
-  "h2": 3,
-  "h3": 3,
+  "h2": 4,
+  "h3": 6,
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
   "middot": 10,
-  "sections": 9,
+  "sections": 10,
   "sr_mono": 4
  },
  "portraits__legacy__seeded": {
-  "bytes": 19844,
+  "bytes": 22962,
   "cta_labels": [
    "Book a session \u2192",
+   "Inquire about On-site team day \u2192",
+   "Inquire about Small-team pack \u2192",
+   "Inquire about Team headshots \u2192",
    "Inquire about Tier I \u2192",
    "Inquire about Tier II \u2192",
    "Inquire about Tier III \u2192",
@@ -468,20 +474,23 @@
   ],
   "emdash": 24,
   "h1": 1,
-  "h2": 3,
-  "h3": 3,
+  "h2": 4,
+  "h3": 6,
   "img": 2,
   "img_lazy": 2,
   "img_noalt": 0,
   "middot": 11,
-  "sections": 9,
+  "sections": 10,
   "sr_mono": 6
  },
  "portraits__screening__empty": {
-  "bytes": 18836,
+  "bytes": 21954,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
+   "Inquire about On-site team day \u2192",
+   "Inquire about Small-team pack \u2192",
+   "Inquire about Team headshots \u2192",
    "Inquire about Tier I \u2192",
    "Inquire about Tier II \u2192",
    "Inquire about Tier III \u2192",
@@ -490,19 +499,22 @@
   ],
   "emdash": 23,
   "h1": 1,
-  "h2": 3,
-  "h3": 3,
+  "h2": 4,
+  "h3": 6,
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
   "middot": 10,
-  "sections": 9,
+  "sections": 10,
   "sr_mono": 4
  },
  "portraits__screening__seeded": {
-  "bytes": 19853,
+  "bytes": 22971,
   "cta_labels": [
    "Book a session \u2192",
+   "Inquire about On-site team day \u2192",
+   "Inquire about Small-team pack \u2192",
+   "Inquire about Team headshots \u2192",
    "Inquire about Tier I \u2192",
    "Inquire about Tier II \u2192",
    "Inquire about Tier III \u2192",
@@ -510,17 +522,17 @@
   ],
   "emdash": 24,
   "h1": 1,
-  "h2": 3,
-  "h3": 3,
+  "h2": 4,
+  "h3": 6,
   "img": 2,
   "img_lazy": 2,
   "img_noalt": 0,
   "middot": 11,
-  "sections": 9,
+  "sections": 10,
   "sr_mono": 6
  },
  "real-estate__legacy__empty": {
-  "bytes": 18145,
+  "bytes": 18342,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -538,12 +550,12 @@
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
-  "middot": 11,
+  "middot": 13,
   "sections": 11,
-  "sr_mono": 8
+  "sr_mono": 10
  },
  "real-estate__legacy__seeded": {
-  "bytes": 20050,
+  "bytes": 20247,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -560,12 +572,12 @@
   "img": 3,
   "img_lazy": 3,
   "img_noalt": 0,
-  "middot": 13,
+  "middot": 15,
   "sections": 12,
-  "sr_mono": 13
+  "sr_mono": 15
  },
  "real-estate__screening__empty": {
-  "bytes": 18154,
+  "bytes": 18351,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -583,12 +595,12 @@
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
-  "middot": 11,
+  "middot": 13,
   "sections": 11,
-  "sr_mono": 8
+  "sr_mono": 10
  },
  "real-estate__screening__seeded": {
-  "bytes": 20059,
+  "bytes": 20256,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -605,12 +617,12 @@
   "img": 3,
   "img_lazy": 3,
   "img_noalt": 0,
-  "middot": 13,
+  "middot": 15,
   "sections": 12,
-  "sr_mono": 13
+  "sr_mono": 15
  },
  "reels__legacy__empty": {
-  "bytes": 6733,
+  "bytes": 6804,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -627,7 +639,7 @@
   "sr_mono": 2
  },
  "reels__legacy__seeded": {
-  "bytes": 6891,
+  "bytes": 6962,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -644,7 +656,7 @@
   "sr_mono": 2
  },
  "reels__screening__empty": {
-  "bytes": 6736,
+  "bytes": 6807,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -661,7 +673,7 @@
   "sr_mono": 2
  },
  "reels__screening__seeded": {
-  "bytes": 6894,
+  "bytes": 6965,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -678,20 +690,23 @@
   "sr_mono": 2
  },
  "services__legacy__empty": {
-  "bytes": 27777,
+  "bytes": 31549,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request Brand Partner \u2192",
    "Request Food & Beverage \u2014 Photography \u2192",
    "Request Food & Beverage \u2014 Videography \u2192",
+   "Request On-site team day \u2192",
    "Request Portrait & Lifestyle \u2192",
    "Request Real Estate \u2192",
+   "Request Small-team pack \u2192",
+   "Request Team headshots \u2192",
    "See past work"
   ],
   "emdash": 18,
   "h1": 1,
   "h2": 5,
-  "h3": 15,
+  "h3": 19,
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
@@ -700,20 +715,23 @@
   "sr_mono": 2
  },
  "services__legacy__seeded": {
-  "bytes": 28395,
+  "bytes": 32167,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request Brand Partner \u2192",
    "Request Food & Beverage \u2014 Photography \u2192",
    "Request Food & Beverage \u2014 Videography \u2192",
+   "Request On-site team day \u2192",
    "Request Portrait & Lifestyle \u2192",
    "Request Real Estate \u2192",
+   "Request Small-team pack \u2192",
+   "Request Team headshots \u2192",
    "See past work"
   ],
   "emdash": 18,
   "h1": 1,
   "h2": 6,
-  "h3": 15,
+  "h3": 19,
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
@@ -722,20 +740,23 @@
   "sr_mono": 2
  },
  "services__screening__empty": {
-  "bytes": 27780,
+  "bytes": 31552,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request Brand Partner \u2192",
    "Request Food & Beverage \u2014 Photography \u2192",
    "Request Food & Beverage \u2014 Videography \u2192",
+   "Request On-site team day \u2192",
    "Request Portrait & Lifestyle \u2192",
    "Request Real Estate \u2192",
+   "Request Small-team pack \u2192",
+   "Request Team headshots \u2192",
    "See past work"
   ],
   "emdash": 18,
   "h1": 1,
   "h2": 5,
-  "h3": 15,
+  "h3": 19,
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
@@ -744,20 +765,23 @@
   "sr_mono": 2
  },
  "services__screening__seeded": {
-  "bytes": 28398,
+  "bytes": 32170,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request Brand Partner \u2192",
    "Request Food & Beverage \u2014 Photography \u2192",
    "Request Food & Beverage \u2014 Videography \u2192",
+   "Request On-site team day \u2192",
    "Request Portrait & Lifestyle \u2192",
    "Request Real Estate \u2192",
+   "Request Small-team pack \u2192",
+   "Request Team headshots \u2192",
    "See past work"
   ],
   "emdash": 18,
   "h1": 1,
   "h2": 6,
-  "h3": 15,
+  "h3": 19,
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
@@ -780,7 +804,7 @@
   "sr_mono": 0
  },
  "work-golden-cs__legacy__seeded": {
-  "bytes": 8471,
+  "bytes": 8542,
   "cta_labels": [
    "Book a shoot \u2192",
    "More work",
@@ -812,7 +836,7 @@
   "sr_mono": 0
  },
  "work-golden-cs__screening__seeded": {
-  "bytes": 8474,
+  "bytes": 8545,
   "cta_labels": [
    "Book a shoot \u2192",
    "More work",
@@ -830,7 +854,7 @@
   "sr_mono": 0
  },
  "work__legacy__empty": {
-  "bytes": 6307,
+  "bytes": 6378,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -847,7 +871,7 @@
   "sr_mono": 1
  },
  "work__legacy__seeded": {
-  "bytes": 6596,
+  "bytes": 6667,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -863,7 +887,7 @@
   "sr_mono": 1
  },
  "work__screening__empty": {
-  "bytes": 6310,
+  "bytes": 6381,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -880,7 +904,7 @@
   "sr_mono": 1
  },
  "work__screening__seeded": {
-  "bytes": 6599,
+  "bytes": 6670,
   "cta_labels": [
    "Book a shoot \u2192"
   ],

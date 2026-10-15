@@ -12,6 +12,8 @@ the change is intended, regenerate inside the same PR and show the diff:
     GOLDEN_UPDATE=1 pytest tests/test_public_render_golden.py
 
 An update run that changes nothing fails, so regenerating is always deliberate.
+Regenerate against CURRENT main immediately before merge, not against the branch
+base: a golden PR that lands after other HTML-changing merges carries stale goldens.
 """
 
 import difflib
