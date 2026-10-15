@@ -495,10 +495,11 @@ FAQS = BOOK_FAQS  # default for templates that don't override
 # the homepage broadens into the studio hub.
 SPECIALTY_PAGES = {
     "re": {
-        "title": "Real Estate Photography & Video",
+        "title": "Real Estate Photography & Video in Asheville",
         "meta": "Real estate photography and video for Asheville & Western "
         "North Carolina — MLS-ready stills, twilight exteriors, and vertical "
-        "walkthrough reels that move listings.",
+        "walkthrough reels that move listings. From "
+        f"${min(t['price_cents'] for g in SERVICES if g['key'] == 'real_estate' for t in g['tiers']) // 100:,}.",
         "kicker": "Real estate · Asheville & WNC",
         "h1a": "Listings that look",
         "h1b": "worth the drive.",
@@ -619,10 +620,11 @@ SPECIALTY_PAGES = {
         },
     },
     "pl": {
-        "title": "Portrait & Lifestyle Photography",
+        "title": "Portrait & Lifestyle Photography in Asheville",
         "meta": "Portrait and lifestyle photography in Asheville, NC — "
         "headshots, personal branding, families, and golden-hour sessions, "
-        "delivered same week in a private gallery.",
+        "delivered same week in a private gallery. From "
+        f"${min(t['price_cents'] for g in SERVICES if g['key'] == 'portraits' for t in g['tiers']) // 100:,}.",
         "kicker": "Portrait & lifestyle · Asheville & WNC",
         "h1a": "Look like yourself —",
         "h1b": "on your best day.",
@@ -745,12 +747,13 @@ SPECIALTY_PAGES = {
         },
     },
     "fb": {
-        "title": "Food & Beverage Photography & Video",
+        "title": "Food & Beverage Photography & Video in Asheville",
         # Inherits the pre-revamp home meta so the indexed F&B positioning
         # keeps a dedicated page — see the module comment above.
         "meta": "Photography that makes people hungry — food & beverage "
         "photography and videography for the restaurants, cafés, and bars of "
-        "Asheville & Western North Carolina.",
+        "Asheville & Western North Carolina. From "
+        f"${min(t['price_cents'] for g in SERVICES if g['key'] in ('photography', 'videography', 'brand_partner') for t in g['tiers']) // 100:,}.",
         "kicker": "Food & beverage · Asheville & WNC",
         "h1a": "We make your menu",
         "h1b": "sell itself.",
