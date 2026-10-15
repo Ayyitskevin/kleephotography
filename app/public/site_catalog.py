@@ -495,7 +495,7 @@ FAQS = BOOK_FAQS  # default for templates that don't override
 # the homepage broadens into the studio hub.
 SPECIALTY_PAGES = {
     "re": {
-        "title": "Real Estate Photography & Video",
+        "title": "Real Estate Photography & Video in Asheville",
         "meta": "Real estate photography and video for Asheville & Western "
         "North Carolina — MLS-ready stills, twilight exteriors, and vertical "
         "walkthrough reels that move listings.",
@@ -619,7 +619,7 @@ SPECIALTY_PAGES = {
         },
     },
     "pl": {
-        "title": "Portrait & Lifestyle Photography",
+        "title": "Portrait & Lifestyle Photography in Asheville",
         "meta": "Portrait and lifestyle photography in Asheville, NC — "
         "headshots, personal branding, families, and golden-hour sessions, "
         "delivered same week in a private gallery.",
@@ -745,7 +745,7 @@ SPECIALTY_PAGES = {
         },
     },
     "fb": {
-        "title": "Food & Beverage Photography & Video",
+        "title": "Food & Beverage Photography & Video in Asheville",
         # Inherits the pre-revamp home meta so the indexed F&B positioning
         # keeps a dedicated page — see the module comment above.
         "meta": "Photography that makes people hungry — food & beverage "
