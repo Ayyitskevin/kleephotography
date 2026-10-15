@@ -107,7 +107,7 @@
 </section>
 
 {% if aerials_live() %}
-{# Planned aerial coverage only; the feature flag is not proof of availability. #}
+{# The Aerial Pass is a live offer; aerials_live() is its kill switch. #}
 {% set aerial_leads = [] %}
 {% for a in photos %}{% if a.portfolio_tag and "aerial" in a.portfolio_tag %}{% set _ = aerial_leads.append(a) %}{% endif %}{% endfor %}
 <section class="sr-wrap" aria-label="The Aerial Pass">
@@ -127,17 +127,17 @@
         <span class="sr-screenbadge">&#9650; The Aerial Pass</span>
       </figure>
       <div class="sr-aerialpass-copy">
-        <p class="sr-mono">The Aerial Pass — planned</p>
+        <p class="sr-mono">The Aerial Pass — new</p>
         <h3>The lot, the roofline, <em>the whole street.</em></h3>
-        <p>Aerial coverage is planned, not available to book today.
-           Launch requires an FAA Part 107-certified operator and permitted
-           local airspace. Confirm future availability before quoting aerials.</p>
+        <p>Drone stills and orbit clips flown the same visit as the interiors &mdash;
+           acreage, roof condition, and how the property sits in its
+           neighborhood. Cut straight into the walkthrough film.</p>
         <ul class="sr-aerialpass-checks">
-          <li>Part 107 launch requirement</li>
-          <li>Local airspace must permit the flight</li>
-          <li>Availability confirmed before any aerial quote</li>
+          <li><b>&#10003;</b> FAA Part 107 certified pilot</li>
+          <li><b>&#10003;</b> LAANC airspace clearance, handled</li>
+          <li><b>&#10003;</b> {{ aerial_rate }} add-on to any tier &middot; included in Premier</li>
         </ul>
-        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Ask about the aerial launch &rarr;</a>
+        <a class="sr-btn sr-btn--ghost" href="{{ book_url }}">Add aerials to a booking &rarr;</a>
       </div>
     </div>
   </div>

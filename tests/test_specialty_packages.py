@@ -251,32 +251,42 @@ def test_food_beverage_starter_inquiries_are_independently_disambiguated(client,
 
 
 @pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
-def test_real_estate_has_no_current_aerial_sale_claims_or_booking_cta(
-    client, theme, monkeypatch, aerial_flag
-):
-    # Separate negative witness: a missing launch notice must not short-circuit
-    # observation of the baseline's live certification/sale assertions.
+def test_real_estate_aerial_sale_claims_follow_the_flag(client, theme, monkeypatch, aerial_flag):
+    """Flag on: the certified, bookable Aerial Pass renders and nothing says planned.
+    Flag off (kill switch): no aerial sale claim and no booking link anywhere."""
     monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
     main = rendered(client, "/real-estate").one(id="main")
     text = main.text().lower()
-    for claim in (
+    sale_claims = (
         "faa part 107 certified pilot",
         "laanc airspace clearance, handled",
         "included in premier",
         "add-on to any tier",
-        "aerial establishing + vertical for social",
-    ):
-        assert claim not in text
-    for link in main.find("a"):
-        label = (link.text() + " " + (link.attrs.get("aria-label") or "")).lower()
-        assert not re.search(r"add aerials|book aerials|aerial booking", label)
-        if "aerial" in label:
-            assert urlsplit(link.attrs.get("href", "")).path == "/contact"
+    )
+    aerial_links = [
+        link
+        for link in main.find("a")
+        if re.search(
+            r"add aerials|book aerials|aerial booking",
+            (link.text() + " " + (link.attrs.get("aria-label") or "")).lower(),
+        )
+    ]
+    if aerial_flag:
+        for claim in sale_claims:
+            assert claim in text
+        assert "not available to book today" not in text
+        assert "planned" not in text
+        assert len(aerial_links) == 1
+        assert urlsplit(aerial_links[0].attrs["href"]).path.startswith("/book")
+    else:
+        for claim in sale_claims:
+            assert claim not in text
+        assert aerial_links == []
 
 
 @pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
 @pytest.mark.parametrize("with_reel", [False, True], ids=["empty-media", "synthetic-reel"])
-def test_real_estate_aerials_are_launch_gated_at_either_flag(
+def test_real_estate_aerial_band_and_film_chapters_follow_the_flag(
     client, theme, monkeypatch, aerial_flag, with_reel
 ):
     monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
@@ -301,26 +311,15 @@ def test_real_estate_aerials_are_launch_gated_at_either_flag(
         db.run("UPDATE assets SET portfolio=? WHERE id=?", (int(with_reel), reel_id))
     main = rendered(client, "/real-estate").one(id="main")
     text = main.text().lower()
-    assert re.search(r"aerial coverage is planned[^.]*not available to book today", text)
     assert "part 107" in text
-    for old_live_claim in (
-        "faa part 107 certified pilot",
-        "laanc airspace clearance, handled",
-        "included in premier",
-        "add-on to any tier",
-        "aerial establishing + vertical for social",
-    ):
-        assert old_live_claim not in text
-    for link in main.find("a"):
-        label = (link.text() + " " + (link.attrs.get("aria-label") or "")).lower()
-        assert not re.search(r"add aerials|book aerials|aerial booking", label)
-        if "aerial" in label:
-            assert urlsplit(link.attrs.get("href", "")).path == "/contact"
     if aerial_flag:
         panel = main.one("section", **{"aria-label": "The Aerial Pass"})
-        assert "launch requires" in panel.text().lower()
-        assert "local airspace" in panel.text().lower()
-        assert "not available to book today" in panel.text().lower()
+        assert "faa part 107 certified pilot" in panel.text().lower()
+        assert "laanc airspace clearance" in panel.text().lower()
+        assert "not available to book today" not in text
+    else:
+        assert main.find("section", **{"aria-label": "The Aerial Pass"}) == []
+        assert "not available to book today" in text
     if with_reel:
         assert main.one("video").one("source").attrs["src"] == f"/site/vid/{reel_id}"
         chapters = [
