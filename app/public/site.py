@@ -505,7 +505,7 @@ def _specialty_doors() -> list[dict]:
     return doors
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def home(request: Request):
     featured = _portfolio_assets()[:6]
     reels = _portfolio_reels()
@@ -530,7 +530,7 @@ def home(request: Request):
     )
 
 
-@router.get("/portfolio", response_class=HTMLResponse)
+@router.api_route("/portfolio", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def portfolio(request: Request):
     # photos AND starred videos share the masonry — /services sells motion, so
     # the archive shouldn't be stills-only. Videos play in the same lightbox.
@@ -594,7 +594,7 @@ def _about_portrait_static() -> str | None:
     return None
 
 
-@router.get("/about", response_class=HTMLResponse)
+@router.api_route("/about", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def about(request: Request):
     # Only a dedicated studio portrait stands in as "Meet Kevin" — never a random
     # portfolio still (that read as a mismatched hero when the asset was a dish).
@@ -608,12 +608,12 @@ def about(request: Request):
     )
 
 
-@router.get("/press", response_class=HTMLResponse)
+@router.api_route("/press", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def press(request: Request):
     return templates.TemplateResponse(request, "site/press.html", {"press": _press_features()})
 
 
-@router.get("/services", response_class=HTMLResponse)
+@router.api_route("/services", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def services(request: Request):
     return templates.TemplateResponse(
         request,
@@ -622,7 +622,7 @@ def services(request: Request):
     )
 
 
-@router.get("/contact", response_class=HTMLResponse)
+@router.api_route("/contact", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def contact(request: Request):
     """Optional ?prefill=<kind>&service=&tier= for cross-surface deep links
     (parsed in _contact_prefill straight off the query string)."""
@@ -818,7 +818,7 @@ def submit_inquiry(
     )
 
 
-@router.get("/work", response_class=HTMLResponse)
+@router.api_route("/work", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def work_index(request: Request):
     studies = [_case_study_view(study) for study in _case_studies()]
     csmap = _cs_specialty_map()
@@ -836,7 +836,7 @@ def work_index(request: Request):
     )
 
 
-@router.get("/work/{slug}", response_class=HTMLResponse)
+@router.api_route("/work/{slug}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def work_detail(request: Request, slug: str):
     g = db.one("SELECT * FROM galleries WHERE slug=? AND cs_published=1", (slug,))
     if not g:
@@ -905,7 +905,7 @@ def work_detail(request: Request, slug: str):
     )
 
 
-@router.get("/reels", response_class=HTMLResponse)
+@router.api_route("/reels", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def reels(request: Request):
     vids = _portfolio_reels()
     sp_counts = Counter(specialties.specialty_key(r["portfolio_tag"]) for r in vids)
@@ -1021,17 +1021,17 @@ def _specialty_page(request: Request, key: str):
     )
 
 
-@router.get("/real-estate", response_class=HTMLResponse)
+@router.api_route("/real-estate", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def specialty_real_estate(request: Request):
     return _specialty_page(request, "re")
 
 
-@router.get("/portraits", response_class=HTMLResponse)
+@router.api_route("/portraits", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def specialty_portraits(request: Request):
     return _specialty_page(request, "pl")
 
 
-@router.get("/food-beverage", response_class=HTMLResponse)
+@router.api_route("/food-beverage", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def specialty_food_beverage(request: Request):
     return _specialty_page(request, "fb")
 

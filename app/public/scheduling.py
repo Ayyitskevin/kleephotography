@@ -134,7 +134,7 @@ def _picker_ctx(
 # ── booking funnel ───────────────────────────────────────────────────────────
 
 
-@router.get("/book", response_class=HTMLResponse)
+@router.api_route("/book", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def book_index(request: Request):
     from .site import _portfolio_assets, _public_photo_spec
     from .site_catalog import BOOK_ACTIVE_PROMISES, BOOK_FAQS, BOOK_PROMISES
