@@ -412,3 +412,40 @@ Outside the block, 23 more admin-only rules sit in the SHARED UI PRIMITIVES tail
 ## Dynamic includes the universe could not resolve
 
 - none
+
+## Result after the cut (CSS payload per surface)
+
+| Surface (CSS only; fonts.css and JS unchanged) | Before raw | Before gz | After raw | After gz | gz saved |
+|---|---:|---:|---:|---:|---:|
+| Marketing visitor (home, spokes, portfolio, services, ...) | 272,379 | 58,972 | 156,773 | 34,192 | +24,780 |
+| Client pages (gallery, portal, money docs) and booking flow | 272,379 | 58,972 | 241,526 | 53,894 | +5,078 |
+| Admin shell | 499,715 | 107,198 | 526,262 | 115,285 | -8,087 |
+
+| Sheet | Raw | gz |
+|---|---:|---:|
+| mise.css (before) | 138,770 | 30,673 |
+| screening-room-tokens.css (before) | 8,841 | 3,235 |
+| screening.css (before) | 124,768 | 25,064 |
+| mise-admin.css (before) | 227,336 | 48,226 |
+| mise-site.css (after) | 54,017 | 10,971 |
+| screening.css (after) | 93,915 | 19,986 |
+| screening-admin.css (after) | 57,400 | 13,165 |
+
+## Cascade proof (scripts/css_split_build.py verify)
+
+```
+PASS  mise-site.css equals build(84c03fd)
+PASS  screening.css equals build(84c03fd)
+PASS  screening-admin.css equals build(84c03fd)
+PASS  new screening.css = old screening.css minus the admin-only deck rules and their private @keyframes, same order
+PASS  screening-admin.css holds every rule from the deck header to EOF, same order
+PASS  admin stack: last occurrences are in the original order
+PASS  all 259 dropped style rules need .sr-admin or .admin-shell in every selector
+PASS  dropped at-rules, referenced only by dropped rules: ['@keyframes sr-pulse']
+PASS  no template, script or non-admin module emits sr-admin / admin-shell []
+PASS  base_admin.html is where body.sr-admin comes from
+PASS  admin templates that wear the deck classes all extend base_admin []
+PASS  marketing: matched-rule sequences identical for 9202 elements on 48 pages []
+PASS  mise-site.css rules appear in mise.css verbatim and in the same order
+RESULT PASS
+```

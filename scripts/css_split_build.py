@@ -32,6 +32,7 @@ from css_split_lib import Sheet, sizes  # noqa: E402
 
 REPO = m.REPO
 STATIC = REPO / "static"
+BASE_REF_DEFAULT = m.BASE_REF
 DECK_MARK = "═══ " + m.DECK_HEADER
 
 ADMIN_HEADER = """/* screening-admin.css: the admin shell's half of the Screening Room sheet (plan R-2)
@@ -71,26 +72,41 @@ def deck_start(text: str) -> int:
     return text.rfind("\n", 0, a) + 1
 
 
-def admin_units(scr: Sheet) -> list[tuple[int, int, int, int]]:
-    """Top-level units after the deck header whose rules are ALL admin-only."""
-    lo, _hi = m.deck_range(scr)
-    out = []
+def admin_units(scr: Sheet, ref: str = BASE_REF_DEFAULT) -> list[tuple[int, int, int, int]]:
+    """Top-level units after the deck header that only the admin shell can use: rules whose
+    selectors are ALL admin-only, and @keyframes that nothing but those rules reference."""
+    lo, hi = m.deck_range(scr)
+    out, admin_ids = [], set()
     for u in scr.units:
-        if u[2] < lo or u[2] >= _hi:
+        if not lo <= u[2] < hi:
             continue
         rules = scr.rules[u[2] : u[3]]
         if all(m.is_admin_rule(r) for r in rules):
             out.append(u)
+            admin_ids.update(range(u[2], u[3]))
         elif any(m.is_admin_rule(r) for r in rules):
             raise SystemExit(
                 f"STOP: a deck unit mixes admin and public rules at line {rules[0].line}"
             )
-    return out
+    others = "\n".join(
+        m.blob(ref, p)
+        for p in m.ls(ref, "static") + m.ls(ref, "templates")
+        if p.endswith((".css", ".js", ".html")) and p != "static/screening.css"
+    )
+    kept_text = " ".join(r.body for r in scr.rules if r.idx not in admin_ids and r.kind == "style")
+    for u in scr.units:
+        r = scr.rules[u[2]]
+        if lo <= u[2] < hi and r.kind == "atomic" and r.prelude.startswith("@keyframes"):
+            name = r.prelude.split()[1]
+            pat = r"(?<![-\w])" + re.escape(name) + r"(?![-\w])"
+            if not re.search(pat, others) and not re.search(pat, kept_text):
+                out.append(u)
+    return sorted(out)
 
 
-def cut_screening(scr: Sheet) -> str:
+def cut_screening(scr: Sheet, ref: str = BASE_REF_DEFAULT) -> str:
     """The base text without the admin-only deck units (and the comments that lead them)."""
-    text, drop = scr.text, admin_units(scr)
+    text, drop = scr.text, admin_units(scr, ref)
     out, pos, first = [], 0, True
     prev_end = 0
     ends = {u[0]: u for u in scr.units}
@@ -125,7 +141,7 @@ def build(ref: str) -> dict[str, str]:
     admin = ADMIN_HEADER + scr.text[deck_start(scr.text) :]
     return {
         "mise-site.css": site,
-        "screening.css": cut_screening(scr),
+        "screening.css": cut_screening(scr, ref),
         "screening-admin.css": admin,
     }
 
@@ -179,12 +195,12 @@ def verify(ref: str) -> list[str]:
     # 2. admin pages: last-occurrence order of every old screening.css rule is unchanged
     base_sigs = [r.sig for r in scr.rules]
     new_scr, new_admin = new["screening.css"], new["screening-admin.css"]
-    drop = admin_units(scr)
+    drop = admin_units(scr, ref)
     dropped = {i for u in drop for i in range(u[2], u[3])}
     kept_old = [i for i in range(len(scr.rules)) if i not in dropped]
     check(
         [r.sig for r in new_scr.rules] == [base_sigs[i] for i in kept_old],
-        "new screening.css = old screening.css minus the admin-only deck rules, same order",
+        "new screening.css = old screening.css minus the admin-only deck rules and their private @keyframes, same order",
     )
     start_rule = next(r.idx for r in scr.rules if r.start >= deck_start(scr.text))
     check(
@@ -203,12 +219,18 @@ def verify(ref: str) -> list[str]:
 
     # 3. what leaves screening.css can only match the admin shell
     tokens_ok = True
-    for sel_rule in (scr.rules[i] for i in dropped):
+    styles = [scr.rules[i] for i in dropped if scr.rules[i].kind == "style"]
+    for sel_rule in styles:
         if not all(m.is_admin_sel(x) for x in sel_rule.selectors):
             tokens_ok = False
     check(
         tokens_ok,
-        f"all {len(dropped)} dropped rules need .sr-admin or .admin-shell in every selector",
+        f"all {len(styles)} dropped style rules need .sr-admin or .admin-shell in every selector",
+    )
+    orphans = [scr.rules[i].prelude for i in dropped if scr.rules[i].kind != "style"]
+    check(
+        len(orphans) == len(dropped) - len(styles),
+        f"dropped at-rules, referenced only by dropped rules: {orphans}",
     )
     leaks = []
     for p in m.ls(ref, "templates") + m.ls(ref, "app") + m.ls(ref, "static"):

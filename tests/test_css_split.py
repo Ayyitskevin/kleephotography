@@ -94,8 +94,11 @@ def test_admin_sheet_repeats_the_public_tail_in_order():
     head = [r for r in adm.rules if r.start < cut]
     tail = [r for r in adm.rules if r.start >= cut]
     assert any(is_admin_rule(r) for r in head)
-    repeated = [r.sig for r in head if not is_admin_rule(r)] + [r.sig for r in tail]
     sigs = [r.sig for r in scr.rules]
+    # in the deck part, what screening.css lacks is admin-only rules and keyframes only they use
+    absent = [r for r in head if r.sig not in set(sigs)]
+    assert all(is_admin_rule(r) or r.prelude.startswith("@keyframes") for r in absent)
+    repeated = [r.sig for r in head if r.sig in set(sigs)] + [r.sig for r in tail]
     start = sigs.index(repeated[0])
     assert sigs[start:] == repeated  # screening.css ends with exactly what the admin sheet repeats
 

@@ -221,7 +221,10 @@ def test_only_the_shared_pager_spells_out_a_page_link():
 def test_pager_styling_cannot_reach_the_kill_switch_stack():
     """screening.css always loads, so an unscoped .sr-pager rule would restyle
     the MISE_SCREENING_ROOM=false admin, which has no body.sr to opt in with."""
-    css = (ROOT / "static" / "screening.css").read_text()
+    # the deck rules live in screening-admin.css since R-2; neither sheet may carry an unscoped one
+    css = "\n".join(
+        (ROOT / "static" / n).read_text() for n in ("screening.css", "screening-admin.css")
+    )
     rules = [line for line in css.splitlines() if ".sr-pager" in line]
 
     assert rules

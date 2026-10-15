@@ -1034,7 +1034,6 @@ html.nav-menu-enhanced .sr .nav-mobile {
 /* THE COMMAND DECK (admin shell) moved to static/screening-admin.css (plan R-2). The public
    rules that sat inside it (breakpoints, reveal stagger, motion, hover) stay here, in order. */
 
-@keyframes sr-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 /* the crew-pass password input reads left-aligned (not PIN-spaced) */
 .sr .sr-pw-input { letter-spacing: 0.2em; text-indent: 0; text-align: center; }
 
