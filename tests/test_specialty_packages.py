@@ -327,6 +327,11 @@ def test_real_estate_aerial_band_and_film_chapters_follow_the_flag(
         ]
         assert any("kitchen & great room" in chapter for chapter in chapters)
         aerial_chapters = [c for c in chapters if "aerial" in c or "drone" in c]
+        # the player strip carries one tick per timed chapter; the aerial one (at 0.62) is
+        # present only while the flag is on
+        strip = main.one("i", **{"class": "sr-progress"})
+        ticks = [t.attrs.get("style", "") for t in strip.find("i")]
+        assert ("left: 62%;" in ticks) is aerial_flag, ticks
         if aerial_flag:
             assert len(aerial_chapters) == 1 and "aerial orbit" in aerial_chapters[0]
             assert "drone" in aerial_chapters[0]
@@ -417,3 +422,34 @@ def test_site_wide_aerial_claims_follow_the_flag(client, theme, monkeypatch, aer
     assert ("faa part 107 certified" in home) is aerial_flag
     about = rendered(client, "/about").text().lower()
     assert ("flown" in about) is aerial_flag
+
+
+@pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
+def test_aerial_badges_and_labels_follow_the_kill_switch(client, theme, monkeypatch, aerial_flag):
+    """The flag hides the aerial badge and label everywhere (.env.example, SPECIALTY-LAUNCH.md),
+    not the photos themselves."""
+    monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug,title,pin) VALUES (?,?,?)",
+        ("synthetic-aerial-badges", "Synthetic aerial badge fixture", "synthetic-only"),
+    )
+    ids = [
+        db.run(
+            """INSERT INTO assets
+               (gallery_id,kind,filename,stored,status,portfolio,portfolio_tag)
+               VALUES (?,'photo',?,?,'ready',1,?)""",
+            (gallery_id, f"{tag.split('/')[1]}.jpg", f"{tag.split('/')[1]}.jpg", tag),
+        )
+        for tag in ("re/aerials", "re/aerial")
+    ]
+    try:
+        for path in ("/real-estate", "/portfolio"):
+            markup = client.get(path).text
+            assert markup.count("sr-filmchip sr-aerial") == (len(ids) if aerial_flag else 0), path
+            labels = re.findall(r'(?:&mdash; |<small>|aria-pressed="false">)\s*Aerials?\b', markup)
+            assert bool(labels) is aerial_flag, (path, labels)
+            for asset_id in ids:  # the photos stay public
+                assert f"FR&middot;{asset_id:04d}" in markup, (path, asset_id)
+    finally:
+        db.run("DELETE FROM assets WHERE gallery_id=?", (gallery_id,))
+        db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))

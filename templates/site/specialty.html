@@ -153,16 +153,19 @@
   <div class="sr-filmstrip">
     {% for a in photos[:6] %}
     {% set image = asset_images[a.id] %}
+    {# The kill switch hides the aerial badge and label, not the photo itself. #}
+    {% set show_aerial = a.portfolio_tag and "aerial" in a.portfolio_tag and aerials_live() %}
+    {% set masked_aerial = a.portfolio_tag and "aerial" in a.portfolio_tag and not aerials_live() %}
     <figure class="tile{{ ' sr-frame-wide' if loop.index is odd else ' sr-frame-tall' }}" data-web="/site/img/{{ a.id }}">
       <img src="{{ image.thumb.url }}" loading="lazy" decoding="async"
            {% if image.srcset %}srcset="{{ image.srcset }}"
            sizes="(max-width: 700px) 45vw, 300px"{% endif %}
            {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
            alt="{{ a|portfolio_alt }}">
-      {% if a.portfolio_tag and "aerial" in a.portfolio_tag %}
+      {% if show_aerial %}
       <span class="sr-filmchip sr-aerial" aria-hidden="true">&#9650; Aerial</span>
       {% endif %}
-      <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
+      <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag and not masked_aerial %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
     </figure>
     {% endfor %}
   </div>
