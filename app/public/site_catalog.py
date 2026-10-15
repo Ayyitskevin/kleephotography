@@ -795,6 +795,11 @@ SPECIALTY_PAGES = {
         # front, the nerves named and answered in the client's own words.
         "sr": {
             "cta": "Book a session",
+            # Second door for teams: the existing ?service=&tier= contact
+            # prefill, so the inquiry arrives naming the team line it is about.
+            # team_tier must stay a SERVICES "portraits" line name.
+            "team_cta": "Plan a team day",
+            "team_tier": "Team headshots",
             "beat": "directed, never posed — you'll always know what to do with your hands",
             "body": "Headshots, personal branding, families, and the moments "
             "in between. Every frame is coached — where to look, when to "

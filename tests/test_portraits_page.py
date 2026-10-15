@@ -9,7 +9,7 @@ binding (the process strip, a priced line's includes) it says so.
 import json
 import re
 import socket
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -85,6 +85,56 @@ def test_portraits_render_the_session_in_three_steps_after_the_frames(client):
     assert frames_or_empty, "the frames block (or its empty state) must render"
     rates = main.one("section", id="rates")
     assert position[id(frames_or_empty[-1])] < position[id(strip)] < position[id(rates)]
+
+
+def test_portraits_offer_a_team_door_beside_the_booking_door(client):
+    page = rendered(client, "/portraits")
+    sr = SPECIALTY_PAGES["pl"]["sr"]
+    # Drift pin: the door's inquiry names a real team line in the catalog.
+    assert sr["team_tier"] in TEAM_LINES
+    assert sr["team_tier"] in [line["name"] for line in catalog_group("portraits")["lines"]]
+    boxes = [
+        page.one("div", **{"class": "sr-herosplit-actions"}),
+        page.one("section", **{"aria-label": "Book"}),
+        *page.find("div", **{"class": "empty-state-actions"}),
+    ]
+    team_hrefs = set()
+    for box in boxes:
+        links = box.find("a")
+        assert any(urlsplit(a.attrs["href"]).path.startswith("/book") for a in links)
+        team = contact_links(box)
+        assert len(team) == 1, "one quote door per action row: the team door"
+        query = parse_qs(urlsplit(team[0].attrs["href"]).query, strict_parsing=True)
+        assert query == {"service": ["Portraits"], "tier": [sr["team_tier"]]}
+        assert "team" in team[0].text().lower()
+        assert "request a quote" not in box.text().lower()
+        team_hrefs.add(team[0].attrs["href"])
+    assert len(team_hrefs) == 1
+    contact = rendered(client, team_hrefs.pop())
+    selected = [
+        option.attrs["value"]
+        for option in contact.one("select", id="contact-service").find("option")
+        if "selected" in option.attrs
+    ]
+    assert selected == ["Portraits"]
+    assert contact.one("input", id="contact-scope").attrs["placeholder"] == (
+        PORTRAIT_SCOPE_PLACEHOLDER
+    )
+    message = contact.one("textarea", id="contact-message").text()
+    assert f"the {sr['team_tier']} tier for Portraits" in message
+
+
+@pytest.mark.parametrize(
+    "path,service", [("/real-estate", "Real Estate"), ("/food-beverage", "Food & Beverage")]
+)
+def test_other_spokes_keep_their_generic_quote_link(client, path, service):
+    final = rendered(client, path).one("section", **{"aria-label": "Book"})
+    links = contact_links(final)
+    assert len(links) == 1
+    assert parse_qs(urlsplit(links[0].attrs["href"]).query, strict_parsing=True) == {
+        "service": [service]
+    }
+    assert links[0].text() == "Request a quote"
 
 
 def test_portraits_faq_answers_practical_prep(client):
