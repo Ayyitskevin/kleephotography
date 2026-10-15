@@ -17,7 +17,7 @@
   "sr_mono": 4
  },
  "about__legacy__seeded": {
-  "bytes": 8222,
+  "bytes": 8252,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -51,7 +51,7 @@
   "sr_mono": 4
  },
  "about__screening__seeded": {
-  "bytes": 8225,
+  "bytes": 8255,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -84,7 +84,7 @@
   "sr_mono": 1
  },
  "book__legacy__seeded": {
-  "bytes": 10023,
+  "bytes": 10053,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -116,7 +116,7 @@
   "sr_mono": 1
  },
  "book__screening__seeded": {
-  "bytes": 10026,
+  "bytes": 10056,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -148,7 +148,7 @@
   "sr_mono": 1
  },
  "contact__legacy__seeded": {
-  "bytes": 14273,
+  "bytes": 14303,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -180,7 +180,7 @@
   "sr_mono": 1
  },
  "contact__screening__seeded": {
-  "bytes": 14276,
+  "bytes": 14306,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -222,7 +222,7 @@
   "sr_mono": 9
  },
  "food-beverage__legacy__seeded": {
-  "bytes": 29204,
+  "bytes": 29234,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
@@ -273,7 +273,7 @@
   "sr_mono": 9
  },
  "food-beverage__screening__seeded": {
-  "bytes": 29213,
+  "bytes": 29243,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
@@ -315,7 +315,7 @@
   "sr_mono": 6
  },
  "home__legacy__seeded": {
-  "bytes": 12679,
+  "bytes": 12831,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -349,7 +349,7 @@
   "sr_mono": 6
  },
  "home__screening__seeded": {
-  "bytes": 12682,
+  "bytes": 12834,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -384,7 +384,7 @@
   "sr_mono": 1
  },
  "portfolio__legacy__seeded": {
-  "bytes": 10583,
+  "bytes": 10613,
   "cta_labels": [
    "Add your shoot to the archive \u2192",
    "Book a shoot \u2192"
@@ -419,7 +419,7 @@
   "sr_mono": 1
  },
  "portfolio__screening__seeded": {
-  "bytes": 10586,
+  "bytes": 10616,
   "cta_labels": [
    "Add your shoot to the archive \u2192",
    "Book a shoot \u2192"
@@ -458,7 +458,7 @@
   "sr_mono": 4
  },
  "portraits__legacy__seeded": {
-  "bytes": 19814,
+  "bytes": 19844,
   "cta_labels": [
    "Book a session \u2192",
    "Inquire about Tier I \u2192",
@@ -500,7 +500,7 @@
   "sr_mono": 4
  },
  "portraits__screening__seeded": {
-  "bytes": 19823,
+  "bytes": 19853,
   "cta_labels": [
    "Book a session \u2192",
    "Inquire about Tier I \u2192",
@@ -543,7 +543,7 @@
   "sr_mono": 8
  },
  "real-estate__legacy__seeded": {
-  "bytes": 20020,
+  "bytes": 20050,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -588,7 +588,7 @@
   "sr_mono": 8
  },
  "real-estate__screening__seeded": {
-  "bytes": 20029,
+  "bytes": 20059,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -627,7 +627,7 @@
   "sr_mono": 2
  },
  "reels__legacy__seeded": {
-  "bytes": 6861,
+  "bytes": 6891,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -661,7 +661,7 @@
   "sr_mono": 2
  },
  "reels__screening__seeded": {
-  "bytes": 6864,
+  "bytes": 6894,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request a quote"
@@ -700,7 +700,7 @@
   "sr_mono": 2
  },
  "services__legacy__seeded": {
-  "bytes": 28365,
+  "bytes": 28395,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request Brand Partner \u2192",
@@ -744,7 +744,7 @@
   "sr_mono": 2
  },
  "services__screening__seeded": {
-  "bytes": 28368,
+  "bytes": 28398,
   "cta_labels": [
    "Book a shoot \u2192",
    "Request Brand Partner \u2192",
@@ -780,7 +780,7 @@
   "sr_mono": 0
  },
  "work-golden-cs__legacy__seeded": {
-  "bytes": 8441,
+  "bytes": 8471,
   "cta_labels": [
    "Book a shoot \u2192",
    "More work",
@@ -812,7 +812,7 @@
   "sr_mono": 0
  },
  "work-golden-cs__screening__seeded": {
-  "bytes": 8444,
+  "bytes": 8474,
   "cta_labels": [
    "Book a shoot \u2192",
    "More work",
@@ -847,7 +847,7 @@
   "sr_mono": 1
  },
  "work__legacy__seeded": {
-  "bytes": 6566,
+  "bytes": 6596,
   "cta_labels": [
    "Book a shoot \u2192"
   ],
@@ -880,7 +880,7 @@
   "sr_mono": 1
  },
  "work__screening__seeded": {
-  "bytes": 6569,
+  "bytes": 6599,
   "cta_labels": [
    "Book a shoot \u2192"
   ],

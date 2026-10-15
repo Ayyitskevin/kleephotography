@@ -38,6 +38,7 @@ UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
 MISSING = "golden missing; run with GOLDEN_UPDATE=1"
 # Fixed at the fixture boundary so the case study's public datePublished is a literal.
 CASE_STUDY_CREATED = "2026-01-10 12:00:00"
+PRESS_OUTLET = "Golden Gazette"
 
 ROUTES = [
     "/",
@@ -147,8 +148,9 @@ def _seed():
         ("The photos did the selling for us.", "Golden client", "Golden Bistro", 1),
     )
     db.run(
-        "INSERT INTO press (outlet, title, url, publish_date) VALUES (?,?,?,?)",
-        ("Golden Gazette", "A room worth the drive", "https://example.com/golden", "2026-01-15"),
+        # show_on_site=1 is the public opt-in (migration 025); this temp DB only.
+        "INSERT INTO press (outlet, title, url, publish_date, show_on_site) VALUES (?,?,?,?,?)",
+        (PRESS_OUTLET, "A room worth the drive", "https://example.com/golden", "2026-01-15", 1),
     )
 
 
@@ -238,3 +240,24 @@ def test_normalisation_removes_churn_and_keeps_content():
 def test_seeded_case_study_golden_keeps_its_published_date(flag):
     golden = (GOLDEN_DIR / f"work-golden-cs__{flag}__seeded.html").read_text(encoding="utf-8")
     assert f'"datePublished": "{CASE_STUDY_CREATED[:10]}"' in golden
+
+
+@pytest.mark.parametrize("flag", FLAGS)
+def test_home_goldens_carry_the_press_seed_only_when_seeded(flag):
+    def home(content):
+        return (GOLDEN_DIR / f"home__{flag}__{content}.html").read_text(encoding="utf-8")
+
+    assert PRESS_OUTLET in home("seeded")
+    assert PRESS_OUTLET not in home("empty")
+
+
+@pytest.mark.parametrize(
+    "seeded_client",
+    [(flag, content) for flag in FLAGS for content in CONTENT],
+    ids=[f"{flag}__{content}" for flag in FLAGS for content in CONTENT],
+    indirect=True,
+)
+def test_home_renders_the_press_seed(seeded_client, request):
+    _flag, content = request.node.callspec.params["seeded_client"]
+    shown = PRESS_OUTLET in seeded_client.get("/").text
+    assert shown is (content == "seeded")
