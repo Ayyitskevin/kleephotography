@@ -436,7 +436,7 @@
   "sr_mono": 4
  },
  "portraits__legacy__empty": {
-  "bytes": 21945,
+  "bytes": 21921,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
@@ -456,7 +456,7 @@
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
-  "middot": 10,
+  "middot": 8,
   "sections": 10,
   "sr_mono": 4
  },
@@ -484,7 +484,7 @@
   "sr_mono": 6
  },
  "portraits__screening__empty": {
-  "bytes": 21954,
+  "bytes": 21930,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
@@ -504,7 +504,7 @@
   "img": 0,
   "img_lazy": 0,
   "img_noalt": 0,
-  "middot": 10,
+  "middot": 8,
   "sections": 10,
   "sr_mono": 4
  },

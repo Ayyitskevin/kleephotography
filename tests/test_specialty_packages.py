@@ -233,6 +233,36 @@ def test_each_native_tier_inquiry_prefills_existing_contact_form(
             assert f"the {tier_text} tier for {expected['contact_service']}" in message
 
 
+def test_portraits_hero_frame_label_needs_a_real_photo(client, theme):
+    """An empty showcase must not paint a fake FR·0000 frame; a seeded photo gets its own number."""
+    from app import specialties
+
+    stock = specialties.SPECIALTIES["pl"]["stock"]
+    markup = client.get("/portraits").text
+    assert "FR&middot;0000" not in markup and "FR·0000" not in markup
+    fig = rendered(client, "/portraits").one("figure", **{"class": "sr-herosplit-fig"})
+    chip = fig.one("span", **{"class": "sr-frameno"}).text()
+    assert chip.startswith(stock) and "FR" not in chip
+
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug,title,pin) VALUES (?,?,?)",
+        ("synthetic-portraits-frame", "Synthetic portraits frame fixture", "synthetic-only"),
+    )
+    asset_id = db.run(
+        """INSERT INTO assets
+           (gallery_id,kind,filename,stored,status,portfolio,portfolio_tag)
+           VALUES (?,'photo','face.jpg','face.jpg','ready',1,'pl/headshots')""",
+        (gallery_id,),
+    )
+    try:
+        fig = rendered(client, "/portraits").one("figure", **{"class": "sr-herosplit-fig"})
+        chip = fig.one("span", **{"class": "sr-frameno"}).text()
+        assert chip.startswith(stock) and f"FR·{asset_id:04d}" in chip
+    finally:
+        db.run("DELETE FROM assets WHERE gallery_id=?", (gallery_id,))
+        db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
+
+
 def test_food_beverage_starter_inquiries_are_independently_disambiguated(client, theme):
     rates = rendered(client, "/food-beverage").one(id="rates")
     seen = []
