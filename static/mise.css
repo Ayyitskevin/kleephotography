@@ -1001,7 +1001,7 @@
   --espresso2: #1c2530;   /* nested panels                                   */
   --cream: #e7dfcd;       /* warm cream text on slate fills                  */
   background: #0e1319;
-}html[data-theme="dark"] .site-body ::selection { background: #e6c9ce; color: #0e1319; }/* ── 2. Shared chrome ───────────────────────────────────────────────────── *//* Scroll-progress: rose→gold sweep. *//* Nav: transparent over the hero, slate glass once scrolled. */html[data-theme="dark"] .site-body .site-nav {
+}html[data-theme="dark"] .site-body ::selection { background: #e6c9ce; color: #0e1319; }/* ── 2. Shared chrome ───────────────────────────────────────────────────── *//* Nav: transparent over the hero, slate glass once scrolled. */html[data-theme="dark"] .site-body .site-nav {
   background: transparent; border-bottom: 1px solid transparent;
   transition: background .45s ease, padding .45s ease, box-shadow .45s ease, border-color .45s ease;
 }html[data-theme="dark"] .site-body .site-nav.scrolled {

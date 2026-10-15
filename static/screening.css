@@ -1625,8 +1625,6 @@ body.sr-admin .admin-shell, body.sr-admin {
 
 @media (prefers-reduced-motion: reduce) {
   .sr [data-reveal] { transition-delay: 0s !important; }
-  .sr .sr-btn { transition: none; }
-  .sr .sr-btn:active { transform: none; }
   ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
   .sr .sr-screen::after { animation: none; }
   .sr .sr-screen--reel > img { animation: none; }
@@ -1648,10 +1646,17 @@ body.sr-admin .admin-shell, body.sr-admin {
    Icon-only actions use .sr-icon-btn. Anything else is legacy — migrate,
    don't add new one-off systems. */
 .sr .sr-btn--sm { padding: 9px 14px; font-size: 10.5px; letter-spacing: 0.08em; }
-/* press feedback (D-8): colour swaps and the :active press ride the fast token */
-.sr .sr-btn { transition: background var(--sr-t-fast), color var(--sr-t-fast),
+/* press feedback (D-8): colour swaps and the :active press ride the fast token.
+   Scoped to the marketing shell (body.site-body.sr): the admin deck and the
+   client surfaces get no new motion. The reduced-motion override sits right
+   AFTER these rules on purpose: equal specificity, so source order decides. */
+.site-body.sr .sr-btn { transition: background var(--sr-t-fast), color var(--sr-t-fast),
   transform var(--sr-t-fast); }
-.sr .sr-btn:active { transform: scale(0.98); }
+.site-body.sr .sr-btn:active { transform: scale(0.98); }
+@media (prefers-reduced-motion: reduce) {
+  .site-body.sr .sr-btn { transition: none; }
+  .site-body.sr .sr-btn:active { transform: none; }
+}
 .sr .sr-btn--danger { background: transparent; color: var(--sr-danger);
   border: 1px solid var(--sr-danger); }
 .sr .sr-btn--danger:hover, .sr .sr-btn--danger:focus-visible {
