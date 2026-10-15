@@ -11,6 +11,20 @@ and, on admin pages only ([`templates/admin/base_admin.html`](../templates/admin
 4. `mise-admin.css` inside `@import … layer(mise)` — the `.admin-shell` half of
    the legacy sheet, appended to the same layer after `mise.css`
 
+### 2026-10-15 — marketing subset and the deck sheet (plan R-2)
+
+- `site/base_site.html` overrides `base.html`'s `{% block legacy_css %}` with
+  `mise-site.css`: the subset of `mise.css` the marketing pages can use (verbatim, same
+  order, same `layer(mise)`). Every other surface still imports the full `mise.css`.
+  `scripts/css_split_measure.py subset` regenerates it; the measurement is in
+  [`CSS-SPLIT-R2-MEASUREMENT.md`](CSS-SPLIT-R2-MEASUREMENT.md). A new marketing class that
+  needs a legacy `mise.css` rule means regenerating the subset (`css_split_build.py build`
+  is pinned to the R-2 base ref; re-run `measure`/`subset` against current main).
+- `screening-admin.css` (linked by `admin/base_admin.html`, after `screening.css`) carries the
+  admin-only COMMAND DECK rules **and a verbatim repeat of the public rules that follow them**,
+  so on admin pages every rule's last occurrence keeps its old order. Shared rules live in both
+  sheets: edit both (`tests/test_css_split.py` fails when they drift).
+
 Kill switch: `MISE_SCREENING_ROOM=false` → no `body.sr` / `sr-admin`; cream +
 admin shell fall back to mise.css + mise-admin.css only. Money docs opt into
 `sr-moneydoc` or stay `.cream-theme`.

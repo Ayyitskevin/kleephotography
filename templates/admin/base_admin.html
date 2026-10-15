@@ -10,6 +10,7 @@
    layer — so the unlayered Screening Room sheets keep out-ranking both, and the
    admin sheet still lands after mise.css inside the layer. #}
 <style>@import url("/static/mise-admin.css?v={{ static_rev }}") layer(mise);</style>
+<link rel="stylesheet" href="/static/screening-admin.css?v={{ static_rev }}">
 {# Self-hosted typefaces — no Google Fonts CDN (no third-party request, no
    layout-shift wait on a remote stylesheet). fonts.css is loaded once for
    every surface by base.html; these preloads jump the queue for the two

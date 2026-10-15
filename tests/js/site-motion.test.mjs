@@ -11,6 +11,7 @@ import vm from "node:vm";
 const read = (rel) => fs.readFileSync(new URL(`../../${rel}`, import.meta.url), "utf8");
 const siteJs = read("static/site.js");
 const sheets = { "static/screening.css": read("static/screening.css"),
+                 "static/screening-admin.css": read("static/screening-admin.css"),
                  "static/screening-room-tokens.css": read("static/screening-room-tokens.css") };
 
 test("site.js registers no scroll listener (text)", () => {

@@ -1,0 +1,919 @@
+/* screening-admin.css: the admin shell's half of the Screening Room sheet (plan R-2)
+   Loaded only by admin/base_admin.html, after screening.css.
+
+   This is the tail of the old single-file screening.css, VERBATIM, from the COMMAND DECK header
+   to the end of the file. Besides the admin-only deck rules it repeats the public rules that sat
+   among and after them (breakpoints, motion, the shared UI primitives). The repeat is on purpose:
+   when two rules tie, the later one wins, and moving only the admin rules out would let them
+   overtake public rules that used to come after them. Repeating the tail after them keeps every
+   rule's last occurrence in its old order (scripts/css_split_build.py verify checks this).
+   Edit a shared rule in BOTH sheets, or edit it only here when it is admin-only.
+   Plan: ops/CSS-SPLIT-R2-MEASUREMENT.md. */
+
+/* ═══ THE COMMAND DECK — admin shell (3h/3i/3j) ═══════════════════════════── */
+body.sr.sr-admin { background: var(--sr-panel); color: var(--sr-ink);
+  font-family: var(--sr-sans); }
+.sr-admin .admin-shell { display: flex; min-height: 100vh; background: var(--sr-panel); }
+.sr-admin .admin-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* 64px icon rail */
+.sr-admin .sr-rail { width: 64px; flex: none; position: sticky; top: 0;
+  height: 100vh; display: flex; flex-direction: column; align-items: center;
+  gap: 6px; padding: 16px 0; background: var(--sr-card);
+  border-right: 1px solid var(--sr-line-faint); z-index: 40; }
+.sr-admin .sr-rail-brand { width: 34px; height: 34px; background: var(--sr-amber);
+  color: var(--sr-house); display: flex; align-items: center; justify-content: center;
+  font: 800 15px/1 var(--sr-sans); text-decoration: none; margin-bottom: 14px; }
+.sr-admin .sr-rail a:not(.sr-rail-brand), .sr-admin .sr-rail-cmd { width: 44px;
+  min-height: 44px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; color: var(--sr-ink-faint); text-decoration: none;
+  background: none; border: 0; cursor: pointer; }
+.sr-admin .sr-rail-ico { font-size: 16px; line-height: 1; font-style: normal; }
+.sr-admin .sr-rail-lbl { font: 500 7.5px/1 var(--sr-mono); letter-spacing: 0.12em;
+  text-transform: uppercase; }
+.sr-admin .sr-rail a.is-active { color: var(--sr-cream); background: var(--sr-line-faint);
+  border-left: 2px solid var(--sr-amber); }
+.sr-admin .sr-rail a:hover, .sr-admin .sr-rail-cmd:hover { color: var(--sr-cream); }
+.sr-admin .sr-rail-pulse { margin-top: auto; width: 8px; height: 8px;
+  border-radius: 99px; background: var(--sr-ok-deep); animation: sr-pulse 2.4s infinite; }
+@keyframes sr-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sr-admin .sr-rail-pulse { animation: none; } }
+
+/* Re-point the legacy admin variable set at the house tokens: every mise
+   component that reads var(--surface)/var(--line)/var(--terra)… converts
+   wholesale, so long-tail pages can't leak the old palettes. Radii collapse
+   to the house's hard corners; shadows go ambient-only. */
+body.sr-admin .admin-shell, body.sr-admin {
+  --bg: var(--sr-panel); --bg-glow: var(--sr-panel);
+  --surface: var(--sr-card); --surface-sunk: var(--sr-house-deep);
+  --surface-rail: var(--sr-card);
+  --ink: var(--sr-ink); --ink-soft: var(--sr-ink-soft);
+  --ink-faint: var(--sr-ink-faint); --ink-ghost: var(--sr-ink-ghost);
+  --terra: var(--sr-amber); --terra-deep: #8a5e1c;
+  --terra-tint: rgba(227, 154, 45, 0.08); --terra-tint-2: rgba(227, 154, 45, 0.16);
+  --ok: var(--sr-ok); --ok-bg: rgba(127, 192, 154, 0.08);
+  --ok-line: rgba(74, 140, 106, 0.5);
+  --honey: var(--sr-amber); --honey-bg: rgba(227, 154, 45, 0.08);
+  --honey-line: rgba(227, 154, 45, 0.35);
+  --neutral: var(--sr-ink-mute); --neutral-bg: #141311;
+  --neutral-line: var(--sr-line-raised);
+  --clay: var(--sr-warn); --clay-bg: rgba(201, 111, 74, 0.08);
+  --clay-line: rgba(201, 111, 74, 0.4);
+  --line: var(--sr-line-faint); --line-strong: var(--sr-line-strong);
+  --line-faint: #141311;
+  --r-sm: 0; --r: 0; --r-lg: 0;
+  --shadow-sm: none; --shadow: none;
+  --shadow-lg: 0 24px 90px -32px rgba(0, 0, 0, 0.95);
+  --font-display: var(--sr-sans); --font-ui: var(--sr-sans);
+  --accent: var(--sr-amber); --accent-lt: var(--sr-amber); --gold: var(--sr-amber);
+  --dash-gold: var(--sr-amber);
+  --cream: var(--sr-cream); --muted: var(--sr-ink-faint);
+  --card: var(--sr-card); --card-bg: var(--sr-card); --paper2: var(--sr-card);
+  --espresso: var(--sr-house-deep); --espresso2: var(--sr-card);
+  --sans: var(--sr-sans); --serif: var(--sr-serif);
+  background: var(--sr-panel);
+}
+
+/* topbar */
+.sr-admin .admin-topbar { background: var(--sr-panel);
+  border-bottom: 1px solid var(--sr-line-faint); }
+.sr-admin .admin-topbar h1 { color: var(--sr-cream); font: 700 20px/1.2 var(--sr-sans);
+  letter-spacing: 0.03em; }
+.sr-admin .v4-eyebrow { font: 500 9.5px/1 var(--sr-mono); letter-spacing: 0.24em;
+  text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr-admin .v4-summary { color: var(--sr-ink-mute); }
+.sr-admin .v4-summary b { color: var(--sr-ink); }
+.sr-admin .v4-sell { color: var(--sr-amber); }
+.sr-admin .dash-search input { background: var(--sr-card);
+  border: 1px solid var(--sr-line-raised); color: var(--sr-cream); border-radius: 0; }
+.sr-admin .dash-signout { background: none; border: 1px solid var(--sr-line-raised);
+  color: var(--sr-ink-soft); border-radius: 0; cursor: pointer; }
+.sr-admin .dash-new, .sr-admin .qc-btn { background: var(--sr-amber); color: var(--sr-house);
+  border-radius: 0; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.sr-admin .qc-menu { background: var(--sr-overlay); border: 1px solid var(--sr-line-raised);
+  border-radius: 0; box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9); }
+.sr-admin .qc-menu a { color: var(--sr-ink); }
+.sr-admin .qc-menu a:hover { background: var(--sr-line-faint); color: var(--sr-cream); }
+
+/* deck layout */
+.sr-admin .sr-deck { padding: 22px 30px; }
+.sr-admin .sr-deck-grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px;
+  align-items: start; }
+.sr-admin .sr-ondeck { border: 1px solid var(--sr-line-faint); background: var(--sr-card);
+  padding: 18px; display: flex; flex-direction: column; gap: 12px;
+  position: sticky; top: 16px; }
+.sr-admin .sr-ondeck-cards { display: flex; flex-direction: column; gap: 8px; }
+.sr-admin .sr-deckcard { border: 1px solid #26241f; padding: 12px 14px;
+  border-left: 3px solid var(--sr-line-raised); }
+.sr-admin .sr-deckcard--amber { border-left-color: var(--sr-amber);
+  border-color: #3a2c20; background: rgba(227, 154, 45, 0.06); }
+.sr-admin .sr-deckcard--pl { border-left-color: var(--sr-stock-pl); }
+.sr-admin .sr-deckcard--fb { border-left-color: var(--sr-stock-fb); }
+.sr-admin .sr-deckcard--ok { border-left-color: var(--sr-ok-deep); }
+.sr-admin .sr-deckcard-head { display: flex; justify-content: space-between;
+  gap: 10px; margin-bottom: 4px; align-items: baseline; }
+.sr-admin .sr-deckcard-title { font: 600 12.5px/1.4 var(--sr-sans);
+  color: var(--sr-cream); text-decoration: none; }
+.sr-admin .sr-deckcard-badge { font: 500 11px/1 var(--sr-mono); letter-spacing: 0.1em;
+  color: var(--sr-warn); white-space: nowrap; }
+.sr-admin .sr-deckcard small { font-size: 11px; color: var(--sr-ink-mute);
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-admin .sr-deckcard-actions { display: flex; align-items: center; gap: 10px;
+  margin-top: 9px; }
+.sr-admin .sr-deckcard-go { font: 700 9.5px/1 var(--sr-mono); letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--sr-house); background: var(--sr-amber);
+  padding: 7px 11px; text-decoration: none; }
+.sr-admin .sr-deckcard--pl .sr-deckcard-go { background: var(--sr-stock-pl); }
+.sr-admin .sr-deckcard--fb .sr-deckcard-go { background: var(--sr-stock-fb); }
+.sr-admin .sr-deckcard--ok .sr-deckcard-go { background: var(--sr-ok-deep); }
+.sr-admin .sr-deckcard-2nd { font: 500 9.5px/1 var(--sr-mono); letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--sr-ink-soft); text-decoration: none;
+  border: 1px solid var(--sr-line-raised); padding: 6px 10px; }
+.sr-admin .sr-deckcard-snooze { margin-left: auto; }
+.sr-admin .sr-deckcard-snooze button { background: none; border: 0;
+  color: var(--sr-ink-ghost); cursor: pointer; font-size: 13px; }
+.sr-admin .sr-deckcard-snooze button:hover { color: var(--sr-amber); }
+.sr-admin .sr-daystrip { margin-top: auto; border-top: 1px solid var(--sr-line-faint);
+  padding-top: 14px; font: 500 9.5px/1.9 var(--sr-mono); letter-spacing: 0.08em;
+  color: var(--sr-ink-faint); display: flex; flex-direction: column; }
+.sr-admin .sr-daystrip a { color: var(--sr-ink-faint); text-decoration: none; }
+.sr-admin .sr-daystrip a:hover { color: var(--sr-cream); }
+.sr-admin .sr-daystrip-aerial { color: var(--sr-stock-re); }
+.sr-admin .sr-deck-main { display: flex; flex-direction: column; gap: 16px;
+  min-width: 0; }
+
+/* panels & the shared admin vocabulary on the house */
+.sr-admin .dash-panel, .sr-admin .dash-money, .sr-admin .card,
+.sr-admin .v4-activity-strip { background: var(--sr-card);
+  border: 1px solid var(--sr-line-faint); border-radius: 0; box-shadow: none; }
+.sr-admin .dash-panel-head h2, .sr-admin h2 { color: var(--sr-cream);
+  font-family: var(--sr-sans); letter-spacing: 0.04em; }
+.sr-admin .dash-panel-head .count { color: var(--sr-ink-faint);
+  font-family: var(--sr-mono); font-size: 10px; }
+.sr-admin a.link, .sr-admin .link { color: var(--sr-amber); }
+.sr-admin .v4-fig { color: var(--sr-cream-strong); font-family: var(--sr-mono); }
+.sr-admin .v4-fig span { color: var(--sr-ink-faint); font-family: var(--sr-sans); }
+.sr-admin .v4-goal { color: var(--sr-ink-faint); font-family: var(--sr-mono); }
+.sr-admin .v4-bar { background: #26241f; border-radius: 0; }
+.sr-admin .v4-bar.is-current { background: linear-gradient(180deg, var(--sr-amber), #8a5e1c); }
+.sr-admin .v4-mlabel { color: var(--sr-ink-ghost); font-family: var(--sr-mono); }
+.sr-admin .v4-mlabel.is-current { color: var(--sr-amber); }
+.sr-admin .v4-galcard, .sr-admin .v4-galnew { background: var(--sr-panel);
+  border: 1px solid var(--sr-line-faint); border-radius: 0; }
+.sr-admin .v4-galcard:hover { border-color: var(--sr-amber); }
+.sr-admin .v4-galcap b { color: var(--sr-cream); }
+.sr-admin .v4-galcap small { color: var(--sr-ink-faint); }
+.sr-admin .v4-galchip { border-radius: 0; font-family: var(--sr-mono);
+  letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .v4-galchip.is-live { background: var(--sr-ok-deep); color: var(--sr-house); }
+.sr-admin .v4-galchip.is-draft { background: var(--sr-line-raised); color: var(--sr-ink); }
+.sr-admin .v4-fcell { border-radius: 0; font-family: var(--sr-mono); font-size: 9.5px;
+  letter-spacing: 0.08em; text-transform: uppercase; }
+.sr-admin .v4-fcell.is-in { background: rgba(227, 154, 45, 0.14); color: var(--sr-amber); }
+.sr-admin .v4-fcell.is-live { background: var(--sr-line-faint); color: var(--sr-ink); }
+.sr-admin .v4-fcell.is-hatch { background: repeating-linear-gradient(45deg,
+  transparent 0 6px, var(--sr-line-faint) 6px 8px); color: var(--sr-ink-ghost); }
+.sr-admin .dash-activity li, .sr-admin .dash-act-text { color: var(--sr-ink-mute); }
+.sr-admin .dash-act-text b { color: var(--sr-ink); }
+.sr-admin .dash-act-time { color: var(--sr-ink-ghost); font-family: var(--sr-mono); }
+.sr-admin .dash-empty { color: var(--sr-ink-faint); }
+.sr-admin .unlinked-warn { background: rgba(201, 111, 74, 0.07);
+  border: 1px solid var(--sr-warn); border-radius: 0; color: var(--sr-ink); }
+.sr-admin .unlinked-warn select, .sr-admin select, .sr-admin input, .sr-admin textarea {
+  background: var(--sr-panel); border: 1px solid var(--sr-line-raised);
+  color: var(--sr-cream); border-radius: 0; }
+.sr-admin .unlinked-warn button, .sr-admin button[type="submit"]:not(.sr-deckcard-snooze button) {
+  background: var(--sr-amber); color: var(--sr-house); border: 0; border-radius: 0;
+  font-weight: 700; cursor: pointer; }
+.sr-admin table { border-color: var(--sr-line-faint); }
+.sr-admin table th { color: var(--sr-ink-ghost); font: 500 11px/1.4 var(--sr-mono);
+  letter-spacing: 0.18em; text-transform: uppercase;
+  border-bottom: 1px solid var(--sr-line-faint); background: none; }
+.sr-admin table td { color: var(--sr-ink); border-top: 1px solid #141311; }
+.sr-admin .admin-main { background: none; }
+.sr-admin .muted { color: var(--sr-ink-faint); }
+/* Offset pager (Newer/Older) under the paginated ledgers. Every rule stays
+   .sr-admin-scoped so MISE_SCREENING_ROOM=false renders exactly as before —
+   that stack sees no body.sr, so the markup keeps `muted` as the only colour
+   mise.css can give this element (ops/CSS-DUAL-STACK.md). */
+.sr-admin .sr-pager { margin: 14px 0 0; color: var(--sr-ink-ghost);
+  font-family: var(--sr-mono); font-size: 11px; letter-spacing: 0.1em; }
+.sr-admin .sr-pager a { color: var(--sr-amber); }
+
+/* ⌘K palette on the house */
+.sr-admin .ns-pal { background: rgba(4, 4, 5, 0.7); }
+.sr-admin .ns-pal-box { background: var(--sr-overlay); border: 1px solid var(--sr-line-raised);
+  border-radius: 0; box-shadow: 0 40px 120px -30px rgba(0, 0, 0, 1); }
+.sr-admin .ns-pal-head { border-bottom: 1px solid var(--sr-line); }
+.sr-admin .ns-pal-input { background: none; color: var(--sr-cream); }
+.sr-admin .ns-pal-esc, .sr-admin .ns-pal-foot { color: var(--sr-ink-ghost);
+  font-family: var(--sr-mono); }
+.sr-admin .ns-pal-group { color: var(--sr-ink-ghost); font: 500 11px/1 var(--sr-mono);
+  letter-spacing: 0.2em; text-transform: uppercase; }
+.sr-admin .ns-pal-row { color: var(--sr-ink-soft); border-radius: 0; }
+.sr-admin .ns-pal-row.sel { background: #1c1911; border-left: 2px solid var(--sr-amber);
+  color: var(--sr-cream); }
+.sr-admin .ns-pal-ic { color: var(--sr-amber); font-family: var(--sr-mono); }
+.sr-admin .ns-pal-sub { color: var(--sr-ink-ghost); font-family: var(--sr-mono);
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* the bench (3i): culling focus + premiere check */
+.sr-admin .sr-bench-keys { margin-left: 14px; letter-spacing: 0.12em;
+  color: var(--sr-ink-ghost); white-space: nowrap; }
+.sr-admin .gd-tile.is-culling { outline: 2px solid var(--sr-amber);
+  outline-offset: 2px; }
+.sr-admin .gd-eyebrow { font: 500 9.5px/1 var(--sr-mono); letter-spacing: 0.24em;
+  text-transform: uppercase; color: var(--sr-amber); }
+.sr-admin .sr-premcheck { border: 1px solid rgba(227, 154, 45, 0.35);
+  background: rgba(227, 154, 45, 0.05); padding: 14px 16px; display: flex;
+  flex-direction: column; gap: 7px; font-size: 11.5px; line-height: 1.5;
+  color: #cbb888; margin-bottom: 14px; }
+.sr-admin .sr-premcheck .sr-mono { letter-spacing: 0.2em; margin-bottom: 4px; }
+.sr-admin .sr-premcheck .is-ok { color: var(--sr-ok); }
+.sr-admin .sr-premcheck .is-miss { color: var(--sr-ink-mute); }
+.sr-admin .sr-premcheck .sr-rec { font-size: 11px; }
+
+/* the ledger (3i): month reel + one action per row */
+.sr-admin .sr-monthreel { display: flex; align-items: flex-end; gap: 10px;
+  height: 74px; margin: 0 0 18px; border-bottom: 1px solid var(--sr-line-faint);
+  padding-bottom: 12px; }
+.sr-admin .sr-monthreel-col { flex: 1; display: flex; flex-direction: column;
+  justify-content: flex-end; gap: 5px; height: 100%; }
+.sr-admin .sr-monthreel-col i { display: block; background: #26241f; }
+.sr-admin .sr-monthreel-col i.is-current { background: linear-gradient(180deg,
+  var(--sr-amber), #8a5e1c); }
+.sr-admin .sr-monthreel-col small { font: 500 11px/1 var(--sr-mono);
+  letter-spacing: 0.1em; color: var(--sr-ink-ghost); text-align: center; }
+.sr-admin .sr-monthreel-col small.is-current { color: var(--sr-amber); }
+.sr-admin .sr-ledger-act { display: inline-block; border: 1px solid var(--sr-line-raised);
+  color: var(--sr-ink-soft); font: 700 11px/1 var(--sr-mono); letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 7px 12px; text-decoration: none; }
+.sr-admin .sr-ledger-act.is-warn { background: var(--sr-warn); border-color: var(--sr-warn);
+  color: var(--sr-house); }
+.sr-admin .fin-tbl { font-family: var(--sr-mono); font-size: 11px; }
+.sr-admin .fin-tbl .fin-strong { font-family: var(--sr-sans); color: var(--sr-cream); }
+.sr-admin .fin-pill { border-radius: 0; font-family: var(--sr-mono);
+  letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .fin-card { background: var(--sr-card); border: 1px solid var(--sr-line-faint);
+  border-radius: 0; box-shadow: none; }
+.sr-admin .fin-card-val { color: var(--sr-cream-strong); font-family: var(--sr-mono); }
+.sr-admin .fin-card-label { color: var(--sr-ink-ghost); font: 500 11px/1 var(--sr-mono);
+  letter-spacing: 0.18em; text-transform: uppercase; }
+.sr-admin .fin-card-sub { color: var(--sr-ink-faint); }
+.sr-admin .fin-export, .sr-admin .fin-panel { background: var(--sr-card);
+  border: 1px solid var(--sr-line-faint); border-radius: 0; }
+.sr-admin .fin-range-pill { border-radius: 0; border: 1px solid var(--sr-line-raised);
+  color: var(--sr-ink-soft); }
+.sr-admin .fin-range-on { background: var(--sr-amber); border-color: var(--sr-amber);
+  color: var(--sr-house); }
+.sr-admin .fin-dl { background: var(--sr-amber); color: var(--sr-house);
+  border-radius: 0; border: 0; font-weight: 700; }
+
+/* focused project + the shared admin panel vocabulary (sweep) */
+.sr-admin .pgtop { background: var(--sr-panel);
+  border-bottom: 1px solid var(--sr-line-faint); }
+.sr-admin .pgtop h1 { color: var(--sr-cream); letter-spacing: 0.03em; }
+.sr-admin .pgtop-sub { color: var(--sr-ink-faint); }
+.sr-admin .pgtop-link { color: var(--sr-amber); }
+.sr-admin .pgtop-new { background: var(--sr-amber); color: var(--sr-house);
+  border-radius: 0; font-weight: 700; }
+.sr-admin .panel, .sr-admin .gd-live, .sr-admin .gd-rail section,
+.sr-admin .fin-wrap section { border-radius: 0; }
+.sr-admin .panel { background: var(--sr-card); border: 1px solid var(--sr-line-faint);
+  box-shadow: none; }
+.sr-admin .room-pill { border-radius: 0; font: 700 11px/1 var(--sr-mono);
+  letter-spacing: 0.14em; text-transform: uppercase; background: #241d10;
+  color: var(--sr-amber); border: 1px solid rgba(227, 154, 45, 0.4); }
+.sr-admin .room-lbl { font: 500 11px/1.4 var(--sr-mono); letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--sr-ink-faint); }
+.sr-admin .room-lbl.is-now { color: var(--sr-amber); }
+.sr-admin .timeline-when { font-family: var(--sr-mono); color: var(--sr-ink-ghost); }
+.sr-admin .timeline-text { color: var(--sr-ink); }
+.sr-admin .kind-badge { border-radius: 0; font-family: var(--sr-mono);
+  letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .gd-status { border-radius: 0; font: 700 11px/1 var(--sr-mono);
+  letter-spacing: 0.14em; text-transform: uppercase; }
+.sr-admin .gd-status.is-live { background: var(--sr-ok-deep); color: var(--sr-house); }
+.sr-admin .gd-status.is-draft { background: var(--sr-line-raised); color: var(--sr-ink); }
+.sr-admin .gd-pill { border-radius: 0; border: 1px solid var(--sr-line-raised);
+  background: none; color: var(--sr-ink-soft); font-family: var(--sr-mono);
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .gd-pill.is-active { background: var(--sr-cream); border-color: var(--sr-cream);
+  color: var(--sr-house); }
+.sr-admin .gd-stat { background: var(--sr-card); border: 1px solid var(--sr-line-faint);
+  border-radius: 0; }
+.sr-admin .gd-stat-n { color: var(--sr-cream-strong); font-family: var(--sr-mono); }
+.sr-admin .gd-stat-l { color: var(--sr-ink-ghost); font: 500 11px/1.4 var(--sr-mono);
+  letter-spacing: 0.16em; text-transform: uppercase; }
+.sr-admin .gd-tile { border-radius: 0; background: var(--sr-house-deep); }
+
+/* focused project (3h): workbench · money · wire */
+.sr-admin .sr-stockchip { border: 1px solid rgba(210, 145, 63, 0.4);
+  color: var(--sr-stock-fb); padding: 4px 9px; letter-spacing: 0.14em; }
+.sr-admin .sr-focus-grid { display: grid; grid-template-columns: 1.5fr 1fr;
+  gap: 16px; margin: 0 0 16px; align-items: start; }
+.sr-admin .sr-focus-stack { display: flex; flex-direction: column; gap: 12px; }
+.sr-admin .sr-workbench-list { display: flex; flex-direction: column; gap: 10px;
+  font-size: 12.5px; padding: 4px 0 14px; }
+.sr-admin .sr-workbench-list .is-ok { color: var(--sr-ok); }
+.sr-admin .sr-workbench-list .is-warn { color: var(--sr-warn); }
+.sr-admin .sr-workbench-list .is-warn a { color: var(--sr-warn);
+  text-decoration: underline; }
+.sr-admin .sr-workbench-list .is-dim { color: var(--sr-ink-mute); }
+.sr-admin .sr-workbench-list .is-recline { color: var(--sr-amber); display: flex;
+  align-items: center; gap: 10px; flex-wrap: wrap; }
+.sr-admin .sr-progressline { flex: 1; min-width: 90px; height: 2px;
+  background: #26241f; position: relative; font-style: normal; }
+.sr-admin .sr-progressline b { position: absolute; left: 0; top: 0; bottom: 0;
+  background: var(--sr-amber); }
+.sr-admin .sr-workbench-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+.sr-admin .sr-moneycard-row { display: flex; justify-content: space-between;
+  gap: 12px; font-size: 12.5px; color: var(--sr-ink-soft); margin-bottom: 6px; }
+.sr-admin .sr-moneycard-row b { font-family: var(--sr-mono); }
+.sr-admin .sr-moneycard-row.is-sub { font-size: 11.5px; color: var(--sr-ink-mute); }
+.sr-admin .sr-moneycard-row .is-in { color: var(--sr-ok); }
+.sr-admin .sr-moneycard-cta { background: none; border: 1px solid
+  rgba(227, 154, 45, 0.45); color: var(--sr-amber); font: 500 9.5px/1 var(--sr-mono);
+  letter-spacing: 0.12em; text-transform: uppercase; padding: 9px 13px;
+  cursor: pointer; border-radius: 0; }
+.sr-admin .sr-moneycard-cta:hover { background: var(--sr-amber);
+  color: var(--sr-house); }
+.sr-admin .sr-wirecard-list { display: flex; flex-direction: column; gap: 8px;
+  font-size: 11.5px; color: var(--sr-ink-soft); }
+.sr-admin .sr-wirecard-list b { font-family: var(--sr-mono); font-weight: 400;
+  font-size: 9.5px; color: var(--sr-ink-ghost); margin-right: 6px; }
+@media (max-width: 1000px) { .sr-admin .sr-focus-grid { grid-template-columns: 1fr; } }
+
+/* inbox — the reply queue in house clothes */
+.sr-admin .ib { background: var(--sr-panel); }
+.sr-admin .ib-threads, .sr-admin .ib-convo, .sr-admin .ib-context {
+  background: var(--sr-panel); border-color: var(--sr-line-faint); }
+.sr-admin .ib-threads-head h1 { color: var(--sr-cream); letter-spacing: 0.04em; }
+.sr-admin .ib-tab { border-radius: 0; color: var(--sr-ink-faint);
+  font: 600 11px/1 var(--sr-sans); letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .ib-tab.is-active { color: var(--sr-amber); border-color: var(--sr-amber); }
+.sr-admin .ib-tab-n { background: var(--sr-line-faint); color: var(--sr-ink);
+  border-radius: 0; font-family: var(--sr-mono); }
+.sr-admin .ib-row { border-bottom: 1px solid var(--sr-line-faint); border-radius: 0; }
+.sr-admin .ib-row.is-active { background: #1c1911; border-left: 2px solid var(--sr-amber); }
+.sr-admin .ib-row-name { color: var(--sr-cream); }
+.sr-admin .ib-row-time { color: var(--sr-ink-ghost); font-family: var(--sr-mono);
+  font-size: 11px; }
+.sr-admin .ib-preview { color: var(--sr-ink-faint); }
+.sr-admin .ib-chan { border-radius: 0; font-family: var(--sr-mono); font-size: 11px;
+  letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .ib-dot { background: var(--sr-amber); }
+.sr-admin .ib-av { border-radius: 0; font-family: var(--sr-mono); }
+.sr-admin .ib-convo-name h2 { color: var(--sr-cream); }
+.sr-admin .ib-convo-sub, .sr-admin .ib-convo-when { color: var(--sr-ink-faint); }
+.sr-admin .ib-bubble { background: var(--sr-card); border: 1px solid var(--sr-line-faint);
+  color: var(--sr-ink); border-radius: 0; }
+.sr-admin .ib-bubble-out { background: #1c1911;
+  border-color: rgba(227, 154, 45, 0.35); color: var(--sr-ink-soft); }
+.sr-admin .ib-bubble-meta { color: var(--sr-ink-ghost); font-family: var(--sr-mono);
+  font-size: 11px; letter-spacing: 0.08em; }
+.sr-admin .ib-reply { background: var(--sr-card); border-top: 1px solid var(--sr-line-faint); }
+.sr-admin .ib-snippet { border: 1px solid var(--sr-line-raised); border-radius: 0;
+  background: none; color: var(--sr-ink-soft); cursor: pointer; }
+.sr-admin .ib-snippet:hover { border-color: var(--sr-amber); color: var(--sr-amber); }
+.sr-admin .ib-reply-send { background: var(--sr-amber); color: var(--sr-house);
+  border: 0; border-radius: 0; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; cursor: pointer; }
+.sr-admin .ib-reply-note { color: var(--sr-ink-ghost); }
+.sr-admin .ib-reply-sent { color: var(--sr-ok); }
+.sr-admin .ib-act { border: 1px solid var(--sr-line-raised); border-radius: 0;
+  background: none; color: var(--sr-ink-soft); }
+.sr-admin .ib-act:hover { border-color: var(--sr-amber); color: var(--sr-cream); }
+.sr-admin .ib-act-primary { background: var(--sr-amber); border-color: var(--sr-amber);
+  color: var(--sr-house); font-weight: 700; }
+.sr-admin .ib-ctx-label, .sr-admin .ib-ctx-k, .sr-admin .ib-ctx-rk {
+  font: 500 11px/1.4 var(--sr-mono); letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--sr-ink-ghost); }
+.sr-admin .ib-ctx-rv { color: var(--sr-ink); }
+.sr-admin .ib-context h3 { color: var(--sr-cream); }
+.sr-admin .ib-stage { border-radius: 0; font-family: var(--sr-mono);
+  letter-spacing: 0.1em; text-transform: uppercase; }
+.sr-admin .ib-blank, .sr-admin .ib-empty-list { color: var(--sr-ink-ghost); }
+
+/* activity / audit / today — the mono ledger treatment */
+.sr-admin .audit-feed { border: 1px solid var(--sr-line-faint);
+  background: var(--sr-card); }
+.sr-admin .audit-row { border-bottom: 1px solid #141311; font-family: var(--sr-mono);
+  font-size: 11px; }
+.sr-admin .audit-time { color: var(--sr-ink-ghost); }
+.sr-admin .audit-title { color: var(--sr-ink); font-family: var(--sr-sans); }
+.sr-admin .audit-actor { color: var(--sr-ink-faint); }
+.sr-admin .audit-amount { color: var(--sr-cream-strong); font-variant-numeric: tabular-nums; }
+.sr-admin .audit-detail { color: var(--sr-ink-faint); }
+.sr-admin .audit-chip { border: 1px solid var(--sr-line-raised); border-radius: 0;
+  background: none; color: var(--sr-ink-soft); font: 500 9.5px/1 var(--sr-mono);
+  letter-spacing: 0.12em; text-transform: uppercase; }
+.sr-admin .audit-chip.is-active { background: var(--sr-cream); border-color: var(--sr-cream);
+  color: var(--sr-house); }
+.sr-admin .audit-chip-n { color: inherit; opacity: 0.7; }
+.sr-admin .audit-ic { color: var(--sr-amber); }
+.sr-admin .audit-foot, .sr-admin .audit-note { color: var(--sr-ink-ghost); }
+.sr-admin .today-quiet { border: 1px dashed var(--sr-line-raised);
+  color: var(--sr-ink-faint); background: none; }
+.sr-admin .list .warn { color: var(--sr-warn); }
+.sr-admin .list .neg { color: var(--sr-warn); }
+.sr-admin .inquiry-msg { background: var(--sr-house-deep);
+  border: 1px solid var(--sr-line-faint); color: var(--sr-ink); }
+.sr-admin .sched-table td, .sr-admin .sched-table th { border-color: #141311; }
+.sr-admin .sched-note td { color: var(--sr-ink-faint); font-family: var(--sr-mono);
+  font-size: 10.5px; }
+.sr-admin .sched-off { opacity: 0.55; }
+.sr-admin .sr-preflight { display: inline-block; margin-left: 8px;
+  font: 700 11px/1 var(--sr-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--sr-house); background: var(--sr-stock-re); padding: 4px 7px; }
+.sr-admin .linkbtn { color: var(--sr-amber); background: none; border: 0; cursor: pointer; }
+.sr-admin .linkbtn.danger { color: var(--sr-warn); }
+.sr-admin .badge { border-radius: 0; font-family: var(--sr-mono); font-size: 11px;
+  letter-spacing: 0.12em; text-transform: uppercase; }
+.sr-admin .studio-view-toggle button { border-radius: 0; border: 1px solid
+  var(--sr-line-raised); background: none; color: var(--sr-ink-soft); }
+.sr-admin .studio-view-toggle button.is-active { background: var(--sr-cream);
+  border-color: var(--sr-cream); color: var(--sr-house); }
+/* the crew-pass password input reads left-aligned (not PIN-spaced) */
+.sr .sr-pw-input { letter-spacing: 0.2em; text-indent: 0; text-align: center; }
+
+/* deck on the phone: rail becomes the 5-tab bottom bar */
+@media (max-width: 860px) {
+  .sr-admin .admin-shell { flex-direction: column; }
+  .sr-admin .sr-rail { position: fixed; top: auto; bottom: 0; left: 0; right: 0;
+    width: 100%; height: auto; flex-direction: row; justify-content: space-around;
+    padding: 8px 6px calc(10px + env(safe-area-inset-bottom));
+    border-right: 0; border-top: 1px solid var(--sr-line-faint); }
+  .sr-admin .sr-rail-brand, .sr-admin .sr-rail-pulse { display: none; }
+  .sr-admin .sr-rail a.is-active { border-left: 0; border-top: 2px solid var(--sr-amber); }
+  .sr-admin .admin-col { padding-bottom: 84px; }
+  .sr-admin .sr-deck { padding: 14px; }
+  .sr-admin .sr-deck-grid { grid-template-columns: 1fr; }
+  .sr-admin .sr-ondeck { position: static; }
+
+  /* ON DECK in one hand (3j): behaviors.js flips the list to .is-stack and
+     deals one card at a time — the current card fills the screen, follows
+     the finger (transform set inline mid-drag), and flies off on commit.
+     Without JS the class never lands and the plain stacked list remains. */
+  .sr-admin .sr-ondeck-cards.is-stack { overflow: hidden; }
+  .sr-admin .sr-ondeck-cards.is-stack .sr-deckcard { display: none; }
+  .sr-admin .sr-ondeck-cards.is-stack .sr-deckcard.is-current { display: flex;
+    flex-direction: column; min-height: 46vh; padding: 22px 18px;
+    touch-action: pan-y; will-change: transform; }
+  .sr-admin .is-stack .sr-deckcard.is-flying { transition: transform 0.25s ease,
+    opacity 0.25s ease; opacity: 0; }
+  .sr-admin .is-stack .sr-deckcard-head { flex-direction: column; gap: 6px; }
+  .sr-admin .is-stack .sr-deckcard-title { font-size: 21px; line-height: 1.2; }
+  .sr-admin .is-stack .sr-deckcard small { white-space: normal; font-size: 12.5px;
+    line-height: 1.6; margin-top: 8px; }
+  .sr-admin .is-stack .sr-deckcard-actions { margin-top: auto; flex-wrap: wrap;
+    padding-top: 18px; }
+  .sr-admin .is-stack .sr-deckcard-go { flex: 1 1 100%; text-align: center;
+    padding: 15px 11px; font-size: 11px; }
+  .sr-admin .is-stack .sr-deckcard-2nd { flex: 1; text-align: center; padding: 12px 10px; }
+  .sr-admin .is-stack .sr-deckcard-snooze { margin-left: 0; flex: 1; display: flex; }
+  .sr-admin .is-stack .sr-deckcard-snooze button { flex: 1; border: 1px solid
+    var(--sr-line-raised); padding: 10px 0; }
+  .sr-admin .sr-decknav { display: flex; align-items: center;
+    justify-content: space-between; gap: 10px; margin-top: 10px; }
+  .sr-admin .sr-decknav[hidden] { display: none; }
+  .sr-admin .sr-decknav-btn { background: none; border: 1px solid var(--sr-line-raised);
+    color: var(--sr-ink-soft); font: 500 9.5px/1 var(--sr-mono); letter-spacing: 0.12em;
+    text-transform: uppercase; padding: 10px 14px; cursor: pointer; }
+  .sr-admin .sr-decknav [data-deck-count] { font-size: 9.5px; letter-spacing: 0.2em;
+    color: var(--sr-amber); text-transform: uppercase; }
+  .sr-admin .sr-swipehint { text-align: center; margin: 12px 0 0; font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--sr-ink-ghost); }
+  .sr-admin .sr-swipehint[hidden] { display: none; }
+}
+
+/* ── responsive (mock frames: 1440 desktop · 390 mobile) ──────────────────── */
+@media (max-width: 1000px) {
+  .sr .sr-features { grid-template-columns: 1fr; }
+  .sr .sr-premiere { grid-template-columns: 1fr; }
+  .sr .sr-herosplit { grid-template-columns: 1fr; }
+  .sr .sr-herosplit-fig { border-left: 0; border-top: 1px solid var(--sr-line);
+    min-height: 380px; }
+  .sr .sr-herosplit-copy { padding: 44px 0 36px; }
+  .sr .sr-appetite { grid-template-columns: 1fr 1fr; grid-auto-rows: 150px; }
+  .sr .sr-sessions { grid-template-columns: 1fr 1fr; }
+  .sr .sr-aerialpass-grid { grid-template-columns: 1fr; }
+  .sr .sr-aerialpass-copy { border-left: 0; border-top: 1px solid rgba(127, 157, 184, 0.25); }
+  .sr .sr-3up { grid-template-columns: 1fr; }
+  .sr .sr-3up > div { border-right: 0; border-bottom: 1px solid var(--sr-line); }
+  .sr .sr-3up > div:last-child { border-bottom: 0; }
+  .sr .sr-stats, .sr .sr-tiers { grid-auto-flow: row; grid-auto-columns: unset;
+    grid-template-columns: 1fr 1fr; }
+  .sr .sr-stat, .sr .sr-tier { border-bottom: 1px solid var(--sr-line); }
+}
+@media (max-width: 1080px) {
+  .sr .site-nav nav { display: none; }
+  .sr .site-nav::after { content: ""; flex: 0 0 44px; width: 44px; height: 44px; }
+  .sr .nav-menu { display: block; }
+  .sr .nav-menu-btn { display: flex; }
+}
+@media (max-width: 700px) {
+  .sr .sr-wrap { padding: 0 16px; }
+  .sr .site-nav { padding: 14px 16px; }
+  .sr .nav-menu-btn,
+  .sr .site-nav.scrolled + .nav-menu > .nav-menu-btn { top: 14px; right: 16px; }
+  .sr .site-footer { padding: 30px 16px 90px; }
+  .sr .sr-screen--reel { aspect-ratio: 4 / 5; }
+  .sr .sr-screen-title h1, .sr .sr-screen-title h2 { font-size: clamp(26px, 8.6vw, 34px); }
+  .sr .sr-playerstrip { gap: 8px; font-size: 11px; }
+  .sr .sr-stats, .sr .sr-tiers { grid-template-columns: 1fr; }
+  .sr .sr-stat, .sr .sr-tier { border-right: 0; }
+  .sr .sr-filmstrip figure { min-width: 140px; }
+  .sr .sr-pagehead { padding: 36px 0 24px; }
+}
+
+/* Scheduling date overrides (admin-only) — legacy var set so the sr-admin
+   re-map above converts it wholesale; works with the kill switch off too. */
+.admin-shell .sch-day-ov .sch-day-label { width: auto; flex: 1; }
+.admin-shell .sch-ov-del { background: none; border: 0; cursor: pointer;
+  color: var(--ink-faint); font: 600 1rem/1 var(--font-ui); padding: 2px 6px; }
+.admin-shell .sch-ov-del:hover { color: var(--clay); }
+.admin-shell .sch-ov-add { margin-top: 4px; padding-top: 14px;
+  border-top: 1px dashed var(--line-strong); align-items: center; }
+.admin-shell .sch-ov-add input[type="date"],
+.admin-shell .sch-ov-add input[type="time"],
+.admin-shell .sch-ov-add select { width: auto; }
+.admin-shell .sch-ov-hours { display: inline-flex; gap: 8px; align-items: center; }
+.admin-shell .sch-ov-hours[hidden] { display: none; }
+
+/* ── house-lights pass (2026-07) ──────────────────────────────────────────────
+   Lobby choreography + cinema atmosphere. All progressive enhancement: every
+   element renders fully without JS, all motion honors prefers-reduced-motion,
+   admin and legacy surfaces never match these selectors. */
+
+/* reveal stagger — sibling cards/frames rise in sequence, like title cards
+   coming up (site.js adds .reveal-hidden per element; delay shapes the rise) */
+.sr .sr-features [data-reveal]:nth-child(2) { transition-delay: 0.12s; }
+.sr .sr-features [data-reveal]:nth-child(3) { transition-delay: 0.24s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(2) { transition-delay: 0.06s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(3) { transition-delay: 0.12s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(4) { transition-delay: 0.18s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(5) { transition-delay: 0.24s; }
+.sr .sr-filmstrip [data-reveal]:nth-child(6) { transition-delay: 0.3s; }
+
+/* ticker pauses under the pointer so a highlight can actually be read */
+.sr .sr-ticker:hover .sr-ticker-track,
+.sr .sr-ticker:focus-within .sr-ticker-track { animation-play-state: paused; }
+
+/* cross-page fade — browsers without view transitions just navigate as before */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: sr-vt-out 160ms ease both; }
+::view-transition-new(root) { animation: sr-vt-in 200ms ease 40ms both; }
+@keyframes sr-vt-out { to { opacity: 0; } }
+@keyframes sr-vt-in { from { opacity: 0; } }
+
+/* film grain over the marquee/premiere screens — texture only, never
+   interactive, below the title/corners/playerstrip (z2), above the scrim */
+.sr .sr-screen::after {
+  content: ""; position: absolute; inset: -60px; z-index: 1; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.055; mix-blend-mode: overlay;
+  animation: sr-grain 1.1s steps(6) infinite;
+}
+@keyframes sr-grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-18px, 12px); }
+  40% { transform: translate(14px, -20px); }
+  60% { transform: translate(-10px, -14px); }
+  80% { transform: translate(20px, 16px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Ken Burns drift on the hero still (only renders when there is no reel) */
+.sr .sr-screen--reel > img { animation: sr-kenburns 28s ease-in-out infinite alternate; }
+@keyframes sr-kenburns { from { transform: scale(1); } to { transform: scale(1.055); } }
+
+/* frame-advance hovers — stills breathe like a projector gate; frame numbers
+   warm to the house amber */
+.sr .sr-filmstrip figure img { transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sr .sr-filmstrip figure:hover img { transform: scale(1.045); }
+.sr .sr-filmstrip .sr-frameno { transition: color 0.3s ease; }
+.sr .sr-filmstrip figure:hover .sr-frameno { color: var(--sr-amber); }
+.sr a.sr-card { transition: border-color 0.25s ease; }
+.sr a.sr-card .sr-card-media img { transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sr a.sr-card:hover .sr-card-media img,
+.sr a.sr-card:focus-visible .sr-card-media img { transform: scale(1.03); }
+.sr .portfolio-masonry .tile { overflow: hidden; }
+.sr .portfolio-masonry .tile img { transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sr .portfolio-masonry .tile:hover img { transform: scale(1.03); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sr [data-reveal] { transition-delay: 0s !important; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
+  .sr .sr-screen::after { animation: none; }
+  .sr .sr-screen--reel > img { animation: none; }
+  .sr .sr-filmstrip figure img, .sr a.sr-card .sr-card-media img,
+  .sr .portfolio-masonry .tile img { transition: none; }
+}
+
+/* ═══ SHARED UI PRIMITIVES — the design-system component layer ═══════════════
+   Canonical primitives every surface builds with: button variants, form
+   fields, badges, cards, the confirm <dialog>, toasts, skeletons, icons.
+   Tokens from screening-room-tokens.css. Same body.sr scoping as the rest of
+   this sheet, so cream/kill-switch surfaces never see them. If a component is
+   used on more than one surface it belongs in this section, not in page CSS.
+   (ops/CSS-DUAL-STACK.md: new shared UI lives here, not in mise.css.)        */
+
+/* ── buttons — variants on the token layer's .sr-btn ────────────────────────
+   Canonical set: .sr-btn (filled stock) · --ghost (outline) · --danger
+   (destructive outline) · --subtle (borderless quiet) · --sm (compact).
+   Icon-only actions use .sr-icon-btn. Anything else is legacy — migrate,
+   don't add new one-off systems. */
+.sr .sr-btn--sm { padding: 9px 14px; font-size: 10.5px; letter-spacing: 0.08em; }
+/* press feedback (D-8): colour swaps and the :active press ride the fast token.
+   Scoped to the marketing shell (body.site-body.sr): the admin deck and the
+   client surfaces get no new motion. The reduced-motion override sits right
+   AFTER these rules on purpose: equal specificity, so source order decides. */
+.site-body.sr .sr-btn { transition: background var(--sr-t-fast), color var(--sr-t-fast),
+  transform var(--sr-t-fast); }
+.site-body.sr .sr-btn:active { transform: scale(0.98); }
+@media (prefers-reduced-motion: reduce) {
+  .site-body.sr .sr-btn { transition: none; }
+  .site-body.sr .sr-btn:active { transform: none; }
+}
+.sr .sr-btn--danger { background: transparent; color: var(--sr-danger);
+  border: 1px solid var(--sr-danger); }
+.sr .sr-btn--danger:hover, .sr .sr-btn--danger:focus-visible {
+  background: var(--sr-danger); color: var(--sr-house); }
+.sr .sr-btn--subtle { background: transparent; border: 0; color: var(--sr-ink-soft);
+  padding-left: 10px; padding-right: 10px; }
+.sr .sr-btn--subtle:hover, .sr .sr-btn--subtle:focus-visible {
+  background: transparent; color: var(--sr-stock); }
+.sr .sr-btn:disabled, .sr .sr-icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.sr .sr-btn:disabled:hover { background: var(--sr-stock); color: var(--sr-house); }
+
+.sr .sr-icon-btn { display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0; background: transparent;
+  border: 1px solid var(--sr-line-raised); border-radius: 0;
+  color: var(--sr-ink-soft); cursor: pointer; }
+.sr .sr-icon-btn:hover, .sr .sr-icon-btn:focus-visible {
+  border-color: var(--sr-stock); color: var(--sr-stock); }
+
+/* ── icons — inline SVG sprite (static/icons.svg) ─────────────────────────── */
+.sr .sr-icon { width: 16px; height: 16px; flex: none; vertical-align: -3px;
+  fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round; }
+.sr .sr-icon--sm { width: 13px; height: 13px; }
+.sr .sr-icon--lg { width: 20px; height: 20px; }
+.sr .sr-btn .sr-icon, .sr .sr-icon-btn .sr-icon { vertical-align: 0; }
+
+/* ── form fields — one field anatomy for every dark surface ─────────────────
+   Base input dressing (well, border, focus) lives in the forms section above;
+   this is the field structure around it: label, hint, error, invalid, req. */
+.sr .sr-field { display: grid; gap: 7px; margin-bottom: var(--sr-s4); }
+.sr .sr-label { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--sr-ink-faint); }
+.sr .sr-req { color: var(--sr-amber); }
+.sr .sr-hint { margin: 0; font-size: var(--sr-text-sm); color: var(--sr-ink-ghost); }
+.sr .sr-error { margin: 0; display: flex; align-items: center; gap: 6px;
+  font-size: var(--sr-text-sm); color: var(--sr-danger); }
+.sr input[aria-invalid="true"], .sr select[aria-invalid="true"],
+.sr textarea[aria-invalid="true"] { border-color: var(--sr-danger); }
+/* a checkbox GROUP is invalid as a whole, so the fieldset carries the state —
+   sighted users get the same cue the single controls above already have */
+.sr fieldset[aria-invalid="true"] { border-color: var(--sr-danger); }
+.sr input[aria-invalid="true"]:focus-visible,
+.sr select[aria-invalid="true"]:focus-visible,
+.sr textarea[aria-invalid="true"]:focus-visible { border-color: var(--sr-danger);
+  outline-color: var(--sr-danger); }
+.sr input:disabled, .sr select:disabled, .sr textarea:disabled {
+  opacity: 0.45; cursor: not-allowed; }
+
+/* ── badges — canonical status pill (new work uses .sr-badge) ─────────────── */
+.sr .sr-badge { display: inline-flex; align-items: center; gap: 5px;
+  font: 700 9.5px/1 var(--sr-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 4px 8px; border: 1px solid var(--sr-line-raised); border-radius: 0;
+  background: var(--sr-house-deep); color: var(--sr-ink-soft); white-space: nowrap; }
+.sr .sr-badge.is-ok      { color: var(--sr-ok);     border-color: color-mix(in srgb, var(--sr-ok) 45%, transparent); }
+.sr .sr-badge.is-warn    { color: var(--sr-warn);   border-color: color-mix(in srgb, var(--sr-warn) 45%, transparent); }
+.sr .sr-badge.is-danger  { color: var(--sr-danger); border-color: color-mix(in srgb, var(--sr-danger) 45%, transparent); }
+.sr .sr-badge.is-signal  { color: var(--sr-amber);  border-color: color-mix(in srgb, var(--sr-amber) 45%, transparent); }
+.sr .sr-badge.is-stock   { color: var(--sr-stock);  border-color: color-mix(in srgb, var(--sr-stock) 45%, transparent); }
+
+/* ── cards / empty / skeleton ─────────────────────────────────────────────── */
+.sr .sr-card { background: var(--sr-card); border: 1px solid var(--sr-line);
+  border-radius: 0; padding: var(--sr-s5); }
+.sr .sr-card--raise { transition: border-color var(--sr-t-fast); }
+.sr .sr-card--raise:hover { border-color: var(--sr-line-raised); }
+
+.sr .sr-skel { position: relative; overflow: hidden; background: var(--sr-house-deep); }
+.sr .sr-skel::after { content: ""; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(236, 228, 211, 0.06), transparent);
+  animation: sr-skel 1.6s infinite; }
+@keyframes sr-skel { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .sr .sr-skel::after { animation: none; } }
+
+/* ── confirm dialog — replaces window.confirm (behaviors.js drives it) ────── */
+.sr dialog.sr-dialog { border: 1px solid var(--sr-line-strong); border-radius: 0;
+  background: var(--sr-overlay); color: var(--sr-ink); padding: 0;
+  width: min(420px, calc(100vw - 48px)); box-shadow: var(--sr-shadow-2); }
+.sr dialog.sr-dialog::backdrop { background: rgba(6, 6, 7, 0.72); }
+.sr dialog.sr-dialog[open] { animation: sr-dialog-in var(--sr-t-fast); }
+@keyframes sr-dialog-in { from { opacity: 0; transform: translateY(6px); } }
+.sr .sr-dialog-box { padding: var(--sr-s5); }
+.sr .sr-dialog-kicker { margin: 0 0 10px; font: 500 10px/1 var(--sr-mono);
+  letter-spacing: 0.26em; text-transform: uppercase; color: var(--sr-amber); }
+.sr .sr-dialog-msg { margin: 0 0 var(--sr-s5); font-size: var(--sr-text-lg);
+  line-height: 1.5; color: var(--sr-cream); }
+.sr .sr-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .sr dialog.sr-dialog[open] { animation: none; }
+}
+
+/* ── toasts — window.miseToast(msg, kind) · kinds: ok / warn / danger ─────── */
+
+/* UNSCOPED ON PURPOSE — the one primitive that must survive without body.sr.
+   Every other shared component here is .sr-scoped so MISE_SCREENING_ROOM=false
+   really does fall back to the legacy look (ops/CSS-DUAL-STACK.md). A toast is
+   the exception because it is the FAILURE surface, not a look: base.html ships
+   the .sr-toasts live region on every page, but with no .sr ancestor the rules
+   below never applied — so on public/contract.html (extends base_cream.html,
+   body.cream-theme, and it stays that way: it is the e-sign document) a client
+   who clicked "Sign agreement" into a 500 got the message as unstyled text in
+   a static div below the whole agreement, i.e. saw nothing. Same site-wide
+   whenever the kill switch is off.
+   This block is deliberately the MINIMUM that makes an error legible —
+   position, stacking, and a neutral readable skin — and it touches only
+   properties the .sr block below also sets, so the cinema styling stays a
+   pure .sr enhancement and the SR surfaces render byte-identically (the .sr
+   selectors outrank these on specificity and come later in source).
+   Colors are literals, not --sr-* tokens, because every token is declared on
+   `body.sr` (screening-room-tokens.css) and resolves to nothing here — the one
+   spot the "sr-* tokens, never raw hex" convention cannot be met. z-index
+   clears mise.css's ceiling (.ns-pal is 200) so the kill-switch stack can't
+   bury an error; .sr keeps --sr-z-toast, which is correct inside SR. */
+.sr-toasts { position: fixed; right: 20px; bottom: 20px; z-index: 300;
+  display: flex; flex-direction: column; gap: 8px; max-width: min(360px, calc(100vw - 40px)); }
+.sr-toast { background: #17161a; border: 1px solid #34313a;
+  border-left: 2px solid #8a857a; padding: 12px 16px;
+  font-size: 15px; color: #f2efe9; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+.sr-toast--ok     { border-left-color: #4f8a5b; }
+.sr-toast--warn   { border-left-color: #b8862f; }
+.sr-toast--danger { border-left-color: #c25b52; }
+.sr-toast.is-out { opacity: 0; transition: opacity 0.2s; }
+@media (max-width: 700px) {
+  .sr-toasts { right: 12px; bottom: 12px; left: 12px; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sr-toast.is-out { transition: none; }
+}
+
+.sr .sr-toasts { position: fixed; right: 20px; bottom: 20px; z-index: var(--sr-z-toast);
+  display: flex; flex-direction: column; gap: 8px; max-width: min(360px, calc(100vw - 40px)); }
+.sr .sr-toast { background: var(--sr-overlay); border: 1px solid var(--sr-line-strong);
+  border-left: 2px solid var(--sr-stock); padding: 12px 16px;
+  font-size: var(--sr-text-base); color: var(--sr-cream); box-shadow: var(--sr-shadow-1);
+  animation: sr-toast-in var(--sr-t-med); }
+.sr .sr-toast--ok     { border-left-color: var(--sr-ok); }
+.sr .sr-toast--warn   { border-left-color: var(--sr-warn); }
+.sr .sr-toast--danger { border-left-color: var(--sr-danger); }
+.sr .sr-toast.is-out { opacity: 0; transform: translateY(4px);
+  transition: opacity var(--sr-t-med), transform var(--sr-t-med); }
+@keyframes sr-toast-in { from { opacity: 0; transform: translateY(8px); } }
+@media (max-width: 700px) {
+  .sr .sr-toasts { right: 12px; bottom: 12px; left: 12px; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sr .sr-toast { animation: none; }
+  .sr .sr-toast.is-out { transition: none; }
+}
+
+/* ── flow chrome ("the box office") — slim header/footer for client task ────
+   flows (templates/public/base_flow.html): booking, booking manage. Keeps the
+   page on the house with just brand + kicker + a way out — no marketing nav. */
+.sr .flow-chrome { position: sticky; top: 0; z-index: var(--sr-z-sticky);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 22px; background: var(--sr-house); border-bottom: 1px solid var(--sr-line); }
+.sr .flow-brand { text-decoration: none; }
+.sr .flow-brand b { display: block; font: 700 15px/1 var(--sr-sans);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--sr-cream-strong); }
+.sr .flow-brand small { display: block; margin-top: 3px; font: 500 11px/1 var(--sr-mono);
+  letter-spacing: 0.26em; text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .flow-kicker { color: var(--sr-amber); }
+.sr .flow-foot { display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin-top: 56px; padding: 18px 22px; border-top: 1px solid var(--sr-line);
+  font: 500 10px/1.6 var(--sr-mono); letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--sr-ink-ghost); }
+.sr .flow-foot a { color: var(--sr-ink-soft); text-decoration: none; }
+.sr .flow-foot a:hover { color: var(--sr-amber); }
+
+/* ── tile openers + a11y utilities (gallery / portal) ───────────────────────
+   Thumb tiles open the lightbox from a real <button class="tile-open"> now
+   (keyboard + AT native); the button is invisible chrome around the img. */
+.sr .tile-open { display: block; width: 100%; padding: 0; border: 0;
+  background: none; color: inherit; cursor: zoom-in; }
+.sr .tile-open img { display: block; width: 100%; }
+.sr .tile-open:focus-visible { outline: 2px solid var(--sr-amber); outline-offset: 2px; }
+
+/* visually-hidden but announced (live regions like .lb-live). Deliberately
+   UNSCOPED — the one exception to the body.sr scoping rule in this file. The
+   lightbox live region renders on the kill-switch path too (gallery.html falls
+   back to .cream-theme, no .sr), and a scoped rule left "Photo — 3 of 41"
+   painting as stray text on every arrow press. Hiding it is a11y plumbing, not
+   Screening Room styling, so it must hold in BOTH theme states. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ── "More" full-index sheet + rail sign-out (command deck) ─────────────────
+   The rail's 7th stop: every admin page as plain links so nothing lives only
+   behind ⌘K. Slides in from the rail on desktop, rises over the bottom bar
+   on phones. */
+.sr-admin .sr-rail-cmd.is-active { color: var(--sr-cream); background: var(--sr-line-faint);
+  border-left: 2px solid var(--sr-amber); }
+.sr-admin .sr-rail-signout { margin: 0; }
+
+.sr-admin .sr-more { position: fixed; inset: 0; z-index: var(--sr-z-overlay);
+  background: rgba(6, 6, 7, 0.55); }
+.sr-admin .sr-more-sheet { position: absolute; left: 64px; top: 0; bottom: 0;
+  width: min(600px, calc(100vw - 64px)); overflow-y: auto;
+  background: var(--sr-panel); border-right: 1px solid var(--sr-line-strong);
+  padding: 22px 28px 44px; animation: sr-more-in var(--sr-t-fast); }
+@keyframes sr-more-in { from { transform: translateX(-10px); opacity: 0; } }
+.sr-admin .sr-more-head { display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 22px; }
+.sr-admin .sr-more-groups { display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 26px; }
+.sr-admin .sr-more-group > p { margin: 0 0 9px; color: var(--sr-amber); }
+.sr-admin .sr-more-group a { display: block; padding: 8px 0; font-size: 13.5px;
+  color: var(--sr-ink-soft); text-decoration: none;
+  border-bottom: 1px solid var(--sr-line-faint); }
+.sr-admin .sr-more-group a:hover { color: var(--sr-amber); }
+@media (max-width: 860px) {
+  .sr-admin .sr-more-sheet { left: 0; right: 0; top: auto; bottom: 62px; width: 100%;
+    max-height: 62vh; border-right: 0; border-top: 1px solid var(--sr-line-strong); }
+  .sr-admin .sr-rail-cmd.is-active { border-left: 0; border-top: 2px solid var(--sr-amber); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sr-admin .sr-more-sheet { animation: none; }
+}
+
+/* ── client detail: anchor jump-nav + config folds ────────────────────────── */
+.sr-admin .sr-anchors { position: sticky; top: 0; z-index: 5; display: flex; gap: 16px;
+  padding: 10px 2px; margin: -8px 0 20px; background: var(--sr-panel);
+  border-bottom: 1px solid var(--sr-line-faint); overflow-x: auto; }
+.sr-admin .sr-anchors a { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--sr-ink-faint); text-decoration: none;
+  white-space: nowrap; padding: 4px 0; }
+.sr-admin .sr-anchors a:hover { color: var(--sr-amber); }
+.sr-admin .client-fold { margin: 0 0 26px; }
+.sr-admin .client-fold > summary { cursor: pointer; list-style: none;
+  display: flex; align-items: center; gap: 8px; }
+.sr-admin .client-fold > summary::-webkit-details-marker { display: none; }
+.sr-admin .client-fold > summary::before { content: "▸"; color: var(--sr-ink-ghost);
+  font-size: 12px; transition: transform var(--sr-t-fast); }
+.sr-admin .client-fold[open] > summary::before { transform: rotate(90deg); }
+.sr-admin .client-fold > summary h2 { margin: 0; }
+.sr-admin .client-fold--danger > summary h2 { color: var(--sr-warn); }
+@media (prefers-reduced-motion: reduce) {
+  .sr-admin .client-fold > summary::before { transition: none; }
+}
+
+/* strip reels are tap-for-sound (delegated in site.js) — show the affordance */
+.sr .motion-strip video { cursor: pointer; }
+
+/* ── work_detail wayfinding: visible breadcrumb + prev/next ───────────────── */
+.sr .work-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 0 0 14px; font: 500 10px/1.5 var(--sr-mono); letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .work-crumbs a { color: var(--sr-ink-soft); text-decoration: none; }
+.sr .work-crumbs a:hover { color: var(--sr-amber); }
+.sr .work-pn { display: flex; justify-content: space-between; gap: 16px;
+  margin: 28px 0 8px; padding: 18px 0; border-top: 1px solid var(--sr-line); }
+.sr .work-pn-link { display: grid; gap: 6px; text-decoration: none; max-width: 46%; }
+.sr .work-pn-link .sr-mono { color: var(--sr-ink-ghost); }
+.sr .work-pn-link .work-pn-title { color: var(--sr-cream); font: 600 15px/1.3 var(--sr-sans); }
+.sr .work-pn-link:hover .work-pn-title { color: var(--sr-amber); }
+.sr .work-pn-next { text-align: right; justify-items: end; }
+
+/* ── page-head rhythm modifiers (the inline-style one-offs, codified) ─────── */
+.sr .sr-kickrow--mt10 { margin-top: 10px; }
+.sr .sr-kickrow--mt12 { margin-top: 12px; }
+.sr .sr-kickrow--mt14 { margin-top: 14px; }
+.sr .sr-beat--flush { margin: 0; }
+.sr .sr-lede--mt14 { margin-top: 14px; }
+.sr .sr-pagehead--edgeless { border-bottom: 0; }
+
+/* closing title-card on the spokes (was border/font/margin inline styles) */
+.sr .sr-cta-final { text-align: center; }
+.sr .sr-cta-final .sr-title { font-size: clamp(26px, 3vw, 44px); }
+.sr .sr-cta-final .sr-titlecard-actions { margin-top: 20px; }
+/* live-availability strip under the closing CTA — real open days, deep-linked
+   into the picker with that day preselected */
+.sr .sr-availstrip { margin-top: 14px; }
+.sr .sr-availstrip a { color: inherit; text-decoration: underline;
+  text-underline-offset: 3px; }
+.sr .sr-availstrip a:hover { color: var(--sr-amber); }
+
+/* ── F items: titlecard mobile size + home marquee no-content fallback ────── */
+@media (max-width: 700px) {
+  .sr .sr-titlecard { min-height: 68vh; }
+}
+.sr .sr-screen-empty { position: absolute; left: 28px; bottom: 64px; display: flex;
+  flex-direction: column; gap: 6px; max-width: 46ch; color: var(--sr-ink-mute);
+  font-size: var(--sr-text-sm); }
