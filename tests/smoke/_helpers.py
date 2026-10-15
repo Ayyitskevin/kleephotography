@@ -37,7 +37,8 @@ def _mp4_bytes(seconds=2, w=128, h=96) -> bytes:
     import subprocess
     from pathlib import Path
 
-    path = tempfile.mktemp(suffix=".mp4")
+    fd, path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
     try:
         subprocess.run(
             [

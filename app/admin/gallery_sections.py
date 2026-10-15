@@ -7,9 +7,9 @@ import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import RedirectResponse
 
 from .. import db, security
+from ..redirects import redirect_local
 from .galleries import _bench_fragment, _tile_fragment, get_gallery
 
 log = logging.getLogger("mise.admin.gallery_sections")
@@ -26,7 +26,7 @@ def add_section(gallery_id: int, name: str = Form(...)):
         "INSERT INTO sections (gallery_id, name, position) VALUES (?,?,?)",
         (gallery_id, name.strip(), row["p"]),
     )
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 def get_section(gallery_id: int, section_id: int) -> "db.sqlite3.Row":
@@ -41,7 +41,7 @@ def rename_section(gallery_id: int, section_id: int, name: str = Form(...)):
     if not name.strip():
         raise HTTPException(status_code=400, detail="name required")
     db.run("UPDATE sections SET name=? WHERE id=?", (name.strip(), section_id))
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/proof")
@@ -58,7 +58,7 @@ def set_section_proof(gallery_id: int, section_id: int, proof_target: str = Form
         except ValueError:
             raise HTTPException(status_code=400, detail="proof target must be a number")
     db.run("UPDATE sections SET proof_target=? WHERE id=?", (target, section_id))
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/caption")
@@ -66,7 +66,7 @@ def set_section_caption(gallery_id: int, section_id: int, caption: str = Form(""
     """Set or clear the public-facing caption shown under the section heading."""
     get_section(gallery_id, section_id)
     db.run("UPDATE sections SET caption=? WHERE id=?", (caption.strip() or None, section_id))
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/move")
@@ -87,13 +87,13 @@ def reorder_section(gallery_id: int, section_id: int, dir: str = Form(...)):
         with db.tx() as con:
             for pos, sid in enumerate(ids):
                 con.execute("UPDATE sections SET position=? WHERE id=?", (pos, sid))
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/delete")
 def delete_section(gallery_id: int, section_id: int):
     db.run("DELETE FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id))
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/section")
@@ -114,7 +114,7 @@ def move_asset(
         )
     if request.headers.get("hx-request") == "true":
         return _tile_fragment(request, gallery_id, asset_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")
 
 
 @router.post("/galleries/{gallery_id}/assets/bulk-section")
@@ -142,4 +142,4 @@ def _bulk_move_assets(request: Request, form, gallery_id: int):
             )
     if request.headers.get("hx-request") == "true":
         return _bench_fragment(request, gallery_id)
-    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+    return redirect_local(f"/admin/galleries/{gallery_id}")

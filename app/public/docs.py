@@ -5,9 +5,10 @@ import json
 import logging
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from .. import db, proposal_notify, security
+from ..redirects import redirect_local
 from ..render import templates
 from . import telemetry
 
@@ -66,7 +67,7 @@ def accept_proposal(request: Request, slug: str):
         return templates.TemplateResponse(
             request, "public/_proposal_state.html", {"d": _proposal_or_404(slug)}
         )
-    return RedirectResponse(f"/p/{slug}", status_code=303)
+    return redirect_local(f"/p/{slug}")
 
 
 @router.post("/p/{slug}/decline")
@@ -88,7 +89,7 @@ def decline_proposal(request: Request, slug: str):
         return templates.TemplateResponse(
             request, "public/_proposal_state.html", {"d": _proposal_or_404(slug)}
         )
-    return RedirectResponse(f"/p/{slug}", status_code=303)
+    return redirect_local(f"/p/{slug}")
 
 
 def _contract_or_404(slug: str) -> "db.sqlite3.Row":
@@ -162,7 +163,7 @@ def sign_contract(
         return templates.TemplateResponse(
             request, "public/_contract_state.html", {"d": _contract_or_404(slug)}
         )
-    return RedirectResponse(f"/c/{slug}", status_code=303)
+    return redirect_local(f"/c/{slug}")
 
 
 # ── Testimonial capture — client writes their own at /t/{slug} ───────────────
@@ -199,7 +200,7 @@ def submit_testimonial(
 ):
     r = _testimonial_request_or_404(slug)
     if r["submitted_at"]:  # one submission per link; idempotent thank-you
-        return RedirectResponse(f"/t/{slug}", status_code=303)
+        return redirect_local(f"/t/{slug}")
     if not (quote.strip() and attribution_name.strip()):
         raise HTTPException(status_code=400, detail="quote and name required")
     # Lands unpublished — the existing /admin/studio/testimonials moderation
@@ -216,4 +217,4 @@ def submit_testimonial(
         (tid, r["id"]),
     )
     log.info("testimonial submitted via request %s -> testimonial %s", r["id"], tid)
-    return RedirectResponse(f"/t/{slug}", status_code=303)
+    return redirect_local(f"/t/{slug}")

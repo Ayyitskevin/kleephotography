@@ -32,6 +32,7 @@ from . import (
     proposal_notify,
     video,
 )
+from .safe_path import path_within
 
 log = logging.getLogger("mise.jobs")
 
@@ -192,11 +193,12 @@ def build_zip(out: Path, entries) -> None:
     """Atomically write a STORED zip (media is already compressed) at `out` from an
     iterable of (source_path, archive_name) pairs. Goes via a .part temp + rename so
     a reader never sees a half-built archive. Callers own arcname de-duplication."""
-    tmp = out.with_suffix(".part")
+    dest = path_within(config.ZIP_DIR, out)
+    tmp = dest.with_suffix(".part")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as zf:
         for src, arc in entries:
             zf.write(src, arcname=arc)
-    tmp.rename(out)
+    tmp.rename(dest)
 
 
 def zip_entries(gallery_id: int, assets) -> list:

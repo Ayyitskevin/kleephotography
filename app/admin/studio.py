@@ -4,12 +4,15 @@ import datetime as dt
 import logging
 import re
 import shutil
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import clients, config, db, jobs, platekit, pricing, security, specialties, usage_vocab
+from ..redirects import redirect_local
 from ..render import templates
+from ..safe_path import path_within
 from . import common, studio_context
 from .lookups import PROJECT_STATUSES, get_client, get_project
 from .studio_context import _studio_context
@@ -77,8 +80,17 @@ def _redirect(return_to: str, default: str) -> RedirectResponse:
     triage action keeps Kevin in place) when it's a safe local admin path;
     otherwise fall back to the action's own destination. Same-origin only —
     rejects anything that isn't a plain /admin/… path."""
-    safe = return_to.startswith("/admin/") and "//" not in return_to[1:]
-    return RedirectResponse(return_to if safe else default, status_code=303)
+    target = return_to.replace("\\", "")
+    if (
+        not urlparse(target).netloc
+        and not urlparse(target).scheme
+        and target.startswith("/admin/")
+        and not target.startswith("//")
+        and "\r" not in target
+        and "\n" not in target
+    ):
+        return RedirectResponse(target, status_code=303)
+    return RedirectResponse(default, status_code=303)
 
 
 @router.post("/inquiries/{inquiry_id}/unconvert")
@@ -430,7 +442,7 @@ def delete_client(client_id: int, force: bool = Form(False)):
     # survive as unowned; brand asset files on disk need explicit rmtree
     # (only the DB rows cascade through the FK).
     db.run("UPDATE galleries SET client_id=NULL WHERE client_id=?", (client_id,))
-    brand_dir = config.BRAND_DIR / str(client_id)
+    brand_dir = path_within(config.BRAND_DIR, str(client_id))
     if brand_dir.exists():
         shutil.rmtree(brand_dir, ignore_errors=True)
     db.run("DELETE FROM clients WHERE id=?", (client_id,))
@@ -471,7 +483,7 @@ def update_client(
             client_id,
         ),
     )
-    return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+    return redirect_local(f"/admin/studio/clients/{client_id}")
 
 
 @router.post("/clients/{client_id}/parent")
@@ -483,7 +495,7 @@ def set_parent(client_id: int, parent_id: str = Form("")):
     pid = parent_id.strip()
     if not pid:
         db.run("UPDATE clients SET parent_id=NULL WHERE id=?", (client_id,))
-        return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+        return redirect_local(f"/admin/studio/clients/{client_id}")
     new_parent = int(pid)
     if new_parent == client_id:
         raise HTTPException(status_code=422, detail="a client cannot be its own parent")
@@ -496,7 +508,7 @@ def set_parent(client_id: int, parent_id: str = Form("")):
             "setting it as parent would create a cycle",
         )
     db.run("UPDATE clients SET parent_id=? WHERE id=?", (new_parent, client_id))
-    return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+    return redirect_local(f"/admin/studio/clients/{client_id}")
 
 
 # ── Portal (Phase 2) ───────────────────────────────────────────────────────
@@ -528,7 +540,7 @@ def create_portal(client_id: int):
     )
     n = _backfill_crops(client_id)
     log.info("portal created for client %s (%d crop jobs queued)", client_id, n)
-    return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+    return redirect_local(f"/admin/studio/clients/{client_id}")
 
 
 @router.post("/clients/{client_id}/portal/publish")
@@ -537,7 +549,7 @@ def toggle_portal(client_id: int, published: bool = Form(False)):
     db.run("UPDATE portals SET published=? WHERE id=?", (1 if published else 0, p["id"]))
     if published:
         _backfill_crops(client_id)
-    return RedirectResponse(f"/admin/studio/clients/{client_id}", status_code=303)
+    return redirect_local(f"/admin/studio/clients/{client_id}")
 
 
 @router.post("/clients/{client_id}/projects")
@@ -751,7 +763,7 @@ def publish_workspace(project_id: int):
         (slug, pin, project_id),
     )
     log.info("workspace published for project %s", project_id)
-    return RedirectResponse(f"/admin/studio/projects/{project_id}", status_code=303)
+    return redirect_local(f"/admin/studio/projects/{project_id}")
 
 
 @router.post("/projects/{project_id}/workspace/unpublish")
@@ -760,7 +772,7 @@ def unpublish_workspace(project_id: int):
     # Keep the slug/PIN so re-publishing reuses the same link; just close it.
     db.run("UPDATE projects SET workspace_published=0 WHERE id=?", (project_id,))
     log.info("workspace unpublished for project %s", project_id)
-    return RedirectResponse(f"/admin/studio/projects/{project_id}", status_code=303)
+    return redirect_local(f"/admin/studio/projects/{project_id}")
 
 
 # ── Testimonials ──────────────────────────────────────────────────────────
@@ -856,7 +868,7 @@ def request_testimonial(project_id: int, gallery_id: int | None = Form(None)):
         (security.new_slug(), p["client_id"], project_id, gallery_id),
     )
     log.info("testimonial request %s raised for project %s", tid, project_id)
-    return RedirectResponse(f"/admin/studio/projects/{project_id}", status_code=303)
+    return redirect_local(f"/admin/studio/projects/{project_id}")
 
 
 @router.post("/projects/{project_id}")
@@ -889,7 +901,7 @@ def update_project(
             project_id,
         ),
     )
-    return RedirectResponse(f"/admin/studio/projects/{project_id}", status_code=303)
+    return redirect_local(f"/admin/studio/projects/{project_id}")
 
 
 @router.post("/projects/{project_id}/status")

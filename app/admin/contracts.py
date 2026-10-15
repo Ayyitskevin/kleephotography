@@ -9,7 +9,9 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, security
+from ..redirects import redirect_local
 from ..render import templates
+from ..safe_path import path_within
 from . import common
 from .lookups import get_project
 
@@ -39,7 +41,7 @@ CONTRACT_LIBRARY = {
 
 
 def load_library_template(key: str) -> str:
-    path = CONTRACT_TEMPLATES_DIR / f"{key}.md"
+    path = path_within(CONTRACT_TEMPLATES_DIR, f"{key}.md")
     return path.read_text(encoding="utf-8")
 
 
@@ -150,7 +152,7 @@ def update_contract(contract_id: int, title: str = Form(...), body: str = Form(.
         "UPDATE contracts SET title=?, body=? WHERE id=?",
         (title.strip() or d["title"], body, contract_id),
     )
-    return RedirectResponse(f"/admin/studio/contracts/{contract_id}", status_code=303)
+    return redirect_local(f"/admin/studio/contracts/{contract_id}")
 
 
 @router.post("/contracts/{contract_id}/duplicate")
@@ -189,7 +191,7 @@ def countersign_contract(request: Request, contract_id: int, countersigner_name:
         (name, contract_id),
     )
     log.info("contract %s COUNTERSIGNED by %s", contract_id, name)
-    return RedirectResponse(f"/admin/studio/contracts/{contract_id}", status_code=303)
+    return redirect_local(f"/admin/studio/contracts/{contract_id}")
 
 
 @router.post("/contracts/{contract_id}/send")
@@ -204,4 +206,4 @@ def mark_contract_sent(contract_id: int):
         (sha, contract_id),
     )
     log.info("contract %s marked sent (sha256=%s)", contract_id, sha[:12])
-    return RedirectResponse(f"/admin/studio/contracts/{contract_id}", status_code=303)
+    return redirect_local(f"/admin/studio/contracts/{contract_id}")

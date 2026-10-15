@@ -15,6 +15,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, clients, config, db, pricing, security
+from ..redirects import redirect_local
 from ..render import templates
 from ..usage_vocab import CHANNELS
 from . import common
@@ -321,7 +322,7 @@ def _update_license(d: "db.sqlite3.Row", form, license_id: int):
         for r in db.all_("SELECT client_id FROM license_clients WHERE license_id=?", (license_id,))
     }
     if not diff and want_cover == have_cover:
-        return RedirectResponse(f"/admin/studio/licenses/{license_id}", status_code=303)
+        return redirect_local(f"/admin/studio/licenses/{license_id}")
     with db.tx() as con:
         con.execute(
             """UPDATE licenses SET title=?, scope=?, coverage_scope=?, usage_tier=?,
@@ -357,7 +358,7 @@ def _update_license(d: "db.sqlite3.Row", form, license_id: int):
             diff["covered_clients"] = [sorted(have_cover), sorted(want_cover)]
         audit.log(con, "license", license_id, "update", diff=diff)
     log.info("license %s updated (%d fields)", license_id, len(diff))
-    return RedirectResponse(f"/admin/studio/licenses/{license_id}", status_code=303)
+    return redirect_local(f"/admin/studio/licenses/{license_id}")
 
 
 @router.post("/licenses/{license_id}/status")
@@ -366,7 +367,7 @@ def change_status(license_id: int, status: str = Form(...)):
     if status not in STATUSES:
         raise HTTPException(status_code=400, detail="bad status")
     if status == d["status"]:
-        return RedirectResponse(f"/admin/studio/licenses/{license_id}", status_code=303)
+        return redirect_local(f"/admin/studio/licenses/{license_id}")
     with db.tx() as con:
         con.execute(
             "UPDATE licenses SET status=?, updated_at=datetime('now') WHERE id=?",
@@ -376,7 +377,7 @@ def change_status(license_id: int, status: str = Form(...)):
             con, "license", license_id, "status_change", diff={"status": [d["status"], status]}
         )
     log.info("license %s status %s -> %s", license_id, d["status"], status)
-    return RedirectResponse(f"/admin/studio/licenses/{license_id}", status_code=303)
+    return redirect_local(f"/admin/studio/licenses/{license_id}")
 
 
 @router.post("/licenses/{license_id}/delete")

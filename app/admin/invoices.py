@@ -8,6 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, jobs, security
+from ..redirects import redirect_local
 from ..render import templates
 from . import common
 from .lookups import get_project
@@ -92,7 +93,7 @@ def _update_invoice(d: "db.sqlite3.Row", form, invoice_id: int):
             invoice_id,
         ),
     )
-    return RedirectResponse(f"/admin/studio/invoices/{invoice_id}", status_code=303)
+    return redirect_local(f"/admin/studio/invoices/{invoice_id}")
 
 
 @router.post("/invoices/{invoice_id}/duplicate")
@@ -131,4 +132,4 @@ def mark_invoice_sent(invoice_id: int):
     db.run("UPDATE invoices SET status='sent', sent_at=datetime('now') WHERE id=?", (invoice_id,))
     jobs.enqueue("notion_sync_invoice", {"invoice_id": invoice_id})
     log.info("invoice %s marked sent", invoice_id)
-    return RedirectResponse(f"/admin/studio/invoices/{invoice_id}", status_code=303)
+    return redirect_local(f"/admin/studio/invoices/{invoice_id}")

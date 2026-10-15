@@ -9,6 +9,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import alerts, audit, config, db, features, jobs, security
+from ..redirects import redirect_local
 from ..render import templates
 from . import telemetry
 
@@ -238,7 +239,7 @@ def pay_invoice(request: Request, slug: str):
         raise HTTPException(status_code=503, detail="online payment is not configured")
     session = _invoice_checkout(d, amount, kind, slug)
     if _stripe_value(session, "status") == "complete":
-        return RedirectResponse(f"/i/{slug}?thanks=1", status_code=303)
+        return redirect_local(f"/i/{slug}?thanks=1")
     url = _stripe_value(session, "url")
     if not url:
         raise HTTPException(status_code=503, detail="payment is temporarily unavailable")

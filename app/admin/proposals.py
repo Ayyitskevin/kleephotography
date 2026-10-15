@@ -8,6 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, security, specialties
+from ..redirects import redirect_local
 from ..render import templates
 from . import common
 from .contracts import render_template
@@ -390,7 +391,7 @@ def _update_proposal(d: "db.sqlite3.Row", form, proposal_id: int):
             proposal_id,
         ),
     )
-    return RedirectResponse(f"/admin/studio/proposals/{proposal_id}", status_code=303)
+    return redirect_local(f"/admin/studio/proposals/{proposal_id}")
 
 
 @router.post("/proposals/{proposal_id}/convert")
@@ -462,4 +463,4 @@ def mark_proposal_sent(proposal_id: int):
             (d["project_id"],),
         )
     log.info("proposal %s marked sent", proposal_id)
-    return RedirectResponse(f"/admin/studio/proposals/{proposal_id}", status_code=303)
+    return redirect_local(f"/admin/studio/proposals/{proposal_id}")

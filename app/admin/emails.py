@@ -3,9 +3,9 @@
 import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException
-from fastapi.responses import RedirectResponse
 
 from .. import db, mailer, security
+from ..redirects import redirect_local
 
 log = logging.getLogger("mise.admin.emails")
 router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.require_admin)])
@@ -41,4 +41,4 @@ def email_doc(
         (d["project_id"], KINDS[kind], doc_id, to, subject),
     )
     log.info("emailed %s %s (doc %s)", KINDS[kind], doc_id, d["slug"])
-    return RedirectResponse(f"/admin/studio/{kind}/{doc_id}", status_code=303)
+    return redirect_local(f"/admin/studio/{kind}/{doc_id}")

@@ -8,17 +8,36 @@ import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from .. import config, db, jobs, security, zip_cache
 from ..http_cache import conditional_file
+from ..redirects import redirect_local
 from ..render import templates
+from ..safe_path import path_within
 from .gallery import get_live_gallery, is_expired
 
 log = logging.getLogger("mise.public.downloads")
 router = APIRouter(prefix="/g")
 
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+def _looks_like_email(value: str) -> bool:
+    """One @, no whitespace, and a dotted domain. Linear in the length of the value.
+
+    The previous ``[^@\\s]+\\.[^@\\s]+`` expression accepted the same set but
+    backtracked quadratically: the class also matches ``.``, so a long near-miss
+    tried every place to put the literal dot.
+    """
+    if not value or any(ch.isspace() for ch in value):
+        return False
+    local, sep, domain = value.partition("@")
+    if not sep or not local or not domain or "@" in domain:
+        return False
+    # ``[^@\s]+\.[^@\s]+``: a dot counts when a character sits on both sides,
+    # so a trailing dot (``a@b.c.``) still matches and ``a@b.`` does not.
+    return "." in domain[1:-1]
+
+
 # Server-minted subset-ZIP filenames (favorites / per-section). Only shape this
 # regex accepts may be polled through zip_status, and it must also carry the
 # caller's own gallery id — see zip_status.
@@ -133,7 +152,7 @@ def download_page(
                 "error": None,
             },
         )
-    return RedirectResponse(_target(slug, asset_id, fav, section, web), status_code=303)
+    return redirect_local(_target(slug, asset_id, fav, section, web))
 
 
 @router.post("/{slug}/email", response_class=HTMLResponse)
@@ -148,7 +167,7 @@ def capture_email(
 ):
     g, visitor = _gate(request, slug)
     email = email.strip().lower()
-    if not _EMAIL.match(email):
+    if not _looks_like_email(email):
         return templates.TemplateResponse(
             request,
             "public/email_gate.html",
@@ -164,7 +183,7 @@ def capture_email(
         )
     db.run("UPDATE visitors SET email=? WHERE id=?", (email, visitor["id"]))
     log.info("email captured for gallery %s visitor %s", g["id"], visitor["id"])
-    return RedirectResponse(_target(slug, asset_id, fav, section, web), status_code=303)
+    return redirect_local(_target(slug, asset_id, fav, section, web))
 
 
 @router.get("/{slug}/download/asset/{asset_id}")
@@ -184,7 +203,7 @@ def download_asset(request: Request, slug: str, asset_id: int):
     """
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
-        return RedirectResponse(f"/g/{slug}/download?asset_id={asset_id}", status_code=303)
+        return redirect_local(f"/g/{slug}/download?asset_id={asset_id}")
     a = db.one(
         "SELECT * FROM assets WHERE id=? AND gallery_id=? AND status='ready'", (asset_id, g["id"])
     )
@@ -210,7 +229,7 @@ def download_web_video(request: Request, slug: str, asset_id: int):
     without pulling the multi-GB camera original."""
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
-        return RedirectResponse(f"/g/{slug}/download?asset_id={asset_id}&web=1", status_code=303)
+        return redirect_local(f"/g/{slug}/download?asset_id={asset_id}&web=1")
     a = db.one(
         "SELECT * FROM assets WHERE id=? AND gallery_id=? AND status='ready' AND kind='video'",
         (asset_id, g["id"]),
@@ -244,7 +263,7 @@ def download_rendition(request: Request, slug: str, rendition_id: int):
     if not r:
         raise HTTPException(status_code=404)
     if _email_required(g) and not visitor["email"]:
-        return RedirectResponse(f"/g/{slug}/download?asset_id={r['a_id']}", status_code=303)
+        return redirect_local(f"/g/{slug}/download?asset_id={r['a_id']}")
     path = config.MEDIA_DIR / str(g["id"]) / "renditions" / r["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
@@ -267,7 +286,7 @@ def download_favorites(request: Request, slug: str):
     # `not email` check here made /download bounce to /download/favorites and
     # back forever (download_page doesn't gate a drop either).
     if _email_required(g) and not visitor["email"]:
-        return RedirectResponse(f"/g/{slug}/download?fav=1", status_code=303)
+        return redirect_local(f"/g/{slug}/download?fav=1")
     assets = db.all_(
         """SELECT a.* FROM favorites f JOIN assets a ON a.id=f.asset_id
                         WHERE f.visitor_id=? AND a.gallery_id=? AND a.status='ready'
@@ -301,7 +320,7 @@ def download_favorites(request: Request, slug: str):
 def download_section(request: Request, slug: str, section_id: int):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
-        return RedirectResponse(f"/g/{slug}/download?section={section_id}", status_code=303)
+        return redirect_local(f"/g/{slug}/download?section={section_id}")
     s = db.one("SELECT * FROM sections WHERE id=? AND gallery_id=?", (section_id, g["id"]))
     if not s:
         raise HTTPException(status_code=404)
@@ -313,7 +332,7 @@ def download_section(request: Request, slug: str, section_id: int):
     if not assets:
         raise HTTPException(status_code=404, detail="section is empty")
     key = hashlib.sha256(",".join(str(a["id"]) for a in assets).encode()).hexdigest()[:8]
-    out = config.ZIP_DIR / f"g{g['id']}-s{section_id}-{key}.zip"
+    out = path_within(config.ZIP_DIR, f"g{g['id']}-s{section_id}-{key}.zip")
     if not out.is_file():
         wait = _queue_or_build(request, g, assets, out, f"g{g['id']}-s{section_id}-*.zip")
         if wait is not None:
@@ -330,7 +349,7 @@ def download_section(request: Request, slug: str, section_id: int):
 def download_zip(request: Request, slug: str):
     g, visitor = _gate(request, slug)
     if _email_required(g) and not visitor["email"]:
-        return RedirectResponse(f"/g/{slug}/download", status_code=303)
+        return redirect_local(f"/g/{slug}/download")
     path = jobs.zip_path(g["id"], g["content_rev"])
     if path.is_file():
         # Refresh the archive's clock so ZIP_DIR eviction measures idleness
@@ -375,7 +394,7 @@ def zip_status(request: Request, slug: str, name: str | None = None):
         # authorization as the full-gallery branch below, no new surface.
         if not (_SUBSET_ZIP.match(name) and name.startswith(f"g{g['id']}-")):
             raise HTTPException(status_code=404)
-        if (config.ZIP_DIR / name).is_file():
+        if path_within(config.ZIP_DIR, name).is_file():
             return {"ready": True, "failed": False}
         # Only report a failure that nothing is superseding. A subset bundle is
         # named by a content hash of the favourite/section set, so for a stable

@@ -13,9 +13,10 @@ inbound bubble from the inquiry's first message. No fabricated data.
 import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from .. import config, db, inquiry_notify, mailer, notion_sync, security, sms
+from ..redirects import redirect_local
 from ..render import templates
 
 log = logging.getLogger("mise.admin.inbox")
@@ -503,7 +504,7 @@ def reply(
         return _inbox_frag(request, tab, inquiry_id)
     if tab not in _TABS:
         tab = "all"
-    return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
+    return redirect_local(f"/admin/inbox?tab={tab}&sel={inquiry_id}")
 
 
 @router.post("/{inquiry_id}/retry-owner-email")
@@ -513,7 +514,7 @@ def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("all"))
     if inq["owner_email_delivered_at"] if "owner_email_delivered_at" in inq.keys() else None:
         if request.headers.get("hx-request") == "true":
             return _inbox_frag(request, tab, inquiry_id)
-        return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
+        return redirect_local(f"/admin/inbox?tab={tab}&sel={inquiry_id}")
     # Clear failed/in_flight so the claim path can run again.
     db.run(
         """UPDATE inquiries SET owner_email_status='failed'
@@ -525,7 +526,7 @@ def retry_owner_email(request: Request, inquiry_id: int, tab: str = Form("all"))
         return _inbox_frag(request, tab, inquiry_id)
     if tab not in _TABS:
         tab = "all"
-    return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
+    return redirect_local(f"/admin/inbox?tab={tab}&sel={inquiry_id}")
 
 
 @router.post("/{inquiry_id}/notion-orphan/relink")
@@ -537,7 +538,7 @@ def notion_orphan_relink(request: Request, inquiry_id: int, tab: str = Form("all
         return _inbox_frag(request, tab, inquiry_id)
     if tab not in _TABS:
         tab = "all"
-    return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
+    return redirect_local(f"/admin/inbox?tab={tab}&sel={inquiry_id}")
 
 
 @router.post("/{inquiry_id}/notion-orphan/dismiss")
@@ -549,4 +550,4 @@ def notion_orphan_dismiss(request: Request, inquiry_id: int, tab: str = Form("al
         return _inbox_frag(request, tab, inquiry_id)
     if tab not in _TABS:
         tab = "all"
-    return RedirectResponse(f"/admin/inbox?tab={tab}&sel={inquiry_id}", status_code=303)
+    return redirect_local(f"/admin/inbox?tab={tab}&sel={inquiry_id}")
