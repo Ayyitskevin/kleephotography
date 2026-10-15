@@ -219,6 +219,9 @@
     </div>
     {% endfor %}
   </div>
+  {% if page.str.multi %}
+  <p class="sr-lede"><b>{{ page.str.multi[0] }}.</b> {{ page.str.multi[1] }}</p>
+  {% endif %}
   {% if page.str.price %}
   <p class="sr-mono">Rental set &middot; {{ page.str.price }}</p>
   {% endif %}

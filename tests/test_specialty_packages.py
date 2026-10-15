@@ -481,6 +481,16 @@ def test_real_estate_twilight_and_str_sections_render_without_prices(client, the
     assert parse_qs(urlsplit(cta[0].attrs["href"]).query) == {"service": ["Real Estate"]}
 
 
+def test_real_estate_rental_section_notes_multi_property_booking_without_a_figure(client, theme):
+    _, rental, _ = _re_sections(client)
+    text = rental.text().lower()
+    assert "several properties" in text
+    assert "single invoice" in text and "volume rate" in text
+    assert "$" not in text
+    cta = [a for a in rental.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
+    assert "tier=" not in cta[0].attrs["href"]
+
+
 def test_real_estate_rental_copy_binds_no_tier_or_deliverable(client, theme):
     _, rental, _ = _re_sections(client)
     text = rental.text().lower()

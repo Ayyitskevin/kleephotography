@@ -732,6 +732,12 @@ SPECIALTY_PAGES = {
                     "I will quote the right fit.",
                 ),
             ],
+            "multi": (
+                "Several properties",
+                "Booking more than one property together? They can share a "
+                "single invoice at a volume rate. Tell me how many on the "
+                "inquiry.",
+            ),
             "cta": "Ask about a rental shoot",
             "price": None,
         },
