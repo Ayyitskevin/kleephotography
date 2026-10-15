@@ -311,12 +311,15 @@
       <span class="sr-mono">{{ page.sr.presents }}</span>
       <h1>{{ page.sr.h2a }}<br>{{ page.sr.h2b }}</h1>
       <p class="sr-beat">{{ page.sr.beat }}</p>
+      <p class="sr-specline">From {{ rates[0].price }} &middot; {{ rates[0].label|lower }}</p>
       <div class="sr-titlecard-actions">
         <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
+        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
         {% if hero_reel and hero_reel.duration and hero_reel.duration|hms %}
         <a class="sr-btn sr-btn--ghost" href="/reels">&#9654; Watch {{ hero_reel.duration|hms }}</a>
         {% endif %}
       </div>
+      <p class="sr-mono">{{ page.sr.quote_ask }}</p>
     </div>
     <div class="sr-titlecard-meta" aria-hidden="true">
       <span>{{ page.sr.card_meta_l }}</span>
@@ -379,6 +382,26 @@
     {% endfor %}
   </div>
 </section>
+
+{# ═══ BRAND LANE — drinks & food brands, routed to Brand Partner (no prices) ══ #}
+{% if page.brand_lane %}
+<section class="sr-wrap sr-section sp-brandlane" aria-labelledby="brandlane-heading">
+  <p class="sr-mono">{{ page.brand_lane.kicker }}</p>
+  <h2 id="brandlane-heading" class="sr-title">{{ page.brand_lane.heading }}</h2>
+  <p class="sr-lede">{{ page.brand_lane.intro }}</p>
+  <div class="sr-3up">
+    {% for kick, body in page.brand_lane["items"] %}
+    <div>
+      <p class="sr-3up-kick">{{ kick }}</p>
+      <p>{{ body }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="sr-kickrow sr-kickrow--mt12">
+    <a class="sr-btn sr-btn--ghost" href="#packages-brand_partner">{{ page.brand_lane.cta }} &rarr;</a>
+  </p>
+</section>
+{% endif %}
 {% endif %}
 
 {# Shared current-catalog packages; an inquiry is not a booking or payment. #}
