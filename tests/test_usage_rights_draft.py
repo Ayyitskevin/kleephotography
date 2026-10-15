@@ -1,4 +1,4 @@
-"""DRAFT usage-rights line on each package card (awaiting Kevin's legal review).
+"""Usage-rights line on each package card (wording ruled 2026-10-15).
 
 Every tier with a TIER_USAGE entry shows exactly that line on its spoke; a tier
 without one shows none. The covered (group, tier) pairs are listed here
@@ -37,7 +37,12 @@ COVERED = {
     ("videography", "Starter"),
     ("videography", "Standard"),
     ("videography", "Premium"),
+    ("brand_partner", "Photo"),
+    ("brand_partner", "Photo + Reels"),
+    ("brand_partner", "Two-day"),
 }
+# Muse ruling 3 (2026-10-15), choice 7 adopted as proposed.
+BRAND_PARTNER_LINE = "For your marketing and social each month. Terms are in your proposal."
 
 
 @pytest.fixture
@@ -95,11 +100,10 @@ def test_each_tier_card_renders_its_usage_line(client, path):
     assert seen == {pair for pair in COVERED if pair[0] in SPOKES[path]}
 
 
-def test_brand_partner_has_no_entry_and_renders_none(client):
-    assert "brand_partner" not in TIER_USAGE
+def test_brand_partner_cards_render_the_ruled_line(client):
     cards = [c for g, _t, c in tier_cards(client, "/food-beverage") if g == "brand_partner"]
     assert len(cards) == 3
-    assert all(usage_lines(card) == [] for card in cards)
+    assert all(usage_lines(card) == [BRAND_PARTNER_LINE] for card in cards)
 
 
 def test_a_tier_with_its_entry_removed_renders_none(client, monkeypatch):

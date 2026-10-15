@@ -349,15 +349,15 @@ SERVICES = [
     },
 ]
 
-# Usage line per package card (brief R11). DRAFT wording awaiting Kevin's
-# legal review. Each line says no more than the tier's own includes and the
-# live /contact answer to "Who owns the photos?" (CONTACT_FAQS): use for the
-# client's marketing and social, terms in the proposal. A line licenses use,
-# never ownership; a line that names a licence also carries the contract's
-# payment condition (subject to final payment). Third-party platforms are not
-# named: the default grant is non-sublicensable. Keyed by SERVICES group key,
-# then tier name, and kept out of the tier dicts. A tier with no entry shows
-# no line (Brand Partner, until its terms are set).
+# Usage line per package card (brief R11). Wording ruled 2026-10-15 (all
+# defaults adopted, Brand Partner line as proposed). Each line says no more
+# than the tier's own includes and the live /contact answer to "Who owns the
+# photos?" (CONTACT_FAQS): use for the client's marketing and social, terms in
+# the proposal. A line licenses use, never ownership; a line that names a
+# licence also carries the contract's payment condition (subject to final
+# payment). Third-party platforms are not named: the default grant is
+# non-sublicensable. Keyed by SERVICES group key, then tier name, and kept out
+# of the tier dicts. A tier with no entry shows no line.
 TIER_USAGE = {
     "real_estate": {
         "Essentials": "For marketing this listing, online and in print. Terms are in "
@@ -390,6 +390,11 @@ TIER_USAGE = {
         "license. Terms are in your proposal.",
         "Premium": "Full usage license, as listed above, once paid in full; the audio "
         "stays within its music license. Terms are in your proposal.",
+    },
+    "brand_partner": {
+        "Photo": "For your marketing and social each month. Terms are in your proposal.",
+        "Photo + Reels": "For your marketing and social each month. Terms are in your proposal.",
+        "Two-day": "For your marketing and social each month. Terms are in your proposal.",
     },
 }
 
