@@ -52,8 +52,10 @@
 <section class="sr-wrap sr-section" aria-label="Listing premiere" data-seek-scope>
   <div class="sr-featurehead">
     <h1>{{ page.sr.h2a }} <em>{{ page.sr.h2b }}</em></h1>
-    <p class="sr-specline">{% for s in page.sr.spec %}{{ s }} &middot; {% endfor %}From {{ rates[0].price }}</p>
+    <p class="sr-specline">{% for s in page.sr.spec %}{{ s }} &middot; {% endfor %}{% if aerials_live() %}<b>{{ page.sr.spec_aerial.format(rate=aerial_rate) }}</b> &middot; {% endif %}From {{ rates[0].price }}</p>
+    {% if not aerials_live() %}
     <p class="sr-mono">Aerial coverage is planned for launch with FAA Part 107 — not available to book today.</p>
+    {% endif %}
   </div>
   <div class="sr-premiere">
     <figure class="sr-screen sr-screen--film" data-sr-player>
@@ -78,7 +80,7 @@
         <span class="sr-tc-play">&#9654;</span>
         <span data-sr-tc>00:00:00:00</span>
         <i class="sr-progress"><b data-sr-bar></b>
-          {%- if hero_reel.duration %}{% for ch in page.sr.chapters if ch.at > 0 and not ch.aerial %}<i style="left: {{ (ch.at * 100)|round|int }}%;"></i>{% endfor %}{% endif -%}
+          {%- if hero_reel.duration %}{% for ch in page.sr.chapters if ch.at > 0 and (not ch.aerial or aerials_live()) %}<i style="left: {{ (ch.at * 100)|round|int }}%;"></i>{% endfor %}{% endif -%}
         </i>
         {% if hero_reel.duration and hero_reel.duration|hms %}<span>{{ hero_reel.duration|hms }}</span>{% endif %}
       </div>
@@ -87,23 +89,24 @@
     <div class="sr-chapters">
       {% if hero_reel and hero_reel.duration %}
       <p class="sr-mono">Chapters</p>
-      {% for ch in page.sr.chapters if not ch.aerial %}
-      <button type="button" class="sr-chapter"
+      {% for ch in page.sr.chapters if not ch.aerial or aerials_live() %}
+      <button type="button" class="sr-chapter{% if ch.aerial %} sr-chapter--marked{% endif %}"
               data-seek="{{ (hero_reel.duration * ch.at)|round|int }}">
         <i>{{ ((hero_reel.duration * ch.at)|round|int)|hms if ch.at > 0 else "0:00" }}</i>
         {{ ch.label }}
+        {% if ch.aerial %}<i class="sr-chapter-badge">Drone</i>{% endif %}
       </button>
       {% endfor %}
       {% endif %}
       <div class="sr-agentcut">
-        <b>Agent's cut:</b> {{ page.sr.agents_cut }}
+        <b>Agent's cut:</b> {{ page.sr.agents_cut_aerial if aerials_live() else page.sr.agents_cut }}
       </div>
     </div>
   </div>
 </section>
 
 {% if aerials_live() %}
-{# Planned aerial coverage only; the feature flag is not proof of availability. #}
+{# The Aerial Pass is a live offer; aerials_live() is its kill switch. #}
 {% set aerial_leads = [] %}
 {% for a in photos %}{% if a.portfolio_tag and "aerial" in a.portfolio_tag %}{% set _ = aerial_leads.append(a) %}{% endif %}{% endfor %}
 <section class="sr-wrap" aria-label="The Aerial Pass">
@@ -123,17 +126,17 @@
         <span class="sr-screenbadge">&#9650; The Aerial Pass</span>
       </figure>
       <div class="sr-aerialpass-copy">
-        <p class="sr-mono">The Aerial Pass — planned</p>
+        <p class="sr-mono">The Aerial Pass — new</p>
         <h3>The lot, the roofline, <em>the whole street.</em></h3>
-        <p>Aerial coverage is planned, not available to book today.
-           Launch requires an FAA Part 107-certified operator and permitted
-           local airspace. Confirm future availability before quoting aerials.</p>
+        <p>Drone stills and orbit clips flown the same visit as the interiors —
+           acreage, roof condition, and how the property sits in its
+           neighborhood. Cut straight into the walkthrough film.</p>
         <ul class="sr-aerialpass-checks">
-          <li>Part 107 launch requirement</li>
-          <li>Local airspace must permit the flight</li>
-          <li>Availability confirmed before any aerial quote</li>
+          <li><b>&#10003;</b> FAA Part 107 certified pilot</li>
+          <li><b>&#10003;</b> LAANC airspace clearance, handled</li>
+          <li><b>&#10003;</b> {{ aerial_rate }} add-on to any tier &middot; included in Premier</li>
         </ul>
-        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Ask about the aerial launch &rarr;</a>
+        <a class="sr-btn sr-btn--ghost" href="{{ book_url }}">Add aerials to a booking &rarr;</a>
       </div>
     </div>
   </div>
@@ -150,16 +153,19 @@
   <div class="sr-filmstrip">
     {% for a in photos[:6] %}
     {% set image = asset_images[a.id] %}
+    {# The kill switch hides the aerial badge and label, not the photo itself. #}
+    {% set show_aerial = a.portfolio_tag and "aerial" in a.portfolio_tag and aerials_live() %}
+    {% set masked_aerial = a.portfolio_tag and "aerial" in a.portfolio_tag and not aerials_live() %}
     <figure class="tile{{ ' sr-frame-wide' if loop.index is odd else ' sr-frame-tall' }}" data-web="/site/img/{{ a.id }}">
       <img src="{{ image.thumb.url }}" loading="lazy" decoding="async"
            {% if image.srcset %}srcset="{{ image.srcset }}"
            sizes="(max-width: 700px) 45vw, 300px"{% endif %}
            {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
            alt="{{ a|portfolio_alt }}">
-      {% if a.portfolio_tag and "aerial" in a.portfolio_tag %}
+      {% if show_aerial %}
       <span class="sr-filmchip sr-aerial" aria-hidden="true">&#9650; Aerial</span>
       {% endif %}
-      <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
+      <span class="sr-frameno" aria-hidden="true">FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag and not masked_aerial %} &mdash; {{ a.portfolio_tag|tag_label }}{% endif %}</span>
     </figure>
     {% endfor %}
   </div>

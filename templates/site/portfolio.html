@@ -47,7 +47,7 @@
     <button class="pf-chip sr-stock-{{ c.key }}" data-filter="sp:{{ c.key }}" aria-pressed="false">{{ c.chip }}
       <span class="muted">({{ c.count }})</span></button>
     {% endfor %}
-    {% for tag in tags %}
+    {% for tag in tags if aerials_live() or "aerial" not in tag %}
     {% set n = assets|selectattr("portfolio_tag", "equalto", tag)|list|length %}
     <button class="pf-chip" data-filter="tag:{{ tag|lower }}" aria-pressed="false">{{ tag|tag_label }}
       <span class="muted">({{ n }})</span></button>
@@ -64,6 +64,9 @@
   <div class="portfolio-masonry">
     {% for a in assets %}
     {% set image = asset_images[a.id] %}
+    {# The kill switch hides the aerial badge and label, not the work itself. #}
+    {% set is_aerial = a.portfolio_tag and 'aerial' in a.portfolio_tag %}
+    {% set show_aerial = is_aerial and aerials_live() %}
     <figure class="tile pf-masonry-tile{% if a.portfolio_tag %} pf-tile{% endif %}"
             {% if a.portfolio_tag %}data-tag="{{ a.portfolio_tag|lower }}"{% endif %}
             data-sp="{{ a.portfolio_tag|tag_specialty }}" data-kind="{{ a.kind }}"
@@ -76,11 +79,11 @@
            {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
            alt="{{ a|portfolio_alt }}">
       {% if a.kind == 'video' %}
-      <span class="play-badge{% if a.portfolio_tag and 'aerial' in a.portfolio_tag %} sr-aerial{% endif %}">&#9654;{% if a.portfolio_tag and 'aerial' in a.portfolio_tag %} Aerial{% else %} Film{% endif %}</span>
+      <span class="play-badge{% if show_aerial %} sr-aerial{% endif %}">&#9654;{% if show_aerial %} Aerial{% else %} Film{% endif %}</span>
       {% if a.duration and a.duration|hms %}<span class="dur-badge">{{ a.duration|hms }}</span>{% endif %}
-      {% elif a.portfolio_tag and 'aerial' in a.portfolio_tag %}<span class="sr-filmchip sr-aerial" aria-hidden="true">&#9650; Aerial</span>
+      {% elif show_aerial %}<span class="sr-filmchip sr-aerial" aria-hidden="true">&#9650; Aerial</span>
       {% endif %}
-      <figcaption class="portfolio-cap">{{ sp_stock[a.portfolio_tag|tag_specialty] }} &middot; FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag %}
+      <figcaption class="portfolio-cap">{{ sp_stock[a.portfolio_tag|tag_specialty] }} &middot; FR&middot;{{ "%04d"|format(a.id) }}{% if a.portfolio_tag and (show_aerial or not is_aerial) %}
         <small>{{ a.portfolio_tag|tag_label }}{% if a.client_name %} &middot; {{ a.client_name }}{% endif %}</small>{% elif a.client_name %}
         <small>{{ a.client_name }}</small>{% endif %}
       </figcaption>

@@ -251,32 +251,42 @@ def test_food_beverage_starter_inquiries_are_independently_disambiguated(client,
 
 
 @pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
-def test_real_estate_has_no_current_aerial_sale_claims_or_booking_cta(
-    client, theme, monkeypatch, aerial_flag
-):
-    # Separate negative witness: a missing launch notice must not short-circuit
-    # observation of the baseline's live certification/sale assertions.
+def test_real_estate_aerial_sale_claims_follow_the_flag(client, theme, monkeypatch, aerial_flag):
+    """Flag on: the certified, bookable Aerial Pass renders and nothing says planned.
+    Flag off (kill switch): no aerial sale claim and no booking link anywhere."""
     monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
     main = rendered(client, "/real-estate").one(id="main")
     text = main.text().lower()
-    for claim in (
+    sale_claims = (
         "faa part 107 certified pilot",
         "laanc airspace clearance, handled",
         "included in premier",
         "add-on to any tier",
-        "aerial establishing + vertical for social",
-    ):
-        assert claim not in text
-    for link in main.find("a"):
-        label = (link.text() + " " + (link.attrs.get("aria-label") or "")).lower()
-        assert not re.search(r"add aerials|book aerials|aerial booking", label)
-        if "aerial" in label:
-            assert urlsplit(link.attrs.get("href", "")).path == "/contact"
+    )
+    aerial_links = [
+        link
+        for link in main.find("a")
+        if re.search(
+            r"add aerials|book aerials|aerial booking",
+            (link.text() + " " + (link.attrs.get("aria-label") or "")).lower(),
+        )
+    ]
+    if aerial_flag:
+        for claim in sale_claims:
+            assert claim in text
+        assert "not available to book today" not in text
+        assert "planned" not in text
+        assert len(aerial_links) == 1
+        assert urlsplit(aerial_links[0].attrs["href"]).path.startswith("/book")
+    else:
+        for claim in sale_claims:
+            assert claim not in text
+        assert aerial_links == []
 
 
 @pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
 @pytest.mark.parametrize("with_reel", [False, True], ids=["empty-media", "synthetic-reel"])
-def test_real_estate_aerials_are_launch_gated_at_either_flag(
+def test_real_estate_aerial_band_and_film_chapters_follow_the_flag(
     client, theme, monkeypatch, aerial_flag, with_reel
 ):
     monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
@@ -301,33 +311,32 @@ def test_real_estate_aerials_are_launch_gated_at_either_flag(
         db.run("UPDATE assets SET portfolio=? WHERE id=?", (int(with_reel), reel_id))
     main = rendered(client, "/real-estate").one(id="main")
     text = main.text().lower()
-    assert re.search(r"aerial coverage is planned[^.]*not available to book today", text)
     assert "part 107" in text
-    for old_live_claim in (
-        "faa part 107 certified pilot",
-        "laanc airspace clearance, handled",
-        "included in premier",
-        "add-on to any tier",
-        "aerial establishing + vertical for social",
-    ):
-        assert old_live_claim not in text
-    for link in main.find("a"):
-        label = (link.text() + " " + (link.attrs.get("aria-label") or "")).lower()
-        assert not re.search(r"add aerials|book aerials|aerial booking", label)
-        if "aerial" in label:
-            assert urlsplit(link.attrs.get("href", "")).path == "/contact"
     if aerial_flag:
         panel = main.one("section", **{"aria-label": "The Aerial Pass"})
-        assert "launch requires" in panel.text().lower()
-        assert "local airspace" in panel.text().lower()
-        assert "not available to book today" in panel.text().lower()
+        assert "faa part 107 certified pilot" in panel.text().lower()
+        assert "laanc airspace clearance" in panel.text().lower()
+        assert "not available to book today" not in text
+    else:
+        assert main.find("section", **{"aria-label": "The Aerial Pass"}) == []
+        assert "not available to book today" in text
     if with_reel:
         assert main.one("video").one("source").attrs["src"] == f"/site/vid/{reel_id}"
         chapters = [
             button.text().lower() for button in main.find("button") if "data-seek" in button.attrs
         ]
         assert any("kitchen & great room" in chapter for chapter in chapters)
-        assert not any("aerial" in chapter or "drone" in chapter for chapter in chapters)
+        aerial_chapters = [c for c in chapters if "aerial" in c or "drone" in c]
+        # the player strip carries one tick per timed chapter; the aerial one (at 0.62) is
+        # present only while the flag is on
+        strip = main.one("i", **{"class": "sr-progress"})
+        ticks = [t.attrs.get("style", "") for t in strip.find("i")]
+        assert ("left: 62%;" in ticks) is aerial_flag, ticks
+        if aerial_flag:
+            assert len(aerial_chapters) == 1 and "aerial orbit" in aerial_chapters[0]
+            assert "drone" in aerial_chapters[0]
+        else:
+            assert aerial_chapters == []
     else:
         assert main.find("video") == []
     db.run("UPDATE assets SET portfolio=0 WHERE id=?", (reel_id,))
@@ -364,3 +373,83 @@ def test_general_booking_links_follow_real_active_event_and_inactive_fallback(
     assert active_urls and set(active_urls) == {f"/book/{book_slug}"}
     db.run("UPDATE event_types SET active=0 WHERE slug=?", (book_slug,))
     assert booking_links() and set(booking_links()) == {"/book"}
+
+
+@pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
+def test_real_estate_headline_aerial_line_follows_the_flag(client, theme, monkeypatch, aerial_flag):
+    """The line under the H1 must agree with the booking card: bookable Aerial Pass
+    wording when the flag is on, the planned notice only in the kill-switch state."""
+    monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
+    main = rendered(client, "/real-estate").one(id="main")
+    head = main.one("div", **{"class": "sr-featurehead"}).text().lower()
+    bands = main.find("section", **{"aria-label": "The Aerial Pass"})
+    if aerial_flag:
+        assert "not available" not in head
+        assert "planned" not in head
+        assert f"aerial pass {specialties.aerial_pass_display()} — faa part 107" in head
+        assert len(bands) == 1
+    else:
+        assert "planned for launch" in head
+        assert "not available to book today" in head
+        assert bands == []
+
+
+@pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
+def test_real_estate_live_aerial_pieces_follow_the_flag(client, theme, monkeypatch, aerial_flag):
+    """Every flag-gated aerial string the live site carries renders at flag on and
+    nowhere at flag off (the documented kill switch)."""
+    from app.public.site_catalog import SPECIALTY_PAGES
+
+    monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
+    sr = SPECIALTY_PAGES["re"]["sr"]
+    rate = specialties.aerial_pass_display()
+    text = rendered(client, "/real-estate").one(id="main").text().lower()
+    pieces = (
+        sr["spec_aerial"].format(rate=rate).lower(),
+        sr["agents_cut_aerial"].lower(),
+        f"aerial pass {rate} on any tier",
+    )
+    for piece in pieces:
+        assert (piece in text) is aerial_flag, piece
+    # the plain agent's cut is the tail of the aerial one, so it is always present
+    assert sr["agents_cut"].lower() in text
+
+
+@pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
+def test_site_wide_aerial_claims_follow_the_flag(client, theme, monkeypatch, aerial_flag):
+    monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
+    home = rendered(client, "/").text().lower()
+    assert ("faa part 107 certified" in home) is aerial_flag
+    about = rendered(client, "/about").text().lower()
+    assert ("flown" in about) is aerial_flag
+
+
+@pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
+def test_aerial_badges_and_labels_follow_the_kill_switch(client, theme, monkeypatch, aerial_flag):
+    """The flag hides the aerial badge and label everywhere (.env.example, SPECIALTY-LAUNCH.md),
+    not the photos themselves."""
+    monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
+    gallery_id = db.run(
+        "INSERT INTO galleries (slug,title,pin) VALUES (?,?,?)",
+        ("synthetic-aerial-badges", "Synthetic aerial badge fixture", "synthetic-only"),
+    )
+    ids = [
+        db.run(
+            """INSERT INTO assets
+               (gallery_id,kind,filename,stored,status,portfolio,portfolio_tag)
+               VALUES (?,'photo',?,?,'ready',1,?)""",
+            (gallery_id, f"{tag.split('/')[1]}.jpg", f"{tag.split('/')[1]}.jpg", tag),
+        )
+        for tag in ("re/aerials", "re/aerial")
+    ]
+    try:
+        for path in ("/real-estate", "/portfolio"):
+            markup = client.get(path).text
+            assert markup.count("sr-filmchip sr-aerial") == (len(ids) if aerial_flag else 0), path
+            labels = re.findall(r'(?:&mdash; |<small>|aria-pressed="false">)\s*Aerials?\b', markup)
+            assert bool(labels) is aerial_flag, (path, labels)
+            for asset_id in ids:  # the photos stay public
+                assert f"FR&middot;{asset_id:04d}" in markup, (path, asset_id)
+    finally:
+        db.run("DELETE FROM assets WHERE gallery_id=?", (gallery_id,))
+        db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
