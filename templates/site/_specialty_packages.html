@@ -33,6 +33,25 @@
         </article>
         {% endfor %}
       </div>
+      {% if sp_key == 'fb' and s.key == 'photography' and page.steady_feed %}
+      {% set bp = package_groups|selectattr('key', 'equalto', 'brand_partner')|first %}
+      <div class="sp-steady" aria-labelledby="steady-feed-heading">
+        <p class="sr-mono">{{ page.steady_feed.kicker }}</p>
+        <h3 id="steady-feed-heading">{{ page.steady_feed.heading }}</h3>
+        <p>{{ page.steady_feed.intro }}</p>
+        <div class="sr-3up">
+          {% for t in bp.tiers %}
+          <div>
+            <p class="sr-3up-kick">{{ t.name }}</p>
+            <p>{{ t.includes|join(' · ') }}</p>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="sr-kickrow sr-kickrow--mt12">
+          <a class="sr-btn sr-btn--ghost" href="#packages-brand_partner">{{ page.steady_feed.cta }} &rarr;</a>
+        </p>
+      </div>
+      {% endif %}
     </section>
     {% endfor %}
 

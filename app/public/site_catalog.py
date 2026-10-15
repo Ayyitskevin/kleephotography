@@ -840,6 +840,13 @@ SPECIALTY_PAGES = {
         "empty_body": "Menus, pours, and the rooms they live in land here as they're delivered.",
         "cta_h1": "Let's make your food look",
         "cta_h2": "the way it tastes.",
+        "steady_feed": {
+            "kicker": "Shooting every month?",
+            "heading": "What a month looks like",
+            "intro": "Brand Partner is the steady-feed option: a shoot on the "
+            "calendar each month. Here is what each plan puts in your month.",
+            "cta": "See the Brand Partner plans",
+        },
         # Screening Room (3c + 3l): full-bleed opening title card, appetite
         # grid, the process told as courses.
         "sr": {
