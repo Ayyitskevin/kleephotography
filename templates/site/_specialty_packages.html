@@ -39,6 +39,7 @@
     <p class="sr-kickrow sr-kickrow--mt12">
       <a class="sr-mono" href="{{ book_url }}">View booking availability &rarr;</a>
       <a class="sr-mono" href="/services">All services &rarr;</a>
+      {% if sp_key == "re" and aerials_live() %}<span class="sr-mono sr-mono--stock">Aerial Pass {{ aerial_rate }} on any tier</span>{% endif %}
     </p>
   </div>
 </section>

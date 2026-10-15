@@ -326,7 +326,12 @@ def test_real_estate_aerial_band_and_film_chapters_follow_the_flag(
             button.text().lower() for button in main.find("button") if "data-seek" in button.attrs
         ]
         assert any("kitchen & great room" in chapter for chapter in chapters)
-        assert not any("aerial" in chapter or "drone" in chapter for chapter in chapters)
+        aerial_chapters = [c for c in chapters if "aerial" in c or "drone" in c]
+        if aerial_flag:
+            assert len(aerial_chapters) == 1 and "aerial orbit" in aerial_chapters[0]
+            assert "drone" in aerial_chapters[0]
+        else:
+            assert aerial_chapters == []
     else:
         assert main.find("video") == []
     db.run("UPDATE assets SET portfolio=0 WHERE id=?", (reel_id,))
@@ -382,3 +387,33 @@ def test_real_estate_headline_aerial_line_follows_the_flag(client, theme, monkey
         assert "planned for launch" in head
         assert "not available to book today" in head
         assert bands == []
+
+
+@pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
+def test_real_estate_live_aerial_pieces_follow_the_flag(client, theme, monkeypatch, aerial_flag):
+    """Every flag-gated aerial string the live site carries renders at flag on and
+    nowhere at flag off (the documented kill switch)."""
+    from app.public.site_catalog import SPECIALTY_PAGES
+
+    monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
+    sr = SPECIALTY_PAGES["re"]["sr"]
+    rate = specialties.aerial_pass_display()
+    text = rendered(client, "/real-estate").one(id="main").text().lower()
+    pieces = (
+        sr["spec_aerial"].format(rate=rate).lower(),
+        sr["agents_cut_aerial"].lower(),
+        f"aerial pass {rate} on any tier",
+    )
+    for piece in pieces:
+        assert (piece in text) is aerial_flag, piece
+    # the plain agent's cut is the tail of the aerial one, so it is always present
+    assert sr["agents_cut"].lower() in text
+
+
+@pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
+def test_site_wide_aerial_claims_follow_the_flag(client, theme, monkeypatch, aerial_flag):
+    monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
+    home = rendered(client, "/").text().lower()
+    assert ("faa part 107 certified" in home) is aerial_flag
+    about = rendered(client, "/about").text().lower()
+    assert ("flown" in about) is aerial_flag
