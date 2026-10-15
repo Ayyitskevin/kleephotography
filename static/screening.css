@@ -45,6 +45,11 @@
   justify-content: space-between; gap: 18px; padding: 18px 48px;
   background: var(--sr-house); border-bottom: 1px solid var(--sr-line); }
 .sr .site-nav.scrolled { box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 0.9); }
+/* nav-state sentinel (D-8): 1px, 24px down the page; site.js observes it and
+   toggles .scrolled when it leaves the viewport. Unscoped on purpose so the
+   legacy palette keeps the same 24px threshold. */
+.nav-sentinel { position: absolute; top: 24px; left: 0; width: 1px; height: 1px;
+  pointer-events: none; }
 .sr .site-brand { display: flex; align-items: center; gap: 14px; line-height: 1;
   text-decoration: none; }
 .sr .site-brand b { font: 700 15px/1 var(--sr-sans); letter-spacing: 0.26em;
@@ -1015,11 +1020,12 @@ html.nav-menu-enhanced .sr .nav-mobile {
 
 /* generic marketing scaffolding that survives from mise.css */
 .sr .site-main { background: none; }
-.sr .scroll-progress { background: none; }
-.sr .scroll-progress > div { background: var(--sr-amber); }
 .sr .skip-link { background: var(--sr-amber); color: var(--sr-house); }
-.sr .reveal-hidden { opacity: 0; transform: translateY(14px); }
-.sr [data-reveal] { transition: opacity 0.5s ease, transform 0.5s ease; }
+/* scroll reveal (D-8): a quiet 12px rise over 600ms on the editorial curve;
+   site.js adds .reveal-hidden per element and an IntersectionObserver lifts it */
+.sr .reveal-hidden { opacity: 0; transform: translateY(12px); }
+.sr [data-reveal] { transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+  transform 600ms cubic-bezier(0.16, 1, 0.3, 1); }
 @media (prefers-reduced-motion: reduce) {
   .sr .reveal-hidden { opacity: 1; transform: none; }
   .sr [data-reveal] { transition: none; }
@@ -1619,6 +1625,8 @@ body.sr-admin .admin-shell, body.sr-admin {
 
 @media (prefers-reduced-motion: reduce) {
   .sr [data-reveal] { transition-delay: 0s !important; }
+  .sr .sr-btn { transition: none; }
+  .sr .sr-btn:active { transform: none; }
   ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
   .sr .sr-screen::after { animation: none; }
   .sr .sr-screen--reel > img { animation: none; }
@@ -1640,6 +1648,10 @@ body.sr-admin .admin-shell, body.sr-admin {
    Icon-only actions use .sr-icon-btn. Anything else is legacy — migrate,
    don't add new one-off systems. */
 .sr .sr-btn--sm { padding: 9px 14px; font-size: 10.5px; letter-spacing: 0.08em; }
+/* press feedback (D-8): colour swaps and the :active press ride the fast token */
+.sr .sr-btn { transition: background var(--sr-t-fast), color var(--sr-t-fast),
+  transform var(--sr-t-fast); }
+.sr .sr-btn:active { transform: scale(0.98); }
 .sr .sr-btn--danger { background: transparent; color: var(--sr-danger);
   border: 1px solid var(--sr-danger); }
 .sr .sr-btn--danger:hover, .sr .sr-btn--danger:focus-visible {

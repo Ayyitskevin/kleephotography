@@ -363,10 +363,7 @@
 
 @keyframes klee-fade { from { opacity: 0; } to { opacity: 1; } }
 
-@keyframes klee-loop { 0% { transform: scaleX(0); } 92% { transform: scaleX(1); } 100% { transform: scaleX(1); } }/* ---- prototype layout parity (structure only) ---- */.scroll-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 60;
-  background: transparent; pointer-events: none; }.scroll-progress [data-progress-bar] { height: 100%; width: 0%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-lt));
-  transition: width 0.08s linear; }.motion-sec { padding: clamp(76px, 10vw, 150px) clamp(20px, 6vw, 88px);
+@keyframes klee-loop { 0% { transform: scaleX(0); } 92% { transform: scaleX(1); } 100% { transform: scaleX(1); } }/* ---- prototype layout parity (structure only) ---- */.motion-sec { padding: clamp(76px, 10vw, 150px) clamp(20px, 6vw, 88px);
   background: var(--espresso); color: var(--cream); }.motion-feature { position: relative; border-radius: 16px; overflow: hidden;
   aspect-ratio: 16 / 9; background: var(--espresso2);
   box-shadow: 0 50px 90px -50px rgba(0,0,0,0.55); }.motion-feature video { position: absolute; inset: 0; width: 100%; height: 100%;
@@ -1004,10 +1001,7 @@
   --espresso2: #1c2530;   /* nested panels                                   */
   --cream: #e7dfcd;       /* warm cream text on slate fills                  */
   background: #0e1319;
-}html[data-theme="dark"] .site-body ::selection { background: #e6c9ce; color: #0e1319; }/* ── 2. Shared chrome ───────────────────────────────────────────────────── *//* Scroll-progress: rose→gold sweep. */html[data-theme="dark"] .site-body .scroll-progress [data-progress-bar] {
-  background: linear-gradient(90deg, #d37e88, #d0b162);
-  box-shadow: 0 0 12px -2px rgba(124, 47, 56, .6);
-}/* Nav: transparent over the hero, slate glass once scrolled. */html[data-theme="dark"] .site-body .site-nav {
+}html[data-theme="dark"] .site-body ::selection { background: #e6c9ce; color: #0e1319; }/* ── 2. Shared chrome ───────────────────────────────────────────────────── *//* Scroll-progress: rose→gold sweep. *//* Nav: transparent over the hero, slate glass once scrolled. */html[data-theme="dark"] .site-body .site-nav {
   background: transparent; border-bottom: 1px solid transparent;
   transition: background .45s ease, padding .45s ease, box-shadow .45s ease, border-color .45s ease;
 }html[data-theme="dark"] .site-body .site-nav.scrolled {

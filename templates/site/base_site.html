@@ -56,6 +56,9 @@
 {% block skip_link %}{% endblock %}
 {% block content %}
 <a class="skip-link" href="#main">Skip to content</a>
+{# Nav-state sentinel (D-8): site.js observes it instead of listening to
+   scroll. It sits BEFORE the header so .site-nav + .nav-menu stay adjacent. #}
+<div class="nav-sentinel" data-nav-sentinel aria-hidden="true"></div>
 {# Marquee nav (Screening Room 3a): one global link set on every page —
    three features, Portfolio, Rates, Work, About, amber Book CTA. Spokes only
    override brand_chip (feature billing); the CTA still picks up film stock
