@@ -375,6 +375,40 @@ def test_general_booking_links_follow_real_active_event_and_inactive_fallback(
     assert booking_links() and set(booking_links()) == {"/book"}
 
 
+def test_real_estate_hero_carries_a_booking_and_quote_cta_row(client, theme):
+    """The first section (the listing premiere) offers both actions above the fold,
+    as the portraits and food hero do; the booking link follows the active event."""
+    book_slug = "re-shoot"
+    db.run("UPDATE event_types SET active=0 WHERE slug=?", (book_slug,))
+
+    def hero_links():
+        hero = rendered(client, "/real-estate").one(id="main").find("section")[0]
+        assert hero.attrs.get("aria-label") == "Listing premiere"
+        return hero, hero.find("a", **{"class": "sr-btn"})
+
+    hero, buttons = hero_links()
+    assert [a.attrs["href"] for a in buttons if a.attrs["href"].startswith("/book")] == ["/book"]
+    quote = [a for a in hero.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
+    assert len(quote) == 1 and quote[0].text() == "Request a quote"
+    assert parse_qs(urlsplit(quote[0].attrs["href"]).query) == {"service": ["Real Estate"]}
+    assert "$" not in " ".join(a.text() for a in hero.find("a"))
+    row = hero.one("div", **{"class": "sr-herosplit-actions"})
+    assert len(row.find("a")) == 2
+    row_id = db.one("SELECT id FROM event_types WHERE slug=?", (book_slug,))
+    if row_id is None:
+        db.run(
+            "INSERT INTO event_types (slug,name,active) VALUES (?,?,1)",
+            (book_slug, "Synthetic specialty availability"),
+        )
+    else:
+        db.run("UPDATE event_types SET active=1 WHERE id=?", (row_id["id"],))
+    _, buttons = hero_links()
+    assert [a.attrs["href"] for a in buttons if a.attrs["href"].startswith("/book")] == [
+        f"/book/{book_slug}"
+    ]
+    db.run("UPDATE event_types SET active=0 WHERE slug=?", (book_slug,))
+
+
 @pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
 def test_real_estate_headline_aerial_line_follows_the_flag(client, theme, monkeypatch, aerial_flag):
     """The line under the H1 must agree with the booking card: bookable Aerial Pass
