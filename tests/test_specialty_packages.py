@@ -453,3 +453,77 @@ def test_aerial_badges_and_labels_follow_the_kill_switch(client, theme, monkeypa
     finally:
         db.run("DELETE FROM assets WHERE gallery_id=?", (gallery_id,))
         db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
+
+
+def _re_sections(client):
+    main = rendered(client, "/real-estate").one(id="main")
+    return (
+        main.one("section", id="twilight"),
+        main.one("section", id="short-term-rentals"),
+        main,
+    )
+
+
+def test_real_estate_twilight_and_str_sections_render_without_prices(client, theme):
+    twilight, rental, main = _re_sections(client)
+    assert "dusk" in twilight.text().lower()
+    assert "guest" in rental.text().lower()
+    for section in (twilight, rental):
+        text = section.text().lower()
+        assert "$" not in text
+        assert "virtual" not in text
+        assert "aerial" not in text and "drone" not in text
+    # the in-page link lands on the rental section, and the CTA is an inquiry
+    assert any(a.attrs.get("href") == "#short-term-rentals" for a in twilight.find("a"))
+    cta = [a for a in rental.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
+    assert len(cta) == 1
+    # generic quote only: no tier is pre-selected (the rental package/price is Kevin's call)
+    assert parse_qs(urlsplit(cta[0].attrs["href"]).query) == {"service": ["Real Estate"]}
+
+
+def test_real_estate_rental_section_notes_multi_property_booking_without_a_figure(client, theme):
+    _, rental, _ = _re_sections(client)
+    text = rental.text().lower()
+    # the volume rate starts at three properties (approved price-sheet line 8)
+    assert "booking three or more properties together" in text
+    for wording in ("more than one", "two or more", "two properties", "several"):
+        assert wording not in text
+    assert "single invoice" in text and "volume rate" in text
+    assert "$" not in text
+    cta = [a for a in rental.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
+    assert "tier=" not in cta[0].attrs["href"]
+
+
+def test_real_estate_rental_copy_binds_no_tier_or_deliverable(client, theme):
+    _, rental, _ = _re_sections(client)
+    text = rental.text().lower()
+    group = catalog_group("real_estate")
+    for tier in group["tiers"]:
+        assert tier["name"].lower() not in text
+    # no tier deliverable is presented as part of the rental set
+    for word in ("reel", "film", "walkthrough", "twilight", "mls", "images"):
+        assert word not in text
+    for line in (inc for t in group["tiers"] for inc in t["includes"]):
+        assert line.lower() not in text
+
+
+def test_real_estate_twilight_and_rental_sections_sit_before_the_proof_band(client, theme):
+    markup = client.get("/real-estate").text
+    work = max(markup.find('id="work"'), markup.find("empty-state"))
+    twilight = markup.index('id="twilight"')
+    rental = markup.index('id="short-term-rentals"')
+    proof = markup.index("Turnaround", rental)
+    assert 0 < work < twilight < rental < proof
+
+
+def test_real_estate_price_lines_appear_only_once_priced(client, theme, monkeypatch):
+    from app.public.site_catalog import SPECIALTY_PAGES
+
+    twilight, rental, _ = _re_sections(client)
+    assert "on its own" not in twilight.text().lower()
+    assert "rental set" not in rental.text().lower()
+    monkeypatch.setitem(SPECIALTY_PAGES["re"]["twilight"], "addon_price", "$111")
+    monkeypatch.setitem(SPECIALTY_PAGES["re"]["str"], "price", "$222")
+    twilight, rental, _ = _re_sections(client)
+    assert "$111" in twilight.text()
+    assert "$222" in rental.text()

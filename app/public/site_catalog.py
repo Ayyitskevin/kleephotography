@@ -683,6 +683,64 @@ SPECIALTY_PAGES = {
                 "all in one gallery, all yours to download.",
             ),
         ],
+        # Twilight explainer + short-term-rental section (re spoke only).
+        # A None price hides its line; set one only when Kevin signs a figure.
+        "twilight": {
+            "kicker": "Twilight",
+            "heading": "The listing at dusk.",
+            "body": "Signature and Premier include a twilight exterior set: the "
+            "house photographed on site as the light drops, windows glowing, "
+            "so the listing's lead image works after the sun is gone.",
+            "points": [
+                (
+                    "Shot on site",
+                    "At the property, in the dusk window, not added afterwards.",
+                ),
+                (
+                    "Chosen frames",
+                    "Picked for the exterior that earns it: the front, the porch, the pool.",
+                ),
+                (
+                    "Your date",
+                    "Tell me the go-live date and I will work the evening around it.",
+                ),
+            ],
+            "addon_price": None,
+        },
+        "str": {
+            "kicker": "Short-term rentals",
+            "heading": "Photos that book the stay.",
+            "body": "A vacation rental is shopped by guests scrolling for a place "
+            "to stay, not by buyers. The set is built for that: the arrival, "
+            "the spaces guests will actually use, and the view they are "
+            "imagining from the porch.",
+            "points": [
+                (
+                    "Guest-first order",
+                    "Exterior and entry, living and kitchen, each bedroom and "
+                    "bath, then the outdoor space.",
+                ),
+                (
+                    "Evening, if it suits",
+                    "A porch, a hot tub, or a fire pit can look best lit up at "
+                    "dusk. Say so and we will plan for it.",
+                ),
+                (
+                    "Scoped to the property",
+                    "Rentals vary, so use the scope field on the inquiry to tell "
+                    "me the rooms, the outdoor space, and where it is listed, and "
+                    "I will quote the right fit.",
+                ),
+            ],
+            "multi": (
+                "Three or more properties",
+                "Booking three or more properties together? They share a "
+                "single invoice at a volume rate. Tell me how many on the "
+                "inquiry.",
+            ),
+            "cta": "Ask about a rental shoot",
+            "price": None,
+        },
         "contact_service": "Real Estate",
         "book_slug": "re-shoot",
         "empty_head": "Real estate work is being curated for the site.",
