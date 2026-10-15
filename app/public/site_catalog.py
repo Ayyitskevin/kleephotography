@@ -704,7 +704,7 @@ SPECIALTY_PAGES = {
                     "Tell me the go-live date and I will work the evening around it.",
                 ),
             ],
-            "addon_price": None,
+            "addon_price": "+$150",
         },
         "str": {
             "kicker": "Short-term rentals",
@@ -738,7 +738,7 @@ SPECIALTY_PAGES = {
                 "inquiry.",
             ),
             "cta": "Ask about a rental shoot",
-            "price": None,
+            "price": "From $450 per property; 3+ properties at $400 each, one invoice",
         },
         "contact_service": "Real Estate",
         "book_slug": "re-shoot",

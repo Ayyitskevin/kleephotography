@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from app import jobs, scheduler, scheduling
 from app.main import app
 from app.public import site
+from app.public.site_catalog import SPECIALTY_PAGES
 from tests.test_specialty_packages import catalog_group, inquiry_link, rendered
 
 pytestmark = pytest.mark.integration
@@ -75,6 +76,17 @@ def test_catalog_carries_the_approved_portrait_figures():
         assert f"Up to {GROUP_SIZES[tier['name']]} people" in tier["includes"]
 
 
+def test_catalog_carries_the_approved_real_estate_figures():
+    re_page = SPECIALTY_PAGES["re"]
+    assert re_page["twilight"]["addon_price"] == "+$150"
+    assert re_page["str"]["price"] == (
+        "From $450 per property; 3+ properties at $400 each, one invoice"
+    )
+    # "From $450" is Signature's published price (the approved Signature scope).
+    signature = next(t for t in catalog_group("real_estate")["tiers"] if t["name"] == "Signature")
+    assert signature["display_price"] == "$450"
+
+
 def test_portraits_spoke_renders_each_team_line_from_the_catalog(client):
     section = rendered(client, "/portraits").one(id="rates").one("section", id="lines-portraits")
     articles = section.find("article")
@@ -106,3 +118,25 @@ def test_portrait_tiers_state_their_group_size(client, path):
 @pytest.mark.parametrize("path", ["/portraits", "/services", "/real-estate"])
 def test_the_family_line_is_gone(client, path):
     assert "Family session" not in client.get(path).text
+
+
+def test_real_estate_renders_the_twilight_add_on_and_the_rental_rate(client):
+    main = rendered(client, "/real-estate").one(id="main")
+    twilight = main.one("section", id="twilight")
+    rental = main.one("section", id="short-term-rentals")
+    re_page = SPECIALTY_PAGES["re"]
+    twilight_lines = [p.text() for p in twilight.find("p") if has_class(p, "sr-mono")]
+    assert f"Twilight set added to Essentials · {re_page['twilight']['addon_price']}" in (
+        twilight_lines
+    )
+    rental_lines = [p.text() for p in rental.find("p") if has_class(p, "sr-mono")]
+    assert f"Rental set · {re_page['str']['price']}" in rental_lines
+    # The volume note and the rate agree: three or more properties, one invoice.
+    note = re_page["str"]["multi"][1].lower()
+    assert "three or more" in note and "single invoice" in note
+    assert "3+" in re_page["str"]["price"] and "one invoice" in re_page["str"]["price"]
+
+
+@pytest.mark.parametrize("path", ["/real-estate", "/services"])
+def test_no_virtual_twilight_anywhere(client, path):
+    assert "virtual" not in client.get(path).text.lower()
