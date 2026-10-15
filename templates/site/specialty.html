@@ -518,7 +518,8 @@
       {% else %}
       <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
       {% endif %}
-    </div>
+    </div>{% if sp_key == "fb" %}
+    <p class="sr-mono">{{ page.sr.quote_ask }}</p>{% endif %}
   </div>
 </section>
 
