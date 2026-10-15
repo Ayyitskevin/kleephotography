@@ -484,7 +484,10 @@ def test_real_estate_twilight_and_str_sections_render_without_prices(client, the
 def test_real_estate_rental_section_notes_multi_property_booking_without_a_figure(client, theme):
     _, rental, _ = _re_sections(client)
     text = rental.text().lower()
-    assert "several properties" in text
+    # the volume rate starts at three properties (approved price-sheet line 8)
+    assert "booking three or more properties together" in text
+    for wording in ("more than one", "two or more", "two properties", "several"):
+        assert wording not in text
     assert "single invoice" in text and "volume rate" in text
     assert "$" not in text
     cta = [a for a in rental.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
