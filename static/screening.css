@@ -30,6 +30,8 @@
 .sr .sr-kickrow { display: flex; justify-content: space-between; align-items: baseline;
   gap: var(--sr-s4); margin: 0 0 var(--sr-s5); flex-wrap: wrap; }
 .sr .sr-kickrow .sr-mono { letter-spacing: var(--sr-track-label); }
+/* D-10: links in a kick row and the availability strip are 44px touch targets */
+.sr .sr-kickrow a, .sr .sr-availstrip a { display: inline-flex; min-height: 44px; align-items: center; }
 
 /* page header for non-mocked surfaces — title-card language, no artwork */
 .sr .sr-pagehead { padding: var(--sr-s8) 0 var(--sr-s7); border-bottom: 1px solid var(--sr-line); }
@@ -64,12 +66,12 @@
 .sr .site-nav nav { display: flex; align-items: center; gap: var(--sr-s4); flex-wrap: nowrap; }
 .sr .site-nav nav a { font: 600 var(--sr-t-xs)/1 var(--sr-sans); letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--sr-ink-soft); text-decoration: none;
-  white-space: nowrap; }
+  white-space: nowrap; padding: var(--sr-s3) 0; }
 /* D-1: nav links are 13px where the one-line nav has room (the 1080px burger breakpoint is pinned by tests
    and 13px links need ~1,230px); below that they stay at the 11px floor. */
 @media (min-width: 1366px) { .sr .site-nav nav a { font-size: var(--sr-t-sm); } }
 .sr .site-nav nav a:hover { color: var(--sr-cream); }
-.sr .site-nav nav a.nav-cta { background: var(--sr-stock); color: var(--sr-house);
+.sr .site-nav nav a.nav-cta { background: var(--sr-amber); color: var(--sr-house);
   padding: 11px var(--sr-s4); font-weight: 700; border-radius: 0; }
 .sr .site-nav nav a.nav-cta:hover { background: var(--sr-cream); color: var(--sr-house); }
 .sr .nav-menu-btn {
@@ -97,7 +99,7 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .nav-mobile a { font: 700 20px/1.2 var(--sr-sans); letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--sr-cream); text-decoration: none;
   padding: var(--sr-s4) 0; border-bottom: 1px solid var(--sr-line); }
-.sr .nav-mobile a.nav-cta { background: var(--sr-stock); color: var(--sr-house);
+.sr .nav-mobile a.nav-cta { background: var(--sr-amber); color: var(--sr-house);
   text-align: center; margin-top: var(--sr-s4); padding: var(--sr-s4) 0; border-bottom: 0; }
 .sr .nav-mobile .nav-mobile-quiet { font: 600 12px/1 var(--sr-sans); letter-spacing: 0.14em;
   color: var(--sr-ink-soft); padding: var(--sr-s3) 0; border-bottom: 0; }
@@ -269,9 +271,9 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .sr-filmstrip figure img { position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; }
 .sr .sr-filmstrip figure.sr-frame-wide { flex: 1.6 1 0; aspect-ratio: 3 / 2; }
-.sr .sr-filmstrip figure.sr-frame-tall { aspect-ratio: 3 / 4; }
+.sr .sr-filmstrip figure.sr-frame-tall { aspect-ratio: 4 / 5; }
 .sr .sr-frameno { position: absolute; bottom: 6px; left: 8px; z-index: 2;
-  font: 400 var(--sr-t-sm)/1 var(--sr-mono); color: rgba(236, 228, 211, 0.7); letter-spacing: 0.06em; }
+  font: 400 var(--sr-t-xs)/1 var(--sr-mono); color: rgba(236, 228, 211, 0.7); letter-spacing: 0.08em; }
 /* aerial / film chips on tiles: tokens ship .sr-filmchip + .sr-aerial */
 
 /* ── chapters rail (premiere hero, data-seek chips) ───────────────────────── */
@@ -386,6 +388,8 @@ html.nav-menu-enhanced .sr .nav-mobile {
   font: 500 var(--sr-t-xs)/1 var(--sr-mono); background: rgba(8, 9, 11, 0.6); color: var(--sr-cream);
   padding: var(--sr-s1) 7px; }
 .sr .tile img { border-radius: 0; }
+/* D-7: a hairline frame on every marketing still, drawn inside the tile so it never shifts layout */
+.site-body.sr .tile { outline: 1px solid rgba(236, 228, 211, 0.08); outline-offset: -1px; }
 /* films-first: the toggle lifts video tiles to the top of the masonry flow */
 .sr .portfolio-masonry.sr-films-first { display: flex; flex-wrap: wrap; gap: var(--sr-s3); }
 .sr .portfolio-masonry.sr-films-first .tile { flex: 1 1 300px; margin: 0; }
@@ -462,14 +466,14 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .empty-state-actions { display: flex; justify-content: center; gap: var(--sr-s3);
   margin-top: var(--sr-s5); flex-wrap: wrap; }
 .sr .btn-pill, .sr .btn-ghost { border-radius: 0; }
-.sr .btn-pill { background: var(--sr-stock); color: var(--sr-house); font-weight: 700;
+.sr .btn-pill { background: var(--sr-amber); color: var(--sr-house); font-weight: 700;
   letter-spacing: 0.1em; text-transform: uppercase; font-size: 12px; padding: var(--sr-s4) var(--sr-s5);
   border: 0; }
 .sr .btn-pill:hover { background: var(--sr-cream); color: var(--sr-house); }
 .sr .btn-ghost { background: none; border: 1px solid rgba(236, 228, 211, 0.35);
   color: var(--sr-cream); font-weight: 600; letter-spacing: 0.1em;
   text-transform: uppercase; font-size: 12px; padding: var(--sr-s4) var(--sr-s5); }
-.sr .btn-ghost:hover { border-color: var(--sr-stock); color: var(--sr-stock); }
+.sr .btn-ghost:hover { border-color: var(--sr-amber); color: var(--sr-amber); }
 
 /* ── feature pages (3b/3k/3c+3l) ──────────────────────────────────────────── */
 /* spec line: mono facts under the premiere title */
@@ -499,6 +503,8 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .sr-herosplit-fig img, .sr .sr-herosplit-fig video { position: absolute; inset: 0;
   width: 100%; height: 100%; object-fit: cover; }
 .sr .sr-herosplit-fig .sr-frameno { bottom: 14px; left: 16px; letter-spacing: 0.14em; }
+/* portrait hero: faces sit above centre, so the cover crop anchors at 40% */
+.sr .sr-herosplit-fig img { object-position: center 40%; }
 
 /* full-bleed opening title card (The Plate) */
 .sr .sr-titlecard { position: relative; min-height: 600px; overflow: hidden;
@@ -555,7 +561,7 @@ html.nav-menu-enhanced .sr .nav-mobile {
   letter-spacing: 0.03em; text-transform: uppercase; color: var(--sr-cream-strong); }
 .sr .lede, .sr .work-brief { color: var(--sr-ink-mute); }
 .sr .muted { color: var(--sr-ink-faint); }
-.sr .btn-gold { background: var(--sr-stock); color: var(--sr-house);
+.sr .btn-gold { background: var(--sr-amber); color: var(--sr-house);
   border-radius: 0; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .sr .cta, .sr .cta-band { background: none; }
 /* services board: tier cards go house-dark with a stock pick */
@@ -651,7 +657,7 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .stack-form label { color: var(--sr-ink-soft); }
 .site-body.sr .stack-form input, .site-body.sr .stack-form select, .site-body.sr .stack-form textarea { font-size: var(--sr-t-base); }
 .sr .stack-form button[type="submit"], .sr button[type="submit"] {
-  background: var(--sr-stock); color: var(--sr-house); border: 0; border-radius: 0;
+  background: var(--sr-amber); color: var(--sr-house); border: 0; border-radius: 0;
   font: 700 12px/1 var(--sr-sans); letter-spacing: 0.1em; text-transform: uppercase;
   padding: 15px var(--sr-s5); cursor: pointer; }
 .sr .stack-form button[type="submit"]:hover, .sr button[type="submit"]:hover {
@@ -1143,7 +1149,7 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr a.sr-card:hover .sr-card-media img,
 .sr a.sr-card:focus-visible .sr-card-media img { transform: scale(1.03); }
 .sr .portfolio-masonry .tile { overflow: hidden; }
-.sr .portfolio-masonry .tile img { transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sr .portfolio-masonry .tile img { transition: transform 700ms cubic-bezier(0.32, 0.72, 0, 1); }
 .sr .portfolio-masonry .tile:hover img { transform: scale(1.03); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1187,16 +1193,16 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .sr-btn--subtle { background: transparent; border: 0; color: var(--sr-ink-soft);
   padding-left: var(--sr-s3); padding-right: var(--sr-s3); }
 .sr .sr-btn--subtle:hover, .sr .sr-btn--subtle:focus-visible {
-  background: transparent; color: var(--sr-stock); }
+  background: transparent; color: var(--sr-amber); }
 .sr .sr-btn:disabled, .sr .sr-icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.sr .sr-btn:disabled:hover { background: var(--sr-stock); color: var(--sr-house); }
+.sr .sr-btn:disabled:hover { background: var(--sr-amber); color: var(--sr-house); }
 
 .sr .sr-icon-btn { display: inline-flex; align-items: center; justify-content: center;
   width: 34px; height: 34px; padding: 0; background: transparent;
   border: 1px solid var(--sr-line-raised); border-radius: 0;
   color: var(--sr-ink-soft); cursor: pointer; }
 .sr .sr-icon-btn:hover, .sr .sr-icon-btn:focus-visible {
-  border-color: var(--sr-stock); color: var(--sr-stock); }
+  border-color: var(--sr-amber); color: var(--sr-amber); }
 
 /* ── icons — inline SVG sprite (static/icons.svg) ─────────────────────────── */
 .sr .sr-icon { width: 16px; height: 16px; flex: none; vertical-align: -3px;
