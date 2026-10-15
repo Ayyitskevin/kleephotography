@@ -1053,7 +1053,7 @@ SPECIALTY_PAGES = {
         ],
         "quoted_separately": [
             "Elaborate set styling — a hired stylist, folded into your quote",
-            "Props and backdrops beyond what we shoot with — sourced for you, folded into your quote",
+            "Props and backdrops beyond what we shoot with — folded into your quote",
         ],
         "brand_lane": {
             "kicker": "For drinks & food brands",

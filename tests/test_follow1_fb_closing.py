@@ -82,4 +82,6 @@ def test_quoted_separately_lists_props_and_stylist_without_a_price(client):
     strip = markup[start : markup.index("</aside>", start)].lower()
     assert "stylist" in strip
     assert "props" in strip
+    assert "props and backdrops beyond what we shoot with — folded into your quote" in strip
+    assert "sourced" not in strip
     assert "$" not in strip
