@@ -216,7 +216,9 @@ def test_the_portrait_hero_still_crops_above_centre():
 
 # ── D-10 ─────────────────────────────────────────────────────────────────────
 def test_buttons_and_inline_links_in_kickrows_and_availstrips_are_forty_four_tall():
-    assert "min-height: 44px" in rule("screening-room-tokens.css", ".sr .sr-btn").body
+    assert (
+        resolved(page('<a id="x" class="sr-btn sr-btn--sm" href="/">x</a>'), "min-height") == "44px"
+    )
     body = rule("screening.css", ".sr .sr-kickrow a, .sr .sr-availstrip a").body
     for want in ("display: inline-flex", "min-height: 44px", "align-items: center"):
         assert want in body
@@ -225,3 +227,36 @@ def test_buttons_and_inline_links_in_kickrows_and_availstrips_are_forty_four_tal
 def test_nav_links_pad_twelve_pixels_vertically_and_the_cta_keeps_its_own_padding():
     assert "padding: var(--sr-s3) 0" in rule("screening.css", ".sr .site-nav nav a").body
     assert "padding: 11px var(--sr-s4)" in rule("screening.css", ".sr .site-nav nav a.nav-cta").body
+
+
+TEMPLATES = ROOT / "templates"
+
+
+def test_the_touch_target_floor_stops_at_the_marketing_shell():
+    """P2-1: `.sr-btn` is also the admin and client button (the admin's compact `sr-btn--sm` among them).
+    The 44px floor is a marketing-shell rule, so no rule in any public sheet may give `.sr-btn` a
+    min-height without requiring `.site-body`, and the resting style on an admin or flow page has none."""
+    for name in ("screening-room-tokens.css", "screening.css", "screening-admin.css"):
+        for r in sheet(name).rules:
+            if r.kind != "style" or "min-height" not in r.body:
+                continue
+            for part in lib.split_commas(r.prelude):
+                if re.search(r"\.sr-btn\b(?!-)", part):
+                    assert part.split()[0].startswith(".site-body"), (name, r.line, part)
+    shell = page('<a id="x" class="sr-btn" href="/">Book</a>')
+    assert resolved(shell, "min-height") == "44px"
+    for body in ("sr sr-admin", "sr"):  # admin shell, booking/client flow shell
+        for classes in ("sr-btn sr-btn--sm", "sr-btn"):
+            assert (
+                resolved(page(f'<a id="x" class="{classes}" href="/">x</a>', body), "min-height")
+                is None
+            )
+
+
+def test_the_small_button_users_are_all_admin_templates():
+    users = sorted(
+        p.relative_to(TEMPLATES).as_posix()
+        for p in TEMPLATES.rglob("*.html")
+        if "sr-btn--sm" in p.read_text()
+    )
+    assert users and all(u.startswith("admin/") for u in users), users
