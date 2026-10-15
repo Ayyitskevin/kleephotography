@@ -36,6 +36,8 @@ GOLDEN_DIR = ROOT / "tests" / "golden" / "site"
 METRICS_PATH = GOLDEN_DIR / "metrics.json"
 UPDATE = os.environ.get("GOLDEN_UPDATE") == "1"
 MISSING = "golden missing; run with GOLDEN_UPDATE=1"
+# Fixed at the fixture boundary so the case study's public datePublished is a literal.
+CASE_STUDY_CREATED = "2026-01-10 12:00:00"
 
 ROUTES = [
     "/",
@@ -69,10 +71,13 @@ def route_slug(route):
 
 
 def normalise(markup):
-    """The four normalisation rules: CSP nonces, static revisions, ISO dates, trailing space."""
+    """Remove only per-request and per-deploy churn: CSP nonces, static ?v= revisions,
+    trailing space. Content (dates, prices, copy) is never rewritten: the seeded case
+    study has a fixed created_at, so its Article datePublished is a stable literal. No
+    route in the matrix renders a volatile date; if one ever does (a sitemap <lastmod>,
+    say), normalise that named field only, never every YYYY-MM-DD on the page."""
     markup = re.sub(r' nonce="[^"]*"', "", markup)
     markup = re.sub(r"\?v=\d+", "?v=REV", markup)
-    markup = re.sub(r"\d{4}-\d{2}-\d{2}", "DATE", markup)
     return "\n".join(line.rstrip() for line in markup.splitlines()) + "\n"
 
 
@@ -115,9 +120,18 @@ def ledger():
 
 def _seed():
     gallery = db.run(
-        """INSERT INTO galleries (slug, title, pin, cs_published, cs_tagline, cs_brief)
-           VALUES (?,?,?,?,?,?)""",
-        ("golden-cs", "Golden case study", "1234", 1, "A focused campaign.", "The brief."),
+        """INSERT INTO galleries
+           (slug, title, pin, cs_published, cs_tagline, cs_brief, created_at)
+           VALUES (?,?,?,?,?,?,?)""",
+        (
+            "golden-cs",
+            "Golden case study",
+            "1234",
+            1,
+            "A focused campaign.",
+            "The brief.",
+            CASE_STUDY_CREATED,
+        ),
     )
     for tag in ("re/exteriors", "pl/headshots", "fb/plated"):
         name = f"golden-{tag.replace('/', '-')}.jpg"
@@ -208,6 +222,19 @@ def test_a_missing_golden_names_the_update_command(tmp_path):
     assert ledger["changed"] == []
 
 
-def test_normalisation_rules():
-    raw = '<script nonce="abc123"></script><link href="/static/a.css?v=1729">2026-10-15  \n'
-    assert normalise(raw) == '<script></script><link href="/static/a.css?v=REV">DATE\n'
+def test_normalisation_removes_churn_and_keeps_content():
+    page = '<script nonce="{n}"></script><link href="/static/a.css?v={v}">{body}  \n'
+    body = '<time datetime="2026-01-15">2026-01-15</time><b>$450</b>'
+    # Per-request nonces and per-deploy revisions normalise to the same bytes ...
+    first = normalise(page.format(n="abc123", v="1729", body=body))
+    assert first == normalise(page.format(n="zz9", v="1800", body=body))
+    assert first == '<script></script><link href="/static/a.css?v=REV">' + body + "\n"
+    # ... while a content date and a price stay distinguishable.
+    for other in (body.replace("2026-01-15", "2001-02-03"), body.replace("$450", "$400")):
+        assert normalise(page.format(n="abc123", v="1729", body=other)) != first
+
+
+@pytest.mark.parametrize("flag", FLAGS)
+def test_seeded_case_study_golden_keeps_its_published_date(flag):
+    golden = (GOLDEN_DIR / f"work-golden-cs__{flag}__seeded.html").read_text(encoding="utf-8")
+    assert f'"datePublished": "{CASE_STUDY_CREATED[:10]}"' in golden
