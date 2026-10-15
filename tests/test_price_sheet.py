@@ -83,11 +83,12 @@ def test_catalog_carries_the_approved_portrait_figures():
     assert "One look, ~15-minute slot, 2 retouched finals" in team["includes"]
     assert (pack["display_price"], pack["price_cents"]) == ("$550", 55000)
     assert "Five people" in pack["subtitle"]
-    assert (onsite["display_price"], onsite["price_cents"], onsite["minimum"]) == (
-        "$750",
-        75000,
-        True,
-    )
+    assert (
+        onsite["display_price"],
+        onsite["price_unit"],
+        onsite["price_cents"],
+        onsite["minimum"],
+    ) == ("$750", " minimum", 75000, True)
     for tier in catalog_group("portraits")["tiers"]:
         assert f"Up to {GROUP_SIZES[tier['name']]} people" in tier["includes"]
 
@@ -174,6 +175,49 @@ def test_services_offer_json_ld_includes_the_team_lines(client):
     assert not [
         b for b in blocks if "Review" in json.dumps(b) or "aggregateRating" in json.dumps(b)
     ]
+
+
+# Literal witnesses for what each team price means (review: Daybreak P2-2).
+TEAM_PRICE_TEXT = {
+    "Team headshots": "$125 /person",
+    "Small-team pack": "$550",
+    "On-site team day": "$750 minimum",
+}
+TEAM_OFFERS = {
+    "Team headshots": (125.0, "Per person", None),
+    "Small-team pack": (550.0, "Five people, one booking", None),
+    "On-site team day": (
+        750.0,
+        "The studio comes to you",
+        {"@type": "PriceSpecification", "minPrice": 750.0, "priceCurrency": "USD"},
+    ),
+}
+
+
+@pytest.mark.parametrize("path", ["/portraits", "/services"])
+def test_team_cards_say_what_each_price_covers(client, path):
+    root = rendered(client, path)
+    container = (
+        root.one(id="rates").one("section", id="lines-portraits")
+        if path == "/portraits"
+        else root.one("div", id="svc-portraits")
+    )
+    shown = {}
+    for article in container.find("article"):
+        name = article.one("h3").text()
+        if name in TEAM_PRICE_TEXT:
+            shown[name] = [p.text() for p in article.find("p") if has_class(p, "svc-price")]
+    assert shown == {name: [text] for name, text in TEAM_PRICE_TEXT.items()}
+
+
+def test_team_offers_carry_their_qualifiers(client):
+    _markup, _blocks, offers = services_offers(client, catalog_group("portraits")["title"])
+    got = {
+        o["name"]: (o["price"], o["description"], o.get("priceSpecification"))
+        for o in offers
+        if o["name"] in TEAM_OFFERS
+    }
+    assert got == TEAM_OFFERS
 
 
 def test_an_unpriced_line_leaves_services_and_its_offers(client, monkeypatch):
