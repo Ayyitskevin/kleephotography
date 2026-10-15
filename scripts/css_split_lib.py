@@ -149,6 +149,8 @@ def parse_decls(body: str) -> list[tuple[str, bool]]:
 class Sheet:
     def __init__(self, name: str, text: str):
         self.name, self.text, self.rules = name, text, []
+        # top-level units in document order: (start, end, first_rule_idx, last_rule_idx + 1)
+        self.units: list[tuple[int, int, int, int]] = []
         self._nl = [m.start() for m in re.finditer("\n", text)]
         self._parse(0, len(text), ())
 
@@ -191,7 +193,10 @@ class Sheet:
                 m = re.match(r"@([-\w]+)", prelude)
                 nm = m.group(1).lower()
                 if nm in GROUP_AT:
+                    first = len(self.rules)
                     self._parse(j + 1, close, ctx + (" ".join(prelude.split()),))
+                    if not ctx:
+                        self.units.append((i, close + 1, first, len(self.rules)))
                 elif nm in ATOMIC_AT:
                     self._add("atomic", ctx, prelude, body, i, close + 1)
                 else:
@@ -213,6 +218,8 @@ class Sheet:
         if kind == "style":
             r.selectors = split_commas(prelude)
             r.props = parse_decls(body)
+        if not ctx:
+            self.units.append((start, end, len(self.rules), len(self.rules) + 1))
         self.rules.append(r)
 
     def src(self, r: Rule) -> str:
