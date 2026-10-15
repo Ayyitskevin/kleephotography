@@ -364,3 +364,22 @@ def test_general_booking_links_follow_real_active_event_and_inactive_fallback(
     assert active_urls and set(active_urls) == {f"/book/{book_slug}"}
     db.run("UPDATE event_types SET active=0 WHERE slug=?", (book_slug,))
     assert booking_links() and set(booking_links()) == {"/book"}
+
+
+@pytest.mark.parametrize("aerial_flag", [False, True], ids=["aerial-off", "aerial-on"])
+def test_real_estate_headline_aerial_line_follows_the_flag(client, theme, monkeypatch, aerial_flag):
+    """The line under the H1 must agree with the booking card: bookable Aerial Pass
+    wording when the flag is on, the planned notice only in the kill-switch state."""
+    monkeypatch.setattr(config, "AERIALS_LIVE", aerial_flag)
+    main = rendered(client, "/real-estate").one(id="main")
+    head = main.one("div", **{"class": "sr-featurehead"}).text().lower()
+    bands = main.find("section", **{"aria-label": "The Aerial Pass"})
+    if aerial_flag:
+        assert "not available" not in head
+        assert "planned" not in head
+        assert f"aerial pass {specialties.aerial_pass_display()} — faa part 107" in head
+        assert len(bands) == 1
+    else:
+        assert "planned for launch" in head
+        assert "not available to book today" in head
+        assert bands == []

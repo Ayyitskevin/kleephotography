@@ -53,7 +53,11 @@
   <div class="sr-featurehead">
     <h1>{{ page.sr.h2a }} <em>{{ page.sr.h2b }}</em></h1>
     <p class="sr-specline">{% for s in page.sr.spec %}{{ s }} &middot; {% endfor %}From {{ rates[0].price }}</p>
+    {% if aerials_live() %}
+    <p class="sr-mono">{{ page.sr.spec_aerial|replace("{rate}", aerial_rate) }}</p>
+    {% else %}
     <p class="sr-mono">Aerial coverage is planned for launch with FAA Part 107 — not available to book today.</p>
+    {% endif %}
   </div>
   <div class="sr-premiere">
     <figure class="sr-screen sr-screen--film" data-sr-player>
