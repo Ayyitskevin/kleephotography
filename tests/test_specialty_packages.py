@@ -464,7 +464,16 @@ def _re_sections(client):
     )
 
 
-def test_real_estate_twilight_and_str_sections_render_without_prices(client, theme):
+def _unprice_re(monkeypatch):
+    from app.public.site_catalog import SPECIALTY_PAGES
+
+    monkeypatch.setitem(SPECIALTY_PAGES["re"]["twilight"], "addon_price", None)
+    monkeypatch.setitem(SPECIALTY_PAGES["re"]["str"], "price", None)
+
+
+def test_real_estate_twilight_and_str_sections_render_without_prices(client, theme, monkeypatch):
+    # Both fields carry approved figures now (ruling 1); unset, nothing price-shaped renders.
+    _unprice_re(monkeypatch)
     twilight, rental, main = _re_sections(client)
     assert "dusk" in twilight.text().lower()
     assert "guest" in rental.text().lower()
@@ -489,7 +498,9 @@ def test_real_estate_rental_section_notes_multi_property_booking_without_a_figur
     for wording in ("more than one", "two or more", "two properties", "several"):
         assert wording not in text
     assert "single invoice" in text and "volume rate" in text
-    assert "$" not in text
+    # the note itself carries no figure; the priced line below it does
+    note = [p for p in rental.find("p") if "three or more" in p.text().lower()]
+    assert len(note) == 1 and "$" not in note[0].text()
     cta = [a for a in rental.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
     assert "tier=" not in cta[0].attrs["href"]
 
@@ -500,11 +511,17 @@ def test_real_estate_rental_copy_binds_no_tier_or_deliverable(client, theme):
     group = catalog_group("real_estate")
     for tier in group["tiers"]:
         assert tier["name"].lower() not in text
-    # no tier deliverable is presented as part of the rental set
+    # Ruling 1 (line 8) adopted exactly two deliverables with the rental price:
+    # a twilight set and 40 images. They appear once, together, and nowhere else.
+    adopted = "twilight set + 40 images"
+    assert text.count(adopted) == 1
+    rest = text.replace(adopted, "")
     for word in ("reel", "film", "walkthrough", "twilight", "mls", "images"):
-        assert word not in text
+        assert word not in rest
     for line in (inc for t in group["tiers"] for inc in t["includes"]):
         assert line.lower() not in text
+    cta = [a for a in rental.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
+    assert len(cta) == 1 and "tier=" not in cta[0].attrs["href"]
 
 
 def test_real_estate_twilight_and_rental_sections_sit_before_the_proof_band(client, theme):
@@ -519,8 +536,9 @@ def test_real_estate_twilight_and_rental_sections_sit_before_the_proof_band(clie
 def test_real_estate_price_lines_appear_only_once_priced(client, theme, monkeypatch):
     from app.public.site_catalog import SPECIALTY_PAGES
 
+    _unprice_re(monkeypatch)
     twilight, rental, _ = _re_sections(client)
-    assert "on its own" not in twilight.text().lower()
+    assert "added to essentials" not in twilight.text().lower()
     assert "rental set" not in rental.text().lower()
     monkeypatch.setitem(SPECIALTY_PAGES["re"]["twilight"], "addon_price", "$111")
     monkeypatch.setitem(SPECIALTY_PAGES["re"]["str"], "price", "$222")

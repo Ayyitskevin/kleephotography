@@ -1,5 +1,6 @@
 """The /portraits spoke: two booking doors, the session in three steps, practical
-prep in the FAQ, and team/family lines that stay hidden until they carry a price.
+prep in the FAQ, and team lines that stay hidden while their price is unset (the
+approved figures themselves are pinned in tests/test_price_sheet.py).
 
 Witnesses are listed here independently of the template (question wording, line
 names, the Portraits scope placeholder). Where a test pins a template-to-catalog
@@ -156,10 +157,17 @@ def test_portraits_faq_answers_practical_prep(client):
         assert not re.search(r"licen|rights|copyright|own the", answers[question].lower())
 
 
-def test_team_and_family_lines_stay_hidden_until_priced(client):
+def unprice_lines(monkeypatch, group):
+    for line in group["lines"]:
+        monkeypatch.setitem(line, "display_price", None)
+
+
+def test_team_lines_stay_hidden_while_unpriced(client, monkeypatch):
+    # The lines carry approved prices now (ruling 1); the gate still holds for a
+    # line whose price is unset.
     group = catalog_group("portraits")
-    assert [line["name"] for line in group["lines"]] == [*TEAM_LINES, FAMILY_LINE]
-    assert all(not line["display_price"] for line in group["lines"])
+    assert [line["name"] for line in group["lines"]] == list(TEAM_LINES)
+    unprice_lines(monkeypatch, group)
     rates = rendered(client, "/portraits").one(id="rates")
     assert [s for s in rates.find("section") if s.attrs.get("id", "").startswith("lines-")] == []
     for name in (*TEAM_LINES, FAMILY_LINE):
@@ -174,9 +182,10 @@ def test_team_and_family_lines_stay_hidden_until_priced(client):
         ]
 
 
-@pytest.mark.parametrize("priced", [*TEAM_LINES, FAMILY_LINE])
+@pytest.mark.parametrize("priced", TEAM_LINES)
 def test_a_priced_line_renders_alone_with_its_inquiry(client, monkeypatch, priced):
     group = catalog_group("portraits")
+    unprice_lines(monkeypatch, group)
     line = next(item for item in group["lines"] if item["name"] == priced)
     monkeypatch.setitem(line, "display_price", "$123")  # synthetic fixture figure
     rates = rendered(client, "/portraits").one(id="rates")
@@ -187,14 +196,14 @@ def test_a_priced_line_renders_alone_with_its_inquiry(client, monkeypatch, price
     article = articles[0]
     assert article.one("h3").text() == priced
     unit = line.get("price_unit")
-    assert svc_prices(article) == ["$123" + (" " + unit if unit else "")]
+    assert svc_prices(article) == [" ".join(f"$123 {unit or ''}".split())]
     # Binding pin: the card lists the line's catalog includes.
     assert [li.text() for li in article.find("li")] == line["includes"]
     if priced in TEAM_LINES:
         assert any("new hires" in li.text().lower() for li in article.find("li"))
     _link, query = inquiry_link(article)
     assert query == {"service": ["Portraits"], "tier": [priced]}
-    for other in (*TEAM_LINES, FAMILY_LINE):
+    for other in TEAM_LINES:
         if other != priced:
             assert other not in section.text()
     # The per-group tier pin keeps seeing exactly three tier cards.
