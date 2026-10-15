@@ -89,7 +89,10 @@ NAMED = {  # selector -> the token its declarations must read
     ".sr .sr-aerialpass-copy p": "var(--sr-t-base)",
     ".sr .faq-item p": "var(--sr-t-base)",
     ".sr .svc-tier ul li": "var(--sr-t-base)",
-    ".sr .stack-form input, .sr .stack-form select, .sr .stack-form textarea": "var(--sr-t-base)",
+    # r1 (review P2-1): scoped to the marketing shell; admin and client forms keep their own size
+    ".site-body.sr .stack-form input, .site-body.sr .stack-form select, .site-body.sr .stack-form textarea": (
+        "var(--sr-t-base)"
+    ),
     ".sr .sr-quote": "var(--sr-t-xl)",
     ".sr .sr-3up .sr-3up-q": "var(--sr-t-xl)",
     ".sr .sr-frameno": "var(--sr-t-sm)",
@@ -103,12 +106,6 @@ NAMED = {  # selector -> the token its declarations must read
     ".sr .svc-head h2": "var(--sr-d-3)",
     ".sr .sr-3up h3": "var(--sr-d-4)",
     ".sr .svc-tier h3": "var(--sr-d-4)",
-    ".sr .sr-section": "var(--sr-section-y)",
-    ".sr .site-footer": "var(--sr-section-y)",
-    ".sr .sr-kickrow": "var(--sr-s5)",
-    ".sr .sr-3up > div": "var(--sr-s6)",
-    ".sr .sr-stats": "var(--sr-s6)",
-    ".sr .sr-quote ": "var(--sr-s6)",
 }
 
 
@@ -174,3 +171,107 @@ def test_masonry_and_wrap_geometry_keep_their_literal_pixels():
         "padding: 0 16px"
         in rule("screening.css", ".sr .sr-wrap", ("@media (max-width: 700px)",)).body
     )
+
+
+# --- r1: the review's P2-1, P3-1 and P3-2 (receipts/REVIEW-P2-W2A-author-sonnet55.md) ------------------------
+
+
+def decl_values(body: str) -> dict:
+    """property -> declared value (the last one wins, as in the cascade within one rule)."""
+    out = {}
+    for chunk in re.sub(r"/\*.*?\*/", "", body, flags=re.S).split(";"):
+        name, sep, value = chunk.partition(":")
+        if sep:
+            out[name.strip().lower()] = " ".join(value.split())
+    return out
+
+
+SPACING = {  # D-2 rows: selector -> (property, exact declared value); the token alone is not enough (mutant F)
+    ".sr .sr-section": ("padding-block", "var(--sr-section-y)"),
+    ".sr .site-footer": ("margin-top", "var(--sr-section-y)"),
+    ".sr .sr-kickrow": ("margin", "0 0 var(--sr-s5)"),
+    ".sr .sr-3up > div": ("padding", "var(--sr-s6)"),
+    ".sr .sr-stats": ("margin-top", "var(--sr-s6)"),
+    ".sr .sr-quote": ("margin", "var(--sr-s6) 0"),
+}
+
+
+@pytest.mark.parametrize("selector,pair", SPACING.items())
+def test_spacing_rows_set_the_token_on_the_specified_property(selector, pair):
+    prop, value = pair
+    assert decl_values(rule("screening.css", selector).body).get(prop) == value
+
+
+def test_both_has_pagehead_branches_declare_the_top_display_size():
+    """Each branch's effective font-size, over every rule that names it (mutant G changes one)."""
+    for page in ("portfolio", "services"):
+        branch = f'.site-body.sr:has(.site-nav nav a[aria-current="page"][href="/{page}"]) .sr-pagehead h1'
+        sizes = [
+            decl_values(r.body)["font-size"]
+            for r in sheet("screening.css").rules
+            if r.kind == "style"
+            and branch in [" ".join(p.split()) for p in lib.split_commas(r.prelude)]
+            and "font-size" in decl_values(r.body)
+        ]
+        assert sizes and sizes[-1] == "var(--sr-d-1)" and set(sizes) == {"var(--sr-d-1)"}, (
+            page,
+            sizes,
+        )
+
+
+def test_the_floor_scan_reads_every_px_in_a_font_shorthand():
+    """P3-1: a shorthand with no line-height (the review's mutant B3) must be seen, not only `size/lh`."""
+    assert list(font_sizes_px("font: 500 9px var(--sr-mono);")) == [9.0]
+    assert list(font_sizes_px("font: italic 400 10.5px/1.4 var(--sr-serif);"))[:1] == [10.5]
+    assert list(font_sizes_px("font: 500 var(--sr-t-xs)/1 var(--sr-mono);")) == []
+
+
+TEMPLATES = ROOT / "templates"
+_EXTENDS = re.compile(r'{%-?\s*extends\s+"([^"]+)"')
+_INCLUDE = re.compile(r'{%-?\s*include\s+"([^"]+)"')
+_BODYCLASS = re.compile(r"{%-?\s*block bodyclass\s*-?%}(.*?){%-?\s*endblock", re.S)
+
+
+def _bodyclass(name: str, seen=()) -> set:
+    """Every bodyclass text a template can render under: its own block, else its layout's; a partial
+    with no layout takes each includer's."""
+    if name in seen:
+        return set()
+    text = (TEMPLATES / name).read_text()
+    own = _BODYCLASS.search(text)
+    if own:
+        return {own.group(1)}
+    parent = _EXTENDS.search(text)
+    if parent:
+        return _bodyclass(parent.group(1), seen + (name,))
+    includers = [
+        p.relative_to(TEMPLATES).as_posix()
+        for p in TEMPLATES.rglob("*.html")
+        if name in _INCLUDE.findall(p.read_text())
+    ]
+    return set().union(*(_bodyclass(i, seen + (name,)) for i in includers)) if includers else {""}
+
+
+def test_the_form_field_size_is_scoped_to_the_marketing_shell():
+    """P2-1: `.stack-form` is also the admin and client form class. Every rule in the public sheets that
+    sizes its fields must require `.site-body` (the marketing shell), and the templates that wear
+    `.stack-form` without that shell are exactly the admin and client ones."""
+    users = sorted(
+        p.relative_to(TEMPLATES).as_posix()
+        for p in TEMPLATES.rglob("*.html")
+        if "stack-form" in p.read_text()
+    )
+    unshelled = [u for u in users if not any("site-body" in b for b in _bodyclass(u))]
+    assert [u for u in users if u not in unshelled] == ["site/contact.html", "site/form.html"]
+    assert len(unshelled) == 14 and all(u.startswith(("admin/", "public/")) for u in unshelled), (
+        unshelled
+    )
+    for name in ("screening.css", "screening-admin.css", "screening-room-tokens.css"):
+        for r in sheet(name).rules:
+            if r.kind != "style" or "stack-form" not in r.prelude:
+                continue
+            if not ({"font", "font-size"} & set(decl_values(r.body))):
+                continue
+            for part in lib.split_commas(r.prelude):
+                if "stack-form" in part:
+                    assert part.split()[0].startswith(".site-body"), (name, r.line, part)
