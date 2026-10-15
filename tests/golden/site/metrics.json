@@ -532,7 +532,7 @@
   "sr_mono": 6
  },
  "real-estate__legacy__empty": {
-  "bytes": 18342,
+  "bytes": 18551,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -555,7 +555,7 @@
   "sr_mono": 10
  },
  "real-estate__legacy__seeded": {
-  "bytes": 20247,
+  "bytes": 20456,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -577,7 +577,7 @@
   "sr_mono": 15
  },
  "real-estate__screening__empty": {
-  "bytes": 18351,
+  "bytes": 18560,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -600,7 +600,7 @@
   "sr_mono": 10
  },
  "real-estate__screening__seeded": {
-  "bytes": 20256,
+  "bytes": 20465,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",

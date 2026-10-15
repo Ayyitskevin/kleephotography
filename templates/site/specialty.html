@@ -51,6 +51,10 @@
   <div class="sr-featurehead">
     <h1>{{ page.sr.h2a }} <em>{{ page.sr.h2b }}</em></h1>
     <p class="sr-specline">{% for s in page.sr.spec %}{{ s }} &middot; {% endfor %}{% if aerials_live() %}<b>{{ page.sr.spec_aerial.format(rate=aerial_rate) }}</b> &middot; {% endif %}From {{ rates[0].price }}</p>
+    <div class="sr-herosplit-actions">
+      <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
+      <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+    </div>
     {% if not aerials_live() %}
     <p class="sr-mono">Aerial coverage is planned for launch with FAA Part 107 — not available to book today.</p>
     {% endif %}
