@@ -62,7 +62,13 @@ def test_services_page():
         # keeps Book a shoot → /book; secondary "See past work" → /work.
         assert "contact?service=" in r.text
         assert "tier=" in r.text
-        assert r.text.count('data-analytics-event="Service Tier CTA"') == 3 * len(SERVICES)
+        # one CTA per tier card, plus one per priced line card (portraits team lines)
+        priced_lines = sum(
+            1 for s in SERVICES for line in s.get("lines", []) if line["display_price"]
+        )
+        assert r.text.count('data-analytics-event="Service Tier CTA"') == (
+            3 * len(SERVICES) + priced_lines
+        )
         assert "data-analytics-service=" in r.text and "data-analytics-tier=" in r.text
         assert 'href="/book"' in r.text
         assert 'href="/work"' in r.text

@@ -6,7 +6,10 @@ the catalog, so a figure can only change in one place. Reservation fees
 (lines 3/4) are live admin settings and are not tested here.
 """
 
+import json
+import re
 import socket
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -53,6 +56,19 @@ def price_text(line):
 
 def team_lines():
     return {line["name"]: line for line in catalog_group("portraits")["lines"]}
+
+
+def services_offers(client, group_title):
+    markup = client.get("/services").text
+    blocks = [
+        json.loads(block)
+        for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', markup, re.S)
+    ]
+    item_list = next(b for b in blocks if b.get("@type") == "ItemList")
+    service = next(
+        e["item"] for e in item_list["itemListElement"] if e["item"]["name"] == group_title
+    )
+    return markup, blocks, service["offers"]
 
 
 def test_catalog_carries_the_approved_portrait_figures():
@@ -118,6 +134,57 @@ def test_portrait_tiers_state_their_group_size(client, path):
 @pytest.mark.parametrize("path", ["/portraits", "/services", "/real-estate"])
 def test_the_family_line_is_gone(client, path):
     assert "Family session" not in client.get(path).text
+
+
+def test_services_lists_the_priced_team_lines(client):
+    group = catalog_group("portraits")
+    block = rendered(client, "/services").one("div", id="svc-portraits")
+    heads = [h for h in block.find("div") if h.attrs.get("id") == "lines-portraits"]
+    assert len(heads) == 1 and heads[0].one("h3").text() == group["lines_title"]
+    articles = block.find("article")
+    assert len(articles) == len(group["tiers"]) + len(TEAM_LINES)
+    for article, line in zip(articles[len(group["tiers"]) :], group["lines"], strict=True):
+        assert article.one("h3").text() == line["name"]
+        prices = [p.text() for p in article.find("p") if has_class(p, "svc-price")]
+        assert prices == [price_text(line)]
+        links = [a for a in article.find("a") if urlsplit(a.attrs["href"]).path == "/contact"]
+        assert parse_qs(urlsplit(links[0].attrs["href"]).query) == {
+            "service": ["Portraits"],
+            "tier": [line["name"]],
+        }
+
+
+def test_services_offer_json_ld_includes_the_team_lines(client):
+    group = catalog_group("portraits")
+    markup, blocks, offers = services_offers(client, group["title"])
+    expected = [*group["tiers"], *group["lines"]]
+    assert [o["name"] for o in offers] == [t["name"] for t in expected]
+    for offer, item in zip(offers, expected, strict=True):
+        assert offer["price"] == item["price_cents"] / 100
+        assert offer["priceCurrency"] == "USD"
+        if item.get("minimum"):
+            assert offer["priceSpecification"] == {
+                "@type": "PriceSpecification",
+                "minPrice": item["price_cents"] / 100,
+                "priceCurrency": "USD",
+            }
+        else:
+            assert "priceSpecification" not in offer
+    # Review JSON-LD stays off.
+    assert not [
+        b for b in blocks if "Review" in json.dumps(b) or "aggregateRating" in json.dumps(b)
+    ]
+
+
+def test_an_unpriced_line_leaves_services_and_its_offers(client, monkeypatch):
+    group = catalog_group("portraits")
+    pack = next(line for line in group["lines"] if line["name"] == "Small-team pack")
+    monkeypatch.setitem(pack, "display_price", None)
+    block = rendered(client, "/services").one("div", id="svc-portraits")
+    names = [a.one("h3").text() for a in block.find("article")]
+    assert "Small-team pack" not in names and "Team headshots" in names
+    _markup, _blocks, offers = services_offers(client, group["title"])
+    assert "Small-team pack" not in [o["name"] for o in offers]
 
 
 def test_real_estate_renders_the_twilight_add_on_and_the_rental_rate(client):
