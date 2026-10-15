@@ -110,6 +110,15 @@
           <p class="muted">Your name and details carry over from the original booking.</p>
           <button type="submit">Confirm new time</button>
         {% else %}
+          {# Intake labels follow the event-type slug prefix convention
+             (ops/SPECIALTY-LAUNCH.md): 're-…' real estate, 'pl-…' portrait &
+             lifestyle, anything else keeps the original F&B intake. Labels
+             only — the input names/columns are identical in all three. #}
+          {% set sp = 're' if e.slug.startswith('re-') else ('pl' if e.slug.startswith('pl-') else 'fb') %}
+          {% if e.creates_notion_session and sp == 're' %}
+          <label>Property address
+            <input type="text" name="venue_address" value="{{ submitted.venue_address }}"></label>
+          {% endif %}
           <label>Name <span class="req" aria-hidden="true">*</span>
             <input type="text" name="name" value="{{ submitted.name }}" required
                    {% if 'name' in error_fields %}aria-invalid="true" aria-describedby="book-error"{% endif %}></label>
@@ -128,11 +137,6 @@
               {% endfor %}
             </select></label>
           {% if e.creates_notion_session %}
-          {# Intake labels follow the event-type slug prefix convention
-             (ops/SPECIALTY-LAUNCH.md): 're-…' real estate, 'pl-…' portrait &
-             lifestyle, anything else keeps the original F&B intake. Labels
-             only — the input names/columns are identical in all three. #}
-          {% set sp = 're' if e.slug.startswith('re-') else ('pl' if e.slug.startswith('pl-') else 'fb') %}
           <fieldset class="book-intake">
             <legend>Shoot details <span class="muted">(helps me prep — optional)</span></legend>
             {% if sp == 're' %}
@@ -141,8 +145,6 @@
               Add the Aerial Pass &mdash; drone stills + orbit clips, {{ aerial_pass_display() }} add-on
               <span class="muted">(FAA Part 107 &middot; LAANC handled)</span></label>
             {% endif %}
-            <label>Property address
-              <input type="text" name="venue_address" value="{{ submitted.venue_address }}"></label>
             <label>Size &amp; rooms
               <input type="text" name="dish_count" value="{{ submitted.dish_count }}" placeholder="e.g. 3,200 sq ft · 4 bed 3 bath"></label>
             <label>Access &amp; parking notes
