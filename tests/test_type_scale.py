@@ -97,7 +97,7 @@ NAMED = {  # selector -> the token its declarations must read
     ),
     ".sr .sr-quote": "var(--sr-t-xl)",
     ".sr .sr-3up .sr-3up-q": "var(--sr-t-xl)",
-    ".sr .sr-frameno": "var(--sr-t-sm)",
+    ".sr .sr-frameno": "var(--sr-t-xs)",  # D-7 supersedes D-1 for frame labels
     ".sr .svc-tier .svc-usage": "var(--sr-t-sm)",
     ".sr .sr-stat small": "var(--sr-t-xs)",
     ".sr .sr-screen-title h1, .sr .sr-screen-title h2": "var(--sr-d-1)",

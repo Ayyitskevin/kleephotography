@@ -196,7 +196,7 @@
   "sr_mono": 1
  },
  "food-beverage__legacy__empty": {
-  "bytes": 28354,
+  "bytes": 28345,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -247,7 +247,7 @@
   "sr_mono": 12
  },
  "food-beverage__screening__empty": {
-  "bytes": 28363,
+  "bytes": 28354,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -436,7 +436,7 @@
   "sr_mono": 4
  },
  "portraits__legacy__empty": {
-  "bytes": 21923,
+  "bytes": 21914,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
@@ -484,7 +484,7 @@
   "sr_mono": 6
  },
  "portraits__screening__empty": {
-  "bytes": 21932,
+  "bytes": 21923,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
@@ -532,7 +532,7 @@
   "sr_mono": 6
  },
  "real-estate__legacy__empty": {
-  "bytes": 18547,
+  "bytes": 18538,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -577,7 +577,7 @@
   "sr_mono": 15
  },
  "real-estate__screening__empty": {
-  "bytes": 18556,
+  "bytes": 18547,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
