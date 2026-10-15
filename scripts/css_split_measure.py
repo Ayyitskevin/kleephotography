@@ -43,7 +43,7 @@ from css_split_lib import (  # noqa: E402
 )
 
 REPO = Path(__file__).resolve().parent.parent
-BASE_REF = "84c03fdb00d63710bae82813e2bcb8088a319a66"
+BASE_REF = "84c03fd"
 DECK_HEADER = "THE COMMAND DECK"
 TAIL_HEADER = "SHARED UI PRIMITIVES"
 SHEETS = ["mise.css", "screening-room-tokens.css", "screening.css"]
