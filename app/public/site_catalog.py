@@ -683,6 +683,49 @@ SPECIALTY_PAGES = {
                 "all in one gallery, all yours to download.",
             ),
         ],
+        # Twilight explainer + short-term-rental section (re spoke only).
+        # A None price hides its line; set one only when Kevin signs a figure.
+        "twilight": {
+            "kicker": "Twilight",
+            "heading": "The listing at dusk.",
+            "body": "Signature and Premier include a twilight exterior set: the "
+            "house photographed on site as the light drops, windows glowing, "
+            "so the listing's lead image works after the sun is gone.",
+            "points": [
+                "Shot at the property, in the dusk window, not added afterwards",
+                "Picked for the exterior that earns it: the front, the porch, the pool",
+                "Tell me the go-live date and I will work the evening around it",
+            ],
+            "addon_price": None,
+        },
+        "str": {
+            "kicker": "Short-term rentals",
+            "heading": "Photos that book the stay.",
+            "body": "A vacation rental is shopped by guests scrolling for a place "
+            "to stay, not by buyers. The set is built for that: the arrival, "
+            "the spaces guests will actually use, and the view they are "
+            "imagining from the porch.",
+            "points": [
+                (
+                    "Guest-first order",
+                    "Exterior and entry, living and kitchen, each bedroom and "
+                    "bath, then the outdoor space and what is nearby worth "
+                    "showing.",
+                ),
+                (
+                    "Evening included where it fits",
+                    "The Signature set adds a twilight exterior, which suits a "
+                    "porch, a hot tub, or a fire pit lit up.",
+                ),
+                (
+                    "Motion for the listing",
+                    "A short vertical walkthrough reel cut from the same visit "
+                    "for the platforms and social.",
+                ),
+            ],
+            "cta": "Ask about a rental shoot",
+            "price": None,
+        },
         "contact_service": "Real Estate",
         "book_slug": "re-shoot",
         "empty_head": "Real estate work is being curated for the site.",

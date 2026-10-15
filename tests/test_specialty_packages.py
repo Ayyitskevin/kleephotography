@@ -453,3 +453,41 @@ def test_aerial_badges_and_labels_follow_the_kill_switch(client, theme, monkeypa
     finally:
         db.run("DELETE FROM assets WHERE gallery_id=?", (gallery_id,))
         db.run("DELETE FROM galleries WHERE id=?", (gallery_id,))
+
+
+def _re_sections(client):
+    main = rendered(client, "/real-estate").one(id="main")
+    return (
+        main.one("section", id="twilight"),
+        main.one("section", id="short-term-rentals"),
+        main,
+    )
+
+
+def test_real_estate_twilight_and_str_sections_render_without_prices(client, theme):
+    twilight, rental, main = _re_sections(client)
+    assert "dusk" in twilight.text().lower()
+    assert "guest" in rental.text().lower()
+    for section in (twilight, rental):
+        text = section.text().lower()
+        assert "$" not in text
+        assert "virtual" not in text
+        assert "aerial" not in text and "drone" not in text
+    # the in-page link lands on the rental section, and the CTA is an inquiry
+    assert any(a.attrs.get("href") == "#short-term-rentals" for a in twilight.find("a"))
+    cta = [a for a in rental.find("a") if urlsplit(a.attrs.get("href", "")).path == "/contact"]
+    assert len(cta) == 1
+    assert parse_qs(urlsplit(cta[0].attrs["href"]).query)["service"] == ["Real Estate"]
+
+
+def test_real_estate_price_lines_appear_only_once_priced(client, theme, monkeypatch):
+    from app.public.site_catalog import SPECIALTY_PAGES
+
+    twilight, rental, _ = _re_sections(client)
+    assert "on its own" not in twilight.text().lower()
+    assert "rental set" not in rental.text().lower()
+    monkeypatch.setitem(SPECIALTY_PAGES["re"]["twilight"], "addon_price", "$111")
+    monkeypatch.setitem(SPECIALTY_PAGES["re"]["str"], "price", "$222")
+    twilight, rental, _ = _re_sections(client)
+    assert "$111" in twilight.text()
+    assert "$222" in rental.text()
