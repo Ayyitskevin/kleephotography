@@ -32,6 +32,8 @@
 .sr .sr-kickrow .sr-mono { letter-spacing: var(--sr-track-label); }
 /* D-10: links in a kick row and the availability strip are 44px touch targets */
 .sr .sr-kickrow a, .sr .sr-availstrip a { display: inline-flex; min-height: 44px; align-items: center; }
+/* D-10: the 44px button floor is a marketing-shell rule; admin and client buttons (sr-btn--sm among them) keep their size */
+.site-body.sr a.sr-btn, .site-body.sr button.sr-btn { min-height: 44px; }
 
 /* page header for non-mocked surfaces — title-card language, no artwork */
 .sr .sr-pagehead { padding: var(--sr-s8) 0 var(--sr-s7); border-bottom: 1px solid var(--sr-line); }
