@@ -11,6 +11,7 @@ Contract (ops/CSS-SPLIT-R2-MEASUREMENT.md, scripts/css_split_build.py):
   * every class and id the rendered marketing goldens use still has a rule in the public sheets.
 """
 
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -20,6 +21,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import css_split_lib as lib  # noqa: E402
+import css_split_measure as measure  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
@@ -124,3 +126,48 @@ def test_every_class_and_id_in_the_marketing_goldens_has_a_rule_or_is_a_known_ho
 def test_no_stale_reference_to_the_old_single_sheet_deck():
     scr = (ROOT / "static/screening.css").read_text()
     assert re.search(r"moved to static/screening-admin\.css", scr)
+
+
+def test_site_subset_is_complete_every_dropped_mise_rule_is_dead_on_marketing():
+    """mise-site.css is exactly the rules a marketing page can use: a rule deleted from it, or a new
+    marketing class that needs a legacy rule, fails here (regenerate with css_split_measure.py subset)."""
+    a = measure.analyse(None)  # working tree: reachable templates, scripts, goldens
+    mise, keep, matched = a["sheets"]["mise.css"], a["keep"], a["matched"]
+    site = sheet("mise-site.css")
+    assert [r.sig for r in mise.rules if keep.get(r.idx)] == [r.sig for r in site.rules]
+    dropped = [r for r in mise.rules if not keep.get(r.idx)]
+    assert dropped
+    for r in dropped:  # dead: needs something no marketing template/script/string has ...
+        if r.kind == "style":
+            assert not any(measure.selector_satisfiable(x, a["uni"]) for x in r.selectors), (
+                r.prelude
+            )
+            assert ("mise.css", r.idx) not in matched, (
+                r.prelude
+            )  # ... and matches no golden element
+        else:  # an @keyframes nothing kept names
+            assert not any(
+                re.search(r"(?<![-\w])" + re.escape(r.prelude.split()[1]) + r"(?![-\w])", k.body)
+                for k in mise.rules
+                if keep.get(k.idx)
+            ), r.prelude
+
+
+# The admin-only COMMAND DECK rules, in order. Pinned because nothing else in the tree says what the
+# split moved: dropping or editing one in screening-admin.css must be a deliberate change of this pin.
+ADMIN_DECK_RULES = 259
+ADMIN_DECK_SHA256 = (
+    "a1bb70e2440fc577fc1a9c759a6b65e8a791022d5fbb20d219220f930299a3ee"  # pragma: allowlist secret
+)
+
+
+def test_admin_sheet_holds_every_admin_deck_rule_and_screening_holds_none_of_them():
+    adm, scr = sheet("screening-admin.css"), sheet("screening.css")
+    cut = adm.text.index(TAIL_MARK)
+    deck = [r for r in adm.rules if r.start < cut and is_admin_rule(r)]
+    assert len(deck) == ADMIN_DECK_RULES
+    assert hashlib.sha256("\n".join(r.sig for r in deck).encode()).hexdigest() == ADMIN_DECK_SHA256
+    lost = {r.sig for r in deck}
+    assert not [
+        r.prelude for r in scr.rules if r.sig in lost
+    ]  # lost from screening.css, present here

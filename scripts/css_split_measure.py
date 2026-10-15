@@ -56,11 +56,18 @@ def git(*args: str, ref: str | None = None) -> str:
     ).stdout
 
 
-def blob(ref: str, path: str) -> str:
+def blob(ref: str | None, path: str) -> str:
+    """File text at a git ref, or from the working tree when ref is None."""
+    if ref is None:
+        return (REPO / path).read_text()
     return git("show", f"{ref}:{path}")
 
 
-def ls(ref: str, prefix: str) -> list[str]:
+def ls(ref: str | None, prefix: str) -> list[str]:
+    if ref is None:
+        base = REPO / prefix
+        found = [base] if base.is_file() else sorted(p for p in base.rglob("*") if p.is_file())
+        return [str(p.relative_to(REPO)) for p in found]
     return git("ls-tree", "-r", "--name-only", ref, prefix).split()
 
 
@@ -166,7 +173,8 @@ def marketing_universe(ref: str) -> dict:
     py = [
         p
         for p in ls(ref, "app")
-        if p.startswith("app/public/") or p in ("app/specialties.py", "app/render.py")
+        if p.endswith(".py")
+        and (p.startswith("app/public/") or p in ("app/specialties.py", "app/render.py"))
     ]
     for p in py:
         for value in py_strings(blob(ref, p)):
