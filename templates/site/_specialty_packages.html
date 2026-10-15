@@ -35,6 +35,7 @@
       </div>
       {% if sp_key == 'fb' and s.key == 'photography' and page.steady_feed %}
       {% set bp = package_groups|selectattr('key', 'equalto', 'brand_partner')|first %}
+      {% if bp %}
       <div class="sp-steady" aria-labelledby="steady-feed-heading">
         <p class="sr-mono">{{ page.steady_feed.kicker }}</p>
         <h3 id="steady-feed-heading">{{ page.steady_feed.heading }}</h3>
@@ -51,6 +52,7 @@
           <a class="sr-btn sr-btn--ghost" href="#packages-brand_partner">{{ page.steady_feed.cta }} &rarr;</a>
         </p>
       </div>
+      {% endif %}
       {% endif %}
     </section>
     {% endfor %}

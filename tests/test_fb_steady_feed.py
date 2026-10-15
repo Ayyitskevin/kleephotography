@@ -43,8 +43,9 @@ def page_html(client, path):
 
 
 def steady_block(markup):
+    # Ends at the CTA link, the block's only anchor; no whitespace-exact marker.
     start = markup.index('class="sp-steady"')
-    return markup[start : markup.index("</p>\n      </div>", markup.index("</a>", start))]
+    return markup[start : markup.index("</a>", start)]
 
 
 def brand_partner():
@@ -79,3 +80,13 @@ def test_brand_partner_terms_are_unchanged(client):
 @pytest.mark.parametrize("path", ["/real-estate", "/portraits"])
 def test_other_spokes_do_not_get_the_steady_feed_block(client, path):
     assert "sp-steady" not in page_html(client, path)
+
+
+def test_page_renders_without_the_brand_partner_group(client, monkeypatch):
+    monkeypatch.setattr(
+        site,
+        "_specialty_package_groups",
+        lambda key: [g for g in SERVICES if g["key"] != "brand_partner"],
+    )
+    markup = page_html(client, "/food-beverage")
+    assert "sp-steady" not in markup
