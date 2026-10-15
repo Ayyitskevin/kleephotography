@@ -536,3 +536,55 @@ def test_a_malformed_coordinate_fails_loud_and_names_the_variable():
     for bad in ("35.59.51", "35,5", "nan", "inf", "-inf"):
         with pytest.raises(ValueError, match="MISE_BUSINESS_LAT"):
             config._parse_coord("MISE_BUSINESS_LAT", bad)
+
+
+# ── HEAD on the marketing routes (monitors and crawlers) ─────────────────────
+
+
+def _sitemap_paths(client) -> list[str]:
+    locs = re.findall(r"<url><loc>([^<]+)</loc>", client.get("/sitemap.xml").text)
+    paths = [loc.removeprefix(config.BASE_URL) for loc in locs]
+    assert "/" in paths and "/contact" in paths
+    return paths
+
+
+def _stable_headers(resp) -> dict[str, str]:
+    # The CSP carries a per-request nonce and Date moves; everything else must agree.
+    skip = {"date"}
+    out = {k.lower(): v for k, v in resp.headers.items() if k.lower() not in skip}
+    out["content-security-policy"] = re.sub(
+        r"'nonce-[^']*'", "'nonce-N'", out.get("content-security-policy", "")
+    )
+    return out
+
+
+def _methods_of(path: str, has: str) -> set[str]:
+    from app.public import site
+
+    return next(r.methods for r in site.router.routes if r.path == path and has in r.methods)
+
+
+def test_head_matches_get_without_a_body_for_every_sitemap_path(client):
+    for path in _sitemap_paths(client):
+        got = client.get(path)
+        head = client.head(path)
+        assert got.status_code == 200, path
+        assert head.status_code == 200, path
+        assert head.content == b"", path
+        assert _stable_headers(head) == _stable_headers(got), path
+
+
+def test_head_contact_is_ok_and_empty(client):
+    head = client.head("/contact")
+    assert head.status_code == 200
+    assert head.content == b""
+
+
+def test_work_detail_route_accepts_head(client):
+    assert {"GET", "HEAD"} <= _methods_of("/work/{slug}", "GET")
+
+
+def test_head_does_not_open_the_booking_flow_or_unsafe_methods(client):
+    # /book/{slug} is outside the HEAD change; POST routes keep their behaviour.
+    assert client.head("/book/no-such-event").status_code == 405
+    assert "HEAD" not in _methods_of("/contact", "POST")
