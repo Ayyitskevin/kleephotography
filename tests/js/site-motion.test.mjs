@@ -84,13 +84,50 @@ test("reveal and button motion use the D-8 values and are off under reduced moti
   assert.match(reveal.body, /transform 600ms cubic-bezier\(0\.16, 1, 0\.3, 1\)/);
   assert.match(find(".sr .reveal-hidden", false).body, /translateY\(12px\)/);
   assert.match(find(".sr [data-reveal]", true).body, /transition\s*:\s*none/);
-  const active = find(".sr .sr-btn:active", false);
-  assert.ok(active, ".sr .sr-btn:active rule");
+  const active = find(".site-body.sr .sr-btn:active", false);
+  assert.ok(active, ".site-body.sr .sr-btn:active rule");
   assert.match(active.body, /transform\s*:\s*scale\(0?\.98\)/);
-  assert.match(find(".sr .sr-btn", false).body, /transition\s*:[^;]*transform var\(--sr-t-fast\)/);
-  assert.match(find(".sr .sr-btn", true).body, /transition\s*:\s*none/);
-  assert.match(find(".sr .sr-btn:active", true).body, /transform\s*:\s*none/);
+  assert.match(find(".site-body.sr .sr-btn", false).body, /transition\s*:[^;]*transform var\(--sr-t-fast\)/);
+  assert.match(find(".site-body.sr .sr-btn", true).body, /transition\s*:\s*none/);
+  assert.match(find(".site-body.sr .sr-btn:active", true).body, /transform\s*:\s*none/);
   assert.ok(!rules.some((r) => /\.scroll-progress/.test(r.selector)), "no .scroll-progress rule survives");
+});
+
+/* --- cascade order: a reduced-motion override only works if it comes AFTER the
+   rule it cancels (equal specificity, same sheet; r1 P2-1). Declarations marked
+   !important win regardless of order and are skipped. --- */
+const declarations = (body) =>
+  [...body.matchAll(/(?:^|;)\s*([a-z-]+)\s*:\s*([^;]*)/g)].map((m) => ({ name: m[1], important: /!important/.test(m[2]) }));
+
+test("every reduced-motion override comes after the last rule it cancels", () => {
+  for (const [file, text] of Object.entries(sheets)) {
+    const rules = parseCss(text).map((r, index) => ({ ...r, index }));
+    let checked = 0;
+    for (const r of rules.filter((x) => isReduce(x.media) && !x.keyframes)) {
+      for (const d of declarations(r.body)) {
+        if (d.important) continue;
+        const cancelled = rules.filter((o) => !isReduce(o.media) && !o.keyframes && o.selector === r.selector &&
+          declarations(o.body).some((q) => q.name === d.name));
+        const last = cancelled[cancelled.length - 1];
+        if (!last) continue;
+        checked += 1;
+        assert.ok(r.index > last.index,
+          `${file}: reduce override '${r.selector} { ${d.name} }' (rule #${r.index}) precedes the rule it must cancel (rule #${last.index}); it never takes effect`);
+      }
+    }
+    assert.ok(checked > 0, `${file}: no override/cancel pairs found (parser broke?)`);
+  }
+});
+
+test("the press feedback is scoped to the marketing shell, never the admin (r1 P3-1)", () => {
+  const rules = parseCss(sheets["static/screening.css"]).filter((r) => !r.keyframes);
+  const press = rules.filter((r) => !isReduce(r.media) && /transform\s*:\s*scale\(0?\.98\)/.test(r.body) && /\.sr-btn/.test(r.selector));
+  const fast = rules.filter((r) => !isReduce(r.media) && /\.sr-btn$/.test(r.selector) && /transition\s*:[^;]*--sr-t-fast/.test(r.body));
+  assert.ok(press.length >= 1 && fast.length >= 1, "the D-8 button rules exist");
+  for (const r of [...press, ...fast]) {
+    assert.match(r.selector, /^\.site-body\.sr /, `scoped to the marketing body: ${r.selector}`);
+    assert.doesNotMatch(r.selector, /sr-admin/);
+  }
 });
 
 /* --- behaviour: the sticky nav state comes from an IntersectionObserver --- */
