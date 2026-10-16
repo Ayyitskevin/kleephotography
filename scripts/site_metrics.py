@@ -103,8 +103,9 @@ class _Counter(HTMLParser):
 
 class _Kickers(HTMLParser):
     """Decorative section kickers: `sr-mono` elements that are not links, not per-card
-    labels (inside `.sr-card-head`), not list or column labels (inside an <aside>), and
-    not data labels (_DATA_LABEL)."""
+    labels (inside `.sr-card-head`), not data labels (_DATA_LABEL), and not the one named
+    structural data-label class (`sr-mono--data`, the F&B included/quoted-separately list headers).
+    No tag is exempt as a whole: an `sr-mono` inside an <aside> counts like any other."""
 
     VOID = set("area base br col embed hr img input link meta source track wbr".split())
 
@@ -117,9 +118,9 @@ class _Kickers(HTMLParser):
         if tag in self.VOID:
             return
         classes = (dict(attrs).get("class") or "").split()
-        inside = any(t == "aside" or "sr-card-head" in c for t, c, _ in self.stack)
+        inside = any("sr-card-head" in c for _t, c, _ in self.stack)
         entry = None
-        if "sr-mono" in classes and tag != "a" and not inside:
+        if "sr-mono" in classes and "sr-mono--data" not in classes and tag != "a" and not inside:
             entry = []
             self.found.append(entry)
         self.stack.append((tag, classes, entry))

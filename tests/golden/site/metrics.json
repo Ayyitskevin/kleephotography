@@ -76,7 +76,7 @@
   "cta_labels": [
    "Book a shoot \u2192"
   ],
-  "decorative_kickers": 0,
+  "decorative_kickers": 1,
   "emdash": 8,
   "h1": 1,
   "h2": 1,
@@ -93,7 +93,7 @@
   "cta_labels": [
    "Book a shoot \u2192"
   ],
-  "decorative_kickers": 0,
+  "decorative_kickers": 1,
   "emdash": 8,
   "h1": 1,
   "h2": 1,
@@ -110,7 +110,7 @@
   "cta_labels": [
    "Book a shoot \u2192"
   ],
-  "decorative_kickers": 0,
+  "decorative_kickers": 1,
   "emdash": 8,
   "h1": 1,
   "h2": 1,
@@ -127,7 +127,7 @@
   "cta_labels": [
    "Book a shoot \u2192"
   ],
-  "decorative_kickers": 0,
+  "decorative_kickers": 1,
   "emdash": 8,
   "h1": 1,
   "h2": 1,
@@ -144,7 +144,7 @@
   "cta_labels": [
    "Book a shoot \u2192"
   ],
-  "decorative_kickers": 0,
+  "decorative_kickers": 1,
   "emdash": 13,
   "h1": 1,
   "h2": 1,
@@ -161,7 +161,7 @@
   "cta_labels": [
    "Book a shoot \u2192"
   ],
-  "decorative_kickers": 0,
+  "decorative_kickers": 1,
   "emdash": 13,
   "h1": 1,
   "h2": 1,
@@ -178,7 +178,7 @@
   "cta_labels": [
    "Book a shoot \u2192"
   ],
-  "decorative_kickers": 0,
+  "decorative_kickers": 1,
   "emdash": 13,
   "h1": 1,
   "h2": 1,
@@ -195,7 +195,7 @@
   "cta_labels": [
    "Book a shoot \u2192"
   ],
-  "decorative_kickers": 0,
+  "decorative_kickers": 1,
   "emdash": 13,
   "h1": 1,
   "h2": 1,
@@ -208,7 +208,7 @@
   "sr_mono": 1
  },
  "food-beverage__legacy__empty": {
-  "bytes": 28257,
+  "bytes": 28285,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -235,7 +235,7 @@
   "sr_mono": 7
  },
  "food-beverage__legacy__seeded": {
-  "bytes": 29299,
+  "bytes": 29327,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
@@ -261,7 +261,7 @@
   "sr_mono": 9
  },
  "food-beverage__screening__empty": {
-  "bytes": 28266,
+  "bytes": 28294,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -288,7 +288,7 @@
   "sr_mono": 7
  },
  "food-beverage__screening__seeded": {
-  "bytes": 29308,
+  "bytes": 29336,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
