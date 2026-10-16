@@ -11,6 +11,7 @@ script report the same numbers.
 """
 
 import argparse
+import re
 import sys
 import urllib.request
 from html.parser import HTMLParser
@@ -41,6 +42,13 @@ KEYS = (
     "middot",
     "cta_labels",
     "bytes",
+)
+
+
+# Data labels the kicker ration exempts (plan D-4 keep-list): state, chapters, next openings,
+# prices, durations, frame numbers, counts and PINs. Links are exempt by tag.
+_DATA_LABEL = re.compile(
+    r"Now showing|^Chapters$|^Next openings|\$\d|\b\d+:\d\d\b|FR·|^\d+ (still|film)|^PIN\b"
 )
 
 
@@ -89,6 +97,47 @@ class _Counter(HTMLParser):
         self.text.append(text)
         if self.stack and self.stack[-1][0] == "a" and self.ctas and _is_cta(self.stack[-1][1]):
             self.ctas[-1] += text
+
+
+class _Kickers(HTMLParser):
+    """Decorative section kickers: `sr-mono` elements that are not links, not per-card
+    labels (inside `.sr-card-head`), not list or column labels (inside an <aside>), and
+    not data labels (_DATA_LABEL)."""
+
+    VOID = set("area base br col embed hr img input link meta source track wbr".split())
+
+    def __init__(self):
+        super().__init__()
+        self.stack = []
+        self.found = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.VOID:
+            return
+        classes = (dict(attrs).get("class") or "").split()
+        inside = any(t == "aside" or "sr-card-head" in c for t, c, _ in self.stack)
+        entry = None
+        if "sr-mono" in classes and tag != "a" and not inside:
+            entry = []
+            self.found.append(entry)
+        self.stack.append((tag, classes, entry))
+
+    def handle_endtag(self, tag):
+        if tag not in self.VOID and self.stack:
+            self.stack.pop()
+
+    def handle_data(self, data):
+        for _tag, _cls, entry in self.stack:
+            if entry is not None:
+                entry.append(data)
+
+
+def decorative_kickers(markup):
+    """Texts of the page's decorative kickers (plan D-4; ration ceil(sections/3))."""
+    parser = _Kickers()
+    parser.feed(markup)
+    texts = [" ".join("".join(parts).split()) for parts in parser.found]
+    return [t for t in texts if not _DATA_LABEL.search(t)]
 
 
 def metrics(markup):
