@@ -1,6 +1,6 @@
 {
  "about__legacy__empty": {
-  "bytes": 7962,
+  "bytes": 7974,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -15,10 +15,11 @@
   "img_noalt": 0,
   "middot": 13,
   "sections": 5,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "about__legacy__seeded": {
-  "bytes": 8120,
+  "bytes": 8132,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -33,10 +34,11 @@
   "img_noalt": 0,
   "middot": 13,
   "sections": 5,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "about__screening__empty": {
-  "bytes": 7965,
+  "bytes": 7977,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -51,10 +53,11 @@
   "img_noalt": 0,
   "middot": 13,
   "sections": 5,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "about__screening__seeded": {
-  "bytes": 8123,
+  "bytes": 8135,
   "cta_labels": [
    "Book a shoot \u2192",
    "Work with me \u2192"
@@ -69,6 +72,7 @@
   "img_noalt": 0,
   "middot": 13,
   "sections": 5,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "book__legacy__empty": {
@@ -86,6 +90,7 @@
   "img_noalt": 0,
   "middot": 7,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "book__legacy__seeded": {
@@ -103,6 +108,7 @@
   "img_noalt": 0,
   "middot": 7,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "book__screening__empty": {
@@ -120,6 +126,7 @@
   "img_noalt": 0,
   "middot": 7,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "book__screening__seeded": {
@@ -137,6 +144,7 @@
   "img_noalt": 0,
   "middot": 7,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "contact__legacy__empty": {
@@ -154,6 +162,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "contact__legacy__seeded": {
@@ -171,6 +180,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "contact__screening__empty": {
@@ -188,6 +198,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "contact__screening__seeded": {
@@ -205,10 +216,11 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "food-beverage__legacy__empty": {
-  "bytes": 28257,
+  "bytes": 28282,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -232,10 +244,11 @@
   "img_noalt": 0,
   "middot": 24,
   "sections": 11,
+  "sr_3up": 1,
   "sr_mono": 7
  },
  "food-beverage__legacy__seeded": {
-  "bytes": 29299,
+  "bytes": 29324,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
@@ -258,10 +271,11 @@
   "img_noalt": 0,
   "middot": 25,
   "sections": 11,
+  "sr_3up": 1,
   "sr_mono": 9
  },
  "food-beverage__screening__empty": {
-  "bytes": 28266,
+  "bytes": 28291,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -285,10 +299,11 @@
   "img_noalt": 0,
   "middot": 24,
   "sections": 11,
+  "sr_3up": 1,
   "sr_mono": 7
  },
  "food-beverage__screening__seeded": {
-  "bytes": 29308,
+  "bytes": 29333,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
@@ -311,6 +326,7 @@
   "img_noalt": 0,
   "middot": 25,
   "sections": 11,
+  "sr_3up": 1,
   "sr_mono": 9
  },
  "home__legacy__empty": {
@@ -329,6 +345,7 @@
   "img_noalt": 0,
   "middot": 11,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 4
  },
  "home__legacy__seeded": {
@@ -347,6 +364,7 @@
   "img_noalt": 0,
   "middot": 15,
   "sections": 6,
+  "sr_3up": 0,
   "sr_mono": 5
  },
  "home__screening__empty": {
@@ -365,6 +383,7 @@
   "img_noalt": 0,
   "middot": 11,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 4
  },
  "home__screening__seeded": {
@@ -383,6 +402,7 @@
   "img_noalt": 0,
   "middot": 15,
   "sections": 6,
+  "sr_3up": 0,
   "sr_mono": 5
  },
  "portfolio__legacy__empty": {
@@ -402,6 +422,7 @@
   "img_noalt": 0,
   "middot": 8,
   "sections": 2,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "portfolio__legacy__seeded": {
@@ -420,6 +441,7 @@
   "img_noalt": 0,
   "middot": 14,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 3
  },
  "portfolio__screening__empty": {
@@ -439,6 +461,7 @@
   "img_noalt": 0,
   "middot": 8,
   "sections": 2,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "portfolio__screening__seeded": {
@@ -457,10 +480,11 @@
   "img_noalt": 0,
   "middot": 14,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 3
  },
  "portraits__legacy__empty": {
-  "bytes": 21896,
+  "bytes": 21901,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
@@ -483,10 +507,11 @@
   "img_noalt": 0,
   "middot": 8,
   "sections": 11,
+  "sr_3up": 0,
   "sr_mono": 3
  },
  "portraits__legacy__seeded": {
-  "bytes": 22946,
+  "bytes": 22951,
   "cta_labels": [
    "Book a session \u2192",
    "Inquire about On-site team day \u2192",
@@ -507,10 +532,11 @@
   "img_noalt": 0,
   "middot": 11,
   "sections": 11,
+  "sr_3up": 0,
   "sr_mono": 5
  },
  "portraits__screening__empty": {
-  "bytes": 21905,
+  "bytes": 21910,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
@@ -533,10 +559,11 @@
   "img_noalt": 0,
   "middot": 8,
   "sections": 11,
+  "sr_3up": 0,
   "sr_mono": 3
  },
  "portraits__screening__seeded": {
-  "bytes": 22955,
+  "bytes": 22960,
   "cta_labels": [
    "Book a session \u2192",
    "Inquire about On-site team day \u2192",
@@ -557,10 +584,11 @@
   "img_noalt": 0,
   "middot": 11,
   "sections": 11,
+  "sr_3up": 0,
   "sr_mono": 5
  },
  "real-estate__legacy__empty": {
-  "bytes": 18336,
+  "bytes": 18362,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -581,10 +609,11 @@
   "img_noalt": 0,
   "middot": 13,
   "sections": 11,
+  "sr_3up": 1,
   "sr_mono": 7
  },
  "real-estate__legacy__seeded": {
-  "bytes": 20250,
+  "bytes": 20276,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -604,10 +633,11 @@
   "img_noalt": 0,
   "middot": 15,
   "sections": 12,
+  "sr_3up": 1,
   "sr_mono": 11
  },
  "real-estate__screening__empty": {
-  "bytes": 18345,
+  "bytes": 18371,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -628,10 +658,11 @@
   "img_noalt": 0,
   "middot": 13,
   "sections": 11,
+  "sr_3up": 1,
   "sr_mono": 7
  },
  "real-estate__screening__seeded": {
-  "bytes": 20259,
+  "bytes": 20285,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -651,6 +682,7 @@
   "img_noalt": 0,
   "middot": 15,
   "sections": 12,
+  "sr_3up": 1,
   "sr_mono": 11
  },
  "reels__legacy__empty": {
@@ -669,6 +701,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 2
  },
  "reels__legacy__seeded": {
@@ -687,6 +720,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 2
  },
  "reels__screening__empty": {
@@ -705,6 +739,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 2
  },
  "reels__screening__seeded": {
@@ -723,6 +758,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 2
  },
  "services__legacy__empty": {
@@ -749,6 +785,7 @@
   "img_noalt": 0,
   "middot": 8,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "services__legacy__seeded": {
@@ -775,6 +812,7 @@
   "img_noalt": 0,
   "middot": 9,
   "sections": 5,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "services__screening__empty": {
@@ -801,6 +839,7 @@
   "img_noalt": 0,
   "middot": 8,
   "sections": 3,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "services__screening__seeded": {
@@ -827,6 +866,7 @@
   "img_noalt": 0,
   "middot": 9,
   "sections": 5,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "work-golden-cs__legacy__empty": {
@@ -842,6 +882,7 @@
   "img_noalt": 0,
   "middot": 0,
   "sections": 0,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "work-golden-cs__legacy__seeded": {
@@ -861,6 +902,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 4,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "work-golden-cs__screening__empty": {
@@ -876,6 +918,7 @@
   "img_noalt": 0,
   "middot": 0,
   "sections": 0,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "work-golden-cs__screening__seeded": {
@@ -895,6 +938,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 4,
+  "sr_3up": 0,
   "sr_mono": 0
  },
  "work__legacy__empty": {
@@ -913,6 +957,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 2,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "work__legacy__seeded": {
@@ -930,6 +975,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 2,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "work__screening__empty": {
@@ -948,6 +994,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 2,
+  "sr_3up": 0,
   "sr_mono": 1
  },
  "work__screening__seeded": {
@@ -965,6 +1012,7 @@
   "img_noalt": 0,
   "middot": 6,
   "sections": 2,
+  "sr_3up": 0,
   "sr_mono": 1
  }
 }

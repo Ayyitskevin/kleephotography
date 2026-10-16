@@ -96,7 +96,7 @@ NAMED = {  # selector -> the token its declarations must read
         "var(--sr-t-base)"
     ),
     ".sr .sr-quote": "var(--sr-t-xl)",
-    ".sr .sr-3up .sr-3up-q": "var(--sr-t-xl)",
+    ".sr .sr-qa .sr-qa-q": "var(--sr-t-lg)",  # D-6: the nerves question (was .sr-3up-q, t-xl)
     ".sr .sr-frameno": "var(--sr-t-xs)",  # D-7 supersedes D-1 for frame labels
     ".sr .svc-tier .svc-usage": "var(--sr-t-sm)",
     ".sr .sr-stat small": "var(--sr-t-xs)",

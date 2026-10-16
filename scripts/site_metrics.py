@@ -38,6 +38,7 @@ KEYS = (
     "img",
     "img_lazy",
     "img_noalt",
+    "sr_3up",
     "sr_mono",
     "decorative_kickers",
     "emdash",
@@ -157,6 +158,7 @@ def metrics(markup):
         "decorative_kickers": len(decorative_kickers(markup)),
         "emdash": visible.count("—"),
         "middot": visible.count("·"),
+        "sr_3up": count_class(markup, "sr-3up"),
         "cta_labels": sorted({label.strip() for label in parser.ctas if label.strip()}),
         "bytes": len(markup.encode("utf-8")),
     }
