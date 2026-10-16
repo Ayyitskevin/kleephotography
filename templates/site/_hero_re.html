@@ -1,0 +1,61 @@
+{# 3b · The Space: the listing premiere (walkthrough film or lead still, chapters, agent's cut).
+   Included by site/specialty.html (plan R-4); renders in that page's context. -#}
+<section class="sr-wrap sr-section" aria-label="Listing premiere" data-seek-scope>
+  <div class="sr-featurehead">
+    <h1>{{ page.sr.h2a }} <em>{{ page.sr.h2b }}</em></h1>
+    <p class="sr-specline">{% for s in page.sr.spec %}{{ s }} &middot; {% endfor %}{% if aerials_live() %}<b>{{ page.sr.spec_aerial.format(rate=aerial_rate) }}</b> &middot; {% endif %}From {{ rates[0].price }}</p>
+    <div class="sr-herosplit-actions">
+      <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
+      <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+    </div>
+    {% if not aerials_live() %}
+    <p class="sr-mono">Aerial coverage is planned for launch with FAA Part 107 — not available to book today.</p>
+    {% endif %}
+  </div>
+  <div class="sr-premiere">
+    <figure class="sr-screen sr-screen--film" data-sr-player>
+      {% if hero_reel %}
+      <video autoplay muted loop playsinline preload="metadata"
+             {% if hero_poster and hero_poster.available %}poster="{{ hero_poster.url }}" width="{{ hero_poster.width }}" height="{{ hero_poster.height }}"{% endif %}
+             aria-label="Walkthrough film">
+        <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
+      </video>
+      {% elif photos %}
+      <img src="{{ hero_image.web.url }}" decoding="async"
+           {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
+           {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
+           {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
+           sizes="(max-width: 1000px) 100vw, 900px"{% endif %}
+           alt="{{ photos[0]|portfolio_alt }}">
+      {% endif %}
+      <span class="sr-screen-scrim" aria-hidden="true"></span>
+      <span class="sr-screenbadge">&#9679; Premiere — {{ page.hero_caption }}</span>
+      {% if hero_reel %}
+      <div class="sr-playerstrip" aria-hidden="true">
+        <span class="sr-tc-play">&#9654;</span>
+        <span data-sr-tc>00:00:00:00</span>
+        <i class="sr-progress"><b data-sr-bar></b>
+          {%- if hero_reel.duration %}{% for ch in page.sr.chapters if ch.at > 0 and (not ch.aerial or aerials_live()) %}<i style="left: {{ (ch.at * 100)|round|int }}%;"></i>{% endfor %}{% endif -%}
+        </i>
+        {% if hero_reel.duration and hero_reel.duration|hms %}<span>{{ hero_reel.duration|hms }}</span>{% endif %}
+      </div>
+      {% endif %}
+    </figure>
+    <div class="sr-chapters">
+      {% if hero_reel and hero_reel.duration %}
+      <p class="sr-mono">Chapters</p>
+      {% for ch in page.sr.chapters if not ch.aerial or aerials_live() %}
+      <button type="button" class="sr-chapter{% if ch.aerial %} sr-chapter--marked{% endif %}"
+              data-seek="{{ (hero_reel.duration * ch.at)|round|int }}">
+        <i>{{ ((hero_reel.duration * ch.at)|round|int)|hms if ch.at > 0 else "0:00" }}</i>
+        {{ ch.label }}
+        {% if ch.aerial %}<i class="sr-chapter-badge">Drone</i>{% endif %}
+      </button>
+      {% endfor %}
+      {% endif %}
+      <div class="sr-agentcut">
+        <b>Agent's cut:</b> {{ page.sr.agents_cut_aerial if aerials_live() else page.sr.agents_cut }}
+      </div>
+    </div>
+  </div>
+</section>
