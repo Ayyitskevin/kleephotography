@@ -237,6 +237,18 @@ def test_public_page_rations_its_decorative_kickers_and_keeps_one_h1(route, seed
     assert got["h1"] == (1 if response.status_code == 200 else 0), (route, response.status_code)
 
 
+@pytest.mark.parametrize(
+    ("route", "seeded_client"),
+    [(route, (flag, content)) for route, flag, content in MATRIX],
+    ids=[f"{route_slug(route)}__{flag}__{content}" for route, flag, content in MATRIX],
+    indirect=["seeded_client"],
+)
+def test_public_page_uses_the_three_up_at_most_once(route, seeded_client):
+    """Plan D-6: one bordered three-up per page; the other blocks wear their layout family."""
+    body = normalise(seeded_client.get(route).text)
+    assert site_metrics.count_class(body, "sr-3up") <= 1, route
+
+
 def test_a_missing_golden_names_the_update_command(tmp_path):
     ledger = {"changed": [], "metrics": {}}
     with pytest.raises(pytest.fail.Exception, match=re.escape(MISSING)):

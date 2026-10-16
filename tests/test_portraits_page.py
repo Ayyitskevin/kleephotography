@@ -70,7 +70,7 @@ def svc_prices(container):
 def test_portraits_render_the_session_in_three_steps_after_the_frames(client):
     main = rendered(client, "/portraits").one(id="main")
     strip = main.one("section", **{"aria-label": "How a session runs"})
-    steps = strip.one("div", **{"class": "sr-3up"}).find("div")
+    steps = strip.one("div", **{"class": "sr-ledger"}).find("div")  # D-6: the process is a ledger
     got = [tuple(p.text() for p in step.find("p")) for step in steps]
     # Binding pin: the strip renders the catalog's portrait process, in order.
     assert got == [tuple(step) for step in SPECIALTY_PAGES["pl"]["process"]]

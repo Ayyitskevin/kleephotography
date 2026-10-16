@@ -11,6 +11,14 @@
 {% set og_asset = photos[0] if photos else None %}
 {# The arrow the empty-feature CTA labels end with (site/_empty_feature.html). #}
 {% set arrow = " <span>&rarr;</span>"|safe %}
+{# One sizes value for the head preload and the hero <img> (plan R-4, carried in D-6). #}
+{% if sp_key == "re" %}
+{% set hero_sizes = "(max-width: 1000px) 100vw, 900px" %}
+{% elif sp_key == "pl" %}
+{% set hero_sizes = "(max-width: 1000px) 100vw, 560px" %}
+{% else %}
+{% set hero_sizes = "100vw" %}
+{% endif %}
 {% block title %}{{ page.title }} — {{ site_name }}{% endblock %}
 {% block meta_description %}{{ page.meta }}{% endblock %}
 {% block sr_stock %} sr-{{ sp_key }}{% endblock %}
@@ -31,13 +39,6 @@
 <meta name="twitter:card" content="{{ 'summary_large_image' if og_asset else 'summary' }}">
 {% endblock %}
 {% block site_head %}
-{% if sp_key == "re" %}
-{% set hero_sizes = "(max-width: 1000px) 100vw, 900px" %}
-{% elif sp_key == "pl" %}
-{% set hero_sizes = "(max-width: 1000px) 100vw, 560px" %}
-{% else %}
-{% set hero_sizes = "100vw" %}
-{% endif %}
 {% if hero_poster and hero_poster.available %}
 <link rel="preload" as="image" href="{{ hero_poster.url }}" fetchpriority="high">
 {% elif hero_image and hero_image.available %}
@@ -144,10 +145,10 @@
 <section class="sr-wrap sr-section" aria-label="Short-term rentals" id="short-term-rentals">
   <h2 class="sr-h2">{{ page.str.heading }}</h2>
   <p class="sr-lede">{{ page.str.body }}</p>
-  <div class="sr-3up">
+  <div class="sr-ledger sr-ledger--plain">
     {% for kick, body in page.str.points %}
     <div>
-      <p class="sr-3up-kick">{{ kick }}</p>
+      <p class="sr-ledger-kick">{{ kick }}</p>
       <p>{{ body }}</p>
     </div>
     {% endfor %}
@@ -182,10 +183,10 @@
 {# ═══ THE NERVES, NAMED ══════════════════════════════════════════════════════ #}
 <section class="sr-wrap sr-section" aria-label="Common worries, answered">
   <p class="sr-lede">{{ page.sr.body }}</p>
-  <div class="sr-3up">
+  <div class="sr-qa">
     {% for q, a in page.sr.nerves %}
     <div>
-      <p class="sr-3up-q">{{ q }}</p>
+      <p class="sr-qa-q">{{ q }}</p>
       <p>{{ a }}</p>
     </div>
     {% endfor %}
@@ -231,10 +232,10 @@
 
 {# ═══ THE SESSION, IN THREE STEPS ════════════════════════════════════════════ #}
 <section class="sr-wrap sr-section" aria-label="How a session runs">
-  <div class="sr-3up">
+  <div class="sr-ledger">
     {% for kick, body in page.process %}
     <div>
-      <p class="sr-3up-kick">{{ kick }}</p>
+      <p class="sr-ledger-kick">{{ kick }}</p>
       <p>{{ body }}</p>
     </div>
     {% endfor %}
@@ -282,10 +283,10 @@
 
 {# ═══ COURSES — the process, told as a menu ══════════════════════════════════ #}
 <section class="sr-wrap sr-section" aria-label="How a shoot runs">
-  <div class="sr-3up">
+  <div class="sr-ledger">
     {% for kick, body in page.sr.courses %}
     <div>
-      <p class="sr-3up-kick">{{ kick }}</p>
+      <p class="sr-ledger-kick">{{ kick }}</p>
       <p>{{ body }}</p>
     </div>
     {% endfor %}
