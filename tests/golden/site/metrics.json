@@ -886,14 +886,14 @@
   "sr_mono": 0
  },
  "work-golden-cs__legacy__seeded": {
-  "bytes": 8540,
+  "bytes": 8544,
   "cta_labels": [
    "Book a shoot \u2192",
    "More work",
    "Request a listing quote \u2192"
   ],
   "decorative_kickers": 0,
-  "emdash": 0,
+  "emdash": 1,
   "h1": 1,
   "h2": 1,
   "h3": 0,
@@ -922,14 +922,14 @@
   "sr_mono": 0
  },
  "work-golden-cs__screening__seeded": {
-  "bytes": 8543,
+  "bytes": 8547,
   "cta_labels": [
    "Book a shoot \u2192",
    "More work",
    "Request a listing quote \u2192"
   ],
   "decorative_kickers": 0,
-  "emdash": 0,
+  "emdash": 1,
   "h1": 1,
   "h2": 1,
   "h3": 0,

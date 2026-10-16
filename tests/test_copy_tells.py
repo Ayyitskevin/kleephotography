@@ -91,6 +91,8 @@ ALLOWED = {
         "ownership answer test_usage_rights_draft pins as the baseline (Kevin's call to change)"
         for kind in ("text", "faq")
     },
+    ("title", "A focused campaign. — Kevin Lee Photography"): "case-study separator kept: the admin share "
+    "preview (app/admin/share.py, retirement-excluded) builds it with the dash (STOP-2 option c)",
 }  # fmt: skip
 
 
@@ -281,6 +283,8 @@ def _og_titles(markup):
 def test_every_title_uses_the_pipe_separator(renders, state):
     for route, markup in renders[state].items():
         for title in titles(markup) + [html.unescape(t) for t in _og_titles(markup)]:
+            if ("title", title) in ALLOWED:  # the one exact separator exception
+                continue
             assert title.endswith(f" | {SITE}") or title.startswith(f"{SITE} | "), (route, title)
 
 
