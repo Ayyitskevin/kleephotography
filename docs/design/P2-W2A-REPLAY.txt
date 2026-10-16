@@ -1,0 +1,25 @@
+# P2-W2A replay attestation (PR #125)
+
+Command (run from the fold worktree; replay.py and gen.py live in the research packet folder, _evidence/P2-W2A-map/, not in this repo):
+  bounded -- python3 _evidence/P2-W2A-map/replay.py docs/design/P2-W2A-CHANGES.md c9eaf85dd3e562786a7fa613281c68e0d64b4477
+
+Sheets are read with git show from the object store at the head below; the fold commit changes no file under static/, so the same hashes hold at the fold head.
+
+base b2ae5b93b7d7b08609f7cb2a9593f11ef5d55369
+head c9eaf85dd3e562786a7fa613281c68e0d64b4477
+PASS  screening-room-tokens.css: 7 blocks
+      base     sha256 d382ed55e5f12a29e482c97b57a6e3ca9a6700ed4ff1b673282e53d169bd065c
+      replayed sha256 83e36b7186c62dd5aa37d21c8fd49ade2741627e05d646c8d15371f53487f435
+      head     sha256 83e36b7186c62dd5aa37d21c8fd49ade2741627e05d646c8d15371f53487f435
+      head blob a4e5abc5c8b7e58a8864a050b772f97fb51c257f
+PASS  screening.css: 181 blocks
+      base     sha256 fa2515fb4e90a5b29ec59bd6dcdfc3a6a924ce53850ac4024b1b51e01ba2f07f
+      replayed sha256 333efbabbf10fe5aacd6c03716473e2710c660c6cf8c35000a0a643fd6b2b6af
+      head     sha256 333efbabbf10fe5aacd6c03716473e2710c660c6cf8c35000a0a643fd6b2b6af
+      head blob 22c9a1fcdeac28585d4de30726a88df737bd571c
+PASS  screening-admin.css: 23 blocks
+      base     sha256 9be368efc30ff2d6625133264810960ed2f05d5def916aec6e99060375d5c6ae
+      replayed sha256 51604ea9e7f2563f7c651afcf8cac61d288068c78f2e5d971c60d29c075f7df4
+      head     sha256 51604ea9e7f2563f7c651afcf8cac61d288068c78f2e5d971c60d29c075f7df4
+      head blob 88d4e78ec34cbc05e1249fcb363deb7e6529cd69
+REPLAY PASS: 211 blocks across 3 sheets; base b2ae5b9 -> head c9eaf85
