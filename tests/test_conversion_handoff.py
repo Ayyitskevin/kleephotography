@@ -138,7 +138,7 @@ def test_contact_validation_echo_preserves_values_and_alerts(client, monkeypatch
     assert "Need a menu shoot in July." in r.text
     assert 'value="12 dishes"' in r.text
     assert "Dishes / setups" in r.text
-    assert "selected>Food &amp; Beverage — photo / video</option>" in r.text or (
+    assert "selected>Food &amp; Beverage: photo / video</option>" in r.text or (
         'value="Food &amp; Beverage" selected' in r.text
         or 'value="Food & Beverage" selected' in r.text
     )
