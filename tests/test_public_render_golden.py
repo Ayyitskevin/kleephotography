@@ -242,14 +242,25 @@ def test_an_ordinary_sr_mono_inside_an_aside_is_a_counted_kicker():
     label, never a whole tag. A plain sr-mono under <aside> is a decorative kicker like any other."""
     aside = '<aside><span class="sr-mono">Request a quote</span><h1>t</h1></aside>'
     assert site_metrics.decorative_kickers(aside) == ["Request a quote"]
-    assert site_metrics.decorative_kickers(aside.replace("<aside>", "<aside class='x'>")) == ["Request a quote"]
+    assert site_metrics.decorative_kickers(aside.replace("<aside>", "<aside class='x'>")) == [
+        "Request a quote"
+    ]
     # the named data label stays exempt, in or out of an aside, and only that class
-    assert site_metrics.decorative_kickers('<aside><p class="sr-mono sr-mono--data">Quoted separately</p></aside>') == []
+    assert (
+        site_metrics.decorative_kickers(
+            '<aside><p class="sr-mono sr-mono--data">Quoted separately</p></aside>'
+        )
+        == []
+    )
     assert site_metrics.decorative_kickers('<p class="sr-mono sr-mono--data">x</p>') == []
-    assert site_metrics.decorative_kickers('<aside><p class="sr-mono sr-mono--other">x</p></aside>') == ["x"]
+    assert site_metrics.decorative_kickers(
+        '<aside><p class="sr-mono sr-mono--other">x</p></aside>'
+    ) == ["x"]
 
 
-@pytest.mark.parametrize("seeded_client", [("screening", "empty"), ("screening", "seeded")], indirect=True)
+@pytest.mark.parametrize(
+    "seeded_client", [("screening", "empty"), ("screening", "seeded")], indirect=True
+)
 def test_three_extra_decorations_beside_request_a_quote_break_the_contact_ration(seeded_client):
     """Daybreak's counterexample (P2-1), as a test-time render: contact's own aside, three more plain
     sr-mono spans next to 'Request a quote'. The ration check must go red; contact.html is not edited."""
@@ -258,8 +269,12 @@ def test_three_extra_decorations_beside_request_a_quote_break_the_contact_ration
     assert body.count(marker) == 1
     got = site_metrics.metrics(body)
     assert site_metrics.decorative_kickers(body) == ["Request a quote"]
-    assert len(site_metrics.decorative_kickers(body)) <= math.ceil(got["sections"] / 3)  # the page as shipped holds
-    noisy = body.replace(marker, marker + "".join(f'<span class="sr-mono">Extra {i}</span>' for i in range(3)))
+    assert len(site_metrics.decorative_kickers(body)) <= math.ceil(
+        got["sections"] / 3
+    )  # the page as shipped holds
+    noisy = body.replace(
+        marker, marker + "".join(f'<span class="sr-mono">Extra {i}</span>' for i in range(3))
+    )
     kickers = site_metrics.decorative_kickers(noisy)
     assert len(kickers) == 4
     assert len(kickers) > math.ceil(site_metrics.metrics(noisy)["sections"] / 3)
