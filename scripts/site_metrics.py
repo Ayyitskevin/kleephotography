@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Structure metrics for public site pages (plan R-1).
 
-Counts sections, headings, images (lazy / missing alt), `sr-mono` labels,
-em-dashes and middots in visible text, CTA labels and bytes. The golden render
-test (tests/test_public_render_golden.py) loads this file, so the test and this
+Counts sections, headings, images (lazy / missing alt), `sr-mono` labels and
+the decorative kickers among them (plan D-4), em-dashes and middots in visible
+text, CTA labels and bytes. The golden render test
+(tests/test_public_render_golden.py) loads this file, so the test and this
 script report the same numbers.
 
   scripts/site_metrics.py page.html [more.html ...]
@@ -38,6 +39,7 @@ KEYS = (
     "img_lazy",
     "img_noalt",
     "sr_mono",
+    "decorative_kickers",
     "emdash",
     "middot",
     "cta_labels",
@@ -147,6 +149,7 @@ def metrics(markup):
     visible = " ".join(parser.text)
     return {
         **parser.counts,
+        "decorative_kickers": len(decorative_kickers(markup)),
         "emdash": visible.count("—"),
         "middot": visible.count("·"),
         "cta_labels": sorted({label.strip() for label in parser.ctas if label.strip()}),

@@ -21,7 +21,6 @@
 <section class="sr-wrap sr-section" aria-label="Now showing">
   <div class="sr-kickrow">
     <p class="sr-mono sr-mono--signal">&#9679; Now showing <span class="sr-blink" aria-hidden="true">&#9646;</span></p>
-    <p class="sr-mono">House reel &middot; Asheville NC</p>
   </div>
   <figure class="sr-screen sr-screen--reel sr-corners4" data-sr-player>
     <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
@@ -63,9 +62,7 @@
 
 {# ═══ THREE FEATURES — title cards on film stock ═════════════════════════════ #}
 <section class="sr-wrap sr-section" aria-label="Three features" id="specialties">
-  <div class="sr-kickrow">
-    <p class="sr-mono">Three features &mdash; pick your screening</p>
-  </div>
+  <h2 class="sr-h2">Three features &mdash; pick your screening</h2>
   <div class="sr-features">
     {% for d in doors %}
     <a class="sr-card sp-door sr-stock-{{ d.key }}" href="/{{ d.slug }}" data-reveal>
@@ -119,7 +116,7 @@
 {% if featured %}
 <section class="sr-wrap sr-section" aria-label="From the archive" id="work">
   <div class="sr-kickrow">
-    <p class="sr-mono">From the archive &mdash; recent frames</p>
+    <h2 class="sr-h2">From the archive &mdash; recent frames</h2>
     <a class="sr-mono sr-mono--signal" href="/portfolio">Open the archive &rarr;</a>
   </div>
   <div class="sr-filmstrip">
