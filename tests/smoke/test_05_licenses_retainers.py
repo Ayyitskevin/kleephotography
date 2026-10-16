@@ -42,7 +42,8 @@ def test_services_page():
         # every specialty group + its tiers render (titles are HTML-escaped —
         # the specialty groups carry '&' since the per-specialty catalog)
         for s in SERVICES:
-            assert s["title"].replace("&", "&amp;") in r.text, s["key"]
+            # D-9: the heading shows the title without its dash (the title itself is unchanged)
+            assert s["title"].replace(" — ", ": ").replace("&", "&amp;") in r.text, s["key"]
             for t in s["tiers"]:
                 # every tier name should appear at least 3 times (once per category)
                 # but we just need each card present per service
