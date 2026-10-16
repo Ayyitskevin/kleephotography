@@ -58,10 +58,10 @@
         <p class="sr-mono">{{ page.steady_feed.kicker }}</p>
         <h3 id="steady-feed-heading">{{ page.steady_feed.heading }}</h3>
         <p>{{ page.steady_feed.intro }}</p>
-        <div class="sr-3up">
+        <div class="sr-tierrow">
           {% for t in bp.tiers %}
           <div>
-            <p class="sr-3up-kick">{{ t.name }}</p>
+            <p class="sr-tierrow-name">{{ t.name }}</p>
             <p>{{ t.includes|join(' · ') }}</p>
           </div>
           {% endfor %}

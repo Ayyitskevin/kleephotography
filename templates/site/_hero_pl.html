@@ -17,7 +17,7 @@
            {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
            {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
            {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
-           sizes="(max-width: 1000px) 100vw, 560px"{% endif %}
+           sizes="{{ hero_sizes }}"{% endif %}
            alt="{{ photos[0]|portfolio_alt }}">
       {% endif %}
       <span class="sr-frameno">{{ sp.stock }}{% if photos %} &middot; FR&middot;{{ "%04d"|format(photos[0].id) }}{% endif %} &mdash; {{ page.hero_caption }}</span>
