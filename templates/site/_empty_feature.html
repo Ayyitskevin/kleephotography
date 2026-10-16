@@ -1,0 +1,23 @@
+{# The empty state of a specialty feature with no portfolio work yet (plan R-4): one
+   anatomy for the three spokes (was three hand-copied blocks in site/specialty.html).
+
+   Usage:
+     {% import "site/_empty_feature.html" as ef %}
+     {{ ef.empty_feature(page.empty_head, page.empty_body, book_url, page.sr.cta ~ arrow,
+                         "/contact?service=" ~ page.contact_service|urlencode, "Request a quote") }}
+   Every argument is autoescaped like the markup it replaced; a label that carries
+   markup (the arrow) is built with ~ and a |safe fragment, so its text part is still
+   escaped. The whitespace control on the macro tags keeps the rendered bytes of the
+   old inline blocks: the call site's own line supplies the newlines. #}
+{% macro empty_feature(head, body, primary_href, primary_label, secondary_href, secondary_label) -%}
+<section class="sr-wrap sr-section">
+  <div class="empty-state">
+    <p><strong>{{ head }}</strong></p>
+    <p class="muted">{{ body }}</p>
+    <div class="empty-state-actions">
+      <a class="sr-btn" href="{{ primary_href }}">{{ primary_label }}</a>
+      <a class="sr-btn btn-ghost" href="{{ secondary_href }}">{{ secondary_label }}</a>
+    </div>
+  </div>
+</section>
+{%- endmacro %}
