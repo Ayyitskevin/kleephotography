@@ -89,7 +89,7 @@ def marketing_page_catalog() -> list[dict[str, str]]:
             None,
         )
         if specialty:
-            title = f"{specialty['title']} — {config.SITE_NAME}"
+            title = f"{specialty['title']} | {config.SITE_NAME}"
             description = specialty["meta"]
         else:
             meta = marketing_meta(path)
@@ -128,7 +128,7 @@ def _sr_rate_cells(key: str) -> list[dict]:
             {"price": tier("portraits", 2)["display_price"], "label": "Tier III — extended"},
         ]
     return [
-        {"price": tier("photography", 0)["display_price"], "label": "Photo starter — half day"},
+        {"price": tier("photography", 0)["display_price"], "label": "Photo starter: half day"},
         {
             "price": tier("videography", 0)["display_price"],
             "label": "Reel starter — hero + 3 cutdowns",

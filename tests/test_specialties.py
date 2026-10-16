@@ -44,16 +44,16 @@ def test_by_slug():
 def test_portfolio_alt_craft_follows_prefix():
     assert (
         _portfolio_alt({"portfolio_tag": "re/exteriors"}, site_name="Kevin Lee Photography")
-        == "Exteriors — real estate photography by Kevin Lee Photography"
+        == "Exteriors, real estate photography by Kevin Lee Photography"
     )
     assert (
         _portfolio_alt({"portfolio_tag": "pl/headshots"}, site_name="Kevin Lee Photography")
-        == "Headshots — portrait & lifestyle photography by Kevin Lee Photography"
+        == "Headshots, portrait & lifestyle photography by Kevin Lee Photography"
     )
     # legacy unprefixed tags keep their F&B alt text verbatim
     assert (
         _portfolio_alt({"portfolio_tag": "Dishes"}, site_name="Kevin Lee Photography")
-        == "Dishes — food & beverage photography by Kevin Lee Photography"
+        == "Dishes, food & beverage photography by Kevin Lee Photography"
     )
     # untagged assets keep the legacy default
     assert (
@@ -93,7 +93,7 @@ def test_portfolio_alt_falls_back_when_the_description_is_absent_or_blank():
                 {"portfolio_tag": "re/exteriors", "argus_alt_text": value},
                 site_name="Kevin Lee Photography",
             )
-            == "Exteriors — real estate photography by Kevin Lee Photography"
+            == "Exteriors, real estate photography by Kevin Lee Photography"
         )
 
 
