@@ -151,13 +151,12 @@ def test_house_text_on_amber_clears_eight_to_one():
 
 def test_the_three_empty_state_ctas_are_square_sr_buttons_and_the_other_two_are_untouched():
     spec = (ROOT / "templates/site/specialty.html").read_text()
-    assert "btn-pill" not in spec
-    assert (
-        spec.count(
-            '<a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} <span>&rarr;</span></a>'
-        )
-        == 3
-    )
+    # R-4: the three empty-feature blocks are one macro, called three times
+    empty = (ROOT / "templates/site/_empty_feature.html").read_text()
+    assert "btn-pill" not in spec and "btn-pill" not in empty
+    assert '<a class="sr-btn" href="{{ primary_href }}">{{ primary_label }}</a>' in empty
+    call = "{{ ef.empty_feature(page.empty_head, page.empty_body, book_url, page.sr.cta ~ arrow,"
+    assert spec.count(call) == 3
     for other in ("templates/site/_empty_portfolio.html", "templates/site/work_detail.html"):
         assert "btn-pill" in (ROOT / other).read_text()  # not in the D-5 row
 
