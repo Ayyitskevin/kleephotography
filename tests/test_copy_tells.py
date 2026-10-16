@@ -54,6 +54,7 @@ STATE_IDS = [
 # Exact normalised segments (kind, text) allowed to keep their dash, and why.
 _AERIAL = "aerial copy (plan D-9: excluded until Kevin says otherwise)"
 _DEVICE = "brand device kept like the credits line (STOP 3 (c))"
+_RENDER_PY = "retirement-fence follow-up: alt fallback in app/render.py (review P2-1)"
 ALLOWED = {
     ("text", "Aerial coverage is planned for launch with FAA Part 107 — not available to book today."): _AERIAL,
     ("text", "Aerial Pass +$150 — FAA Part 107"): _AERIAL,
@@ -91,6 +92,11 @@ ALLOWED = {
         "ownership answer test_usage_rights_draft pins as the baseline (Kevin's call to change)"
         for kind in ("text", "faq")
     },
+    # Retirement-fence follow-up (review P2-1): the portfolio alt fallback is built in app/render.py,
+    # which PHASE2-PACKET.md:8-9 fences, so these three keep the dash.
+    ("alt", "Exteriors — real estate photography by Kevin Lee Photography"): _RENDER_PY,
+    ("alt", "Headshots — portrait & lifestyle photography by Kevin Lee Photography"): _RENDER_PY,
+    ("alt", "Plated — food & beverage photography by Kevin Lee Photography"): _RENDER_PY,
     ("title", "A focused campaign. — Kevin Lee Photography"): "case-study separator kept: the admin share "
     "preview (app/admin/share.py, retirement-excluded) builds it with the dash (STOP-2 option c)",
 }  # fmt: skip

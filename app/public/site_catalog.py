@@ -43,7 +43,7 @@ MARKETING_PAGE_META = {
         "title": "Services | {site_name}",
         "description": (
             "Photography, videography, and monthly Brand Partner retainers for real "
-            "estate, portraits, and food & beverage. Asheville and Western North "
+            "estate, portraits, and food & beverage in Asheville and Western North "
             "Carolina. Three tiers per category."
         ),
     },
@@ -253,7 +253,7 @@ SERVICES = [
         "title": "Food & Beverage — Photography",
         "contact_service": "Food & Beverage",
         "tagline": "Menu refreshes, launch weeks, and the rooms that sell the "
-        "plate: private same-week gallery with social crops baked in.",
+        "plate, with a private same-week gallery and social crops baked in.",
         "monthly": False,
         "tiers": [
             {
@@ -1103,7 +1103,7 @@ SPECIALTY_PAGES = {
             "presents": "Kevin Lee presents — Food & Beverage",
             "h2a": "Your menu,",
             "h2b": "selling itself.",
-            "beat": "the steam, the pour, the first cut: in the thirty seconds a dish looks alive",
+            "beat": "the steam, the pour, the first cut, all in the thirty seconds a dish looks alive",
             "card_meta_l": "Stock 500T — appetite grade",
             "card_meta_r": "Same-week gallery · crops 1:1 / 4:5 / 9:16",
             "grid_label": "Recent menus: plates, pours & the rooms they live in",
