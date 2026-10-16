@@ -514,13 +514,13 @@ body.sr-admin .admin-shell, body.sr-admin {
 }
 @media (max-width: 700px) {
   .sr .sr-wrap { padding: 0 16px; }
-  .sr .site-nav { padding: 14px 16px; }
+  .sr .site-nav { padding: var(--sr-s4) var(--sr-s4); }
   .sr .nav-menu-btn,
   .sr .site-nav.scrolled + .nav-menu > .nav-menu-btn { top: 14px; right: 16px; }
-  .sr .site-footer { padding: 30px 16px 90px; }
+  .sr .site-footer { padding: var(--sr-s6) var(--sr-s4) 90px; }
   .sr .sr-screen--reel { aspect-ratio: 4 / 5; }
   .sr .sr-screen-title h1, .sr .sr-screen-title h2 { font-size: clamp(26px, 8.6vw, 34px); }
-  .sr .sr-playerstrip { gap: 8px; font-size: 11px; }
+  .sr .sr-playerstrip { gap: var(--sr-s2); font-size: var(--sr-t-xs); }
   .sr .sr-stats, .sr .sr-tiers { grid-template-columns: 1fr; }
   .sr .sr-stat, .sr .sr-tier { border-right: 0; }
   .sr .sr-filmstrip figure { min-width: 140px; }
@@ -624,7 +624,7 @@ body.sr-admin .admin-shell, body.sr-admin {
    (destructive outline) · --subtle (borderless quiet) · --sm (compact).
    Icon-only actions use .sr-icon-btn. Anything else is legacy — migrate,
    don't add new one-off systems. */
-.sr .sr-btn--sm { padding: 9px 14px; font-size: 10.5px; letter-spacing: 0.08em; }
+.sr .sr-btn--sm { padding: 9px var(--sr-s4); font-size: var(--sr-t-xs); letter-spacing: 0.08em; }
 /* press feedback (D-8): colour swaps and the :active press ride the fast token.
    Scoped to the marketing shell (body.site-body.sr): the admin deck and the
    client surfaces get no new motion. The reduced-motion override sits right
@@ -641,7 +641,7 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr .sr-btn--danger:hover, .sr .sr-btn--danger:focus-visible {
   background: var(--sr-danger); color: var(--sr-house); }
 .sr .sr-btn--subtle { background: transparent; border: 0; color: var(--sr-ink-soft);
-  padding-left: 10px; padding-right: 10px; }
+  padding-left: var(--sr-s3); padding-right: var(--sr-s3); }
 .sr .sr-btn--subtle:hover, .sr .sr-btn--subtle:focus-visible {
   background: transparent; color: var(--sr-stock); }
 .sr .sr-btn:disabled, .sr .sr-icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -666,11 +666,11 @@ body.sr-admin .admin-shell, body.sr-admin {
    Base input dressing (well, border, focus) lives in the forms section above;
    this is the field structure around it: label, hint, error, invalid, req. */
 .sr .sr-field { display: grid; gap: 7px; margin-bottom: var(--sr-s4); }
-.sr .sr-label { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.18em;
+.sr .sr-label { font: 500 var(--sr-t-xs)/1 var(--sr-mono); letter-spacing: 0.18em;
   text-transform: uppercase; color: var(--sr-ink-faint); }
 .sr .sr-req { color: var(--sr-amber); }
 .sr .sr-hint { margin: 0; font-size: var(--sr-text-sm); color: var(--sr-ink-ghost); }
-.sr .sr-error { margin: 0; display: flex; align-items: center; gap: 6px;
+.sr .sr-error { margin: 0; display: flex; align-items: center; gap: var(--sr-s2);
   font-size: var(--sr-text-sm); color: var(--sr-danger); }
 .sr input[aria-invalid="true"], .sr select[aria-invalid="true"],
 .sr textarea[aria-invalid="true"] { border-color: var(--sr-danger); }
@@ -686,8 +686,8 @@ body.sr-admin .admin-shell, body.sr-admin {
 
 /* ── badges — canonical status pill (new work uses .sr-badge) ─────────────── */
 .sr .sr-badge { display: inline-flex; align-items: center; gap: 5px;
-  font: 700 9.5px/1 var(--sr-mono); letter-spacing: 0.12em; text-transform: uppercase;
-  padding: 4px 8px; border: 1px solid var(--sr-line-raised); border-radius: 0;
+  font: 700 var(--sr-t-xs)/1 var(--sr-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  padding: var(--sr-s1) var(--sr-s2); border: 1px solid var(--sr-line-raised); border-radius: 0;
   background: var(--sr-house-deep); color: var(--sr-ink-soft); white-space: nowrap; }
 .sr .sr-badge.is-ok      { color: var(--sr-ok);     border-color: color-mix(in srgb, var(--sr-ok) 45%, transparent); }
 .sr .sr-badge.is-warn    { color: var(--sr-warn);   border-color: color-mix(in srgb, var(--sr-warn) 45%, transparent); }
@@ -717,11 +717,11 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr dialog.sr-dialog[open] { animation: sr-dialog-in var(--sr-t-fast); }
 @keyframes sr-dialog-in { from { opacity: 0; transform: translateY(6px); } }
 .sr .sr-dialog-box { padding: var(--sr-s5); }
-.sr .sr-dialog-kicker { margin: 0 0 10px; font: 500 10px/1 var(--sr-mono);
-  letter-spacing: 0.26em; text-transform: uppercase; color: var(--sr-amber); }
+.sr .sr-dialog-kicker { margin: 0 0 var(--sr-s3); font: 500 var(--sr-t-xs)/1 var(--sr-mono);
+  letter-spacing: var(--sr-track-label); text-transform: uppercase; color: var(--sr-amber); }
 .sr .sr-dialog-msg { margin: 0 0 var(--sr-s5); font-size: var(--sr-text-lg);
   line-height: 1.5; color: var(--sr-cream); }
-.sr .sr-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.sr .sr-dialog-actions { display: flex; justify-content: flex-end; gap: var(--sr-s3); }
 @media (prefers-reduced-motion: reduce) {
   .sr dialog.sr-dialog[open] { animation: none; }
 }
@@ -765,9 +765,9 @@ body.sr-admin .admin-shell, body.sr-admin {
 }
 
 .sr .sr-toasts { position: fixed; right: 20px; bottom: 20px; z-index: var(--sr-z-toast);
-  display: flex; flex-direction: column; gap: 8px; max-width: min(360px, calc(100vw - 40px)); }
+  display: flex; flex-direction: column; gap: var(--sr-s2); max-width: min(360px, calc(100vw - 40px)); }
 .sr .sr-toast { background: var(--sr-overlay); border: 1px solid var(--sr-line-strong);
-  border-left: 2px solid var(--sr-stock); padding: 12px 16px;
+  border-left: 2px solid var(--sr-stock); padding: var(--sr-s3) var(--sr-s4);
   font-size: var(--sr-text-base); color: var(--sr-cream); box-shadow: var(--sr-shadow-1);
   animation: sr-toast-in var(--sr-t-med); }
 .sr .sr-toast--ok     { border-left-color: var(--sr-ok); }
@@ -788,17 +788,17 @@ body.sr-admin .admin-shell, body.sr-admin {
    flows (templates/public/base_flow.html): booking, booking manage. Keeps the
    page on the house with just brand + kicker + a way out — no marketing nav. */
 .sr .flow-chrome { position: sticky; top: 0; z-index: var(--sr-z-sticky);
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 14px 22px; background: var(--sr-house); border-bottom: 1px solid var(--sr-line); }
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sr-s4);
+  padding: var(--sr-s4) var(--sr-s5); background: var(--sr-house); border-bottom: 1px solid var(--sr-line); }
 .sr .flow-brand { text-decoration: none; }
 .sr .flow-brand b { display: block; font: 700 15px/1 var(--sr-sans);
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--sr-cream-strong); }
-.sr .flow-brand small { display: block; margin-top: 3px; font: 500 11px/1 var(--sr-mono);
-  letter-spacing: 0.26em; text-transform: uppercase; color: var(--sr-ink-ghost); }
+.sr .flow-brand small { display: block; margin-top: 3px; font: 500 var(--sr-t-xs)/1 var(--sr-mono);
+  letter-spacing: var(--sr-track-label); text-transform: uppercase; color: var(--sr-ink-ghost); }
 .sr .flow-kicker { color: var(--sr-amber); }
 .sr .flow-foot { display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; margin-top: 56px; padding: 18px 22px; border-top: 1px solid var(--sr-line);
-  font: 500 10px/1.6 var(--sr-mono); letter-spacing: 0.14em; text-transform: uppercase;
+  gap: var(--sr-s4); margin-top: 56px; padding: var(--sr-s4) var(--sr-s5); border-top: 1px solid var(--sr-line);
+  font: 500 var(--sr-t-xs)/1.6 var(--sr-mono); letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--sr-ink-ghost); }
 .sr .flow-foot a { color: var(--sr-ink-soft); text-decoration: none; }
 .sr .flow-foot a:hover { color: var(--sr-amber); }
@@ -857,7 +857,7 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr-admin .sr-anchors { position: sticky; top: 0; z-index: 5; display: flex; gap: 16px;
   padding: 10px 2px; margin: -8px 0 20px; background: var(--sr-panel);
   border-bottom: 1px solid var(--sr-line-faint); overflow-x: auto; }
-.sr-admin .sr-anchors a { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.14em;
+.sr-admin .sr-anchors a { font: 500 11px/1 var(--sr-mono); letter-spacing: 0.14em;
   text-transform: uppercase; color: var(--sr-ink-faint); text-decoration: none;
   white-space: nowrap; padding: 4px 0; }
 .sr-admin .sr-anchors a:hover { color: var(--sr-amber); }
@@ -878,34 +878,34 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr .motion-strip video { cursor: pointer; }
 
 /* ── work_detail wayfinding: visible breadcrumb + prev/next ───────────────── */
-.sr .work-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  margin: 0 0 14px; font: 500 10px/1.5 var(--sr-mono); letter-spacing: 0.12em;
+.sr .work-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sr-s2);
+  margin: 0 0 var(--sr-s4); font: 500 var(--sr-t-xs)/1.5 var(--sr-mono); letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--sr-ink-ghost); }
 .sr .work-crumbs a { color: var(--sr-ink-soft); text-decoration: none; }
 .sr .work-crumbs a:hover { color: var(--sr-amber); }
-.sr .work-pn { display: flex; justify-content: space-between; gap: 16px;
-  margin: 28px 0 8px; padding: 18px 0; border-top: 1px solid var(--sr-line); }
-.sr .work-pn-link { display: grid; gap: 6px; text-decoration: none; max-width: 46%; }
+.sr .work-pn { display: flex; justify-content: space-between; gap: var(--sr-s4);
+  margin: 28px 0 var(--sr-s2); padding: var(--sr-s4) 0; border-top: 1px solid var(--sr-line); }
+.sr .work-pn-link { display: grid; gap: var(--sr-s2); text-decoration: none; max-width: 46%; }
 .sr .work-pn-link .sr-mono { color: var(--sr-ink-ghost); }
 .sr .work-pn-link .work-pn-title { color: var(--sr-cream); font: 600 15px/1.3 var(--sr-sans); }
 .sr .work-pn-link:hover .work-pn-title { color: var(--sr-amber); }
 .sr .work-pn-next { text-align: right; justify-items: end; }
 
 /* ── page-head rhythm modifiers (the inline-style one-offs, codified) ─────── */
-.sr .sr-kickrow--mt10 { margin-top: 10px; }
-.sr .sr-kickrow--mt12 { margin-top: 12px; }
-.sr .sr-kickrow--mt14 { margin-top: 14px; }
+.sr .sr-kickrow--mt10 { margin-top: var(--sr-s3); }
+.sr .sr-kickrow--mt12 { margin-top: var(--sr-s3); }
+.sr .sr-kickrow--mt14 { margin-top: var(--sr-s4); }
 .sr .sr-beat--flush { margin: 0; }
-.sr .sr-lede--mt14 { margin-top: 14px; }
+.sr .sr-lede--mt14 { margin-top: var(--sr-s4); }
 .sr .sr-pagehead--edgeless { border-bottom: 0; }
 
 /* closing title-card on the spokes (was border/font/margin inline styles) */
 .sr .sr-cta-final { text-align: center; }
-.sr .sr-cta-final .sr-title { font-size: clamp(26px, 3vw, 44px); }
-.sr .sr-cta-final .sr-titlecard-actions { margin-top: 20px; }
+
+.sr .sr-cta-final .sr-titlecard-actions { margin-top: var(--sr-s5); }
 /* live-availability strip under the closing CTA — real open days, deep-linked
    into the picker with that day preselected */
-.sr .sr-availstrip { margin-top: 14px; }
+.sr .sr-availstrip { margin-top: var(--sr-s4); }
 .sr .sr-availstrip a { color: inherit; text-decoration: underline;
   text-underline-offset: 3px; }
 .sr .sr-availstrip a:hover { color: var(--sr-amber); }
@@ -915,5 +915,5 @@ body.sr-admin .admin-shell, body.sr-admin {
   .sr .sr-titlecard { min-height: 68vh; }
 }
 .sr .sr-screen-empty { position: absolute; left: 28px; bottom: 64px; display: flex;
-  flex-direction: column; gap: 6px; max-width: 46ch; color: var(--sr-ink-mute);
+  flex-direction: column; gap: var(--sr-s2); max-width: 46ch; color: var(--sr-ink-mute);
   font-size: var(--sr-text-sm); }

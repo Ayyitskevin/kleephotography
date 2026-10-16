@@ -91,6 +91,18 @@ body.sr {
   /* body text sizes — display sizes stay with the clamp() classes */
   --sr-text-sm: 12px; --sr-text-base: 14px; --sr-text-lg: 17px;
 
+  /* type scale (plan D-1): nothing below 11px; body copy 15px; one clamp per display step.
+     xs = mono labels, sm = captions / frame labels / nav / usage lines, base = body,
+     lg = lede, xl = pull quotes; d-1 hero h1, d-2 split/feature/contact h1, d-3 section
+     h2, d-4 card and tier h3. Labels track at 0.18em (the wider values compensated for 10px). */
+  --sr-t-xs: 11px; --sr-t-sm: 13px; --sr-t-base: 15px; --sr-t-lg: 17px; --sr-t-xl: 20px;
+  --sr-d-1: clamp(36px, 5vw, 68px); --sr-d-2: clamp(30px, 3.6vw, 48px);
+  --sr-d-3: clamp(22px, 2.4vw, 32px); --sr-d-4: 20px;
+  --sr-track-label: 0.18em;
+
+  /* section air (plan D-2): the space above and below every .sr-section */
+  --sr-section-y: clamp(48px, 7vw, 96px);
+
   background: var(--sr-house);
   color: var(--sr-ink);
   font-family: var(--sr-sans);
@@ -103,7 +115,10 @@ body.sr.sr-fb { --sr-stock: var(--sr-stock-fb); }
 /* ── primitives ───────────────────────────────────────────────────────────── */
 
 /* caps display title: hero 64–68px desktop, 32–40px mobile */
-.sr .sr-title { font: 700 clamp(32px, 4.6vw, 68px)/1.02 var(--sr-sans);
+.sr .sr-title { font: 700 var(--sr-d-1)/1.02 var(--sr-sans);
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--sr-cream-strong); }
+/* section heading: every marketing section h2 (d-3) */
+.sr .sr-h2 { font: 700 var(--sr-d-3)/1.1 var(--sr-sans);
   letter-spacing: 0.04em; text-transform: uppercase; color: var(--sr-cream-strong); }
 
 /* serif italic emotional beat under a title */
@@ -111,7 +126,7 @@ body.sr.sr-fb { --sr-stock: var(--sr-stock-fb); }
   font-size: clamp(15px, 1.4vw, 21px); color: var(--sr-ink-soft); }
 
 /* mono label — kickers, timecodes, metadata */
-.sr .sr-mono { font: 500 10px/1 var(--sr-mono); letter-spacing: 0.26em;
+.sr .sr-mono { font: 500 var(--sr-t-xs)/1 var(--sr-mono); letter-spacing: var(--sr-track-label);
   text-transform: uppercase; color: var(--sr-ink-ghost); }
 .sr .sr-mono--signal { color: var(--sr-amber); }
 .sr .sr-mono--stock  { color: var(--sr-stock); }
@@ -119,7 +134,7 @@ body.sr.sr-fb { --sr-stock: var(--sr-stock-fb); }
 /* buttons */
 .sr .sr-btn { display: inline-flex; align-items: center; gap: 9px;
   font: 700 12px/1 var(--sr-sans); letter-spacing: 0.1em; text-transform: uppercase;
-  padding: 14px 26px; border: 0; cursor: pointer;
+  padding: var(--sr-s4) var(--sr-s5); border: 0; cursor: pointer;
   background: var(--sr-stock); color: var(--sr-house); }
 .sr .sr-btn:hover, .sr .sr-btn:focus-visible { background: var(--sr-cream); }
 .sr .sr-btn--ghost { background: transparent; color: var(--sr-cream);
@@ -131,8 +146,8 @@ body.sr.sr-fb { --sr-stock: var(--sr-stock-fb); }
 
 /* film chip on any tile that is a video (duration always shown) */
 .sr .sr-filmchip { position: absolute; top: 10px; left: 10px;
-  font: 700 9px/1 var(--sr-mono); letter-spacing: 0.14em;
-  color: var(--sr-house); background: var(--sr-stock); padding: 4px 8px; }
+  font: 700 var(--sr-t-xs)/1 var(--sr-mono); letter-spacing: 0.14em;
+  color: var(--sr-house); background: var(--sr-stock); padding: var(--sr-s1) var(--sr-s2); }
 
 /* aerial marker (▲) — Part 107 deliverables, RE only */
 .sr .sr-aerial { background: var(--sr-stock-re); }
@@ -154,14 +169,14 @@ body.sr.sr-fb { --sr-stock: var(--sr-stock-fb); }
 
 /* processing / REC state */
 @keyframes sr-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
-.sr .sr-rec { font: 700 10px/1 var(--sr-mono); letter-spacing: 0.2em; color: var(--sr-amber); }
+.sr .sr-rec { font: 700 var(--sr-t-xs)/1 var(--sr-mono); letter-spacing: var(--sr-track-label); color: var(--sr-amber); }
 .sr .sr-rec::before { content: "● "; animation: sr-blink 1.2s infinite; }
 @media (prefers-reduced-motion: reduce) { .sr .sr-rec::before { animation: none; } }
 
 /* sticky export rail (client gallery) */
 .sr .sr-export { position: sticky; bottom: 0; z-index: 10;
   background: var(--sr-house-deep); border-top: 1px solid var(--sr-line-strong);
-  display: flex; align-items: center; gap: 20px; padding: 15px 48px; }
+  display: flex; align-items: center; gap: var(--sr-s5); padding: 15px 48px; }
 
 /* the money sheet — cream doc floating on the house; print = pure paper */
 .sr .sr-sheet { background: var(--sr-sheet); color: var(--sr-sheet-body);

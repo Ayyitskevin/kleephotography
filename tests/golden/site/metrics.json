@@ -196,7 +196,7 @@
   "sr_mono": 1
  },
  "food-beverage__legacy__empty": {
-  "bytes": 28360,
+  "bytes": 28354,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -222,7 +222,7 @@
   "sr_mono": 10
  },
  "food-beverage__legacy__seeded": {
-  "bytes": 29393,
+  "bytes": 29387,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
@@ -247,7 +247,7 @@
   "sr_mono": 12
  },
  "food-beverage__screening__empty": {
-  "bytes": 28369,
+  "bytes": 28363,
   "cta_labels": [
    "Book a shoot",
    "Book a shoot \u2192",
@@ -273,7 +273,7 @@
   "sr_mono": 10
  },
  "food-beverage__screening__seeded": {
-  "bytes": 29402,
+  "bytes": 29396,
   "cta_labels": [
    "Book a shoot \u2192",
    "Inquire about Photo + Reels \u2192",
@@ -436,7 +436,7 @@
   "sr_mono": 4
  },
  "portraits__legacy__empty": {
-  "bytes": 21926,
+  "bytes": 21923,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
@@ -461,7 +461,7 @@
   "sr_mono": 4
  },
  "portraits__legacy__seeded": {
-  "bytes": 22967,
+  "bytes": 22964,
   "cta_labels": [
    "Book a session \u2192",
    "Inquire about On-site team day \u2192",
@@ -484,7 +484,7 @@
   "sr_mono": 6
  },
  "portraits__screening__empty": {
-  "bytes": 21935,
+  "bytes": 21932,
   "cta_labels": [
    "Book a session",
    "Book a session \u2192",
@@ -509,7 +509,7 @@
   "sr_mono": 4
  },
  "portraits__screening__seeded": {
-  "bytes": 22976,
+  "bytes": 22973,
   "cta_labels": [
    "Book a session \u2192",
    "Inquire about On-site team day \u2192",
@@ -532,7 +532,7 @@
   "sr_mono": 6
  },
  "real-estate__legacy__empty": {
-  "bytes": 18556,
+  "bytes": 18547,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -555,7 +555,7 @@
   "sr_mono": 10
  },
  "real-estate__legacy__seeded": {
-  "bytes": 20461,
+  "bytes": 20452,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -577,7 +577,7 @@
   "sr_mono": 15
  },
  "real-estate__screening__empty": {
-  "bytes": 18565,
+  "bytes": 18556,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
@@ -600,7 +600,7 @@
   "sr_mono": 10
  },
  "real-estate__screening__seeded": {
-  "bytes": 20470,
+  "bytes": 20461,
   "cta_labels": [
    "Add aerials to a booking \u2192",
    "Ask about a rental shoot \u2192",
