@@ -58,6 +58,11 @@ def _is_cta(cls):
     return "sr-btn" in cls or "svc-cta" in cls or "btn" in cls
 
 
+def count_class(markup, cls):
+    """Elements whose class list carries `cls` (plan D-6: `.sr-3up` at most once per page)."""
+    return sum(cls in m.split() for m in re.findall(r'\bclass="([^"]*)"', markup))
+
+
 class _Counter(HTMLParser):
     def __init__(self):
         super().__init__()
