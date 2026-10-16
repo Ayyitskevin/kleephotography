@@ -33,7 +33,7 @@ UNSTYLED = {
     "#contact-shoot-date", "#contact-usage", "#brandlane-heading", "#lightbox", "#rates",
     "#short-term-rentals", "#specialties", "#steady-feed-heading", "#twilight", "#work",
     "#lines-portraits", "#lines-portraits-heading", ".lb-live", ".page-hero-work", ".pf-tile",
-    ".sp-steady",
+    ".sp-steady", ".sr-mono--data",
     *{f"#line-portraits-{n}" for n in (1, 2, 3)},
     *{f"#package-{k}-{n}" for k in ("brand_partner", "photography", "portraits", "real_estate", "videography") for n in (1, 2, 3)},
     *{f"#packages-{k}" for k in ("brand_partner", "photography", "portraits", "real_estate", "videography")},
