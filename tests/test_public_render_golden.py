@@ -237,6 +237,34 @@ def test_public_page_rations_its_decorative_kickers_and_keeps_one_h1(route, seed
     assert got["h1"] == (1 if response.status_code == 200 else 0), (route, response.status_code)
 
 
+def test_an_ordinary_sr_mono_inside_an_aside_is_a_counted_kicker():
+    """P2-1 (W3A r1): the D-4 classifier exempts links, .sr-card-head labels and the named data
+    label, never a whole tag. A plain sr-mono under <aside> is a decorative kicker like any other."""
+    aside = '<aside><span class="sr-mono">Request a quote</span><h1>t</h1></aside>'
+    assert site_metrics.decorative_kickers(aside) == ["Request a quote"]
+    assert site_metrics.decorative_kickers(aside.replace("<aside>", "<aside class='x'>")) == ["Request a quote"]
+    # the named data label stays exempt, in or out of an aside, and only that class
+    assert site_metrics.decorative_kickers('<aside><p class="sr-mono sr-mono--data">Quoted separately</p></aside>') == []
+    assert site_metrics.decorative_kickers('<p class="sr-mono sr-mono--data">x</p>') == []
+    assert site_metrics.decorative_kickers('<aside><p class="sr-mono sr-mono--other">x</p></aside>') == ["x"]
+
+
+@pytest.mark.parametrize("seeded_client", [("screening", "empty"), ("screening", "seeded")], indirect=True)
+def test_three_extra_decorations_beside_request_a_quote_break_the_contact_ration(seeded_client):
+    """Daybreak's counterexample (P2-1), as a test-time render: contact's own aside, three more plain
+    sr-mono spans next to 'Request a quote'. The ration check must go red; contact.html is not edited."""
+    body = normalise(seeded_client.get("/contact").text)
+    marker = '<span class="sr-mono">Request a quote</span>'
+    assert body.count(marker) == 1
+    got = site_metrics.metrics(body)
+    assert site_metrics.decorative_kickers(body) == ["Request a quote"]
+    assert len(site_metrics.decorative_kickers(body)) <= math.ceil(got["sections"] / 3)  # the page as shipped holds
+    noisy = body.replace(marker, marker + "".join(f'<span class="sr-mono">Extra {i}</span>' for i in range(3)))
+    kickers = site_metrics.decorative_kickers(noisy)
+    assert len(kickers) == 4
+    assert len(kickers) > math.ceil(site_metrics.metrics(noisy)["sections"] / 3)
+
+
 def test_a_missing_golden_names_the_update_command(tmp_path):
     ledger = {"changed": [], "metrics": {}}
     with pytest.raises(pytest.fail.Exception, match=re.escape(MISSING)):
