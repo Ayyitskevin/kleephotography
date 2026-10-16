@@ -187,9 +187,6 @@
 
 {# ═══ TWILIGHT — real dusk, included in Signature and Premier ═══════════════ #}
 <section class="sr-wrap sr-section" aria-label="Twilight exteriors" id="twilight">
-  <div class="sr-kickrow">
-    <p class="sr-mono">{{ page.twilight.kicker }}</p>
-  </div>
   <h2 class="sr-h2">{{ page.twilight.heading }}</h2>
   <p class="sr-lede">{{ page.twilight.body }}</p>
   <div class="sr-3up">
@@ -208,9 +205,6 @@
 
 {# ═══ SHORT-TERM RENTALS — guest-first shooting order ════════════════════════ #}
 <section class="sr-wrap sr-section" aria-label="Short-term rentals" id="short-term-rentals">
-  <div class="sr-kickrow">
-    <p class="sr-mono">{{ page.str.kicker }}</p>
-  </div>
   <h2 class="sr-h2">{{ page.str.heading }}</h2>
   <p class="sr-lede">{{ page.str.body }}</p>
   <div class="sr-3up">
@@ -242,16 +236,9 @@
       <span class="sr-mono sr-mono--stock">{{ page.kicker }}</span>
       <h1>{{ page.h1a }}<br><em>{{ page.h1b }}</em></h1>
       <p class="sr-beat">{{ page.sr.beat }}</p>
-      <p class="sr-lede">{{ page.sr.body }}</p>
       <div class="sr-herosplit-actions">
         <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
         <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}&amp;tier={{ page.sr.team_tier|urlencode }}">{{ page.sr.team_cta }} &rarr;</a>
-      </div>
-      <div class="sr-stats">
-        {% for n, label in page.sr.stats %}
-        <div class="sr-stat"><b>{{ n }}</b><small>{{ label }}</small></div>
-        {% endfor %}
-        <div class="sr-stat"><b>From {{ rates[0].price }}</b><small>{{ rates[0].label|lower }}</small></div>
       </div>
     </div>
     <figure class="sr-herosplit-fig">
@@ -268,8 +255,19 @@
   </div>
 </section>
 
+{# ═══ STATS BAND — the proof numbers, full width under the hero (D-3) ═══════ #}
+<section class="sr-wrap">
+  <div class="sr-stats sr-stats--band">
+    {% for n, label in page.sr.stats %}
+    <div class="sr-stat"><b>{{ n }}</b><small>{{ label }}</small></div>
+    {% endfor %}
+    <div class="sr-stat"><b>From {{ rates[0].price }}</b><small>{{ rates[0].label|lower }}</small></div>
+  </div>
+</section>
+
 {# ═══ THE NERVES, NAMED ══════════════════════════════════════════════════════ #}
 <section class="sr-wrap sr-section" aria-label="Common worries, answered">
+  <p class="sr-lede">{{ page.sr.body }}</p>
   <div class="sr-3up">
     {% for q, a in page.sr.nerves %}
     <div>
@@ -364,11 +362,8 @@
       <div class="sr-titlecard-actions">
         <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
         <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
-        {% if hero_reel and hero_reel.duration and hero_reel.duration|hms %}
-        <a class="sr-btn sr-btn--ghost" href="/reels">&#9654; Watch {{ hero_reel.duration|hms }}</a>
-        {% endif %}
       </div>
-      <p class="sr-mono">{{ page.sr.quote_ask }}</p>
+      <p class="sr-lede sr-lede--tight">{{ page.sr.quote_ask }}</p>
     </div>
     <div class="sr-titlecard-meta" aria-hidden="true">
       <span>{{ page.sr.card_meta_l }}</span>
@@ -435,7 +430,6 @@
 {# ═══ BRAND LANE — drinks & food brands, routed to Brand Partner (no prices) ══ #}
 {% if page.brand_lane %}
 <section class="sr-wrap sr-section sp-brandlane" aria-labelledby="brandlane-heading">
-  <p class="sr-mono">{{ page.brand_lane.kicker }}</p>
   <h2 id="brandlane-heading" class="sr-h2">{{ page.brand_lane.heading }}</h2>
   <p class="sr-lede">{{ page.brand_lane.intro }}</p>
   <div class="sr-3up">
@@ -460,7 +454,7 @@
 {% if studies %}
 <section class="sr-wrap sr-section" aria-label="Case studies">
   <div class="sr-kickrow">
-    <p class="sr-mono">{{ sp.screen_name }}, in the wild</p>
+    <h2 class="sr-h2">{{ sp.screen_name }}, in the wild</h2>
     <a class="sr-mono sr-mono--stock" href="/work">All screenings &rarr;</a>
   </div>
   <div class="sr-features">

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Structure metrics for public site pages (plan R-1).
 
-Counts sections, headings, images (lazy / missing alt), `sr-mono` labels,
-em-dashes and middots in visible text, CTA labels and bytes. The golden render
-test (tests/test_public_render_golden.py) loads this file, so the test and this
+Counts sections, headings, images (lazy / missing alt), `sr-mono` labels and
+the decorative kickers among them (plan D-4), em-dashes and middots in visible
+text, CTA labels and bytes. The golden render test
+(tests/test_public_render_golden.py) loads this file, so the test and this
 script report the same numbers.
 
   scripts/site_metrics.py page.html [more.html ...]
@@ -11,6 +12,7 @@ script report the same numbers.
 """
 
 import argparse
+import re
 import sys
 import urllib.request
 from html.parser import HTMLParser
@@ -37,10 +39,18 @@ KEYS = (
     "img_lazy",
     "img_noalt",
     "sr_mono",
+    "decorative_kickers",
     "emdash",
     "middot",
     "cta_labels",
     "bytes",
+)
+
+
+# Data labels the kicker ration exempts (plan D-4 keep-list): state, chapters, next openings,
+# prices, durations, frame numbers, counts and PINs. Links are exempt by tag.
+_DATA_LABEL = re.compile(
+    r"Now showing|^Chapters$|^Next openings|\$\d|\b\d+:\d\d\b|FR·|^\d+ (still|film)|^PIN\b"
 )
 
 
@@ -91,6 +101,48 @@ class _Counter(HTMLParser):
             self.ctas[-1] += text
 
 
+class _Kickers(HTMLParser):
+    """Decorative section kickers: `sr-mono` elements that are not links, not per-card
+    labels (inside `.sr-card-head`), not data labels (_DATA_LABEL), and not the one named
+    structural data-label class (`sr-mono--data`, the F&B included/quoted-separately list headers).
+    No tag is exempt as a whole: an `sr-mono` inside an <aside> counts like any other."""
+
+    VOID = set("area base br col embed hr img input link meta source track wbr".split())
+
+    def __init__(self):
+        super().__init__()
+        self.stack = []
+        self.found = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.VOID:
+            return
+        classes = (dict(attrs).get("class") or "").split()
+        inside = any("sr-card-head" in c for _t, c, _ in self.stack)
+        entry = None
+        if "sr-mono" in classes and "sr-mono--data" not in classes and tag != "a" and not inside:
+            entry = []
+            self.found.append(entry)
+        self.stack.append((tag, classes, entry))
+
+    def handle_endtag(self, tag):
+        if tag not in self.VOID and self.stack:
+            self.stack.pop()
+
+    def handle_data(self, data):
+        for _tag, _cls, entry in self.stack:
+            if entry is not None:
+                entry.append(data)
+
+
+def decorative_kickers(markup):
+    """Texts of the page's decorative kickers (plan D-4; ration ceil(sections/3))."""
+    parser = _Kickers()
+    parser.feed(markup)
+    texts = [" ".join("".join(parts).split()) for parts in parser.found]
+    return [t for t in texts if not _DATA_LABEL.search(t)]
+
+
 def metrics(markup):
     """Return the metrics dict for one page's HTML."""
     parser = _Counter()
@@ -98,6 +150,7 @@ def metrics(markup):
     visible = " ".join(parser.text)
     return {
         **parser.counts,
+        "decorative_kickers": len(decorative_kickers(markup)),
         "emdash": visible.count("—"),
         "middot": visible.count("·"),
         "cta_labels": sorted({label.strip() for label in parser.ctas if label.strip()}),

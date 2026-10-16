@@ -1,7 +1,6 @@
 {# Read-only SERVICES rows: keep package terms in the catalog, not this view. #}
 <section class="svc-cats sr-wrap sr-section sp-packages" id="rates" aria-label="Packages and inquiries">
   <div class="sec-inner">
-    <p class="sr-mono">Packages &amp; scope</p>
     <p class="sr-lede">Compare what's included, then tell me about your project.
       Sending an inquiry does not confirm scope, reserve a time, or take payment.</p>
 
@@ -14,13 +13,13 @@
       {% if sp_key == 'fb' and s.key == 'photography' %}
       <aside class="sp-included" aria-label="What's included and what's quoted separately">
         <div>
-          <p class="sr-mono">Included, from {{ s.tiers[0].name }} up</p>
+          <p class="sr-mono sr-mono--data">Included, from {{ s.tiers[0].name }} up</p>
           <ul>
             {% for line in s.tiers[0].includes %}<li>{{ line }}</li>{% endfor %}
           </ul>
         </div>
         <div>
-          <p class="sr-mono">Quoted separately</p>
+          <p class="sr-mono sr-mono--data">Quoted separately</p>
           <ul>
             {% for line in page.quoted_separately %}<li>{{ line }}</li>{% endfor %}
           </ul>

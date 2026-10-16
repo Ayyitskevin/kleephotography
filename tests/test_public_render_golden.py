@@ -19,6 +19,7 @@ base: a golden PR that lands after other HTML-changing merges carries stale gold
 import difflib
 import importlib.util
 import json
+import math
 import os
 import re
 import socket
@@ -217,6 +218,66 @@ def test_public_page_matches_its_golden(route, seeded_client, request, ledger):
     if name not in recorded:
         pytest.fail(f"{MISSING}: metrics.json[{name}]")
     assert got == recorded[name], name
+
+
+@pytest.mark.parametrize(
+    ("route", "seeded_client"),
+    [(route, (flag, content)) for route, flag, content in MATRIX],
+    ids=[f"{route_slug(route)}__{flag}__{content}" for route, flag, content in MATRIX],
+    indirect=["seeded_client"],
+)
+def test_public_page_rations_its_decorative_kickers_and_keeps_one_h1(route, seeded_client):
+    """Plan D-4: at most ceil(sections/3) decorative kickers per page (data labels exempt,
+    scripts/site_metrics.py decorative_kickers), and one h1 on every page that renders."""
+    response = seeded_client.get(route)
+    body = normalise(response.text)
+    got = site_metrics.metrics(body)
+    kickers = site_metrics.decorative_kickers(body)
+    assert len(kickers) <= math.ceil(got["sections"] / 3), (route, got["sections"], kickers)
+    assert got["h1"] == (1 if response.status_code == 200 else 0), (route, response.status_code)
+
+
+def test_an_ordinary_sr_mono_inside_an_aside_is_a_counted_kicker():
+    """P2-1 (W3A r1): the D-4 classifier exempts links, .sr-card-head labels and the named data
+    label, never a whole tag. A plain sr-mono under <aside> is a decorative kicker like any other."""
+    aside = '<aside><span class="sr-mono">Request a quote</span><h1>t</h1></aside>'
+    assert site_metrics.decorative_kickers(aside) == ["Request a quote"]
+    assert site_metrics.decorative_kickers(aside.replace("<aside>", "<aside class='x'>")) == [
+        "Request a quote"
+    ]
+    # the named data label stays exempt, in or out of an aside, and only that class
+    assert (
+        site_metrics.decorative_kickers(
+            '<aside><p class="sr-mono sr-mono--data">Quoted separately</p></aside>'
+        )
+        == []
+    )
+    assert site_metrics.decorative_kickers('<p class="sr-mono sr-mono--data">x</p>') == []
+    assert site_metrics.decorative_kickers(
+        '<aside><p class="sr-mono sr-mono--other">x</p></aside>'
+    ) == ["x"]
+
+
+@pytest.mark.parametrize(
+    "seeded_client", [("screening", "empty"), ("screening", "seeded")], indirect=True
+)
+def test_three_extra_decorations_beside_request_a_quote_break_the_contact_ration(seeded_client):
+    """Daybreak's counterexample (P2-1), as a test-time render: contact's own aside, three more plain
+    sr-mono spans next to 'Request a quote'. The ration check must go red; contact.html is not edited."""
+    body = normalise(seeded_client.get("/contact").text)
+    marker = '<span class="sr-mono">Request a quote</span>'
+    assert body.count(marker) == 1
+    got = site_metrics.metrics(body)
+    assert site_metrics.decorative_kickers(body) == ["Request a quote"]
+    assert len(site_metrics.decorative_kickers(body)) <= math.ceil(
+        got["sections"] / 3
+    )  # the page as shipped holds
+    noisy = body.replace(
+        marker, marker + "".join(f'<span class="sr-mono">Extra {i}</span>' for i in range(3))
+    )
+    kickers = site_metrics.decorative_kickers(noisy)
+    assert len(kickers) == 4
+    assert len(kickers) > math.ceil(site_metrics.metrics(noisy)["sections"] / 3)
 
 
 def test_a_missing_golden_names_the_update_command(tmp_path):
