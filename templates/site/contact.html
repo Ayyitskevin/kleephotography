@@ -8,7 +8,7 @@
   <aside class="contact-aside" data-reveal>
     <span class="sr-mono">Request a quote</span>
     <h1 class="sr-contact-h1">Work with <em>me.</em></h1>
-    <p class="sr-beat">tell me what we're selling &mdash; photo, film, or both</p>
+    <p class="sr-beat">tell me what we're selling: photo, film, or both</p>
     <p class="sr-lede">Your listing, your team, your restaurant, or your
        brand. I read every message and reply within a business day.</p>
 
@@ -51,7 +51,7 @@
   <div class="contact-card" data-reveal>
     {% if sent %}
     <div class="sent-note" data-analytics-view="Contact Success" data-analytics-once>
-      <h2>Thanks — your inquiry is in.</h2>
+      <h2>Thanks, your inquiry is in.</h2>
       <p>I read every message and I'll get back to you within a business day.</p>
       <p><a class="sr-btn" href="/book">Need a time now? Book a shoot &rarr;</a></p>
     </div>
@@ -81,7 +81,7 @@
           <option value=""
                   data-scope-label="Project scope"
                   data-scope-placeholder="e.g. property size, team size, or number of setups">
-            Not sure yet — help me choose
+            Not sure yet: help me choose
           </option>
           {% for opt in service_options %}
           <option value="{{ opt.value }}"
@@ -102,7 +102,7 @@
                   placeholder="What are we shooting?" {{ invalid('message') }}>{{ pf.message if pf.message is defined else '' }}</textarea></label>
 
       <details class="contact-more"{% if open_more %} open{% endif %}>
-        <summary>Project details <span class="muted">(optional — helps me quote faster)</span></summary>
+        <summary>Project details <span class="muted">(optional, helps me quote faster)</span></summary>
         <div class="contact-more-body">
           <label for="contact-shoot-date">Target date
             <input id="contact-shoot-date" type="date" name="shoot_date"
@@ -113,8 +113,8 @@
                    placeholder="{{ scope_placeholder }}"></label>
           <label for="contact-usage">Usage / licensing
             <select id="contact-usage" name="usage">
-              <option value="">Standard — web &amp; social</option>
-              <option value="Extended — advertising / paid media"{% if pf.usage == 'Extended — advertising / paid media' %} selected{% endif %}>Extended — advertising / paid media</option>
+              <option value="">Standard: web &amp; social</option>
+              <option value="Extended — advertising / paid media"{% if pf.usage == 'Extended — advertising / paid media' %} selected{% endif %}>Extended: advertising / paid media</option>
               <option value="Exclusive / talent release"{% if pf.usage == 'Exclusive / talent release' %} selected{% endif %}>Exclusive / talent release</option>
               <option value="Not sure"{% if pf.usage == 'Not sure' %} selected{% endif %}>Not sure</option>
             </select></label>

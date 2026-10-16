@@ -5,12 +5,12 @@
 {% set hero_image = photo_images[hero.id] if hero else None %}
 {% set cs_title = g.cs_tagline or g.title %}
 {% set cs_desc = (g.cs_brief or g.cs_tagline or g.title)|truncate(200, True, '') %}
-{% block title %}{{ cs_title }} — {{ site_name }}{% endblock %}
+{% block title %}{{ cs_title }} | {{ site_name }}{% endblock %}
 {% block meta_description %}{{ cs_desc }}{% endblock %}
 {% block og %}
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="{{ site_name }}">
-<meta property="og:title" content="{{ cs_title }} — {{ site_name }}">
+<meta property="og:title" content="{{ cs_title }} | {{ site_name }}">
 <meta property="og:description" content="{{ (g.cs_brief or '')[:200] }}">
 <meta property="og:url" content="{{ base_url }}/work/{{ g.slug }}">
 {% if hero %}<meta property="og:image" content="{{ base_url }}/site/img/{{ hero.id }}">{% endif %}
@@ -108,7 +108,7 @@
            {% if image.thumb.width %}width="{{ image.thumb.width }}" height="{{ image.thumb.height }}"{% endif %}
            {% if image.srcset %}srcset="{{ image.srcset }}"
            sizes="(max-width: 700px) 100vw, 50vw"{% endif %}
-           alt="{{ g.cs_tagline or g.title }}{% if g.client_name %} — {{ g.client_name }}{% endif %}">
+           alt="{{ g.cs_tagline or g.title }}{% if g.client_name %}, {{ g.client_name }}{% endif %}">
     </figure>
     {% endfor %}
   </div>
