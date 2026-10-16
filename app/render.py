@@ -167,7 +167,7 @@ def _portfolio_alt(asset, site_name: str | None = None) -> str:
         key, label = specialties.split_tag(tag)
         craft = specialties.SPECIALTIES[key]["craft"]
         if label:
-            return f"{label.capitalize()}, {craft} by {name}"
+            return f"{label.capitalize()} — {craft} by {name}"
         return f"{craft[0].upper()}{craft[1:]} by {name}"
     return f"Food & beverage photography by {name}"
 
