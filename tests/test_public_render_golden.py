@@ -19,6 +19,7 @@ base: a golden PR that lands after other HTML-changing merges carries stale gold
 import difflib
 import importlib.util
 import json
+import math
 import os
 import re
 import socket
@@ -217,6 +218,23 @@ def test_public_page_matches_its_golden(route, seeded_client, request, ledger):
     if name not in recorded:
         pytest.fail(f"{MISSING}: metrics.json[{name}]")
     assert got == recorded[name], name
+
+
+@pytest.mark.parametrize(
+    ("route", "seeded_client"),
+    [(route, (flag, content)) for route, flag, content in MATRIX],
+    ids=[f"{route_slug(route)}__{flag}__{content}" for route, flag, content in MATRIX],
+    indirect=["seeded_client"],
+)
+def test_public_page_rations_its_decorative_kickers_and_keeps_one_h1(route, seeded_client):
+    """Plan D-4: at most ceil(sections/3) decorative kickers per page (data labels exempt,
+    scripts/site_metrics.py decorative_kickers), and one h1 on every page that renders."""
+    response = seeded_client.get(route)
+    body = normalise(response.text)
+    got = site_metrics.metrics(body)
+    kickers = site_metrics.decorative_kickers(body)
+    assert len(kickers) <= math.ceil(got["sections"] / 3), (route, got["sections"], kickers)
+    assert got["h1"] == (1 if response.status_code == 200 else 0), (route, response.status_code)
 
 
 def test_a_missing_golden_names_the_update_command(tmp_path):
