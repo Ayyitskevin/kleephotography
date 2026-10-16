@@ -341,3 +341,12 @@ def test_display_only_changes_keep_every_submitted_and_tracked_value(renders):
             joined = f"Food & Beverage — {group} — {tier}"
             assert f'data-analytics-tier="{html.escape(joined, quote=True)}"' in fb, joined
             assert "tier=" + quote(joined) + '"' in fb, joined
+
+
+def test_the_share_catalog_mirrors_the_pipe_separator():
+    """app/admin/share.py previews what the socials scrape from marketing_page_catalog();
+    a spoke title there must match the rendered one, separator included."""
+    for page in site.marketing_page_catalog():
+        title = page["title"]
+        assert DASH not in title, page["path"]
+        assert title.endswith(f" | {SITE}") or title.startswith(f"{SITE} | "), (page["path"], title)
