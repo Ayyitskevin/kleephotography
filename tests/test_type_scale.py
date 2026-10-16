@@ -125,7 +125,9 @@ def test_section_heading_class_is_d3_and_the_title_class_is_d1():
 def test_the_four_section_h2s_use_sr_h2_and_the_orphaned_override_is_gone():
     html = (ROOT / "templates/site/specialty.html").read_text()
     assert 'class="sr-title"' not in html
-    assert len(re.findall(r'<h2[^>]*class="sr-h2"', html)) == 4
+    # D-1's four renamed section h2s, plus D-4's case-study kicker promoted to an h2 (W3A)
+    assert len(re.findall(r'<h2[^>]*class="sr-h2"', html)) == 5
+    assert '<h2 class="sr-h2">{{ sp.screen_name }}, in the wild</h2>' in html
     for name in ("screening.css", "screening-admin.css"):
         assert not re.search(
             r"\.sr-cta-final \.sr-title\s*\{", (ROOT / "static" / name).read_text()
