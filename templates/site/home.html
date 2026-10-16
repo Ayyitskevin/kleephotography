@@ -40,14 +40,14 @@
     {% else %}
     <div class="sr-screen-empty">
       <span class="sr-rec">Reel</span>
-      <p>The house reel is being threaded — first screening lands soon.</p>
+      <p>The house reel is being threaded. First screening lands soon.</p>
     </div>
     {% endif %}
     <span class="sr-screen-scrim" aria-hidden="true"></span>
     <div class="sr-screen-title">
       <h1>The space. The face.<br>The plate.</h1>
-      <p class="sr-beat">&mdash; shot to sell, in three features &mdash;</p>
-      <p class="sr-lede">Photography &amp; film for real estate, portraits, and food &amp; beverage &mdash; Asheville &amp; Western North Carolina.</p>
+      <p class="sr-beat">shot to sell, in three features</p>
+      <p class="sr-lede">Photography &amp; film for real estate, portraits, and food &amp; beverage, Asheville &amp; Western North Carolina.</p>
     </div>
     {% if hero_reel %}
     <div class="sr-playerstrip" aria-hidden="true">
@@ -62,7 +62,7 @@
 
 {# ═══ THREE FEATURES — title cards on film stock ═════════════════════════════ #}
 <section class="sr-wrap sr-section" aria-label="Three features" id="specialties">
-  <h2 class="sr-h2">Three features &mdash; pick your screening</h2>
+  <h2 class="sr-h2">Three features: pick your screening</h2>
   <div class="sr-features">
     {% for d in doors %}
     <a class="sr-card sp-door sr-stock-{{ d.key }}" href="/{{ d.slug }}" data-reveal>
@@ -116,7 +116,7 @@
 {% if featured %}
 <section class="sr-wrap sr-section" aria-label="From the archive" id="work">
   <div class="sr-kickrow">
-    <h2 class="sr-h2">From the archive &mdash; recent frames</h2>
+    <h2 class="sr-h2">From the archive: recent frames</h2>
     <a class="sr-mono sr-mono--signal" href="/portfolio">Open the archive &rarr;</a>
   </div>
   <div class="sr-filmstrip">
@@ -135,7 +135,7 @@
   {% if demo_gallery %}
   <p class="sr-kickrow sr-kickrow--mt14">
     <a class="sr-mono sr-mono--signal" href="{{ demo_gallery.url }}"
-       data-analytics-event="Demo Gallery Click" data-analytics-page="home">Prospect screening &mdash; try the sample gallery &rarr;</a>
+       data-analytics-event="Demo Gallery Click" data-analytics-page="home">Prospect screening: try the sample gallery &rarr;</a>
     {% if demo_gallery.pin %}<span class="sr-mono">PIN {{ demo_gallery.pin }}</span>
     {% else %}<a class="sr-mono" href="/contact?prefill=demo_gallery">Ask for the PIN</a>{% endif %}
   </p>

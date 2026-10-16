@@ -19,7 +19,7 @@
 {% else %}
 {% set hero_sizes = "100vw" %}
 {% endif %}
-{% block title %}{{ page.title }} — {{ site_name }}{% endblock %}
+{% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
 {% block meta_description %}{{ page.meta }}{% endblock %}
 {% block sr_stock %} sr-{{ sp_key }}{% endblock %}
 {% block brand_chip %}{{ sp.feature }} — {{ sp.screen_name }}{% endblock %}
@@ -32,7 +32,7 @@
 {% block og %}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{ site_name }}">
-<meta property="og:title" content="{{ page.title }} — {{ site_name }}">
+<meta property="og:title" content="{{ page.title }} | {{ site_name }}">
 <meta property="og:description" content="{{ page.meta }}">
 <meta property="og:url" content="{{ base_url }}/{{ sp.slug }}">
 {% if og_asset %}<meta property="og:image" content="{{ base_url }}/site/img/{{ og_asset.id }}">{% endif %}
@@ -354,7 +354,7 @@
 {% if testimonials %}
 <section class="sr-wrap" aria-label="Client quote">
   <p class="sr-quote">&ldquo;{{ testimonials[0].quote }}&rdquo;
-    <span class="sr-quote-by">&mdash; {{ testimonials[0].attribution_name }}{% if testimonials[0].business %}, {{ testimonials[0].business }}{% endif %}</span>
+    <span class="sr-quote-by">{{ testimonials[0].attribution_name }}{% if testimonials[0].business %}, {{ testimonials[0].business }}{% endif %}</span>
   </p>
 </section>
 {% endif %}

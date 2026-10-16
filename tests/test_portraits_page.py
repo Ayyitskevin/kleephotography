@@ -24,7 +24,7 @@ from tests.test_specialty_packages import catalog_group, inquiry_link, rendered
 pytestmark = pytest.mark.integration
 
 PREP_QUESTIONS = (
-    "I wear glasses — will they catch the light?",
+    "I wear glasses. Will they catch the light?",  # D-9
     "Can I bring a second look?",
     "Should I get hair and makeup done?",
     "How should I arrive?",

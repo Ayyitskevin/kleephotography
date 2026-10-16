@@ -17,69 +17,69 @@ REFERRAL_SOURCES = [
 
 MARKETING_PAGE_META = {
     "/": {
-        "title": "{site_name} — Real Estate · Portraits · Food & Beverage",
+        "title": "{site_name} | Real Estate · Portraits · Food & Beverage",
         "description": (
-            "Photography & film studio in Asheville, NC — real estate listings, "
+            "Photography & film studio in Asheville, NC: real estate listings, "
             "portraits & personal branding, and the food & beverage work that made "
             "the name. Photo and video, delivered fast."
         ),
     },
     "/portfolio": {
-        "title": "The Archive — {site_name}",
+        "title": "The Archive | {site_name}",
         "description": (
-            "Selected work across real estate, portraits, and food & beverage — "
+            "Selected work across real estate, portraits, and food & beverage: "
             "exteriors, faces, dishes, and the rooms they live in, shot for listings, "
             "brands, and menus."
         ),
     },
     "/work": {
-        "title": "Work — {site_name}",
+        "title": "Work | {site_name}",
         "description": (
-            "Client case studies across real estate, portraits, and food & beverage — "
+            "Client case studies across real estate, portraits, and food & beverage: "
             "what we shot, and what happened after it went live."
         ),
     },
     "/services": {
-        "title": "Services — {site_name}",
+        "title": "Services | {site_name}",
         "description": (
             "Photography, videography, and monthly Brand Partner retainers for real "
-            "estate, portraits, and food & beverage — Asheville and Western North "
+            "estate, portraits, and food & beverage. Asheville and Western North "
             "Carolina. Three tiers per category."
         ),
     },
     "/about": {
-        "title": "About — {site_name}",
+        "title": "About | {site_name}",
         "description": (
-            "Meet Kevin Lee — photographer & filmmaker in Asheville, NC, shooting real "
+            "Meet Kevin Lee, photographer & filmmaker in Asheville, NC, shooting real "
             "estate, portraits, and food & beverage across Western North Carolina."
         ),
     },
     "/contact": {
-        "title": "Contact — {site_name}",
+        "title": "Contact | {site_name}",
         "description": (
-            "Request a quote — tell me about your listing, portrait session, or food & "
+            "Request a quote: tell me about your listing, portrait session, or food & "
             "beverage project and get a tailored proposal within a business day."
         ),
     },
     "/book": {
-        "title": "Book a time — {site_name}",
+        "title": "Book a time | {site_name}",
         "description": (
-            "Book a call or a shoot — pick a date and get an instant confirmation with "
+            "Book a call or a shoot: pick a date and get an instant confirmation with "
             "a calendar invite."
         ),
     },
     "/reels": {
-        "title": "Reels — {site_name}",
+        "title": "Reels | {site_name}",
         "description": (
-            "Short-form video across real estate, portraits, and food & beverage — "
+            "Short-form video across real estate, portraits, and food & beverage: "
             "walkthrough reels, brand films, and social motion by {site_name}. "
             "Asheville & Western North Carolina."
         ),
     },
     "/press": {
-        "title": "Press — {site_name}",
+        "title": "Press | {site_name}",
         "description": (
-            "Where the work has run — press features and publications covering "
+            "Where the work has run: press features and publications covering "
             "{site_name}, in print and online."
         ),
     },
@@ -107,7 +107,7 @@ SERVICES = [
         "key": "real_estate",
         "title": "Real Estate",
         "contact_service": "Real Estate",
-        "tagline": "Listings, photo and film — MLS-ready stills, twilight "
+        "tagline": "Listings, photo and film: MLS-ready stills, twilight "
         "exteriors, and walkthrough reels that move buyers.",
         "monthly": False,
         "tiers": [
@@ -142,7 +142,7 @@ SERVICES = [
                 "display_price": "$850",
                 "price_cents": 85000,
                 "includes": [
-                    "Extended session — photo & film",
+                    "Extended session: photo & film",
                     "60 edited, MLS-ready images",
                     "Walkthrough film, 1–2 min + reel",
                     "Twilight exterior set",
@@ -155,7 +155,7 @@ SERVICES = [
         "key": "portraits",
         "title": "Portrait & Lifestyle",
         "contact_service": "Portraits",
-        "tagline": "Headshots, personal branding, families — directed, not "
+        "tagline": "Headshots, personal branding, families: directed, not "
         "posed, and delivered ready for wherever they're going.",
         "monthly": False,
         "tiers": [
@@ -253,7 +253,7 @@ SERVICES = [
         "title": "Food & Beverage — Photography",
         "contact_service": "Food & Beverage",
         "tagline": "Menu refreshes, launch weeks, and the rooms that sell the "
-        "plate — private same-week gallery with social crops baked in.",
+        "plate: private same-week gallery with social crops baked in.",
         "monthly": False,
         "tiers": [
             {
@@ -264,7 +264,7 @@ SERVICES = [
                 "includes": [
                     "Up to 3 hours on site, one location",
                     "25 edited finals",
-                    "Social crops — 1:1 · 4:5 · 9:16",
+                    "Social crops in 1:1, 4:5 and 9:16",
                     "One revision round",
                     "Same-week gallery delivery",
                 ],
@@ -275,7 +275,7 @@ SERVICES = [
                 "display_price": "$1,400",
                 "price_cents": 140000,
                 "includes": [
-                    "Up to 6 hours — menu, drinks & room",
+                    "Up to 6 hours: menu, drinks & room",
                     "50 edited finals",
                     "Full social crop pack",
                     "Two revision rounds",
@@ -351,7 +351,7 @@ SERVICES = [
         "title": "Brand Partner",
         "contact_service": "Brand Partner (monthly retainer)",
         "tagline": "A monthly content rhythm for kitchens that need a steady "
-        "feed — built-in discount versus ad-hoc, cancel anytime.",
+        "feed: built-in discount versus ad-hoc, cancel anytime.",
         "monthly": True,
         "tiers": [
             {
@@ -457,7 +457,7 @@ _CONTACT_SCOPE = {
     "Real Estate": (
         "Listing / property scope",
         "e.g. 3,200 sq ft · 4 bed 3 bath",
-        "Real Estate — photo / video",
+        "Real Estate: photo / video",
         "real-estate",
     ),
     "Portraits": (
@@ -469,7 +469,7 @@ _CONTACT_SCOPE = {
     "Food & Beverage": (
         "Dishes / setups",
         "e.g. 8–10 dishes · 3 drink setups",
-        "Food & Beverage — photo / video",
+        "Food & Beverage: photo / video",
         "food-beverage",
     ),
     "Brand Partner (monthly retainer)": (
@@ -523,7 +523,7 @@ def contact_scope_for(service: str) -> tuple[str, str]:
 CONTACT_FAQS = [
     (
         "What does a typical project cost?",
-        "It depends on scope — a single listing, a half-day menu refresh, and a "
+        "It depends on scope: a single listing, a half-day menu refresh, and a "
         "multi-day campaign sit far apart. Send a few details and I will quote "
         "the right tier; full ranges live on the Services page.",
     ),
@@ -535,7 +535,7 @@ CONTACT_FAQS = [
     ),
     (
         "Do you offer ongoing content?",
-        "Yes — the Brand Partner retainer covers a monthly rhythm of photo, photo "
+        "Yes. The Brand Partner retainer covers a monthly rhythm of photo, photo "
         "+ reels, or a two-day schedule, at a built-in discount versus ad-hoc shoots.",
     ),
     (
@@ -561,12 +561,12 @@ BOOK_FAQS = [
     (
         "How far in advance should I book?",
         "Two to three weeks is comfortable for listings, sessions, and menu work. "
-        "I keep a few slots open for launches and go-lives — if it is urgent, say so "
+        "I keep a few slots open for launches and go-lives. If it is urgent, say so "
         "in the form and I will tell you honestly what is possible.",
     ),
     (
         "Do you direct on set?",
-        "Yes — direction is included either way. Light honest food styling, listing "
+        "Yes. Direction is included either way. Light honest food styling, listing "
         "flow that sells rooms, and portrait direction so you always know what to do "
         "with your hands. Elaborate prop styling or wardrobe support is quoted "
         "separately when you need it.",
@@ -574,7 +574,7 @@ BOOK_FAQS = [
     (
         "What do I actually get, and when?",
         "A private online gallery, usually within the week: full-resolution "
-        "downloads, your favorites, and social crops in 1:1, 4:5, and 9:16 — "
+        "downloads, your favorites, and social crops in 1:1, 4:5, and 9:16, "
         "already sized for every platform.",
     ),
     (
@@ -597,7 +597,7 @@ SPECIALTY_PAGES = {
     "re": {
         "title": "Real Estate Photography & Video in Asheville",
         "meta": "Real estate photography and video for Asheville & Western "
-        "North Carolina — MLS-ready stills, twilight exteriors, and vertical "
+        "North Carolina: MLS-ready stills, twilight exteriors, and vertical "
         "walkthrough reels that move listings. From "
         f"${min(t['price_cents'] for g in SERVICES if g['key'] == 'real_estate' for t in g['tiers']) // 100:,}.",
         "kicker": "Real estate · Asheville & WNC",
@@ -660,25 +660,25 @@ SPECIALTY_PAGES = {
             (
                 "How fast can you turn a listing around?",
                 "Tell me the go-live date and I'll be straight about what's "
-                "possible — listings move fast and the calendar keeps room for "
+                "possible: listings move fast and the calendar keeps room for "
                 "them. If it's urgent, say so on the booking form.",
             ),
             (
                 "Do you shoot video as well as photos?",
-                "Yes — vertical walkthrough reels for social and a horizontal "
+                "Yes. Vertical walkthrough reels for social and a horizontal "
                 "cut for the listing page, shot in the same visit as the "
                 "photos. Motion is where buyers linger.",
             ),
             (
                 "How should the property be prepped?",
                 "Clean, declutter, lights on, blinds open. I stage lightly as "
-                "I shoot — a tidy house is most of the battle, and I'll flag "
+                "I shoot: a tidy house is most of the battle, and I'll flag "
                 "anything worth moving before the camera comes out.",
             ),
             (
                 "What formats do I get?",
                 "Web-sized files that upload straight to MLS and portals, "
-                "social crops for the feed, and full resolution for print — "
+                "social crops for the feed, and full resolution for print, "
                 "all in one gallery, all yours to download.",
             ),
         ],
@@ -744,7 +744,7 @@ SPECIALTY_PAGES = {
         "contact_service": "Real Estate",
         "book_slug": "re-shoot",
         "empty_head": "Real estate work is being curated for the site.",
-        "empty_body": "The listing pipeline is open — MLS-ready stills, twilight "
+        "empty_body": "The listing pipeline is open: MLS-ready stills, twilight "
         "exteriors, and walkthrough reels land here as they're delivered.",
         "cta_h1": "Got a listing",
         "cta_h2": "going live?",
@@ -770,7 +770,7 @@ SPECIALTY_PAGES = {
             "agents_cut_aerial": "aerial establishing + vertical for social + "
             "hero for the listing page, delivered together, 48 hours after "
             "the shoot.",
-            "strip_label": "Stills — frames pulled from the film day",
+            "strip_label": "Stills: frames pulled from the film day",
             "proof": [
                 ("18h", "avg. MLS turnaround"),
                 ("48h", "walkthrough film"),
@@ -780,12 +780,12 @@ SPECIALTY_PAGES = {
     },
     "pl": {
         "title": "Portrait & Lifestyle Photography in Asheville",
-        "meta": "Portrait and lifestyle photography in Asheville, NC — "
+        "meta": "Portrait and lifestyle photography in Asheville, NC: "
         "headshots, personal branding, families, and golden-hour sessions, "
         "delivered same week in a private gallery. From "
         f"${min(t['price_cents'] for g in SERVICES if g['key'] == 'portraits' for t in g['tiers']) // 100:,}.",
         "kicker": "Portrait & lifestyle · Asheville & WNC",
-        "h1a": "Look like yourself —",
+        "h1a": "Look like yourself,",
         "h1b": "on your best day.",
         "lede": "Headshots, personal branding, families, and the moments in "
         "between — directed so nothing feels stiff, and delivered ready for "
@@ -825,7 +825,7 @@ SPECIALTY_PAGES = {
             (
                 "Plan the session",
                 "A short call to pick looks, locations, and what the photos "
-                "are for — LinkedIn, the company site, the mantel.",
+                "are for: LinkedIn, the company site, the mantel.",
             ),
             (
                 "The session",
@@ -835,13 +835,13 @@ SPECIALTY_PAGES = {
             ),
             (
                 "Same-week gallery",
-                "A private gallery to pick favorites and download finals — "
+                "A private gallery to pick favorites and download finals, "
                 "with crops sized for profiles, sites, and print.",
             ),
         ],
         "faqs": [
             (
-                "I'm awkward in front of a camera — will this work?",
+                "I'm awkward in front of a camera. Will this work?",
                 "That's most people, and it's my favorite kind of session. "
                 "Everything is directed: where to look, what to do with your "
                 "hands, when to move. You'll never be left posing in silence.",
@@ -855,17 +855,17 @@ SPECIALTY_PAGES = {
             (
                 "Where do we shoot?",
                 "In the studio in Asheville or on location anywhere the light "
-                "is good — your office, a trailhead, downtown at golden hour. "
+                "is good: your office, a trailhead, downtown at golden hour. "
                 "We pick the spot to match where the photos will live.",
             ),
             (
                 "Can you photograph our whole team?",
-                "Yes — consistent headshots for a full team in one visit, "
+                "Yes. Consistent headshots for a full team in one visit, "
                 "matched lighting and framing, so the site looks unified even "
                 "as new people join.",
             ),
             (
-                "I wear glasses — will they catch the light?",
+                "I wear glasses. Will they catch the light?",
                 "Wear them if you wear them every day; they're part of how "
                 "people know you. I set the lights and the angle of your frames "
                 "so the lenses stay clear. If you own a pair with an "
@@ -874,13 +874,13 @@ SPECIALTY_PAGES = {
             (
                 "Can I bring a second look?",
                 "Yes. Tier II and Tier III are built for more than one look. On "
-                "Tier I, bring a backup anyway — we'll choose the stronger one "
+                "Tier I, bring a backup anyway. We'll choose the stronger one "
                 "before we start.",
             ),
             (
                 "Should I get hair and makeup done?",
                 "It's optional. Come the way you'd want to be seen on a good "
-                "day — hair as you usually wear it, makeup if it's part of your "
+                "day: hair as you usually wear it, makeup if it's part of your "
                 "routine, and no new haircut or skincare experiment that week. "
                 "If you'd like a professional artist there, tell me when we plan "
                 "and I'll set the timing around them.",
@@ -888,8 +888,8 @@ SPECIALTY_PAGES = {
             (
                 "How should I arrive?",
                 "A few minutes early, with outfits on hangers rather than folded "
-                "in a bag. For the hour before, skip anything that leaves a mark "
-                "— tight collars, watch straps — and give yourself a minute to "
+                "in a bag. For the hour before, skip anything that leaves a mark: "
+                "tight collars, watch straps. Give yourself a minute to "
                 "settle in; we start easy.",
             ),
         ],
@@ -897,7 +897,7 @@ SPECIALTY_PAGES = {
         "book_slug": "pl-session",
         "empty_head": "Portrait sessions are being curated for the site.",
         "empty_body": "Headshots, branding, and family sessions land here as "
-        "they're delivered — the calendar is open now.",
+        "they're delivered. The calendar is open now.",
         "cta_h1": "Let's make time",
         "cta_h2": "for a session.",
         # Screening Room (3k — reassurance psychology): direction promised up
@@ -909,10 +909,10 @@ SPECIALTY_PAGES = {
             # team_tier must stay a SERVICES "portraits" line name.
             "team_cta": "Plan a team day",
             "team_tier": "Team headshots",
-            "beat": "directed, never posed — you'll always know what to do with your hands",
+            "beat": "directed, never posed: you'll always know what to do with your hands",
             "body": "Headshots, personal branding, families, and the moments "
-            "in between. Every frame is coached — where to look, when to "
-            "move — and delivered ready for wherever it's going: LinkedIn, "
+            "in between. Every frame is coached on where to look and when to "
+            "move, and delivered ready for wherever it's going: LinkedIn, "
             "the company site, the mantel.",
             "stats": [
                 ("10 min", "until most people relax"),
@@ -921,7 +921,7 @@ SPECIALTY_PAGES = {
             "nerves": [
                 (
                     "“I'm awkward in front of a camera.”",
-                    "That's most people — and my favorite kind of session. "
+                    "That's most people, and my favorite kind of session. "
                     "Everything is directed; you're never left posing in silence.",
                 ),
                 (
@@ -931,18 +931,18 @@ SPECIALTY_PAGES = {
                 ),
                 (
                     "“Can you do our whole team?”",
-                    "One visit, matched lighting and framing — new hires slot in "
+                    "One visit, matched lighting and framing: new hires slot in "
                     "later without the team page looking stitched together.",
                 ),
             ],
-            "frames_label": "Selected sessions — none of them born camera-ready",
+            "frames_label": "Selected sessions: none of them born camera-ready",
         },
     },
     "fb": {
         "title": "Food & Beverage Photography & Video in Asheville",
         # Inherits the pre-revamp home meta so the indexed F&B positioning
         # keeps a dedicated page — see the module comment above.
-        "meta": "Photography that makes people hungry — food & beverage "
+        "meta": "Photography that makes people hungry: food & beverage "
         "photography and videography for the restaurants, cafés, and bars of "
         "Asheville & Western North Carolina. From "
         f"${min(t['price_cents'] for g in SERVICES if g['key'] in ('photography', 'videography', 'brand_partner') for t in g['tiers']) // 100:,}.",
@@ -1005,7 +1005,7 @@ SPECIALTY_PAGES = {
         "faqs": [
             (
                 "Do you style the food?",
-                "Light, honest styling is included — the goal is for the dish "
+                "Light, honest styling is included: the goal is for the dish "
                 "to look like what arrives at the table, at its best. For "
                 "elaborate set styling I can bring in a stylist and fold it "
                 "into the quote.",
@@ -1014,23 +1014,23 @@ SPECIALTY_PAGES = {
                 "What do I actually get, and when?",
                 "A private online gallery, usually within the week: "
                 "full-resolution downloads, your favorites, and social crops "
-                "in 1:1, 4:5, and 9:16 — already sized for every platform.",
+                "in 1:1, 4:5, and 9:16, already sized for every platform.",
             ),
             (
                 "Can you shoot during service?",
-                "Around it, always — we plan the shot list so the kitchen "
+                "Around it, always: we plan the shot list so the kitchen "
                 "never waits on a photographer, and most full menus wrap "
                 "between lunch and dinner.",
             ),
             (
                 "Do you shoot video too?",
-                "Yes — steam, pours, and first cuts built vertical for the "
+                "Yes. Steam, pours, and first cuts built vertical for the "
                 "feed, plus brand films for launches. Photo and motion in the "
                 "same visit is the most efficient way to buy either.",
             ),
             (
                 "Can you shoot for our delivery app listings?",
-                "Yes — it's a common reason to shoot a menu. "
+                "Yes. It's a common reason to shoot a menu. "
                 "I plan those dishes into the shot list and cut them to the "
                 "sizes your delivery app listings ask for, alongside the menu "
                 "and social crops, so nothing gets re-cropped later.",
@@ -1039,12 +1039,12 @@ SPECIALTY_PAGES = {
                 "Can the photos be used for social and paid ads?",
                 "Every shoot comes with social crops in 1:1, 4:5, and 9:16. "
                 "If the images will run as paid ads, say so when you ask for a "
-                "quote — the quote form has a usage field for exactly that — "
+                "quote. The quote form has a usage field for exactly that, "
                 "and what your shoot covers goes in your proposal.",
             ),
             (
                 "When does a dish need a food stylist?",
-                "Most dishes don't — I work with your kitchen on how each "
+                "Most dishes don't. I work with your kitchen on how each "
                 "plate is built for camera. A dish that has to hold for an "
                 "hour under lights, like a stacked build, melting cheese, or "
                 "foam, is worth a stylist. I'll flag it when we go through "
@@ -1052,13 +1052,13 @@ SPECIALTY_PAGES = {
             ),
         ],
         "quoted_separately": [
-            "Elaborate set styling — a hired stylist, folded into your quote",
-            "Props and backdrops beyond what we shoot with — folded into your quote",
+            "Elaborate set styling: a hired stylist, folded into your quote",
+            "Props and backdrops beyond what we shoot with, folded into your quote",
         ],
         "brand_lane": {
             "kicker": "For drinks & food brands",
             "heading": "Making a product, not just a menu?",
-            "intro": "Cans, bottles, jars, and packaging — shot here in Western "
+            "intro": "Cans, bottles, jars, and packaging: shot here in Western "
             "North Carolina, on site or in the studio, with the files your "
             "site, listings, and feed need.",
             "items": [
@@ -1077,7 +1077,7 @@ SPECIALTY_PAGES = {
                 (
                     "A steady feed",
                     "New flavors and seasonal drops are easier on a monthly "
-                    "rhythm — Brand Partner keeps the calendar.",
+                    "rhythm: Brand Partner keeps the calendar.",
                 ),
             ],
             "cta": "See the monthly Brand Partner plans",
@@ -1103,24 +1103,24 @@ SPECIALTY_PAGES = {
             "presents": "Kevin Lee presents — Food & Beverage",
             "h2a": "Your menu,",
             "h2b": "selling itself.",
-            "beat": "the steam, the pour, the first cut — in the thirty seconds a dish looks alive",
+            "beat": "the steam, the pour, the first cut: in the thirty seconds a dish looks alive",
             "card_meta_l": "Stock 500T — appetite grade",
             "card_meta_r": "Same-week gallery · crops 1:1 / 4:5 / 9:16",
-            "grid_label": "Recent menus — plates, pours & the rooms they live in",
+            "grid_label": "Recent menus: plates, pours & the rooms they live in",
             "courses": [
                 (
-                    "First course — Scout",
+                    "First course: Scout",
                     "We walk the menu together, agree the hero dishes and "
                     "drinks, and build the shot list around your service window.",
                 ),
                 (
-                    "Main — Shoot fast",
+                    "Main: Shoot fast",
                     "Natural light first, styling honest, shot in the thirty "
                     "seconds a dish looks alive. The kitchen never waits.",
                 ),
                 (
-                    "Dessert — Same week",
-                    "A private premiere within the week — full-res downloads, "
+                    "Dessert: Same week",
+                    "A private premiere within the week: full-res downloads, "
                     "circled takes, crops already cut for every platform.",
                 ),
             ],

@@ -119,7 +119,7 @@ def _sr_rate_cells(key: str) -> list[dict]:
         ]
     if key == "pl":
         return [
-            {"price": tier("portraits", 0)["display_price"], "label": "Tier I — one look"},
+            {"price": tier("portraits", 0)["display_price"], "label": "Tier I: one look"},
             {
                 "price": tier("portraits", 1)["display_price"],
                 "label": "Tier II — two looks",
@@ -466,10 +466,10 @@ def _contact_scope(service: str) -> tuple[str, str]:
 # Subtitle under each lobby title card (Screening Room 3a). The RE line gains
 # "& aerials" only once the Part 107 cert is live (aerials_live flag).
 DOOR_LINES = {
-    "re": "real estate — stills & film",
+    "re": "real estate: stills & film",
     "re_aerial": "real estate — stills, film & aerials",
-    "pl": "portraits — directed, never posed",
-    "fb": "food & beverage — the original craft",
+    "pl": "portraits: directed, never posed",
+    "fb": "food & beverage: the original craft",
 }
 
 

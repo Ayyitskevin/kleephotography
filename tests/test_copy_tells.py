@@ -85,6 +85,12 @@ ALLOWED = {
         "text",
         "A quick call to talk through your menu, goals, and timing — no pressure, no hard sell.",
     ): "stored content: event_types.description (migration 047 seed, edited in admin)",
+    **{
+        (kind, "You get a clear commercial usage license for your marketing and social. Licensing terms "
+               "are spelled out in your gallery and proposal — no surprises."): "ruled legal wording: the "
+        "ownership answer test_usage_rights_draft pins as the baseline (Kevin's call to change)"
+        for kind in ("text", "faq")
+    },
 }  # fmt: skip
 
 
