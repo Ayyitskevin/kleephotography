@@ -135,11 +135,11 @@ body.sr.sr-fb { --sr-stock: var(--sr-stock-fb); }
 .sr .sr-btn { display: inline-flex; align-items: center; gap: 9px;
   font: 700 12px/1 var(--sr-sans); letter-spacing: 0.1em; text-transform: uppercase;
   padding: var(--sr-s4) var(--sr-s5); border: 0; cursor: pointer;
-  background: var(--sr-stock); color: var(--sr-house); }
+  background: var(--sr-amber); color: var(--sr-house); }
 .sr .sr-btn:hover, .sr .sr-btn:focus-visible { background: var(--sr-cream); }
 .sr .sr-btn--ghost { background: transparent; color: var(--sr-cream);
   border: 1px solid rgba(236, 228, 211, 0.35); }
-.sr .sr-btn--ghost:hover { border-color: var(--sr-stock); color: var(--sr-stock); background: transparent; }
+.sr .sr-btn--ghost:hover { border-color: var(--sr-amber); color: var(--sr-amber); background: transparent; }
 
 /* focus — visible everywhere, amber, no ambiguity on the dark house */
 .sr :focus-visible { outline: 2px solid var(--sr-amber); outline-offset: 2px; }
