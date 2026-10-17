@@ -599,7 +599,7 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr a.sr-card:hover .sr-card-media img,
 .sr a.sr-card:focus-visible .sr-card-media img { transform: scale(1.03); }
 .sr .portfolio-masonry .tile { overflow: hidden; }
-.sr .portfolio-masonry .tile img { transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sr .portfolio-masonry .tile img { transition: transform 700ms cubic-bezier(0.32, 0.72, 0, 1); }
 .sr .portfolio-masonry .tile:hover img { transform: scale(1.03); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -643,16 +643,16 @@ body.sr-admin .admin-shell, body.sr-admin {
 .sr .sr-btn--subtle { background: transparent; border: 0; color: var(--sr-ink-soft);
   padding-left: var(--sr-s3); padding-right: var(--sr-s3); }
 .sr .sr-btn--subtle:hover, .sr .sr-btn--subtle:focus-visible {
-  background: transparent; color: var(--sr-stock); }
+  background: transparent; color: var(--sr-amber); }
 .sr .sr-btn:disabled, .sr .sr-icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.sr .sr-btn:disabled:hover { background: var(--sr-stock); color: var(--sr-house); }
+.sr .sr-btn:disabled:hover { background: var(--sr-amber); color: var(--sr-house); }
 
 .sr .sr-icon-btn { display: inline-flex; align-items: center; justify-content: center;
   width: 34px; height: 34px; padding: 0; background: transparent;
   border: 1px solid var(--sr-line-raised); border-radius: 0;
   color: var(--sr-ink-soft); cursor: pointer; }
 .sr .sr-icon-btn:hover, .sr .sr-icon-btn:focus-visible {
-  border-color: var(--sr-stock); color: var(--sr-stock); }
+  border-color: var(--sr-amber); color: var(--sr-amber); }
 
 /* ── icons — inline SVG sprite (static/icons.svg) ─────────────────────────── */
 .sr .sr-icon { width: 16px; height: 16px; flex: none; vertical-align: -3px;
