@@ -24,8 +24,21 @@ from .. import (
     specialties,
 )
 from ..http_cache import PUBLIC_24H, conditional_file
-from ..render import ROOT, _reel_description, _reel_title, _static_rev, templates
+from ..render import ROOT, _static_rev, templates
 from . import site_catalog as _site_catalog
+from .site_media import (  # noqa: F401  (re-exported: tests and other modules import these from site)
+    _public_photo_spec,
+    _public_portfolio_tile_spec,
+    _public_video_poster_spec,
+)
+from .sitemap import (  # noqa: F401
+    SITEMAP_MAX_IMAGES,
+    _image_entries,
+    _sitemap_day,
+    _sitemap_url,
+    _video_entries,
+    _xml_escape,
+)
 
 BOOK_ACTIVE_PROMISES = _site_catalog.BOOK_ACTIVE_PROMISES
 BOOK_FAQS = _site_catalog.BOOK_FAQS
@@ -158,130 +171,6 @@ def _portfolio_assets() -> list:
                       LEFT JOIN galleries g ON g.id = a.gallery_id
                       WHERE a.portfolio=1 AND a.status='ready' AND a.kind='photo'
                       ORDER BY a.id DESC""")
-
-
-def _public_photo_spec(asset) -> dict:
-    """Actual derivative metadata for an already public-gated photo row.
-
-    The database stores source dimensions, while generated JPEG sizes depend
-    on the settings in force when the asset was processed. Probe only trusted
-    ``thumb``/``web`` derivative headers so responsive descriptors describe
-    the bytes visitors will really receive. Callers must pass rows already
-    gated by ``portfolio=1 AND status='ready' AND kind='photo'``.
-    """
-    asset_id = asset["id"]
-    gallery_id = asset["gallery_id"]
-    stem = Path(asset["stored"]).stem
-
-    def candidate(variant: str) -> dict:
-        path = config.MEDIA_DIR / str(gallery_id) / variant / f"{stem}.jpg"
-        dimensions = imaging.image_dimensions(path)
-        return {
-            "url": f"/site/img/{asset_id}?variant={variant}",
-            "width": dimensions[0] if dimensions else None,
-            "height": dimensions[1] if dimensions else None,
-        }
-
-    thumb = candidate("thumb")
-    web = candidate("web")
-
-    def preferred(primary: dict, fallback: dict) -> dict:
-        if primary["width"]:
-            return primary
-        if fallback["width"]:
-            return fallback
-        return primary
-
-    # Width descriptors are valid only when both encoded candidates exist,
-    # differ in width, and retain the same aspect ratio (allowing resize
-    # rounding). A stale/cropped derivative stays usable as a plain src but is
-    # never mixed into a misleading srcset.
-    srcset = None
-    if thumb["width"] and web["width"] and thumb["width"] != web["width"]:
-        thumb_ratio = thumb["width"] / thumb["height"]
-        web_ratio = web["width"] / web["height"]
-        if abs(thumb_ratio - web_ratio) / web_ratio <= 0.01:
-            candidates = sorted((thumb, web), key=lambda item: item["width"])
-            srcset = ", ".join(f"{item['url']} {item['width']}w" for item in candidates)
-        else:
-            log.warning(
-                "Public asset %s has mismatched derivative ratios: thumb=%sx%s web=%sx%s",
-                asset_id,
-                thumb["width"],
-                thumb["height"],
-                web["width"],
-                web["height"],
-            )
-
-    return {
-        "available": bool(thumb["width"] or web["width"]),
-        "thumb": preferred(thumb, web),
-        "web": preferred(web, thumb),
-        "srcset": srcset,
-    }
-
-
-def _public_video_poster_spec(asset) -> dict:
-    """Actual poster metadata for an already public-gated video row.
-
-    Prefer the full poster rendition. If it is missing or corrupt, the
-    independently public-gated video thumbnail is a truthful lower-resolution
-    fallback for both ``poster`` and its matching preload. Callers must pass
-    rows already gated by ``portfolio=1 AND status='ready' AND kind='video'``.
-    """
-    asset_id = asset["id"]
-    gallery_id = asset["gallery_id"]
-    stem = Path(asset["stored"]).stem
-    candidates = (
-        (
-            config.MEDIA_DIR / str(gallery_id) / "web" / f"{stem}_poster.jpg",
-            f"/site/poster/{asset_id}",
-        ),
-        (
-            config.MEDIA_DIR / str(gallery_id) / "thumb" / f"{stem}.jpg",
-            f"/site/img/{asset_id}?variant=thumb",
-        ),
-    )
-    for path, url in candidates:
-        dimensions = imaging.image_dimensions(path)
-        if dimensions:
-            return {
-                "available": True,
-                "url": url,
-                "width": dimensions[0],
-                "height": dimensions[1],
-            }
-    return {"available": False, "url": None, "width": None, "height": None}
-
-
-def _public_portfolio_tile_spec(asset) -> dict:
-    """Actual preview metadata for one already public-gated masonry asset.
-
-    Photos reuse the responsive derivative contract. Video tiles deliberately
-    keep their lightweight thumbnail rather than pulling the larger lightbox
-    poster into the initial grid; a separately validated poster spec is only
-    carried into the on-demand lightbox. Missing or corrupt thumbnails remain
-    the existing lazy fallback and are never promoted as known-good media.
-    """
-    if asset["kind"] == "photo":
-        return _public_photo_spec(asset)
-    if asset["kind"] != "video":
-        raise ValueError(f"Unsupported portfolio asset kind: {asset['kind']}")
-
-    asset_id = asset["id"]
-    stem = Path(asset["stored"]).stem
-    path = config.MEDIA_DIR / str(asset["gallery_id"]) / "thumb" / f"{stem}.jpg"
-    dimensions = imaging.image_dimensions(path)
-    return {
-        "available": bool(dimensions),
-        "thumb": {
-            "url": f"/site/img/{asset_id}?variant=thumb",
-            "width": dimensions[0] if dimensions else None,
-            "height": dimensions[1] if dimensions else None,
-        },
-        "poster": _public_video_poster_spec(asset),
-        "srcset": None,
-    }
 
 
 def _parse_cs_credits(raw: str | None) -> list[dict]:
@@ -1133,78 +1022,6 @@ def security_txt():
         "Preferred-Languages: en\n"
         f"Canonical: {config.BASE_URL}/.well-known/security.txt\n"
     )
-
-
-def _sitemap_day(value) -> str:
-    """W3C Datetime date portion (YYYY-MM-DD) for <lastmod>."""
-    if value is None or value == "":
-        return datetime.now(UTC).strftime("%Y-%m-%d")
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(float(value), UTC).strftime("%Y-%m-%d")
-    text = str(value).strip()
-    if len(text) >= 10 and text[4] == "-" and text[7] == "-":
-        return text[:10]
-    try:
-        return (
-            datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(UTC).strftime("%Y-%m-%d")
-        )
-    except ValueError:
-        return datetime.now(UTC).strftime("%Y-%m-%d")
-
-
-# Google caps a sitemap URL at 1000 images. The portfolio is nowhere near that,
-# but an unbounded loop over a growing table is how a sitemap silently becomes
-# invalid years later.
-SITEMAP_MAX_IMAGES = 1000
-
-
-def _xml_escape(value: str) -> str:
-    return (
-        str(value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-    )
-
-
-def _image_entries(assets) -> str:
-    """<image:image> children for one <url>, capped at Google's per-URL limit."""
-    return "".join(
-        f"<image:image><image:loc>{config.BASE_URL}/site/img/{a['id']}</image:loc></image:image>"
-        for a in assets[:SITEMAP_MAX_IMAGES]
-    )
-
-
-def _video_entries(reels) -> str:
-    """<video:video> children for one <url>.
-
-    Title and description come from app/render.py, the same helpers /reels uses
-    for its VideoObject JSON-LD — Google cross-checks the two and a forked
-    formula would make them disagree.
-    """
-    out = []
-    for r in reels[:SITEMAP_MAX_IMAGES]:
-        duration = ""
-        if r["duration"]:
-            seconds = int(round(float(r["duration"])))
-            # Google rejects a video:duration outside 1..28800 seconds.
-            if 1 <= seconds <= 28800:
-                duration = f"<video:duration>{seconds}</video:duration>"
-        out.append(
-            "<video:video>"
-            f"<video:thumbnail_loc>{config.BASE_URL}/site/poster/{r['id']}</video:thumbnail_loc>"
-            f"<video:title>{_xml_escape(_reel_title(r))}</video:title>"
-            f"<video:description>{_xml_escape(_reel_description(r))}</video:description>"
-            f"<video:content_loc>{config.BASE_URL}/site/vid/{r['id']}</video:content_loc>"
-            f"{duration}"
-            "</video:video>"
-        )
-    return "".join(out)
-
-
-def _sitemap_url(path: str, lastmod: str, children: str = "") -> str:
-    return f"<url><loc>{config.BASE_URL}{path}</loc><lastmod>{lastmod}</lastmod>{children}</url>"
 
 
 @router.get("/sitemap.xml")
