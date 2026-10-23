@@ -40,8 +40,12 @@ _EVENT_COLS = frozenset(
         "creates_notion_session",
         "booking_fee_cents",
         "auto_meet",
+        "confirm_note",
+        "prep_note",
     }
 )
+# Server-side bound for the plain-text note slots; the form's maxlength matches.
+NOTE_MAX = 2000
 
 
 def _fee_cents(form, current: int) -> int:
@@ -55,6 +59,15 @@ def _fee_cents(form, current: int) -> int:
     except ValueError:
         return current
     return min(max(cents, 0), 1_000_000)
+
+
+def _note(form, key: str, current: str) -> str:
+    """Plain-text note slot: an absent field keeps the stored text (a form that
+    predates the slot cannot blank it); oversize input is clamped, not refused."""
+    raw = form.get(key)
+    if raw is None:
+        return current
+    return raw.strip()[:NOTE_MAX]
 
 
 def _min_to_hhmm(m: int | None) -> str:
@@ -504,7 +517,9 @@ def create_event(
 def edit_event(request: Request, event_id: int):
     e = _get_event(event_id)
     return templates.TemplateResponse(
-        request, "admin/scheduling_event.html", {"e": e, "base_url": scheduling.config.BASE_URL}
+        request,
+        "admin/scheduling_event.html",
+        {"e": e, "base_url": scheduling.config.BASE_URL, "note_max": NOTE_MAX},
     )
 
 
@@ -536,6 +551,8 @@ def _update_event(e: "db.sqlite3.Row", form, event_id: int):
         "creates_notion_session": 1 if form.get("creates_notion_session") else 0,
         "booking_fee_cents": _fee_cents(form, e["booking_fee_cents"]),
         "auto_meet": 1 if form.get("auto_meet") else 0,
+        "confirm_note": _note(form, "confirm_note", e["confirm_note"]),
+        "prep_note": _note(form, "prep_note", e["prep_note"]),
     }
     sets = ", ".join(f"{db.ident(k, _EVENT_COLS)}=?" for k in fields)
     with db.tx() as con:
