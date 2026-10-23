@@ -17,6 +17,7 @@ from .. import config, db, security
 from ..redirects import redirect_local
 from ..render import templates
 from . import gallery as public_gallery
+from . import pay
 
 log = logging.getLogger("mise.public.workspace")
 router = APIRouter(prefix="/w")
@@ -45,6 +46,56 @@ def _cookie_name(project_id: int) -> str:
 def _has_access(request: Request, project_id: int) -> bool:
     raw = request.cookies.get(_cookie_name(project_id))
     return bool(raw) and security.unsign(raw) == f"workspace:{project_id}"
+
+
+def next_step(proposals, contracts, invoices, gallery, gallery_expired: bool) -> dict:
+    """Which single document is the client's next step, and how to draw the rest.
+
+    Emphasis only: every non-draft document stays on the page and linked, so no
+    step is gated behind another (sign-before-pay is R19's decision, not this
+    page's). The primary is the first outstanding item in the order proposal →
+    contract → invoice → gallery; sections holding something outstanding come
+    first, the rest follow in the same order. Whether an invoice still owes
+    anything is pay.next_payment's answer — no money math here."""
+    states = {
+        "proposal": {
+            d["slug"]: "outstanding"
+            if d["status"] in ("sent", "viewed")
+            else "done"
+            if d["status"] == "accepted"
+            else "closed"
+            for d in proposals
+        },
+        "contract": {
+            d["slug"]: "outstanding" if d["status"] in ("sent", "viewed") else "done"
+            for d in contracts
+        },
+        "invoice": {
+            d["slug"]: "outstanding" if pay.next_payment(d)[0] > 0 else "done" for d in invoices
+        },
+        "gallery": None if gallery is None else "closed" if gallery_expired else "outstanding",
+    }
+    open_slugs = {
+        kind: [slug for slug, state in states[kind].items() if state == "outstanding"]
+        for kind in ("proposal", "contract", "invoice")
+    }
+    open_slugs["gallery"] = [gallery["slug"]] if states["gallery"] == "outstanding" else []
+    present = [
+        kind
+        for kind, docs in (
+            ("proposal", proposals),
+            ("contract", contracts),
+            ("invoice", invoices),
+            ("gallery", [gallery] if gallery else []),
+        )
+        if docs
+    ]
+    open_kinds = [kind for kind in present if open_slugs[kind]]
+    return {
+        "primary": (open_kinds[0], open_slugs[open_kinds[0]][0]) if open_kinds else None,
+        "states": states,
+        "order": open_kinds + [kind for kind in present if kind not in open_kinds],
+    }
 
 
 @router.get("/{slug}", response_class=HTMLResponse)
@@ -103,6 +154,7 @@ def view(request: Request, slug: str):
             "invoices": invoices,
             "gallery": gallery,
             "gallery_expired": gallery_expired,
+            "step": next_step(proposals, contracts, invoices, gallery, gallery_expired),
             "share_href": share_href,
         },
     )
