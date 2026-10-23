@@ -7,4 +7,8 @@
 -- copying any note text out, is:
 --   ALTER TABLE event_types DROP COLUMN prep_note;
 --   ALTER TABLE event_types DROP COLUMN confirm_note;
+-- The DROP leaves 083's schema_migrations row, so redeploying R15 code would
+-- not re-add the columns and the event-type save and booking_notify._load
+-- would fail. Delete that row too, or do not redeploy R15:
+--   DELETE FROM schema_migrations WHERE name='083_event_type_notes.sql';
 SELECT 1;
