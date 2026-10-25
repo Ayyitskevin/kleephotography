@@ -10,16 +10,20 @@
       · <a class="portal-share" href="{{ share_href }}">&#9993; Share</a></p>
   </header>
 
-  {# R9a: sections run in step.order (outstanding first). The one next step's
-     title wears the amber sr-btn; other open items wear the ghost; finished
-     ones collapse to a mono line that still opens the document. Emphasis only —
-     nothing is hidden or disabled. The primary keeps no ws-card-title class:
-     screening.css repaints that title cream, which would sit on the amber.
-     copy: BLOCKED-ON-OWNER — the primary's label per step (accept / sign / pay /
-     open gallery) and the done-line wording; until Kevin words them, the card's
-     own title and raw status word stand in, and no new text is added. #}
-  {% macro emphasis(kind, slug) -%}
-    {%- if step.primary == (kind, slug) %}sr-btn{% else %}ws-card-title sr-btn sr-btn--ghost{% endif -%}
+  {# R9a: sections run in step.order (outstanding first). The one next step
+     gets an amber sr-btn naming the action, beside the card's title; other open
+     items wear the ghost on their title; finished ones collapse to a mono line
+     that still opens the document. Emphasis only: nothing is hidden or
+     disabled. The amber span carries no ws-card-title class: screening.css
+     repaints that title cream, which would sit on the amber.
+     Copy: DELEGATED-DECISIONS-20261025, R9a rows (conductor-delegated). #}
+  {% macro card_title(kind, slug, title, label) -%}
+    {%- if step.primary == (kind, slug) -%}
+    <span class="ws-card-title">{{ title }}</span>
+      <span class="sr-btn">{{ label }}</span>
+    {%- else -%}
+    <span class="ws-card-title sr-btn sr-btn--ghost">{{ title }}</span>
+    {%- endif -%}
   {%- endmacro %}
   {% for kind in step.order %}
   {% if kind == 'proposal' %}
@@ -28,12 +32,12 @@
     {% for d in proposals %}
     {% if step.states.proposal[d.slug] == 'outstanding' %}
     <a class="ws-card" href="/p/{{ d.slug }}">
-      <span class="{{ emphasis('proposal', d.slug) }}">{{ d.title }}</span>
+      {{ card_title('proposal', d.slug, d.title, 'Review and accept') }}
       <span class="ws-card-meta">${{ d.total_cents|usd }}</span>
-      <span class="kind-badge kind-proposal">{{ d.status }}</span>
+      <span class="kind-badge kind-proposal">Awaiting your reply</span>
     </a>
     {% else %}
-    <p><a class="sr-mono" href="/p/{{ d.slug }}">{{ d.title }} · {{ d.status }}</a></p>
+    <p><a class="sr-mono" href="/p/{{ d.slug }}">{{ d.title }} · {{ 'Accepted' if d.status == 'accepted' else 'Declined' }}</a></p>
     {% endif %}
     {% endfor %}
   </section>
@@ -43,11 +47,11 @@
     {% for d in contracts %}
     {% if step.states.contract[d.slug] == 'outstanding' %}
     <a class="ws-card" href="/c/{{ d.slug }}">
-      <span class="{{ emphasis('contract', d.slug) }}">{{ d.title }}</span>
-      <span class="kind-badge kind-contract">{{ d.status }}</span>
+      {{ card_title('contract', d.slug, d.title, 'Review and sign') }}
+      <span class="kind-badge kind-contract">Awaiting your signature</span>
     </a>
     {% else %}
-    <p><a class="sr-mono" href="/c/{{ d.slug }}">{{ d.title }} · {{ d.status }}</a></p>
+    <p><a class="sr-mono" href="/c/{{ d.slug }}">{{ d.title }} · Signed</a></p>
     {% endif %}
     {% endfor %}
   </section>
@@ -57,13 +61,14 @@
     {% for d in invoices %}
     {% if step.states.invoice[d.slug] == 'outstanding' %}
     <a class="ws-card" href="/i/{{ d.slug }}">
-      <span class="{{ emphasis('invoice', d.slug) }}">{{ d.title }}</span>
+      {{ card_title('invoice', d.slug, d.title, 'Review invoice') }}
       <span class="ws-card-meta">${{ d.total_cents|usd }}
         {% if d.due_date %}· due {{ d.due_date }}{% endif %}</span>
-      <span class="kind-badge kind-invoice">{{ d.status }}</span>
+      <span class="kind-badge kind-invoice">Payment due</span>
     </a>
     {% else %}
-    <p><a class="sr-mono" href="/i/{{ d.slug }}">{{ d.title }} · {{ d.status }}</a></p>
+    {# done = nothing owed (pay.next_payment); only a paid invoice says Paid #}
+    <p><a class="sr-mono" href="/i/{{ d.slug }}">{{ d.title }} · {{ 'Paid' if d.status == 'paid' else 'Nothing due' }}</a></p>
     {% endif %}
     {% endfor %}
   </section>
@@ -73,11 +78,11 @@
     {% if gallery_expired %}
     <div class="ws-card ws-card-expired">
       <span class="ws-card-title">{{ gallery.title }}</span>
-      <span class="ws-card-meta muted">Expired {{ gallery.expires_at }} — <a href="/contact?prefill=gallery_question&amp;gallery={{ gallery.title|urlencode }}">get in touch</a> to re-open</span>
+      <span class="ws-card-meta muted">Expired {{ gallery.expires_at }}. <a href="/contact?prefill=gallery_question&amp;gallery={{ gallery.title|urlencode }}">Get in touch</a> to re-open it.</span>
     </div>
     {% else %}
     <a class="ws-card" href="/g/{{ gallery.slug }}">
-      <span class="{{ emphasis('gallery', gallery.slug) }}">{{ gallery.title }}</span>
+      {{ card_title('gallery', gallery.slug, gallery.title, 'Open your gallery') }}
       <span class="ws-card-meta">View &amp; download &rarr;</span>
     </a>
     {% endif %}
@@ -85,10 +90,12 @@
   {% endif %}
   {% endfor %}
 
-  {# copy: BLOCKED-ON-OWNER — the all-done state (and Q1: an expired gallery with
-     nothing else outstanding) gets no line of its own until Kevin words it. #}
+  {# All-done shows only when nothing is outstanding (an expired gallery
+     included); a live gallery stays the primary instead. #}
   {% if not (proposals or contracts or invoices or gallery) %}
-  <p class="muted">Nothing here yet — your documents and gallery will appear as they're ready.</p>
+  <p class="muted">Nothing here yet. Your documents and gallery will appear as they're ready.</p>
+  {% elif step.primary is none %}
+  <p class="muted">Nothing needs your attention right now.</p>
   {% endif %}
 </main>
 {% endblock %}
