@@ -1,0 +1,37 @@
+{# 3c · The Plate: full-bleed title card (reel or lead still, booking and quote doors, quote ask).
+   Included by site/specialty.html (plan R-4); renders in that page's context. -#}
+<section aria-label="Food &amp; beverage">
+  <div class="sr-titlecard sr-corners4">
+    <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+    {% if hero_reel %}
+    <video autoplay muted loop playsinline preload="metadata"
+           {% if hero_poster and hero_poster.available %}poster="{{ hero_poster.url }}" width="{{ hero_poster.width }}" height="{{ hero_poster.height }}"{% endif %}
+           aria-label="Appetite reel">
+      <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
+    </video>
+    {% elif photos %}
+    <img src="{{ hero_image.web.url }}" decoding="async"
+         {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
+         {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
+         {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
+         sizes="100vw"{% endif %}
+         alt="{{ photos[0]|portfolio_alt }}">
+    {% endif %}
+    <span class="sr-titlecard-scrim" aria-hidden="true"></span>
+    <div class="sr-titlecard-copy">
+      <span class="sr-mono">{{ page.sr.presents }}</span>
+      <h1>{{ page.sr.h2a }}<br>{{ page.sr.h2b }}</h1>
+      <p class="sr-beat">{{ page.sr.beat }}</p>
+      <p class="sr-specline">From {{ rates[0].price }} &middot; {{ rates[0].label|lower }}</p>
+      <div class="sr-titlecard-actions">
+        <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
+        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
+      </div>
+      <p class="sr-lede sr-lede--tight">{{ page.sr.quote_ask }}</p>
+    </div>
+    <div class="sr-titlecard-meta" aria-hidden="true">
+      <span>{{ page.sr.card_meta_l }}</span>
+      <span>{{ page.sr.card_meta_r }}</span>
+    </div>
+  </div>
+</section>

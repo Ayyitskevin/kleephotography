@@ -1,5 +1,6 @@
 {% extends "site/base_site.html" %}
 {% import "site/_cta_band.html" as cta %}
+{% import "site/_empty_feature.html" as ef %}
 {# Shared spoke template for /real-estate, /portraits, /food-beverage — the
    three Screening Room features (3b The Space · 3k The Face · 3c+3l The
    Plate). One route + context per spoke (site.SPECIALTY_PAGES, .sr = the
@@ -8,6 +9,8 @@
 {# Top-level so the og block AND site_content both see it — a {% set %} inside
    one block is invisible to the others (Jinja block scoping). #}
 {% set og_asset = photos[0] if photos else None %}
+{# The arrow the empty-feature CTA labels end with (site/_empty_feature.html). #}
+{% set arrow = " <span>&rarr;</span>"|safe %}
 {% block title %}{{ page.title }} — {{ site_name }}{% endblock %}
 {% block meta_description %}{{ page.meta }}{% endblock %}
 {% block sr_stock %} sr-{{ sp_key }}{% endblock %}
@@ -47,65 +50,7 @@
 
 {% if sp_key == "re" %}
 {# ═══ 3b · THE SPACE — a listing premiere: the walkthrough film IS the page ══ #}
-<section class="sr-wrap sr-section" aria-label="Listing premiere" data-seek-scope>
-  <div class="sr-featurehead">
-    <h1>{{ page.sr.h2a }} <em>{{ page.sr.h2b }}</em></h1>
-    <p class="sr-specline">{% for s in page.sr.spec %}{{ s }} &middot; {% endfor %}{% if aerials_live() %}<b>{{ page.sr.spec_aerial.format(rate=aerial_rate) }}</b> &middot; {% endif %}From {{ rates[0].price }}</p>
-    <div class="sr-herosplit-actions">
-      <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
-      <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
-    </div>
-    {% if not aerials_live() %}
-    <p class="sr-mono">Aerial coverage is planned for launch with FAA Part 107 — not available to book today.</p>
-    {% endif %}
-  </div>
-  <div class="sr-premiere">
-    <figure class="sr-screen sr-screen--film" data-sr-player>
-      {% if hero_reel %}
-      <video autoplay muted loop playsinline preload="metadata"
-             {% if hero_poster and hero_poster.available %}poster="{{ hero_poster.url }}" width="{{ hero_poster.width }}" height="{{ hero_poster.height }}"{% endif %}
-             aria-label="Walkthrough film">
-        <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
-      </video>
-      {% elif photos %}
-      <img src="{{ hero_image.web.url }}" decoding="async"
-           {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
-           {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
-           {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
-           sizes="(max-width: 1000px) 100vw, 900px"{% endif %}
-           alt="{{ photos[0]|portfolio_alt }}">
-      {% endif %}
-      <span class="sr-screen-scrim" aria-hidden="true"></span>
-      <span class="sr-screenbadge">&#9679; Premiere — {{ page.hero_caption }}</span>
-      {% if hero_reel %}
-      <div class="sr-playerstrip" aria-hidden="true">
-        <span class="sr-tc-play">&#9654;</span>
-        <span data-sr-tc>00:00:00:00</span>
-        <i class="sr-progress"><b data-sr-bar></b>
-          {%- if hero_reel.duration %}{% for ch in page.sr.chapters if ch.at > 0 and (not ch.aerial or aerials_live()) %}<i style="left: {{ (ch.at * 100)|round|int }}%;"></i>{% endfor %}{% endif -%}
-        </i>
-        {% if hero_reel.duration and hero_reel.duration|hms %}<span>{{ hero_reel.duration|hms }}</span>{% endif %}
-      </div>
-      {% endif %}
-    </figure>
-    <div class="sr-chapters">
-      {% if hero_reel and hero_reel.duration %}
-      <p class="sr-mono">Chapters</p>
-      {% for ch in page.sr.chapters if not ch.aerial or aerials_live() %}
-      <button type="button" class="sr-chapter{% if ch.aerial %} sr-chapter--marked{% endif %}"
-              data-seek="{{ (hero_reel.duration * ch.at)|round|int }}">
-        <i>{{ ((hero_reel.duration * ch.at)|round|int)|hms if ch.at > 0 else "0:00" }}</i>
-        {{ ch.label }}
-        {% if ch.aerial %}<i class="sr-chapter-badge">Drone</i>{% endif %}
-      </button>
-      {% endfor %}
-      {% endif %}
-      <div class="sr-agentcut">
-        <b>Agent's cut:</b> {{ page.sr.agents_cut_aerial if aerials_live() else page.sr.agents_cut }}
-      </div>
-    </div>
-  </div>
-</section>
+{% include "site/_hero_re.html" %}
 
 {% if aerials_live() %}
 {# The Aerial Pass is a live offer; aerials_live() is its kill switch. #}
@@ -173,16 +118,8 @@
   </div>
 </section>
 {% else %}
-<section class="sr-wrap sr-section">
-  <div class="empty-state">
-    <p><strong>{{ page.empty_head }}</strong></p>
-    <p class="muted">{{ page.empty_body }}</p>
-    <div class="empty-state-actions">
-      <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} <span>&rarr;</span></a>
-      <a class="sr-btn btn-ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
-    </div>
-  </div>
-</section>
+{{ ef.empty_feature(page.empty_head, page.empty_body, book_url, page.sr.cta ~ arrow,
+    "/contact?service=" ~ page.contact_service|urlencode, "Request a quote") }}
 {% endif %}
 
 {# ═══ TWILIGHT — real dusk, included in Signature and Premier ═══════════════ #}
@@ -230,30 +167,7 @@
 
 {% elif sp_key == "pl" %}
 {# ═══ 3k · THE FACE — direction promised up front ════════════════════════════ #}
-<section class="sr-wrap" aria-label="Portrait sessions">
-  <div class="sr-herosplit">
-    <div class="sr-herosplit-copy">
-      <span class="sr-mono sr-mono--stock">{{ page.kicker }}</span>
-      <h1>{{ page.h1a }}<br><em>{{ page.h1b }}</em></h1>
-      <p class="sr-beat">{{ page.sr.beat }}</p>
-      <div class="sr-herosplit-actions">
-        <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
-        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}&amp;tier={{ page.sr.team_tier|urlencode }}">{{ page.sr.team_cta }} &rarr;</a>
-      </div>
-    </div>
-    <figure class="sr-herosplit-fig">
-      {% if photos %}
-      <img src="{{ hero_image.web.url }}" decoding="async"
-           {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
-           {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
-           {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
-           sizes="(max-width: 1000px) 100vw, 560px"{% endif %}
-           alt="{{ photos[0]|portfolio_alt }}">
-      {% endif %}
-      <span class="sr-frameno">{{ sp.stock }}{% if photos %} &middot; FR&middot;{{ "%04d"|format(photos[0].id) }}{% endif %} &mdash; {{ page.hero_caption }}</span>
-    </figure>
-  </div>
-</section>
+{% include "site/_hero_pl.html" %}
 
 {# ═══ STATS BAND — the proof numbers, full width under the hero (D-3) ═══════ #}
 <section class="sr-wrap">
@@ -310,16 +224,9 @@
   </div>
 </section>
 {% else %}
-<section class="sr-wrap sr-section">
-  <div class="empty-state">
-    <p><strong>{{ page.empty_head }}</strong></p>
-    <p class="muted">{{ page.empty_body }}</p>
-    <div class="empty-state-actions">
-      <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} <span>&rarr;</span></a>
-      <a class="sr-btn btn-ghost" href="/contact?service={{ page.contact_service|urlencode }}&amp;tier={{ page.sr.team_tier|urlencode }}">{{ page.sr.team_cta }} <span>&rarr;</span></a>
-    </div>
-  </div>
-</section>
+{{ ef.empty_feature(page.empty_head, page.empty_body, book_url, page.sr.cta ~ arrow,
+    "/contact?service=" ~ page.contact_service|urlencode ~ "&tier=" ~ page.sr.team_tier|urlencode,
+    page.sr.team_cta ~ arrow) }}
 {% endif %}
 
 {# ═══ THE SESSION, IN THREE STEPS ════════════════════════════════════════════ #}
@@ -336,41 +243,7 @@
 
 {% else %}
 {# ═══ 3c · THE PLATE — full-bleed opening title card ═════════════════════════ #}
-<section aria-label="Food &amp; beverage">
-  <div class="sr-titlecard sr-corners4">
-    <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
-    {% if hero_reel %}
-    <video autoplay muted loop playsinline preload="metadata"
-           {% if hero_poster and hero_poster.available %}poster="{{ hero_poster.url }}" width="{{ hero_poster.width }}" height="{{ hero_poster.height }}"{% endif %}
-           aria-label="Appetite reel">
-      <source src="/site/vid/{{ hero_reel.id }}" type="video/mp4">
-    </video>
-    {% elif photos %}
-    <img src="{{ hero_image.web.url }}" decoding="async"
-         {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
-         {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
-         {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
-         sizes="100vw"{% endif %}
-         alt="{{ photos[0]|portfolio_alt }}">
-    {% endif %}
-    <span class="sr-titlecard-scrim" aria-hidden="true"></span>
-    <div class="sr-titlecard-copy">
-      <span class="sr-mono">{{ page.sr.presents }}</span>
-      <h1>{{ page.sr.h2a }}<br>{{ page.sr.h2b }}</h1>
-      <p class="sr-beat">{{ page.sr.beat }}</p>
-      <p class="sr-specline">From {{ rates[0].price }} &middot; {{ rates[0].label|lower }}</p>
-      <div class="sr-titlecard-actions">
-        <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} &rarr;</a>
-        <a class="sr-btn sr-btn--ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
-      </div>
-      <p class="sr-lede sr-lede--tight">{{ page.sr.quote_ask }}</p>
-    </div>
-    <div class="sr-titlecard-meta" aria-hidden="true">
-      <span>{{ page.sr.card_meta_l }}</span>
-      <span>{{ page.sr.card_meta_r }}</span>
-    </div>
-  </div>
-</section>
+{% include "site/_hero_fb.html" %}
 
 {# ═══ APPETITE GRID ══════════════════════════════════════════════════════════ #}
 {% if photos %}
@@ -403,16 +276,8 @@
   </div>
 </section>
 {% else %}
-<section class="sr-wrap sr-section">
-  <div class="empty-state">
-    <p><strong>{{ page.empty_head }}</strong></p>
-    <p class="muted">{{ page.empty_body }}</p>
-    <div class="empty-state-actions">
-      <a class="sr-btn" href="{{ book_url }}">{{ page.sr.cta }} <span>&rarr;</span></a>
-      <a class="sr-btn btn-ghost" href="/contact?service={{ page.contact_service|urlencode }}">Request a quote</a>
-    </div>
-  </div>
-</section>
+{{ ef.empty_feature(page.empty_head, page.empty_body, book_url, page.sr.cta ~ arrow,
+    "/contact?service=" ~ page.contact_service|urlencode, "Request a quote") }}
 {% endif %}
 
 {# ═══ COURSES — the process, told as a menu ══════════════════════════════════ #}
