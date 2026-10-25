@@ -8,7 +8,7 @@ import os
 import tempfile
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageCms
 
 from app import imaging
 
@@ -190,3 +190,124 @@ def test_a_codec_failure_is_survivable(monkeypatch, caplog):
         )
 
     assert (w, h) == (300, 200)  # the asset still gets its dimensions
+
+
+# ── The real Pillow calls an upload makes ───────────────────────────────────
+#
+# A Pillow major bump (12 → 13) is a dependency change the rest of the suite
+# barely exercises: it never feeds an oriented, profiled, or non-JPEG upload
+# through the pipeline. These do, end to end, through the public functions.
+
+
+def _left_red_right_blue(w=400, h=300) -> Image.Image:
+    """Orientation is readable from the pixels: left half red, right half blue."""
+    img = Image.new("RGB", (w, h), (0, 0, 255))
+    img.paste((255, 0, 0), (0, 0, w // 2, h))
+    return img
+
+
+def _colour_at(im: Image.Image, x: float, y: float) -> str:
+    r, _, b = im.convert("RGB").getpixel((int(im.width * x), int(im.height * y)))
+    return "red" if r > b else "blue"
+
+
+@pytest.mark.unit
+def test_orientation_is_baked_and_exif_is_stripped_from_every_output(tmp_path):
+    """A phone shot stored landscape with Orientation=6 must come out portrait,
+    right way up, and no derivative or crop may carry its EXIF (GPS included)."""
+    exif = Image.Exif()
+    exif[0x0112] = 6  # Orientation: rotate 90° clockwise to display
+    exif[0x010F] = "TestCam"  # Make
+    exif.get_ifd(0x8825)[2] = (40.0, 26.0, 46.0)  # GPSLatitude
+    src = tmp_path / "phone.jpg"
+    _left_red_right_blue().save(src, "JPEG", quality=95, exif=exif)
+    with Image.open(src) as im:
+        assert im.getexif()[0x0112] == 6  # the fixture really carries the tag
+
+    web, thumb = tmp_path / "w.jpg", tmp_path / "t.jpg"
+    assert imaging.make_derivatives(str(src), str(web), str(thumb), 200, 100, 85) == (300, 400)
+
+    logo = tmp_path / "logo.png"
+    Image.new("RGBA", (120, 40), (255, 255, 255, 200)).save(logo, "PNG")
+    overlay = {
+        "path": str(logo),
+        "position": "br",
+        "opacity": 80,
+        "scale_pct": 20,
+        "margin_pct": 2,
+    }
+    preset = {
+        "slug": "sq",
+        "width": 100,
+        "height": 100,
+        "centering_x": 0.5,
+        "centering_y": 0.5,
+        "brand_overlay": 1,
+    }
+    crops = imaging.make_crops(str(src), tmp_path, "phone", 85, [preset], overlay=overlay)
+    assert crops == ["phone_sq.jpg"]
+
+    siblings = [tmp_path / f"{s}.{ext}" for s in ("w", "t") for ext in imaging.MODERN_FORMATS]
+    for out in [web, thumb, tmp_path / "phone_sq.jpg", *siblings]:
+        with Image.open(out) as im:
+            assert im.height >= im.width, out.name
+            # Rotated 90° clockwise: the source's left (red) half is now on top.
+            assert _colour_at(im, 0.5, 0.2) == "red", out.name
+            assert _colour_at(im, 0.5, 0.8) == "blue", out.name
+            assert not im.getexif(), out.name
+            assert "exif" not in im.info, out.name
+
+
+@pytest.mark.unit
+def test_an_embedded_icc_profile_goes_through_littlecms(tmp_path, monkeypatch):
+    """F&B colour depends on the profile being converted, not dropped. The
+    except branch ("assume sRGB") is silent about it, so prove the real
+    conversion ran and its output is what was saved."""
+    calls = []
+    real = ImageCms.profileToProfile
+
+    def spy(im, src, dst, **kw):
+        out = real(im, src, dst, **kw)
+        calls.append(out.mode)
+        return out
+
+    monkeypatch.setattr(imaging.ImageCms, "profileToProfile", spy)
+    icc = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    src = tmp_path / "profiled.jpg"
+    Image.new("RGB", (64, 64), (200, 100, 50)).save(src, "JPEG", quality=100, icc_profile=icc)
+
+    web, thumb = tmp_path / "w.jpg", tmp_path / "t.jpg"
+    imaging.make_derivatives(str(src), str(web), str(thumb), 32, 16, 95)
+
+    assert calls == ["RGB"]
+    with Image.open(web) as im:
+        assert all(abs(a - b) <= 4 for a, b in zip(im.getpixel((16, 16)), (200, 100, 50)))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("ext", "pil_format", "mode"),
+    [
+        ("png", "PNG", "RGBA"),
+        ("webp", "WEBP", "RGB"),
+        ("tif", "TIFF", "RGB"),
+        ("heic", "HEIF", "RGB"),
+    ],
+)
+def test_every_accepted_still_format_becomes_a_jpeg_of_record(tmp_path, ext, pil_format, mode):
+    """Each non-JPEG upload type in PHOTO_EXTS decodes (HEIC via pillow-heif)
+    and is re-encoded as the JPEG plus its modern siblings."""
+    assert f".{ext}" in imaging.PHOTO_EXTS
+    src = tmp_path / f"upload.{ext}"
+    _left_red_right_blue().convert(mode).save(src, pil_format)
+
+    web, thumb = tmp_path / "w.jpg", tmp_path / "t.jpg"
+    assert imaging.make_derivatives(str(src), str(web), str(thumb), 200, 100, 85) == (400, 300)
+
+    for out in [web, *(tmp_path / f"w.{e}" for e in imaging.MODERN_FORMATS)]:
+        with Image.open(out) as im:
+            assert im.size == (200, 150), out.name
+            assert _colour_at(im, 0.2, 0.5) == "red", out.name
+            assert _colour_at(im, 0.8, 0.5) == "blue", out.name
+    with Image.open(web) as im:
+        assert im.format == "JPEG" and im.mode == "RGB"
