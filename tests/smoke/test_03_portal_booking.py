@@ -1269,7 +1269,7 @@ def test_workspace_expired_gallery_unlinked(admin):
             db.run("UPDATE galleries SET expires_at='2000-01-01' WHERE id=?", (gid,))
             page = pub.get("/w/ws-proj-01").text
             assert 'href="/g/ws-gallery-01"' not in page
-            assert "Expired 2000-01-01" in page and "get in touch" in page
+            assert "Expired 2000-01-01" in page and "Get in touch" in page
     finally:
         db.run("DELETE FROM projects WHERE id=?", (pid,))
         db.run("DELETE FROM galleries WHERE id=?", (gid,))

@@ -52,7 +52,9 @@ class _Page(HTMLParser):
         self.sections: list[dict] = []
         self.links: list[dict] = []
         self.primaries: list[str | None] = []
+        self.spans: list[dict] = []
         self._open_a: list[dict] = []
+        self._open_span: list[dict] = []
         self._in_section = False
         self._in_h2 = False
         self.feed(html)
@@ -75,6 +77,10 @@ class _Page(HTMLParser):
             self._open_a.append(link)
             if self._in_section and a.get("href"):
                 self.sections[-1]["hrefs"].append(a["href"])
+        elif tag == "span":
+            span = {"classes": classes, "text": ""}
+            self.spans.append(span)
+            self._open_span.append(span)
         if "sr-btn" in classes and "sr-btn--ghost" not in classes:
             here = a.get("href") if tag == "a" else None
             self.primaries.append(here or (self._open_a[-1]["href"] if self._open_a else None))
@@ -86,15 +92,31 @@ class _Page(HTMLParser):
             self._in_h2 = False
         elif tag == "a" and self._open_a:
             self._open_a.pop()
+        elif tag == "span" and self._open_span:
+            self._open_span.pop()
 
     def handle_data(self, data):
         if self._in_h2 and self._in_section:
             self.sections[-1]["headings"][-1] += data.strip()
         for link in self._open_a:
             link["text"] += data
+        for span in self._open_span:
+            span["text"] += data
 
     def headings(self) -> list[str]:
         return [s["headings"][0] if s["headings"] else None for s in self.sections]
+
+    def span_texts(self, cls: str, without: str | None = None) -> list[str]:
+        return [
+            " ".join(s["text"].split())
+            for s in self.spans
+            if cls in s["classes"] and (without is None or without not in s["classes"])
+        ]
+
+    def link_text(self, href: str) -> str:
+        texts = [" ".join(link["text"].split()) for link in self.links if link["href"] == href]
+        assert len(texts) == 1, f"expected one link to {href}, got {len(texts)}"
+        return texts[0]
 
 
 def _seed(proposal=None, contract=None, invoice=None, gallery=None):
@@ -292,3 +314,139 @@ def test_page_structure(client):
     assert len(page.sections) == 4
     for section in page.sections:
         assert len(section["headings"]) == 1 and section["headings"][0]
+
+
+# R9a-COPY: the conductor-delegated copy picks (DELEGATED-DECISIONS-20261025, R9a
+# rows) pinned as the client reads them. Each string is exact; the document's own
+# title stays visible on its card.
+LABELS = {
+    "proposal": "Review and accept",
+    "contract": "Review and sign",
+    "invoice": "Review invoice",
+    "gallery": "Open your gallery",
+}
+BADGES = {
+    "proposal": "Awaiting your reply",
+    "contract": "Awaiting your signature",
+    "invoice": "Payment due",
+}
+ALL_DONE = "Nothing needs your attention right now."
+EMPTY = "Nothing here yet. Your documents and gallery will appear as they're ready."
+
+
+def _title(slugs, key):
+    noun = {"p1": "Proposal", "c1": "Contract", "i1": "Invoice", "g1": "Gallery"}[key]
+    return f"{noun} {slugs[key].split('-')[1]}"
+
+
+# T10 (R9a-1..4) — the primary says what to do; the title stays on the card.
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("proposal", "contract", "invoice", "gallery", "primary", "states", "order"),
+    [r[1:] for r in ROWS if r[5] is not None],
+    ids=[r[0] for r in ROWS if r[5] is not None],
+)
+def test_primary_label_names_the_next_step(
+    client, proposal, contract, invoice, gallery, primary, states, order
+):
+    pid, slugs = _seed(proposal, contract, invoice, gallery)
+    page = _Page(_open(client, pid))
+    kind, key = primary
+    assert page.span_texts("sr-btn", without="sr-btn--ghost") == [LABELS[kind]]
+    assert _title(slugs, key) in page.link_text(_href(slugs, key))
+
+
+# T11 (R9a-5/6/7) — finished lines carry a capitalised human word, no dates, and
+# an invoice that was never paid never reads "Paid".
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("seed", "key", "word"),
+    [
+        ({"proposal": "accepted"}, "p1", "Accepted"),
+        ({"proposal": "declined"}, "p1", "Declined"),
+        ({"contract": "signed"}, "c1", "Signed"),
+        ({"invoice": ("paid", 150000, 50000)}, "i1", "Paid"),
+        ({"invoice": ("sent", 0, 0)}, "i1", "Nothing due"),
+        ({"invoice": ("viewed", 0, 0)}, "i1", "Nothing due"),
+        ({"invoice": ("deposit_paid", 150000, 150000)}, "i1", "Nothing due"),
+    ],
+    ids=[
+        "accepted",
+        "declined",
+        "signed",
+        "paid",
+        "sent-zero-invoice",
+        "viewed-zero-invoice",
+        "deposit-covers-total",
+    ],
+)
+def test_done_line_wording(client, seed, key, word):
+    pid, slugs = _seed(**seed)
+    page = _Page(_open(client, pid))
+    assert page.link_text(_href(slugs, key)) == f"{_title(slugs, key)} · {word}"
+
+
+# T12 (R9a-10) — open cards say whose move it is, never the raw sent/viewed word.
+@pytest.mark.integration
+@pytest.mark.parametrize("status", ["sent", "viewed"])
+def test_open_card_badges(client, status):
+    pid, _ = _seed(status, status, (status, 150000, 0), "live")
+    page = _Page(_open(client, pid))
+    assert page.span_texts("kind-badge") == [
+        BADGES["proposal"],
+        BADGES["contract"],
+        BADGES["invoice"],
+    ]
+
+
+# T12b (R9a-10) — one invoice badge string, also once the deposit is in.
+@pytest.mark.integration
+def test_invoice_badge_after_deposit(client):
+    pid, _ = _seed(invoice=("deposit_paid", 150000, 50000))
+    page = _Page(_open(client, pid))
+    assert page.span_texts("kind-badge") == [BADGES["invoice"]]
+
+
+# T13 (R9a-8) — the all-done line shows only when the page holds something and
+# nothing is outstanding; a live gallery stays the primary instead.
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("proposal", "contract", "invoice", "gallery", "primary", "states", "order"),
+    [r[1:] for r in ROWS],
+    ids=[r[0] for r in ROWS],
+)
+def test_all_done_line(client, proposal, contract, invoice, gallery, primary, states, order):
+    pid, _ = _seed(proposal, contract, invoice, gallery)
+    html = _open(client, pid)
+    shows = primary is None and bool(order)
+    assert html.count(ALL_DONE) == (1 if shows else 0)
+
+
+# T14 (R9a-9) — the expired card: no dash, a capitalised sentence, the same link.
+@pytest.mark.integration
+def test_expired_gallery_card_wording(client):
+    pid, slugs = _seed(gallery="expired")
+    html = _open(client, pid)
+    page = _Page(html)
+    title = _title(slugs, "g1")
+    contact = f"/contact?prefill=gallery_question&gallery={title.replace(' ', '%20')}"
+    assert page.link_text(contact) == "Get in touch"
+    meta = page.span_texts("ws-card-meta")
+    assert meta == ["Expired 2000-01-01. Get in touch to re-open it."]
+
+
+# T15 (D-9) — the empty state, dash-free, and no em dash anywhere in the page body.
+@pytest.mark.integration
+def test_empty_state_wording(client):
+    pid, _ = _seed()
+    html = _open(client, pid)
+    assert EMPTY in html
+    assert ALL_DONE not in html
+
+
+@pytest.mark.integration
+def test_workspace_body_has_no_em_dash(client):
+    pid, _ = _seed("declined", "sent", ("sent", 0, 0), "expired")
+    html = _open(client, pid)
+    main = html[html.index("<main") : html.index("</main>")]
+    assert "\u2014" not in main
