@@ -45,9 +45,9 @@
     </div>
     <label class="sched-desc">Description
       <textarea name="description" rows="3" placeholder="Shown on the booking page and in the invite.">{{ e.description }}</textarea></label>
-    <label class="sched-desc">Confirmation note <span class="muted">(internal; emailed to the client when set)</span>
+    <label class="sched-desc">Confirmation note: <span class="muted">added to the client's booking confirmation and reschedule emails</span>
       <textarea name="confirm_note" rows="3" maxlength="{{ note_max }}">{{ e.confirm_note }}</textarea></label>
-    <label class="sched-desc">Prep note <span class="muted">(internal; stored, not sent yet)</span>
+    <label class="sched-desc">Prep note: <span class="muted">saved only. Nothing sends it yet</span>
       <textarea name="prep_note" rows="3" maxlength="{{ note_max }}">{{ e.prep_note }}</textarea></label>
     <label class="sched-check">
       <input type="checkbox" name="creates_notion_session" value="1"

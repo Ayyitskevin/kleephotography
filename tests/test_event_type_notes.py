@@ -339,6 +339,49 @@ def test_oversize_note_is_clamped(admin_client):
     assert page.count(f'maxlength="{limit}"') == 2  # the form states the same bound
 
 
+# ── T8: the admin labels say where each note goes ───────────────────────────
+
+
+class _NoteLabels(HTMLParser):
+    """Visible text of each <label> that wraps a textarea, keyed by its name."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.labels, self._text, self._name, self._in_textarea = {}, None, None, False
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "label":
+            self._text, self._name = [], None
+        elif tag == "textarea" and self._text is not None:
+            self._name, self._in_textarea = dict(attrs)["name"], True
+
+    def handle_data(self, data):
+        if self._text is not None and not self._in_textarea:
+            self._text.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "textarea":
+            self._in_textarea = False
+        elif tag == "label" and self._text is not None:
+            if self._name:
+                self.labels[self._name] = " ".join("".join(self._text).split())
+            self._text = None
+
+
+def test_note_labels_say_where_each_note_goes(admin_client):
+    # Wording delegated 2026-10-25 (R15-3 = A). The confirmation note really is
+    # emailed on booking and reschedule (T2); nothing reads the prep note yet.
+    eid = _event(confirm_note=CONFIRM_NOTE, prep_note=PREP_NOTE)
+    page = admin_client.get(f"/admin/scheduling/event/{eid}").text
+    parser = _NoteLabels()
+    parser.feed(page)
+    assert parser.labels["confirm_note"] == (
+        "Confirmation note: added to the client's booking confirmation and reschedule emails"
+    )
+    assert parser.labels["prep_note"] == "Prep note: saved only. Nothing sends it yet"
+    assert "(internal;" not in page
+
+
 # ── T7: the migration ───────────────────────────────────────────────────────
 
 
