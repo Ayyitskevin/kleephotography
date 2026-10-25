@@ -14,7 +14,7 @@
          {% if hero_image.available %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
          {% if hero_image.web.width %}width="{{ hero_image.web.width }}" height="{{ hero_image.web.height }}"{% endif %}
          {% if hero_image.srcset %}srcset="{{ hero_image.srcset }}"
-         sizes="100vw"{% endif %}
+         sizes="{{ hero_sizes }}"{% endif %}
          alt="{{ photos[0]|portfolio_alt }}">
     {% endif %}
     <span class="sr-titlecard-scrim" aria-hidden="true"></span>

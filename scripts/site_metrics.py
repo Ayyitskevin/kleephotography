@@ -38,6 +38,7 @@ KEYS = (
     "img",
     "img_lazy",
     "img_noalt",
+    "sr_3up",
     "sr_mono",
     "decorative_kickers",
     "emdash",
@@ -56,6 +57,11 @@ _DATA_LABEL = re.compile(
 
 def _is_cta(cls):
     return "sr-btn" in cls or "svc-cta" in cls or "btn" in cls
+
+
+def count_class(markup, cls):
+    """Elements whose class list carries `cls` (plan D-6: `.sr-3up` at most once per page)."""
+    return sum(cls in m.split() for m in re.findall(r'\bclass="([^"]*)"', markup))
 
 
 class _Counter(HTMLParser):
@@ -153,6 +159,7 @@ def metrics(markup):
         "decorative_kickers": len(decorative_kickers(markup)),
         "emdash": visible.count("—"),
         "middot": visible.count("·"),
+        "sr_3up": count_class(markup, "sr-3up"),
         "cta_labels": sorted({label.strip() for label in parser.ctas if label.strip()}),
         "bytes": len(markup.encode("utf-8")),
     }

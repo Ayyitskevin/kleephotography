@@ -174,7 +174,7 @@ def test_portraits_stats_leave_the_hero_for_a_band_and_the_lede_opens_the_nerves
     assert "<b>From $" in band
     assert 'aria-label="Common worries, answered"' in nerves
     lede = nerves.index('<p class="sr-lede">')
-    assert lede < nerves.index('class="sr-3up"')
+    assert lede < nerves.index('class="sr-qa"')
     assert "Headshots, personal branding" in nerves[lede:]
 
 

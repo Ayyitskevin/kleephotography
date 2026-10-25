@@ -280,6 +280,18 @@ def test_three_extra_decorations_beside_request_a_quote_break_the_contact_ration
     assert len(kickers) > math.ceil(site_metrics.metrics(noisy)["sections"] / 3)
 
 
+@pytest.mark.parametrize(
+    ("route", "seeded_client"),
+    [(route, (flag, content)) for route, flag, content in MATRIX],
+    ids=[f"{route_slug(route)}__{flag}__{content}" for route, flag, content in MATRIX],
+    indirect=["seeded_client"],
+)
+def test_public_page_uses_the_three_up_at_most_once(route, seeded_client):
+    """Plan D-6: one bordered three-up per page; the other blocks wear their layout family."""
+    body = normalise(seeded_client.get(route).text)
+    assert site_metrics.count_class(body, "sr-3up") <= 1, route
+
+
 def test_a_missing_golden_names_the_update_command(tmp_path):
     ledger = {"changed": [], "metrics": {}}
     with pytest.raises(pytest.fail.Exception, match=re.escape(MISSING)):
