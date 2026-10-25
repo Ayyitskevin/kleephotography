@@ -30,6 +30,8 @@
 .sr .sr-kickrow { display: flex; justify-content: space-between; align-items: baseline;
   gap: var(--sr-s4); margin: 0 0 var(--sr-s5); flex-wrap: wrap; }
 .sr .sr-kickrow .sr-mono { letter-spacing: var(--sr-track-label); }
+/* D-4: a section heading promoted out of a kicker sits in the row without its UA margin */
+.sr .sr-kickrow .sr-h2 { margin: 0; }
 /* D-10: links in a kick row and the availability strip are 44px touch targets */
 .sr .sr-kickrow a, .sr .sr-availstrip a { display: inline-flex; min-height: 44px; align-items: center; }
 /* D-10: the 44px button floor is a marketing-shell rule; admin and client buttons (sr-btn--sm among them) keep their size */
@@ -47,6 +49,8 @@
 .site-body.sr:has(.site-nav nav a[aria-current="page"][href="/services"]) .sr-pagehead h1 { font-size: var(--sr-d-1); }
 .sr .sr-pagehead .sr-beat { margin: 0; }
 .sr .sr-lede { font-size: var(--sr-t-lg); line-height: 1.65; color: var(--sr-ink-mute); max-width: 60ch; }
+/* D-3: a one-line lede under hero actions (F&B quote ask) */
+.sr .sr-lede--tight { margin: var(--sr-s4) 0 0; font-size: var(--sr-t-base); line-height: 1.5; }
 
 /* ── marquee nav (restyles base_site's .site-nav under body.sr) ───────────── */
 .sr .site-nav { position: sticky; top: 0; z-index: 50; display: flex; align-items: center;
@@ -250,6 +254,8 @@ html.nav-menu-enhanced .sr .nav-mobile {
 .sr .sr-stat--hot small { color: var(--sr-stock); }
 .sr .sr-stat--cta { display: flex; align-items: center; justify-content: center;
   padding: var(--sr-s4) var(--sr-s4); }
+/* D-3: the portraits proof numbers as a full-width band under the hero: top/bottom rules only */
+.sr .sr-stats--band { border-left: 0; border-right: 0; }
 
 /* ── 3-up bordered band (nerves / courses / deliverables / process) ───────── */
 .sr .sr-3up { display: grid; grid-template-columns: repeat(3, 1fr);
