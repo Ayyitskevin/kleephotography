@@ -10,46 +10,64 @@
       · <a class="portal-share" href="{{ share_href }}">&#9993; Share</a></p>
   </header>
 
-  {% if proposals %}
+  {# R9a: sections run in step.order (outstanding first). The one next step's
+     title wears the amber sr-btn; other open items wear the ghost; finished
+     ones collapse to a mono line that still opens the document. Emphasis only —
+     nothing is hidden or disabled. The primary keeps no ws-card-title class:
+     screening.css repaints that title cream, which would sit on the amber.
+     copy: BLOCKED-ON-OWNER — the primary's label per step (accept / sign / pay /
+     open gallery) and the done-line wording; until Kevin words them, the card's
+     own title and raw status word stand in, and no new text is added. #}
+  {% macro emphasis(kind, slug) -%}
+    {%- if step.primary == (kind, slug) %}sr-btn{% else %}ws-card-title sr-btn sr-btn--ghost{% endif -%}
+  {%- endmacro %}
+  {% for kind in step.order %}
+  {% if kind == 'proposal' %}
   <section class="ws-section">
     <h2>Proposal</h2>
     {% for d in proposals %}
+    {% if step.states.proposal[d.slug] == 'outstanding' %}
     <a class="ws-card" href="/p/{{ d.slug }}">
-      <span class="ws-card-title">{{ d.title }}</span>
+      <span class="{{ emphasis('proposal', d.slug) }}">{{ d.title }}</span>
       <span class="ws-card-meta">${{ d.total_cents|usd }}</span>
       <span class="kind-badge kind-proposal">{{ d.status }}</span>
     </a>
+    {% else %}
+    <p><a class="sr-mono" href="/p/{{ d.slug }}">{{ d.title }} · {{ d.status }}</a></p>
+    {% endif %}
     {% endfor %}
   </section>
-  {% endif %}
-
-  {% if contracts %}
+  {% elif kind == 'contract' %}
   <section class="ws-section">
     <h2>Agreement</h2>
     {% for d in contracts %}
+    {% if step.states.contract[d.slug] == 'outstanding' %}
     <a class="ws-card" href="/c/{{ d.slug }}">
-      <span class="ws-card-title">{{ d.title }}</span>
+      <span class="{{ emphasis('contract', d.slug) }}">{{ d.title }}</span>
       <span class="kind-badge kind-contract">{{ d.status }}</span>
     </a>
+    {% else %}
+    <p><a class="sr-mono" href="/c/{{ d.slug }}">{{ d.title }} · {{ d.status }}</a></p>
+    {% endif %}
     {% endfor %}
   </section>
-  {% endif %}
-
-  {% if invoices %}
+  {% elif kind == 'invoice' %}
   <section class="ws-section">
     <h2>Invoice</h2>
     {% for d in invoices %}
+    {% if step.states.invoice[d.slug] == 'outstanding' %}
     <a class="ws-card" href="/i/{{ d.slug }}">
-      <span class="ws-card-title">{{ d.title }}</span>
+      <span class="{{ emphasis('invoice', d.slug) }}">{{ d.title }}</span>
       <span class="ws-card-meta">${{ d.total_cents|usd }}
         {% if d.due_date %}· due {{ d.due_date }}{% endif %}</span>
       <span class="kind-badge kind-invoice">{{ d.status }}</span>
     </a>
+    {% else %}
+    <p><a class="sr-mono" href="/i/{{ d.slug }}">{{ d.title }} · {{ d.status }}</a></p>
+    {% endif %}
     {% endfor %}
   </section>
-  {% endif %}
-
-  {% if gallery %}
+  {% elif kind == 'gallery' %}
   <section class="ws-section">
     <h2>Gallery</h2>
     {% if gallery_expired %}
@@ -59,13 +77,16 @@
     </div>
     {% else %}
     <a class="ws-card" href="/g/{{ gallery.slug }}">
-      <span class="ws-card-title">{{ gallery.title }}</span>
+      <span class="{{ emphasis('gallery', gallery.slug) }}">{{ gallery.title }}</span>
       <span class="ws-card-meta">View &amp; download &rarr;</span>
     </a>
     {% endif %}
   </section>
   {% endif %}
+  {% endfor %}
 
+  {# copy: BLOCKED-ON-OWNER — the all-done state (and Q1: an expired gallery with
+     nothing else outstanding) gets no line of its own until Kevin words it. #}
   {% if not (proposals or contracts or invoices or gallery) %}
   <p class="muted">Nothing here yet — your documents and gallery will appear as they're ready.</p>
   {% endif %}
