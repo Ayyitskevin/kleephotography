@@ -24,11 +24,13 @@ ssh <prod-host> 'set -euo pipefail
   cd /opt/mise
   git fetch origin
   git merge --ff-only origin/main
-  git diff --quiet ORIG_HEAD HEAD -- requirements.lock ||
-    sudo -u <venv-owner> .venv/bin/pip install --require-hashes -r requirements.lock
+  sudo -u <venv-owner> .venv/bin/pip install --require-hashes -r requirements.lock
+  want=$(grep -oE "^(pillow|certifi)==[^ ]+" requirements.lock)
+  have=$(sudo -u <venv-owner> .venv/bin/pip freeze | grep -E "^(pillow|certifi)==")
+  printf "lock:\n%s\nvenv:\n%s\n" "$want" "$have"
+  test "$want" = "$have"
   sudo systemctl restart mise
   systemctl is-active mise
-  .venv/bin/python -c "import PIL, certifi; print(PIL.__version__, certifi.__version__)"
 '
 ```
 
@@ -39,22 +41,31 @@ ssh <prod-host> 'set -euo pipefail
   cd /opt/mise
   git fetch github
   git merge --ff-only github/main
-  git diff --quiet ORIG_HEAD HEAD -- requirements.lock ||
-    sudo -u <venv-owner> .venv/bin/pip install --require-hashes -r requirements.lock
+  sudo -u <venv-owner> .venv/bin/pip install --require-hashes -r requirements.lock
+  want=$(grep -oE "^(pillow|certifi)==[^ ]+" requirements.lock)
+  have=$(sudo -u <venv-owner> .venv/bin/pip freeze | grep -E "^(pillow|certifi)==")
+  printf "lock:\n%s\nvenv:\n%s\n" "$want" "$have"
+  test "$want" = "$have"
   sudo systemctl restart mise
   systemctl is-active mise
-  .venv/bin/python -c "import PIL, certifi; print(PIL.__version__, certifi.__version__)"
 '
 ```
 
 `mise` runs as systemd unit `mise.service` (user `mise`, binds loopback — see
-[`../mise.service`](../mise.service)). Restart needs sudo.
+[`../mise.service`](../mise.service)). The SSH user needs sudo for both
+`sudo systemctl restart mise` and `sudo -u <venv-owner>` (a sudoers rule to run
+commands as that user); if the SSH user owns the venv itself, drop the
+`sudo -u <venv-owner>` prefix.
 
 The `requirements.lock` step is what upgrades production: CI audits the lock, but
-the prod venv only gets the lock's versions when this install runs. `<venv-owner>`
-is whoever owns `/opt/mise/.venv` — this repo doesn't record it, so check with
-`stat -c %U /opt/mise/.venv` and substitute. The last line should print the
-versions pinned in `requirements.lock`.
+the prod venv only gets the lock's versions when this install runs. It runs on
+every deploy, not only when the lock changed: it is a no-op when the venv already
+matches, and a gate keyed on the last merge would skip it on a retry after a
+failed install. `<venv-owner>` is whoever owns `/opt/mise/.venv` — this repo
+doesn't record it, so check with `stat -c %U /opt/mise/.venv` and substitute.
+The `want`/`have` lines compare two of the lock's pins (pillow, certifi) with what
+`pip freeze` reports in the venv and stop the deploy **before** the restart if
+they differ, so the last line's `active` is the restart's own result.
 
 ### Post-deploy spot checks
 
@@ -91,6 +102,9 @@ migration sent this way moves the **schema without the code that expects it** �
 renames `admin_sessions.token`, which would break admin login on the spot. Schema
 changes reach production through git pull + restart, where code and schema move
 together. See [`MIGRATIONS.md`](MIGRATIONS.md).
+
+It also never installs `requirements.lock`, so a lock bump must go through the git
+pull path above, which runs the install.
 
 Touching `scripts/deploy-flow.sh`, `mise.service`, host hardening, or the backup chain
 is **red-light** per [`AGENTS.md`](../AGENTS.md) (PR + human merge).
