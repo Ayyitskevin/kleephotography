@@ -24,8 +24,11 @@ ssh <prod-host> 'set -euo pipefail
   cd /opt/mise
   git fetch origin
   git merge --ff-only origin/main
+  git diff --quiet ORIG_HEAD HEAD -- requirements.lock ||
+    sudo -u <venv-owner> .venv/bin/pip install --require-hashes -r requirements.lock
   sudo systemctl restart mise
   systemctl is-active mise
+  .venv/bin/python -c "import PIL, certifi; print(PIL.__version__, certifi.__version__)"
 '
 ```
 
@@ -36,13 +39,22 @@ ssh <prod-host> 'set -euo pipefail
   cd /opt/mise
   git fetch github
   git merge --ff-only github/main
+  git diff --quiet ORIG_HEAD HEAD -- requirements.lock ||
+    sudo -u <venv-owner> .venv/bin/pip install --require-hashes -r requirements.lock
   sudo systemctl restart mise
   systemctl is-active mise
+  .venv/bin/python -c "import PIL, certifi; print(PIL.__version__, certifi.__version__)"
 '
 ```
 
 `mise` runs as systemd unit `mise.service` (user `mise`, binds loopback — see
 [`../mise.service`](../mise.service)). Restart needs sudo.
+
+The `requirements.lock` step is what upgrades production: CI audits the lock, but
+the prod venv only gets the lock's versions when this install runs. `<venv-owner>`
+is whoever owns `/opt/mise/.venv` — this repo doesn't record it, so check with
+`stat -c %U /opt/mise/.venv` and substitute. The last line should print the
+versions pinned in `requirements.lock`.
 
 ### Post-deploy spot checks
 
