@@ -17,7 +17,7 @@ from app.main import app
 from app.public import site_catalog
 
 CITY = "Asheville"
-HOME_LINE = "Photography & film for real estate, portraits, and food & beverage — Asheville & Western North Carolina."
+HOME_LINE = "Photography & film for real estate, portraits, and food & beverage, Asheville & Western North Carolina."
 # The catalog groups each spoke's package comparison shows (site.py _specialty_package_groups).
 SPOKE_GROUPS = {
     "re": ("real_estate",),

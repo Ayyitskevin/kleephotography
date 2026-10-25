@@ -694,7 +694,7 @@ def test_inquiry_form(monkeypatch):
         assert 'value="12 dishes"' in r.text
         assert "<span data-scope-label>Dishes / setups</span>" in r.text
         # selects re-select the chosen option (specialty options since the revamp)
-        assert "selected>Food &amp; Beverage — photo / video</option>" in r.text
+        assert "selected>Food &amp; Beverage: photo / video</option>" in r.text  # D-9 label
         assert '<option value="Not sure" selected' in r.text
         assert '<option value="Under $1,000" selected' in r.text
         # nothing was stored for the rejected submission

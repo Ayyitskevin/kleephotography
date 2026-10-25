@@ -181,7 +181,9 @@ def test_rates_render_every_current_tier_and_literal_inclusion(
     assert [group.attrs["id"] for group in actual_groups] == [f"packages-{g}" for g in groups]
     for group, expected_key in zip(actual_groups, groups, strict=True):
         expected = catalog_group(expected_key)
-        assert group.one("h2").text() == expected["title"]
+        # D-9: the heading shows the title without its dash; the title itself (the F&B
+        # inquiry-tier join) is unchanged.
+        assert group.one("h2").text() == expected["title"].replace(" — ", ": ")
         articles = group.find("article")
         assert len(articles) == 3
         assert tuple(t["display_price"] for t in expected["tiers"]) == CURRENT_PRICES[expected_key]

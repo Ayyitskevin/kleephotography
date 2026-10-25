@@ -7,7 +7,7 @@
     {% for s in package_groups %}
     <section class="svc" id="packages-{{ s.key }}" aria-labelledby="packages-{{ s.key }}-heading">
       <div class="svc-head">
-        <h2 id="packages-{{ s.key }}-heading">{{ s.title }}</h2>
+        <h2 id="packages-{{ s.key }}-heading">{{ s.title|replace(" — ", ": ") }}</h2>
         <span class="svc-tag">{{ 'Monthly retainer' if s.monthly else 'Per project' }}</span>
       </div>
       {% if sp_key == 'fb' and s.key == 'photography' %}
