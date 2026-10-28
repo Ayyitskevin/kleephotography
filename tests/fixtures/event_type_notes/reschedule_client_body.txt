@@ -1,0 +1,15 @@
+Hi Ada,
+
+Your booking has been rescheduled:
+
+  Studio Session
+  Tuesday, April 6, 2027 · 7:00 AM PDT
+  On-site
+
+The attached invite updates calendars that imported the original .ics file.
+If you used the Google Calendar link instead, remove or edit the old entry, then add the new time here:
+https://calendar.google.com/calendar/render?action=TEMPLATE&text=Studio+Session+%C2%B7+Example+Studio&dates=20270406T140000Z%2F20270406T150000Z&details=A+relaxed+hour+in+the+studio.%0A%0AManage+this+booking%3A+https%3A%2F%2Fstudio.example.test%2Fbooking%2Fetnote-new&location=On-site
+
+Need to change or cancel? https://studio.example.test/booking/etnote-new
+
+— Example Studio

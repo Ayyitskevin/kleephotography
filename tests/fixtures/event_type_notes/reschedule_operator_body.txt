@@ -1,0 +1,11 @@
+Rescheduled booking via https://studio.example.test
+
+Event: Studio Session
+When: Tuesday, April 6, 2027 · 10:00 AM EDT
+Name: Ada
+Email: etnote@example.com
+Phone: +15550003333
+
+(no note)
+
+Manage: https://studio.example.test/booking/etnote-new

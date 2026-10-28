@@ -19,7 +19,7 @@ _UTC = dt.UTC
 def _load(booking_id: int):
     return db.one(
         """SELECT b.*, e.name AS event_name, e.location, e.description AS event_desc,
-                  e.auto_meet
+                  e.auto_meet, e.confirm_note
            FROM bookings b JOIN event_types e ON e.id=b.event_type_id
            WHERE b.id=?""",
         (booking_id,),
@@ -190,6 +190,8 @@ def confirm(booking_id: int) -> None:
         + f"Manage this booking: {_manage_url(b['token'])}"
     )
     meet_line = f"  Join: {b['meet_url']}\n" if b["meet_url"] else ""
+    # Kevin's per-event-type note (event_types.confirm_note); empty adds nothing.
+    note = f"{b['confirm_note']}\n\n" if b["confirm_note"] else ""
     gcal_link = ics.google_link(
         summary=summary,
         details=details,
@@ -231,6 +233,7 @@ def confirm(booking_id: int) -> None:
             f"Hi {b['name']},\n\n"
             f"Your booking {'has been rescheduled' if rescheduled else 'is confirmed'}:\n\n"
             f"  {b['event_name']}\n  {cli_when}\n  {loc}\n{meet_line}\n"
+            f"{note}"
             f"{calendar_copy}"
             f"Need to change or cancel? {_manage_url(b['token'])}\n\n"
             f"— {config.SITE_NAME}\n"
