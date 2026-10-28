@@ -190,6 +190,20 @@ def check_pin(request: Request, slug: str, pin: str = Form(...)):
     return resp
 
 
+def _fav_span(asset_id: int, *, circled: bool, count: int | None = None) -> str:
+    """Take marker swapped into the tile after a favorite toggle.
+
+    Same classes and circle entity as the span in gallery.html. The id is
+    written by the Jinja environment (autoescape on), not an f-string, so it
+    cannot break out of the attribute.
+    """
+    return (
+        templates.env.get_template("public/_fav_span.html")
+        .render(asset_id=asset_id, circled=circled, count=count)
+        .strip()
+    )
+
+
 def _takes_oob(visitor_id: int, toggled_id: int, gallery_id: int) -> str:
     """OOB fragments after a fav/unfav: every circled take's number (pick order
     shifts when a take is uncircled) + the sticky export rail's count. Ships
@@ -406,9 +420,7 @@ def toggle_fav(request: Request, slug: str, asset_id: int):
         db.run("DELETE FROM favorites WHERE visitor_id=? AND asset_id=?", (visitor["id"], asset_id))
         oob = _progress_oob(g, a["section_id"], visitor["id"])
         return Response(
-            f'<span id="take-{asset_id}" class="fav-btn sr-take">&#9675;</span>'
-            + _takes_oob(visitor["id"], asset_id, g["id"])
-            + oob
+            _fav_span(asset_id, circled=False) + _takes_oob(visitor["id"], asset_id, g["id"]) + oob
         )
     # Proofing cap: refuse the fav if the visitor already hit the section's target.
     if a["proof_target"]:
@@ -420,7 +432,7 @@ def toggle_fav(request: Request, slug: str, asset_id: int):
         )["n"]
         if picks >= a["proof_target"]:
             return Response(
-                f'<span id="take-{asset_id}" class="fav-btn sr-take">&#9675;</span>',
+                _fav_span(asset_id, circled=False),
                 status_code=409,
                 headers={"HX-Trigger": f'{{"proof-cap":{{"target":{a["proof_target"]}}}}}'},
             )
@@ -430,7 +442,7 @@ def toggle_fav(request: Request, slug: str, asset_id: int):
     n = db.one("SELECT COUNT(*) AS n FROM favorites WHERE visitor_id=?", (visitor["id"],))["n"]
     oob = _progress_oob(g, a["section_id"], visitor["id"])
     return Response(
-        f'<span id="take-{asset_id}" class="fav-btn faved sr-take is-circled">{n}</span>'
+        _fav_span(asset_id, circled=True, count=n)
         + _takes_oob(visitor["id"], asset_id, g["id"])
         + oob
     )
