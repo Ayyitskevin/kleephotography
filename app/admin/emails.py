@@ -13,13 +13,34 @@ router = APIRouter(prefix="/admin/studio", dependencies=[Depends(security.requir
 KINDS = {"proposals": "proposal", "contracts": "contract", "invoices": "invoice"}
 
 
+def _doc_table(kind: str) -> str:
+    """Table name for a studio-doc path segment.
+
+    `kind` is the caller's path parameter, and a table name cannot be a bound
+    parameter. The name spliced into SQL is one of the literals below, not
+    `kind`. ``db.ident`` still rejects a literal that is not a ``KINDS`` key.
+    Checking ``kind not in KINDS`` and then interpolating ``ident(kind)`` does
+    not: CodeQL's const-compare barrier only sees an inline collection of
+    literals, and ``ident`` returns its argument, so the path parameter was
+    followed into ``db.one``.
+    """
+    if kind == "proposals":
+        table = "proposals"
+    elif kind == "contracts":
+        table = "contracts"
+    elif kind == "invoices":
+        table = "invoices"
+    else:
+        raise HTTPException(status_code=404)
+    return db.ident(table, KINDS)
+
+
 @router.post("/{kind}/{doc_id}/email")
 def email_doc(
     kind: str, doc_id: int, to: str = Form(...), subject: str = Form(...), message: str = Form(...)
 ):
-    if kind not in KINDS:
-        raise HTTPException(status_code=404)
-    d = db.get_or_404(f"SELECT * FROM {db.ident(kind, KINDS)} WHERE id=?", (doc_id,))
+    table = _doc_table(kind)
+    d = db.get_or_404(f"SELECT * FROM {table} WHERE id=?", (doc_id,))
     if d["status"] == "draft":
         raise HTTPException(
             status_code=400,
