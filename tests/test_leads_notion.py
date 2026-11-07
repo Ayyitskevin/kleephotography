@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from app import booking_notify, config, db, notion_sync
 from app.main import app
 from tests.jobtest import freeze_job_pool
+from tests.urlcheck import links_google_calendar
 
 pytestmark = pytest.mark.integration
 
@@ -248,7 +249,7 @@ def test_reschedule_confirmation_reuses_inquiry_and_calendar_identity(booking_id
     assert "has been rescheduled" in client_body
     assert "imported the original .ics" in client_body
     assert "remove or edit the old entry" in client_body
-    assert "calendar.google.com" in client_body
+    assert links_google_calendar(client_body)
     invite = sent[0][1]["ics"]["content"]
     assert f"UID:mise-booking-{booking_id}@kleephotography.com" in invite
     assert "SEQUENCE:1" in invite

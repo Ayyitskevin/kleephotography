@@ -29,6 +29,7 @@ from tests.smoke._helpers import (
     _spark_rect_count,
     _stripe_sig,
 )
+from tests.urlcheck import links_google_calendar
 
 pytestmark = pytest.mark.smoke
 
@@ -1610,7 +1611,7 @@ def test_client_booking_reschedule_leaves_one_confirmed(monkeypatch):
         assert new_token not in old_manage.text
         assert old_invite.status_code == 410
         assert new_token not in old_invite.text
-        assert "calendar.google.com" in new_manage.text
+        assert links_google_calendar(new_manage.text)
         assert "remove or edit that old entry" in new_manage.text
         assert compensated_invite.status_code == 410
         assert new_token not in compensated_invite.text
