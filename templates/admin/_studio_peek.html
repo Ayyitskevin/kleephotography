@@ -15,7 +15,8 @@
   </p>
   {% endif %}
   <p class="stu-peek-touch">
-    {%- if p.last_client_touch_at %}Client last acted {{ p.days_quiet }}d ago
+    {%- if p.last_client_touch_at and p.days_quiet == 0 %}Client last acted today
+    {%- elif p.last_client_touch_at %}Client last acted {{ p.days_quiet }}d ago
     {%- else %}No client action recorded yet{% endif %}</p>
   {% if intel %}<p class="stu-intel is-{{ intel.tone }}">{{ intel.text }}</p>{% endif %}
   <form class="stu-peek-move" method="post" action="/admin/studio/projects/{{ p.id }}/status"
@@ -26,6 +27,6 @@
       <option value="{{ s }}"{% if s == p.status %} selected{% endif %}>{{ s.replace("_", " ") | title }}</option>
       {% endfor %}
     </select>
-    <button type="submit" class="sr-btn sr-btn--sm">Move</button>
+    <button type="submit">Move</button>
   </form>
 </div>
