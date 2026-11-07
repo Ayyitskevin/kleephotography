@@ -1,0 +1,32 @@
+{# Board quick-look — the HX fragment a card's <details class="stu-peek"> loads
+   on first open (studio.py project_peek). Contact links, the client's last
+   action, the next step, and a one-field stage move. The move form posts to
+   the same /status route a drag uses and swaps the whole board (server truth);
+   without htmx it falls back to a plain POST + redirect. Stage labels come
+   from the status keys, which title-case to the board's own column names. #}
+<div class="stu-peek-inner">
+  <p class="stu-peek-who"><b>{{ p.client_name }}</b>{% if p.company %} · {{ p.company }}{% endif %}</p>
+  {% if p.client_email or p.client_phone or p.inquiry_id %}
+  <p class="stu-peek-links">
+    {% if p.client_email %}<a href="mailto:{{ p.client_email }}"><svg class="sr-icon sr-icon--sm" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-mail"/></svg> Email</a>{% endif %}
+    {% if p.client_phone %}<a href="tel:{{ p.client_phone }}">Call</a>
+    <a href="sms:{{ p.client_phone }}">Text</a>{% endif %}
+    {% if p.inquiry_id %}<a href="/admin/inbox?sel={{ p.inquiry_id }}">Inbox thread</a>{% endif %}
+  </p>
+  {% endif %}
+  <p class="stu-peek-touch">
+    {%- if p.last_client_touch_at and p.days_quiet == 0 %}Client last acted today
+    {%- elif p.last_client_touch_at %}Client last acted {{ p.days_quiet }}d ago
+    {%- else %}No client action recorded yet{% endif %}</p>
+  {% if intel %}<p class="stu-intel is-{{ intel.tone }}">{{ intel.text }}</p>{% endif %}
+  <form class="stu-peek-move" method="post" action="/admin/studio/projects/{{ p.id }}/status"
+        hx-post="/admin/studio/projects/{{ p.id }}/status" hx-target="#studio-board" hx-swap="outerHTML">
+    <label for="stu-peek-stage-{{ p.id }}">Stage</label>
+    <select id="stu-peek-stage-{{ p.id }}" name="status">
+      {% for s in statuses %}
+      <option value="{{ s }}"{% if s == p.status %} selected{% endif %}>{{ s.replace("_", " ") | title }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Move</button>
+  </form>
+</div>

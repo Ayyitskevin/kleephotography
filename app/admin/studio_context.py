@@ -14,6 +14,39 @@ from .lookups import PROJECT_STATUSES
 # the kanban (terminal stages — project_closed/archived — are never flagged).
 STALE_DAYS = 14
 
+# A live project whose CLIENT hasn't acted in this many days gets a "quiet" chip.
+# Distinct from STALE_DAYS: stage age resets when Kevin moves a card; quiet age
+# only resets when the client does something (see _LAST_CLIENT_TOUCH).
+QUIET_DAYS = 7
+
+# Latest moment the client did something on a project: opened/accepted a
+# proposal, opened/signed a contract, opened/paid an invoice, a payment landed,
+# they sent the original inquiry, or they replied by text/email. Our own sends
+# (outbound messages, emails_log) deliberately do NOT count — chasing a client
+# must not make a cold project look warm. Every column here is written with
+# datetime('now'), so text MAX() orders them correctly.
+_LAST_CLIENT_TOUCH = """
+    WITH touches AS (
+      SELECT project_id, viewed_at AS ts FROM proposals
+      UNION ALL SELECT project_id, accepted_at FROM proposals
+      UNION ALL SELECT project_id, viewed_at FROM contracts
+      UNION ALL SELECT project_id, signed_at FROM contracts
+      UNION ALL SELECT project_id, viewed_at FROM invoices
+      UNION ALL SELECT project_id, paid_at FROM invoices
+      UNION ALL SELECT i.project_id, pay.created_at
+                FROM payments pay JOIN invoices i ON i.id = pay.invoice_id
+      UNION ALL SELECT converted_project_id, created_at FROM inquiries
+      UNION ALL SELECT q.converted_project_id, m.created_at
+                FROM messages m JOIN inquiries q ON q.id = m.inquiry_id
+                WHERE m.direction = 'in'
+    ),
+    last_touch AS (
+      SELECT project_id, MAX(ts) AS ts FROM touches
+      WHERE project_id IS NOT NULL AND ts IS NOT NULL
+      GROUP BY project_id
+    )
+"""
+
 
 def _spark_series(table: str, today: dt.date, window: int) -> tuple[list[int], int]:
     """Daily counts for the `window` days ending `today`, on the studio clock
@@ -49,10 +82,15 @@ def _ctx_pipeline(today_iso: str) -> dict:
     client. due_date is a stored wall-clock date; compare it to local "today"
     passed as a bound param so SQLite never derives its own UTC 'now' here."""
     projects = db.all_(
-        """SELECT p.*, c.name AS client_name, c.company,
+        _LAST_CLIENT_TOUCH
+        + """SELECT p.*, c.name AS client_name, c.company,
                           CAST(julianday('now')
                                - julianday(COALESCE(p.stage_changed_at, p.created_at))
                                AS INTEGER) AS days_in_stage,
+                          lt.ts AS last_client_touch_at,
+                          CAST(julianday('now')
+                               - julianday(COALESCE(lt.ts, p.stage_changed_at, p.created_at))
+                               AS INTEGER) AS days_quiet,
                           (SELECT COUNT(*) FROM invoices i WHERE i.project_id=p.id
                              AND i.status IN ('sent','viewed','deposit_paid')
                              AND i.due_date IS NOT NULL
@@ -63,6 +101,7 @@ def _ctx_pipeline(today_iso: str) -> dict:
                                ORDER BY (pr.status='accepted') DESC, pr.created_at DESC LIMIT 1),
                             0) AS value_cents
                           FROM projects p JOIN clients c ON c.id=p.client_id
+                          LEFT JOIN last_touch lt ON lt.project_id=p.id
                           WHERE p.status != 'archived'
                           ORDER BY p.created_at DESC""",
         (today_iso,),
@@ -456,24 +495,41 @@ def _ctx_intel() -> dict:
         "SELECT project_id, status FROM proposals WHERE status IN ('sent','viewed','accepted')"
     ):
         intel[r["project_id"]] = {
-            "sent": {"text": "Proposal out — not opened yet", "tone": "muted", "act": "Follow up"},
+            "sent": {
+                "text": "Proposal out — not opened yet",
+                "tone": "muted",
+                "act": "Follow up",
+                "attention": "their_move",
+            },
             "viewed": {
                 "text": "Proposal opened — awaiting answer",
                 "tone": "gold",
                 "act": "Nudge proposal",
+                "attention": "their_move",
             },
-            "accepted": {"text": "Proposal accepted", "tone": "go", "act": "Send contract"},
+            "accepted": {
+                "text": "Proposal accepted",
+                "tone": "go",
+                "act": "Send contract",
+                "attention": "your_move",
+            },
         }[r["status"]]
     for r in db.all_(
         "SELECT project_id, status FROM contracts WHERE status IN ('sent','viewed','signed')"
     ):
         intel[r["project_id"]] = (
-            {"text": "Contract signed", "tone": "go", "act": "Send invoice"}
+            {
+                "text": "Contract signed",
+                "tone": "go",
+                "act": "Send invoice",
+                "attention": "your_move",
+            }
             if r["status"] == "signed"
             else {
                 "text": "Contract out — awaiting signature",
                 "tone": "gold",
                 "act": "Nudge contract",
+                "attention": "their_move",
             }
         )
     for r in db.all_(
@@ -481,9 +537,19 @@ def _ctx_intel() -> dict:
            WHERE status IN ('sent','viewed','deposit_paid') AND project_id IS NOT NULL"""
     ):
         intel[r["project_id"]] = (
-            {"text": "Retainer in — plan the shoot", "tone": "go", "act": "Open plan"}
+            {
+                "text": "Retainer in — plan the shoot",
+                "tone": "go",
+                "act": "Open plan",
+                "attention": "your_move",
+            }
             if r["status"] == "deposit_paid"
-            else {"text": "Invoice out — unpaid", "tone": "gold", "act": "Nudge invoice"}
+            else {
+                "text": "Invoice out — unpaid",
+                "tone": "gold",
+                "act": "Nudge invoice",
+                "attention": "money_out",
+            }
         )
     return intel
 
@@ -507,6 +573,7 @@ def _studio_context(request: Request) -> dict:
     return {
         "statuses": PROJECT_STATUSES,
         "stale_days": STALE_DAYS,
+        "quiet_days": QUIET_DAYS,
         "intel": _ctx_intel(),
         **_ctx_pipeline(today_iso),
         "outstanding": common.open_invoice_balance(),

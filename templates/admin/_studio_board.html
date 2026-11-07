@@ -11,6 +11,11 @@
     "proposal_sent": "#9a7a2c", "contract_signed": "#7C2F38",
     "retainer_paid": "#2f7d57", "session_planning": "#1f6f6b",
     "project_closed": "#143C2F", "archived": "#8A9183"} %}
+{# Share bars scale each open column's count against the fullest open column, so
+   the busiest stage reads full width at a glance. Archived is excluded: it holds
+   the whole history and would flatten every other bar. #}
+{% set share = namespace(max=0) %}
+{% for s in statuses if s != "archived" %}{% if counts.get(s, 0) > share.max %}{% set share.max = counts.get(s, 0) %}{% endif %}{% endfor %}
 <div class="stu-board" id="studio-board"
      data-drag-board="/admin/studio/projects/{pid}/status" data-drag-target="#studio-board">
   <div class="stu-board-rail">
@@ -22,11 +27,16 @@
         <span class="stu-col-count">{{ counts.get(s, 0) }}</span>
         <span class="stu-col-sum">{{ ("$" ~ (stage_value[s]|usd0)) if stage_value.get(s) else "—" }}</span>
       </div>
+      {% if s != "archived" and share.max %}
+      <div class="stu-col-share" aria-hidden="true"><i style="width: {{ (100 * counts.get(s, 0) / share.max)|round|int }}%;"></i></div>
+      {% endif %}
       <div class="stu-col-body" data-stage="{{ s }}">
       {% for p in projects if p.status == s %}
       {% set won = p.status in ('project_closed', 'archived') %}
       {% set is_stale = not won and p.days_in_stage >= stale_days %}
-      <article class="stu-card studio-row" draggable="true"
+      {% set is_quiet = not won and p.days_quiet is not none and p.days_quiet >= quiet_days %}
+      {% set pi = intel.get(p.id) %}
+      <article class="stu-card studio-row{% if pi %} is-att-{{ pi.attention }}{% endif %}" draggable="true"
                data-pid="{{ p.id }}" data-stage="{{ p.status }}"
                data-name="{{ p.title | lower }}" data-shoot="{{ p.shoot_date or '' }}"
                data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
@@ -44,7 +54,6 @@
              title="{{ stage_label.get(st, st) }}"></i>
           {% endfor %}
         </div>
-        {% set pi = intel.get(p.id) %}
         {% if pi %}
         <div class="stu-intel is-{{ pi.tone }}">{{ pi.text }}</div>
         {% endif %}
@@ -58,6 +67,9 @@
           {% else %}
             <span class="stu-step tone-calm">{{ stage_label.get(p.status, p.status) }}</span>
           {% endif %}
+          {% if is_quiet %}
+          <span class="stu-quiet" title="The client last acted {{ p.days_quiet }} days ago">quiet {{ p.days_quiet }}d</span>
+          {% endif %}
           <span class="stu-card-age">
             {%- if won %}{{ p.shoot_date or (p.created_at[:10] if p.created_at else "") }}
             {%- else %}{{ p.days_in_stage }}d{% endif %}</span>
@@ -65,6 +77,12 @@
         {% if pi %}
         <a class="stu-card-act" href="/admin/studio/projects/{{ p.id }}">{{ pi.act }} &rarr;</a>
         {% endif %}
+        <details class="stu-peek" data-goto-ignore
+                 hx-get="/admin/studio/projects/{{ p.id }}/peek" hx-trigger="toggle once"
+                 hx-target="find .stu-peek-body">
+          <summary aria-label="Quick actions for {{ p.title }}">Quick actions</summary>
+          <div class="stu-peek-body"><p class="stu-peek-touch">Loading…</p></div>
+        </details>
       </article>
       {% endfor %}
       <a class="stu-add" href="#clients" data-open-new>+ Add</a>

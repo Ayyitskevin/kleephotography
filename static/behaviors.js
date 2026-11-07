@@ -12,6 +12,9 @@
      [data-goto]                 navigate to the given URL on click, unless
                                  window.__stuDragged is set (the studio board
                                  raises it during a drag so drop != navigate)
+                                 or the click lands inside a [data-goto-ignore]
+                                 region of it (the board card's quick-actions
+                                 peek owns its own clicks)
      [data-seek]                 chapter chips: jump the nearest scoped <video>
                                  (closest [data-seek-scope], else the page's
                                  first video) to the given second and play
@@ -219,6 +222,8 @@
         return;
       }
       if (el.hasAttribute("data-goto")) {
+        var own = ev.target.closest("[data-goto-ignore]");
+        if (own && el.contains(own)) return;
         if (!window.__stuDragged) window.location.href = el.getAttribute("data-goto");
         return;
       }
