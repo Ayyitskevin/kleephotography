@@ -584,8 +584,8 @@
 }/* Sticky header: pin the first/header row just below the global topbar (~47px).
    Browsers wrap bare <tr> rows in an implicit <tbody>, so the first-row selector
    covers both explicit-<thead> tables and the bare-row majority. The th carries
-   an opaque background, so scrolled rows don't bleed through. On mobile the table
-   becomes its own overflow-x scroller, which harmlessly disables the pin. */.admin-shell table.list thead th, .admin-shell table.list tr:first-child th {
+   an opaque background, so scrolled rows don't bleed through. At 861–1280px the
+   table becomes its own overflow-x scroller and the pin is switched off there. */.admin-shell table.list thead th, .admin-shell table.list tr:first-child th {
   position: sticky;
   top: 47px;
   z-index: 3;
@@ -872,7 +872,10 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     white-space: nowrap;
-  }
+  }/* display:block above outranks the UA's [hidden] rule, so a hidden list (the
+     Studio board's inactive list view) rendered under the board. And inside this
+     scroller a sticky th measures top:47px from the table, not the viewport,
+     which pushed the header down over row 1 — unpin it explicitly here. */.admin-shell table.list[hidden] { display: none; }.admin-shell table.list thead th, .admin-shell table.list tr:first-child th { position: static; }
 }.admin-shell .table-scroll {
   overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--r);
 }.admin-shell .table-scroll table.list {
