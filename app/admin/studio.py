@@ -9,7 +9,18 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import clients, config, db, jobs, platekit, pricing, security, specialties, usage_vocab
+from .. import (
+    audit,
+    clients,
+    config,
+    db,
+    jobs,
+    platekit,
+    pricing,
+    security,
+    specialties,
+    usage_vocab,
+)
 from ..redirects import redirect_local
 from ..render import templates
 from ..safe_path import path_within
@@ -881,27 +892,66 @@ def update_project(
     notion_page_id: str = Form(""),
     shoot_date: str = Form(""),
 ):
-    get_project(project_id)
+    old_status = get_project(project_id)["status"]
     if status not in PROJECT_STATUSES:
         raise HTTPException(status_code=400, detail="bad status")
-    db.run(
-        """UPDATE projects SET title=?, status=?, notes=?, gallery_id=?,
-              notion_page_id=?, shoot_date=?,
-              stage_changed_at=CASE WHEN status=? THEN stage_changed_at
-                                    ELSE datetime('now') END
-              WHERE id=?""",
-        (
-            title.strip(),
-            status,
-            notes.strip() or None,
-            gallery_id,
-            notion_page_id.strip() or None,
-            shoot_date.strip() or None,
-            status,
-            project_id,
-        ),
-    )
+    with db.tx() as con:
+        con.execute(
+            """UPDATE projects SET title=?, status=?, notes=?, gallery_id=?,
+                  notion_page_id=?, shoot_date=?,
+                  stage_changed_at=CASE WHEN status=? THEN stage_changed_at
+                                        ELSE datetime('now') END
+                  WHERE id=?""",
+            (
+                title.strip(),
+                status,
+                notes.strip() or None,
+                gallery_id,
+                notion_page_id.strip() or None,
+                shoot_date.strip() or None,
+                status,
+                project_id,
+            ),
+        )
+        _audit_stage_move(con, project_id, old_status, status)
     return redirect_local(f"/admin/studio/projects/{project_id}")
+
+
+def _audit_stage_move(con, project_id: int, old: str, new: str) -> None:
+    """One audit_log row per real stage change, on the caller's transaction, so
+    the pipeline keeps its history (stage_changed_at only remembers the last
+    move). Shared by the full project form and the board's quick-move."""
+    if old != new:
+        audit.log(con, "project", project_id, "stage_move", diff={"status": [old, new]})
+
+
+@router.get("/projects/{project_id}/peek", response_class=HTMLResponse)
+def project_peek(request: Request, project_id: int):
+    """Board quick-look, loaded when a card's peek opens: contact links, when
+    the client last acted, the next step, and a one-field stage move that posts
+    to move_project_status exactly like a drag. Read-only itself."""
+    p = db.get_or_404(
+        studio_context._LAST_CLIENT_TOUCH
+        + """SELECT p.id, p.title, p.status, c.name AS client_name, c.company,
+                    c.email AS client_email, c.phone AS client_phone,
+                    lt.ts AS last_client_touch_at,
+                    CAST(julianday('now') - julianday(lt.ts) AS INTEGER) AS days_quiet,
+                    (SELECT q.id FROM inquiries q WHERE q.converted_project_id=p.id
+                       ORDER BY q.created_at DESC LIMIT 1) AS inquiry_id
+             FROM projects p JOIN clients c ON c.id=p.client_id
+             LEFT JOIN last_touch lt ON lt.project_id=p.id
+             WHERE p.id=?""",
+        (project_id,),
+    )
+    return templates.TemplateResponse(
+        request,
+        "admin/_studio_peek.html",
+        {
+            "p": p,
+            "intel": studio_context._ctx_intel().get(project_id),
+            "statuses": PROJECT_STATUSES,
+        },
+    )
 
 
 @router.post("/projects/{project_id}/status")
@@ -909,16 +959,18 @@ def move_project_status(request: Request, project_id: int, status: str = Form(..
     """Kanban quick-move: change only a project's pipeline stage. The full project
     form (update_project) still owns title/notes/gallery edits; this is the
     board's drag-to-column equivalent — one field, one write, back to the board."""
-    get_project(project_id)
+    old_status = get_project(project_id)["status"]
     if status not in PROJECT_STATUSES:
         raise HTTPException(status_code=400, detail="bad status")
-    db.run(
-        """UPDATE projects SET status=?,
-              stage_changed_at=CASE WHEN status=? THEN stage_changed_at
-                                    ELSE datetime('now') END
-              WHERE id=?""",
-        (status, status, project_id),
-    )
+    with db.tx() as con:
+        con.execute(
+            """UPDATE projects SET status=?,
+                  stage_changed_at=CASE WHEN status=? THEN stage_changed_at
+                                        ELSE datetime('now') END
+                  WHERE id=?""",
+            (status, status, project_id),
+        )
+        _audit_stage_move(con, project_id, old_status, status)
     log.info("project %s moved to status %s", project_id, status)
     if request.headers.get("hx-request") == "true":
         # The drag behavior swaps with the server's truth: the whole board
