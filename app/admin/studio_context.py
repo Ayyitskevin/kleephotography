@@ -143,6 +143,36 @@ def _ctx_pipeline(today_iso: str) -> dict:
     }
 
 
+def _sales_review(projects) -> dict:
+    """A review queue, never a send schedule or a claim that contact is due.
+
+    Reuse the pipeline projection and its value semantics. A missing client
+    touch is explicitly distinct from client inactivity: days_quiet then uses
+    the existing stage/creation fallback. No new clock, query or write.
+    """
+    actions = {
+        "inquiry_received": "Review outreach",
+        "consultation_call": "Review conversation",
+        "proposal_sent": "Review proposal follow-up",
+    }
+    rows = []
+    for p in projects:
+        if p["status"] not in actions:
+            continue
+        age = p["days_quiet"]
+        if age is None or age < QUIET_DAYS:
+            continue
+        rows.append({"project": p, "action": actions[p["status"]]})
+    rows.sort(
+        key=lambda r: (
+            -r["project"]["days_quiet"],
+            -(r["project"]["value_cents"] or 0),
+            r["project"]["id"],
+        )
+    )
+    return {"sales_review": rows[:5], "sales_review_total": len(rows)}
+
+
 def _ctx_inquiries() -> dict:
     """Open inquiries (live triage) + a recently-resolved archive tail."""
     inquiries = db.all_(
@@ -570,12 +600,14 @@ def _studio_context(request: Request) -> dict:
 
     today = studio._today()
     today_iso = today.isoformat()
+    pipeline = _ctx_pipeline(today_iso)
     return {
         "statuses": PROJECT_STATUSES,
         "stale_days": STALE_DAYS,
         "quiet_days": QUIET_DAYS,
         "intel": _ctx_intel(),
-        **_ctx_pipeline(today_iso),
+        **pipeline,
+        **_sales_review(pipeline["projects"]),
         "outstanding": common.open_invoice_balance(),
         **_ctx_inquiries(),
         "licenses_expiring": _ctx_licenses_expiring(),
