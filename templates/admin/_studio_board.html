@@ -40,6 +40,8 @@
                data-pid="{{ p.id }}" data-stage="{{ p.status }}"
                data-name="{{ p.title | lower }}" data-shoot="{{ p.shoot_date or '' }}"
                data-age="{{ p.days_in_stage or 0 }}" data-value="{{ p.value_cents or 0 }}"
+               data-quiet="{{ p.days_quiet if p.days_quiet is not none else '' }}"
+               data-client-touch="{{ p.last_client_touch_at or '' }}"
                data-created="{{ p.created_at or '' }}"
                data-goto="/admin/studio/projects/{{ p.id }}">
         <div class="stu-card-top">
