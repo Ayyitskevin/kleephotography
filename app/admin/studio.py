@@ -896,6 +896,7 @@ def update_project(
     if status not in PROJECT_STATUSES:
         raise HTTPException(status_code=400, detail="bad status")
     with db.tx() as con:
+        _gate_retainer_paid(con, project_id, old_status, status)
         con.execute(
             """UPDATE projects SET title=?, status=?, notes=?, gallery_id=?,
                   notion_page_id=?, shoot_date=?,
@@ -915,6 +916,26 @@ def update_project(
         )
         _audit_stage_move(con, project_id, old_status, status)
     return redirect_local(f"/admin/studio/projects/{project_id}")
+
+
+def _gate_retainer_paid(con, project_id: int, old: str, new: str) -> None:
+    """Payment is the gate into retainer_paid (migration 031's rule, and what
+    pay.py does when money lands). A hand move into it — drag or full form —
+    is refused unless an invoice on the project is already deposit_paid or
+    paid, so `booked_value` can't count money that never arrived. Runs on the
+    caller's BEGIN IMMEDIATE transaction, so the check and the write can't race
+    a webhook. Re-saving a project already in retainer_paid is not a move."""
+    if new != "retainer_paid" or old == "retainer_paid":
+        return
+    paid = con.execute(
+        "SELECT 1 FROM invoices WHERE project_id=? AND status IN ('deposit_paid','paid') LIMIT 1",
+        (project_id,),
+    ).fetchone()
+    if not paid:
+        raise HTTPException(
+            status_code=409,
+            detail="Retainer Paid needs a recorded deposit or payment on this project",
+        )
 
 
 def _audit_stage_move(con, project_id: int, old: str, new: str) -> None:
@@ -963,6 +984,7 @@ def move_project_status(request: Request, project_id: int, status: str = Form(..
     if status not in PROJECT_STATUSES:
         raise HTTPException(status_code=400, detail="bad status")
     with db.tx() as con:
+        _gate_retainer_paid(con, project_id, old_status, status)
         con.execute(
             """UPDATE projects SET status=?,
                   stage_changed_at=CASE WHEN status=? THEN stage_changed_at
