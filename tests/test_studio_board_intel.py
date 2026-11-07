@@ -188,6 +188,19 @@ def test_peek_shows_contacts_touch_and_a_stage_form(admin_client, new_project):
     assert '<option value="inquiry_received" selected>' in response.text
 
 
+def test_peek_says_today_when_the_client_acted_today(admin_client, new_project):
+    pid = new_project()
+    db.run(
+        "INSERT INTO inquiries (name, email, message, converted_project_id) "
+        "VALUES ('Intel Chef', 'chef@intel.example', 'hi', ?)",
+        (pid,),
+    )
+
+    response = admin_client.get(f"/admin/studio/projects/{pid}/peek")
+
+    assert "Client last acted today" in response.text
+
+
 def test_peek_404s_for_a_missing_project(admin_client):
     assert admin_client.get("/admin/studio/projects/999999/peek").status_code == 404
 
