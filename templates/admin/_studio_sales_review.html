@@ -1,0 +1,30 @@
+<section class="stu-sales" aria-labelledby="sales-review-title">
+  <h2 id="sales-review-title">Sales review <small>{{ sales_review_total }} to review</small></h2>
+  <p>Open sales opportunities with no recorded client activity for {{ quiet_days }}+ days.
+    Review the history before reaching out. Oldest first, then recorded value.</p>
+  {% if sales_review %}
+  <ol>
+    {% for item in sales_review %}
+    {% set p = item.project %}
+    <li>
+      <div><a href="/admin/studio/projects/{{ p.id }}">{{ p.title }}</a>
+        <span>{{ p.company or p.client_name }}</span></div>
+      <div>
+        {% if p.last_client_touch_at %}
+        <span>Client activity {{ p.days_quiet }}d ago</span>
+        {% else %}
+        <span>No client activity recorded · {{ p.days_quiet }}d since stage entry / creation</span>
+        {% endif %}
+        <span>{{ item.action }} · {% if p.value_cents %}${{ p.value_cents|usd0 }} recorded{% else %}Value not recorded{% endif %}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% if sales_review_total > sales_review|length %}
+  <p>Showing the first {{ sales_review|length }} of {{ sales_review_total }}. All opportunities remain in the board below.</p>
+  {% endif %}
+  {% else %}
+  <p>No opportunities meet this review rule. Check <a href="/admin/inbox">Inbox</a> for new conversations,
+    or <a href="/admin/studio/clients">Clients</a> to add a contact and project.</p>
+  {% endif %}
+</section>

@@ -18,6 +18,7 @@
 {% for s in statuses if s != "archived" %}{% if counts.get(s, 0) > share.max %}{% set share.max = counts.get(s, 0) %}{% endif %}{% endfor %}
 <div class="stu-board" id="studio-board"
      data-drag-board="/admin/studio/projects/{pid}/status" data-drag-target="#studio-board">
+  {% include "admin/_studio_sales_review.html" %}
   <div class="stu-board-rail">
     {% for s in statuses %}
     <div class="stu-col" data-stage="{{ s }}">

@@ -1,0 +1,15 @@
+/* Same review queue in the full board and HTMX stage-move fragment. */
+.admin-shell .stu-sales {
+  margin-bottom: 1rem; padding: 1rem; max-width: 70rem;
+  border: 1px solid var(--sr-line, var(--line));
+  color: var(--sr-ink, var(--ink)); background: var(--sr-panel, var(--paper));
+}
+.admin-shell .stu-sales h2 { margin: 0 0 .5rem; font-size: 1rem; }
+.admin-shell .stu-sales small { font-weight: normal; margin-left: .5rem; }
+.admin-shell .stu-sales p { font-size: .85rem; margin: .5rem 0; }
+.admin-shell .stu-sales ol { margin: .75rem 0; padding-left: 1.5rem; }
+.admin-shell .stu-sales li { padding: .6rem 0; border-top: 1px solid var(--sr-line, var(--line)); }
+.admin-shell .stu-sales li > div { display: flex; flex-wrap: wrap; gap: .4rem 1rem; }
+.admin-shell .stu-sales li > div + div { margin-top: .3rem; font-size: .8rem; }
+.admin-shell .stu-sales a { color: var(--sr-cream, var(--ink)); overflow-wrap: anywhere; }
+.admin-shell .stu-sales a:focus-visible { outline: 2px solid var(--sr-amber, var(--terra)); outline-offset: 3px; }
