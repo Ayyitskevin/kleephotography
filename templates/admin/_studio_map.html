@@ -1,0 +1,30 @@
+{# Read-only projection of the current board's rows. No API or duplicate store. #}
+<section id="studio-map" class="stu-map" hidden aria-label="Project age and value map">
+  <div class="stu-map-controls">
+    <label>Age
+      <select data-map-clock aria-label="Map age metric">
+        <option value="quiet" selected>Client quiet</option>
+        <option value="age">Time in stage</option>
+      </select>
+    </label>
+    <label>Window
+      <select data-map-window aria-label="Map age window">
+        <option value="7">7 days</option>
+        <option value="30" selected>30 days</option>
+        <option value="90">90 days</option>
+        <option value="all">All ages</option>
+      </select>
+    </label>
+    <p data-map-summary role="status" aria-live="polite"></p>
+  </div>
+  <p class="stu-map-help">Recent at the top; older below. Project value increases to the right inside each stage, on the same scale. Nearby projects are grouped. Hover or focus for details; select a project to open it.</p>
+  <p class="stu-map-help" data-map-clock-help>Client quiet excludes our follow-ups. Where no client action is recorded, age falls back to the stage change or creation date.</p>
+  <div class="stu-map-scroll" tabindex="0" aria-label="Pipeline map, scroll horizontally for more stages">
+    <div class="stu-map-plot" data-map-plot></div>
+  </div>
+  <details class="stu-map-excluded" data-map-excluded hidden>
+    <summary data-map-excluded-label>Projects outside this view</summary>
+    <ul data-map-excluded-list></ul>
+  </details>
+  <p class="stu-map-help">Values match the Board view, not cash collected. A dash means no positive value is shown. Archived projects are not plotted; closed projects remain for context. Use List for a table of projects.</p>
+</section>

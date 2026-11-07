@@ -1,5 +1,9 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Studio · Mise{% endblock %}
+{% block admin_head %}
+<link rel="stylesheet" href="/static/studio-map.css?v={{ static_rev }}">
+<script src="/static/studio-map.js?v={{ static_rev }}" defer></script>
+{% endblock %}
 {% block topbar %}
 {% set na_count = (licenses_expiring or [])|length + (press_confirm or [])|length + (retainer_drafts or [])|length + (quota_behind or [])|length + (content_due or [])|length + (conflicts or [])|length + (proofing_waiting or [])|length %}
 <header class="admin-topbar pgtop">
@@ -17,6 +21,7 @@
     <div class="stu-viewpill" role="group" aria-label="View">
       <button type="button" data-view="board" class="is-active" aria-pressed="true">Board</button>
       <button type="button" data-view="list" aria-pressed="false">List</button>
+      <button type="button" data-view="map" data-map-toggle hidden aria-pressed="false">Map</button>
     </div>
     <details class="stu-newproj" id="clients">
       <summary class="pgtop-new"><span class="qc-plus" aria-hidden="true">+</span> New project</summary>
@@ -38,6 +43,7 @@
     {% include "admin/_studio_board.html" %}
 
     {% include "admin/_studio_list_table.html" %}
+    {% include "admin/_studio_map.html" %}
   </section>
 
 </main>

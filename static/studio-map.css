@@ -1,0 +1,38 @@
+/* An admin-only projection; theme variables preserve the Screening Room switch. */
+.admin-shell #studio-board[hidden], .admin-shell #studio-list[hidden],
+.admin-shell #studio-map[hidden], .admin-shell [data-map-toggle][hidden],
+.admin-shell .stu-map [hidden] { display: none !important; }
+.admin-shell .stu-map { color: var(--ink); }
+.admin-shell .stu-map-controls { display: flex; align-items: end; gap: 1rem; flex-wrap: wrap; }
+.admin-shell .stu-map-controls label { display: grid; gap: .35rem; }
+.admin-shell .stu-map-controls p { margin: 0 0 .5rem; }
+.admin-shell .stu-map-help { font-size: .85rem; color: var(--ink-soft); max-width: 85ch; }
+.admin-shell .stu-map-scroll { overflow-x: auto; padding: .5rem 0 1.5rem; }
+.admin-shell .stu-map-plot { display: flex; width: max-content; padding-right: 1rem; }
+.admin-shell .stu-map-axis { width: 48px; flex: none; position: relative; }
+.admin-shell .stu-map-axis-title { position: absolute; top: 20px; font-size: .8rem; }
+.admin-shell .stu-map-tick { position: absolute; right: 8px; font-size: .75rem; }
+.admin-shell .stu-map-lane { width: 220px; flex: none; border-left: 1px solid var(--line); }
+.admin-shell .stu-map-heading { height: 56px; margin: 0; padding: .5rem; font: 600 .85rem/1.4 var(--font-ui); }
+.admin-shell .stu-map-field { height: 400px; position: relative;
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent 89px, var(--line) 89px, var(--line) 90px);
+  background-position: 0 20px; }
+.admin-shell .stu-map-scale { margin: .5rem; font-size: .75rem; color: var(--ink-soft); }
+.admin-shell .stu-map-point, .admin-shell .stu-map-cluster { position: absolute; transform: translate(-50%, -50%); }
+.admin-shell .stu-map-point, .admin-shell .stu-map-cluster > summary { width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid var(--terra); background: var(--paper); cursor: pointer; }
+.admin-shell .stu-map-cluster > summary { display: grid; place-items: center; font-size: .75rem; list-style: none; }
+.admin-shell .stu-map-cluster > summary::-webkit-details-marker { display: none; }
+.admin-shell .stu-map-point:focus-visible, .admin-shell .stu-map-cluster > summary:focus-visible { outline: 3px solid var(--terra); outline-offset: 3px; }
+.admin-shell .stu-map-tooltip, .admin-shell .stu-map-cluster-list { position: absolute; left: 0; top: 28px; width: 210px;
+  padding: .65rem; background: var(--paper); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow);
+  font-size: .8rem; line-height: 1.5; overflow-wrap: anywhere; }
+.admin-shell .stu-map-tooltip { display: none; }
+.admin-shell .stu-map-point:hover, .admin-shell .stu-map-point:focus-visible,
+.admin-shell .stu-map-cluster[open] { z-index: 5; }
+.admin-shell .stu-map-point:hover .stu-map-tooltip, .admin-shell .stu-map-point:focus-visible .stu-map-tooltip { display: block; }
+.admin-shell .stu-map-cluster-list { margin: 0; max-height: 260px; overflow-y: auto; list-style: none; }
+.admin-shell .stu-map-cluster-list li + li { margin-top: .5rem; }
+.admin-shell .stu-map-excluded { margin-top: 1rem; }
+body.sr .stu-map { --ink: var(--sr-cream); --ink-soft: var(--sr-ink-soft); --paper: var(--sr-overlay);
+  --line: var(--sr-line-raised); --terra: var(--sr-amber); --shadow: var(--sr-shadow-1); --font-ui: var(--sr-sans); }

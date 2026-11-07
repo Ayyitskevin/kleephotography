@@ -523,6 +523,9 @@
       var listTable = document.getElementById("studio-list");
       if (board) board.hidden = view !== "board";
       if (listTable) listTable.hidden = view !== "list";
+      var map = document.getElementById("studio-map");
+      if (map) map.hidden = view !== "map";
+      if (view === "map" && window.miseStudioMap) window.miseStudioMap.render();
       document.querySelectorAll(".stu-viewpill button").forEach(function (b) {
         var on = b === vp;
         b.classList.toggle("is-active", on);
@@ -560,6 +563,9 @@
     var listTable = document.getElementById("studio-list");
     if (board) board.hidden = view !== "board";
     if (listTable) listTable.hidden = view !== "list";
+    var map = document.getElementById("studio-map");
+    if (map) map.hidden = view !== "map";
+    if (view === "map" && window.miseStudioMap) window.miseStudioMap.render();
   });
 
   /* data-filter — delegated pill filtering, one behavior for every page that
