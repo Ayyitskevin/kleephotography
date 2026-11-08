@@ -57,7 +57,9 @@
       <button type="button" data-print class="link">Print / save as PDF</button>
       <a href="/i/{{ d.slug }}" class="link">Back to invoice</a>
     </div>
+    {% if payments|selectattr('stripe_event_id')|list %}
     <p class="client-doc-security no-print">Payments processed securely by Stripe.</p>
+    {% endif %}
   </section>
 
   <p class="client-doc-foot">Proposal → Contract → Invoice — clean documents, secure payment, no extra portal friction.</p>

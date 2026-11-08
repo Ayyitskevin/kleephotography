@@ -106,12 +106,12 @@ def view_invoice(request: Request, slug: str, thanks: str = ""):
 
 @router.get("/i/{slug}/receipt", response_class=HTMLResponse)
 def view_receipt(request: Request, slug: str):
-    """Printable receipt — a read-only render of payments Stripe already
-    recorded, so it can never disagree with what was charged. 404 until at
-    least one payment exists."""
+    """Printable receipt — a read-only render of payments already recorded (by
+    Stripe, or by the studio for a payment received outside Stripe), so it can
+    never disagree with what was paid. 404 until at least one payment exists."""
     d = _invoice_or_404(slug)
     payments = db.all_(
-        """SELECT amount_cents, kind, created_at
+        """SELECT amount_cents, kind, created_at, stripe_event_id
                           FROM payments WHERE invoice_id=?
                           ORDER BY created_at""",
         (d["id"],),
@@ -246,8 +246,86 @@ def pay_invoice(request: Request, slug: str):
     return RedirectResponse(url, status_code=303)
 
 
-class _PaymentStateConflict(Exception):
-    pass
+class PaymentStateConflict(Exception):
+    """The invoice (or booking) is no longer in the state a payment of this kind
+    requires. Raised inside the payment transaction, so nothing is written."""
+
+
+def record_invoice_payment(
+    con,
+    d,
+    kind: str,
+    amount_cents: int,
+    *,
+    stripe_event_id=None,
+    stripe_session_id=None,
+    received_at=None,
+):
+    """Record one installment on invoice ``d`` and advance invoice + project state,
+    on the caller's open ``db.tx()`` connection. Returns (payment id, staged job id).
+
+    The Stripe webhook and the admin offline-payment action both apply payments
+    through here, so the two can never move an invoice or a project differently.
+
+    ``received_at`` is a wall-clock 'YYYY-MM-DD HH:MM:SS' for a payment received
+    earlier than now (an offline payment); it is stored UTC like datetime('now'),
+    so revenue months ('localtime') and paid_at land on the day it was received.
+    None (the webhook) stamps now, exactly as before.
+
+    Raises PaymentStateConflict when the invoice is not in the state this kind
+    requires, and sqlite3.IntegrityError when the installment (UNIQUE invoice_id,
+    kind), the Stripe event or the Stripe session is already recorded. The INSERT
+    runs first, so a duplicate unwinds the whole transaction with nothing written.
+    """
+    cur = con.execute(
+        """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
+              amount_cents, kind, created_at)
+           VALUES (?,?,?,?,?, COALESCE(datetime(?, 'utc'), datetime('now')))""",
+        (d["id"], stripe_event_id, stripe_session_id, amount_cents, kind, received_at),
+    )
+    if kind == "deposit":
+        changed = con.execute(
+            """UPDATE invoices SET status='deposit_paid'
+                 WHERE id=? AND status IN ('sent','viewed')""",
+            (d["id"],),
+        )
+    elif kind == "balance":
+        changed = con.execute(
+            """UPDATE invoices
+                  SET status='paid', paid_at=COALESCE(datetime(?, 'utc'), datetime('now'))
+                WHERE id=? AND status='deposit_paid'""",
+            (received_at, d["id"]),
+        )
+    else:
+        changed = con.execute(
+            """UPDATE invoices
+                  SET status='paid', paid_at=COALESCE(datetime(?, 'utc'), datetime('now'))
+                WHERE id=? AND status IN ('sent','viewed')""",
+            (received_at, d["id"]),
+        )
+    if changed.rowcount != 1:
+        raise PaymentStateConflict
+    # Payment landed → advance the project to Retainer Paid (the funnel's
+    # money gate). Only moves forward from pre-payment stages; never rewinds
+    # a project already at session planning / closed / archived.
+    con.execute(
+        """UPDATE projects SET status='retainer_paid',
+              stage_changed_at=datetime('now') WHERE id=?
+              AND status IN ('inquiry_received','consultation_call',
+                             'proposal_sent','contract_signed')""",
+        (d["project_id"],),
+    )
+    # Staged INSIDE the transaction, not enqueued after it. jobs.enqueue
+    # writes its own row in a separate transaction, so a crash, a restart,
+    # or a killed worker between the commit above and that call left the
+    # payment recorded with no sync job and nothing to notice it: Stripe's
+    # retry short-circuits on the duplicate event id, the sweeper only
+    # re-offers rows that exist, and Notion stays silently stale. Staging
+    # makes the job as durable as the payment — they commit together or
+    # not at all, which is the pattern uploads.py already uses for work
+    # far less important than this.
+    notion_job = jobs.stage(con, "notion_sync_invoice", {"invoice_id": d["id"]})
+    return cur.lastrowid, notion_job
 
 
 def _ack_unapplied(
@@ -328,7 +406,7 @@ def _handle_invoice_async_payment_failed(event, session, metadata) -> dict:
                 (invoice_id, session_id),
             )
             if changed.rowcount != 1:
-                raise _PaymentStateConflict
+                raise PaymentStateConflict
             audit.log(
                 con,
                 "invoice",
@@ -337,7 +415,7 @@ def _handle_invoice_async_payment_failed(event, session, metadata) -> dict:
                 diff={"event_id": event["id"], "session_id": session_id},
                 actor="stripe",
             )
-    except _PaymentStateConflict:
+    except PaymentStateConflict:
         return _ack_unapplied(
             event["id"],
             invoice_id,
@@ -457,8 +535,8 @@ def _apply_booking_payment(event, session, metadata) -> dict:
                 (amount_total, booking_id),
             )
             if changed.rowcount != 1:
-                raise _PaymentStateConflict
-    except _PaymentStateConflict:
+                raise PaymentStateConflict
+    except PaymentStateConflict:
         return _ack_unapplied(
             event["id"],
             booking_id,
@@ -645,52 +723,15 @@ def _process_stripe_webhook(payload: bytes, signature: str):
     # event rolls the whole tx back with nothing else written.
     try:
         with db.tx() as con:
-            con.execute(
-                """INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id,
-                      amount_cents, kind) VALUES (?,?,?,?,?)""",
-                (invoice_id, event["id"], session["id"], amount_total, kind),
+            _payment_id, notion_job = record_invoice_payment(
+                con,
+                d,
+                kind,
+                amount_total,
+                stripe_event_id=event["id"],
+                stripe_session_id=session["id"],
             )
-            if kind == "deposit":
-                changed = con.execute(
-                    """UPDATE invoices SET status='deposit_paid'
-                         WHERE id=? AND status IN ('sent','viewed')""",
-                    (invoice_id,),
-                )
-            elif kind == "balance":
-                changed = con.execute(
-                    """UPDATE invoices SET status='paid', paid_at=datetime('now')
-                         WHERE id=? AND status='deposit_paid'""",
-                    (invoice_id,),
-                )
-            else:
-                changed = con.execute(
-                    """UPDATE invoices SET status='paid', paid_at=datetime('now')
-                         WHERE id=? AND status IN ('sent','viewed')""",
-                    (invoice_id,),
-                )
-            if changed.rowcount != 1:
-                raise _PaymentStateConflict
-            # Payment landed → advance the project to Retainer Paid (the funnel's
-            # money gate). Only moves forward from pre-payment stages; never rewinds
-            # a project already at session planning / closed / archived.
-            con.execute(
-                """UPDATE projects SET status='retainer_paid',
-                      stage_changed_at=datetime('now') WHERE id=?
-                      AND status IN ('inquiry_received','consultation_call',
-                                     'proposal_sent','contract_signed')""",
-                (d["project_id"],),
-            )
-            # Staged INSIDE the transaction, not enqueued after it. jobs.enqueue
-            # writes its own row in a separate transaction, so a crash, a restart,
-            # or a killed worker between the commit above and that call left the
-            # payment recorded with no sync job and nothing to notice it: Stripe's
-            # retry short-circuits on the duplicate event id, the sweeper only
-            # re-offers rows that exist, and Notion stays silently stale. Staging
-            # makes the job as durable as the payment — they commit together or
-            # not at all, which is the pattern uploads.py already uses for work
-            # far less important than this.
-            notion_job = jobs.stage(con, "notion_sync_invoice", {"invoice_id": invoice_id})
-    except _PaymentStateConflict:
+    except PaymentStateConflict:
         return _ack_unapplied(
             event["id"],
             invoice_id,

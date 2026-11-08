@@ -360,6 +360,28 @@ def test_refuses_when_not_signed_in(chain):
     _assert_nothing_written(before, iid, pid)
 
 
+# ── what the client sees ────────────────────────────────────────────────────
+
+
+def test_the_client_receipt_lists_a_cash_payment_without_claiming_stripe(admin_client, chain):
+    pid, iid = chain()
+    slug = db.one("SELECT slug FROM invoices WHERE id=?", (iid,))["slug"]
+    assert _record(admin_client, iid).status_code == 303
+    with TestClient(app) as anon:
+        r = anon.get(f"/i/{slug}/receipt")
+    assert r.status_code == 200 and "300.00" in r.text
+    assert "processed securely by Stripe" not in r.text
+    # Control: a Stripe-recorded payment still carries the line.
+    db.run(
+        "INSERT INTO payments (invoice_id, stripe_event_id, stripe_session_id, amount_cents, kind) "
+        "VALUES (?,?,?,?,?)",
+        (iid, f"evt_receipt_{iid}", f"cs_receipt_{iid}", 60000, "balance"),
+    )
+    with TestClient(app) as anon:
+        r = anon.get(f"/i/{slug}/receipt")
+    assert r.status_code == 200 and "processed securely by Stripe" in r.text
+
+
 # ── shown on the invoice page ───────────────────────────────────────────────
 
 
