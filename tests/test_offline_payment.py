@@ -155,6 +155,8 @@ def test_a_cash_deposit_is_recorded_and_moves_invoice_and_project_like_stripe(ad
                 "method": "cash",
                 "received_on": "2026-11-07",
                 "reference": "paid at the consult",
+                # ties the audit row to this exact payment row, not just to its reusable id
+                "payment_created_at": pay_row["created_at"],
             },
         )
     ]
@@ -297,6 +299,26 @@ def test_refuses_an_amount_that_is_not_the_installment_due(admin_client, chain, 
     assert _record(admin_client, iid, amount="300.00").status_code == 303  # control: the deposit
 
 
+@pytest.mark.parametrize("amount", ["299.999", "300.001", "300.0000", "300.005"])
+def test_refuses_more_than_two_decimal_places(admin_client, chain, amount):
+    """Exact parse: 299.999 used to round to the $300.00 deposit and be accepted."""
+    pid, iid = chain()
+    before = _state(iid, pid)
+    assert _record(admin_client, iid, amount=amount).status_code == 400
+    _assert_nothing_written(before, iid, pid)
+    assert _record(admin_client, iid, amount="300.0").status_code == 303  # control: exactly $300
+
+
+@pytest.mark.parametrize("amount", ["1e309", "inf", "-inf", "nan", "Infinity", "1e999999999"])
+def test_refuses_an_amount_that_is_not_finite_or_overflows(admin_client, chain, amount):
+    """These used to reach round(float(...)) and raise OverflowError: a 500 on a money route."""
+    pid, iid = chain()
+    before = _state(iid, pid)
+    assert _record(admin_client, iid, amount=amount).status_code == 400
+    _assert_nothing_written(before, iid, pid)
+    assert _record(admin_client, iid, amount="300").status_code == 303  # control
+
+
 def test_refuses_a_second_deposit_on_a_double_submit(admin_client, chain):
     pid, iid = chain()
     assert _record(admin_client, iid).status_code == 303  # control: the first one lands
@@ -397,3 +419,100 @@ def test_the_invoice_page_shows_how_it_was_paid(admin_client, chain):
     assert page.status_code == 200
     assert "data-offline-payment" in page.text
     assert "Check" in page.text and "received 2026-11-07" in page.text and "check 1042" in page.text
+
+
+# ── labels survive a correction (payments.id has no AUTOINCREMENT, so ids are reused) ──
+
+
+def _correct_by_hand(iid, payment_id, *, void=True):
+    """What the PR's correction does: delete the offline payment row and put the invoice back.
+    With void=True it also retires the payment's audit row by appending an
+    offline_payment_voided row that names it (audit_log stays append-only)."""
+    if void:
+        from app import audit
+
+        a = db.one(
+            "SELECT id FROM audit_log WHERE entity_type='payment' AND action='offline_payment' "
+            "AND entity_id=? ORDER BY id DESC LIMIT 1",
+            (payment_id,),
+        )
+        with db.tx() as con:
+            audit.log(con, "payment", payment_id, "offline_payment_voided", diff={"voids": a["id"]})
+    db.run("DELETE FROM payments WHERE id=?", (payment_id,))
+    db.run("UPDATE invoices SET status='sent', paid_at=NULL WHERE id=?", (iid,))
+
+
+def _payment_line(page_text, amount="300.00"):
+    """The <li> of the payment list that shows this amount."""
+    return [li for li in page_text.split("<li") if f"${amount}</strong>" in li]
+
+
+def test_a_stripe_payment_reusing_a_corrected_offline_payments_id_is_labelled_stripe(
+    admin_client, chain
+):
+    """Kimi's reproduction (probe E): the corrected check's audit row used to re-attach,
+    by id alone, to the Stripe payment that reused that id."""
+    pid, iid = chain()
+    assert _record(admin_client, iid, method="check", reference="chk-1").status_code == 303
+    old_id = db.one("SELECT id FROM payments WHERE invoice_id=?", (iid,))["id"]
+    _correct_by_hand(iid, old_id, void=False)  # even without the void row
+    db.run(
+        "INSERT INTO payments (id, invoice_id, stripe_event_id, amount_cents, kind) VALUES (?,?,?,?,?)",
+        (old_id, iid, f"evt_reuse_{iid}", 30000, "deposit"),
+    )
+    page = admin_client.get(f"/admin/studio/invoices/{iid}").text
+    assert "chk-1" not in page and "received 2026-11-07" not in page
+    lines = _payment_line(page)
+    assert len(lines) == 1 and "Stripe" in lines[0] and "data-offline-payment" not in lines[0]
+
+
+def test_a_second_offline_payment_reusing_the_id_shows_only_its_own_details(admin_client, chain):
+    pid, iid = chain()
+    assert _record(admin_client, iid, method="check", reference="chk-1").status_code == 303
+    old_id = db.one("SELECT id FROM payments WHERE invoice_id=?", (iid,))["id"]
+    _correct_by_hand(iid, old_id, void=False)
+    # same day, same kind, same amount: everything but the method and reference matches
+    assert _record(admin_client, iid, method="cash", reference="cash-2").status_code == 303
+    new_id = db.one("SELECT id FROM payments WHERE invoice_id=?", (iid,))["id"]
+    assert new_id == old_id, "precondition: SQLite reused the freed id"
+    page = admin_client.get(f"/admin/studio/invoices/{iid}").text
+    lines = _payment_line(page)
+    assert len(lines) == 1 and "cash-2" in lines[0] and "Cash" in lines[0]
+    assert "chk-1" not in page
+
+
+def test_a_retired_audit_row_never_labels_a_payment(admin_client, chain):
+    """A row restored by hand with the same id, kind, amount and created_at would match the old
+    audit row on every field; only the void row tells them apart."""
+    pid, iid = chain()
+    assert _record(admin_client, iid, method="check", reference="chk-1").status_code == 303
+    old = dict(db.one("SELECT * FROM payments WHERE invoice_id=?", (iid,)))
+
+    def restore():
+        db.run(
+            "INSERT INTO payments (id, invoice_id, amount_cents, kind, created_at) VALUES (?,?,?,?,?)",
+            (old["id"], iid, old["amount_cents"], old["kind"], old["created_at"]),
+        )
+
+    # Control: deleted and restored byte for byte WITHOUT retiring the audit row: it is the same
+    # payment, so the label comes back.
+    _correct_by_hand(iid, old["id"], void=False)
+    restore()
+    assert "chk-1" in admin_client.get(f"/admin/studio/invoices/{iid}").text
+    # Retired, then restored: no label.
+    _correct_by_hand(iid, old["id"], void=True)
+    restore()
+    page = admin_client.get(f"/admin/studio/invoices/{iid}").text
+    assert "chk-1" not in page
+    assert "Recorded payment" in _payment_line(page)[0]
+
+
+def test_a_payment_without_stripe_or_an_audit_row_is_not_called_stripe(admin_client, chain):
+    pid, iid = chain()
+    db.run(
+        "INSERT INTO payments (invoice_id, amount_cents, kind) VALUES (?,?,?)",
+        (iid, 30000, "deposit"),
+    )
+    db.run("UPDATE invoices SET status='deposit_paid' WHERE id=?", (iid,))
+    lines = _payment_line(admin_client.get(f"/admin/studio/invoices/{iid}").text)
+    assert len(lines) == 1 and "Recorded payment" in lines[0] and "Stripe" not in lines[0]
