@@ -161,7 +161,7 @@
       </section>
       {% else %}
       <section class="inv-card">
-        <span class="inv-label">Stripe payments</span>
+        <span class="inv-label">Payments</span>
         <div class="inv-pay-summary">
           <div><span>Paid</span><strong>${{ paid.cents|usd }}</strong></div>
           <div><span>Balance</span><strong>${{ balance_cents|usd }}</strong></div>
@@ -169,13 +169,44 @@
         {% if payments %}
         <ul class="inv-payments">
           {% for pay in payments %}
-          <li><span>{{ pay.kind|replace('_', ' ')|title }}<small>{{ pay.created_at }}</small></span><strong>${{ pay.amount_cents|usd }}</strong></li>
+          {% set off = offline.get(pay.id) %}
+          {% if pay.stripe_event_id %}
+          <li><span>{{ pay.kind|replace('_', ' ')|title }}<small>Stripe · {{ pay.created_at }}</small></span><strong>${{ pay.amount_cents|usd }}</strong></li>
+          {% elif off %}
+          <li data-offline-payment><span>{{ pay.kind|replace('_', ' ')|title }}<small>{{ offline_methods.get(off.method, off.method) }} · received {{ off.received_on }}{% if off.reference %} · {{ off.reference }}{% endif %}</small></span><strong>${{ pay.amount_cents|usd }}</strong></li>
+          {% else %}
+          <li><span>{{ pay.kind|replace('_', ' ')|title }}<small>Recorded payment · {{ pay.created_at }}</small></span><strong>${{ pay.amount_cents|usd }}</strong></li>
+          {% endif %}
           {% endfor %}
         </ul>
         {% else %}
         <p class="muted">No payments yet.</p>
         {% endif %}
       </section>
+      {% if owed_cents %}
+      <section class="inv-card inv-draft-controls" data-offline-payment-form>
+        <span class="inv-label">Record a payment received outside Stripe</span>
+        <form method="post" action="/admin/studio/invoices/{{ d.id }}/offline-payment"
+              data-confirm="Record ${{ owed_cents|usd }} as the {{ owed_kind }} received? The invoice and the project move exactly as they would for a Stripe payment.">
+          <label>Method
+            <select name="method" required>
+              {% for key, label in offline_methods.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+            </select>
+          </label>
+          <label>Amount ({{ owed_kind }} due)
+            <input type="number" name="amount" min="0.01" step="0.01" value="{{ owed_cents|usd }}" required>
+          </label>
+          <label>Date received
+            <input type="date" name="received_on" max="{{ today }}" value="{{ today }}" required>
+          </label>
+          <label>Reference or note
+            <input type="text" name="reference" maxlength="200" placeholder="Check number, transfer reference…">
+          </label>
+          <button type="submit" class="ghost">Record payment</button>
+        </form>
+        <p class="muted">Only the {{ owed_kind }} due can be recorded, once. Nothing is sent to the client.</p>
+      </section>
+      {% endif %}
       <section class="inv-card inv-actions">
         <form method="post" action="/admin/studio/invoices/{{ d.id }}/duplicate"
               data-confirm="Make an editable copy of this invoice as a new draft? Payments stay with the original.">
