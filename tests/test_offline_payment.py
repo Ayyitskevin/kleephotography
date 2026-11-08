@@ -443,8 +443,9 @@ def _correct_by_hand(iid, payment_id, *, void=True):
 
 
 def _payment_line(page_text, amount="300.00"):
-    """The <li> of the payment list that shows this amount."""
-    return [li for li in page_text.split("<li") if f"${amount}</strong>" in li]
+    """The <li> items of the invoice's payment list (only that <ul>) showing this amount."""
+    ul = page_text.split('<ul class="inv-payments">', 1)[1].split("</ul>", 1)[0]
+    return [li for li in ul.split("<li")[1:] if f"${amount}</strong>" in li]
 
 
 def test_a_stripe_payment_reusing_a_corrected_offline_payments_id_is_labelled_stripe(
@@ -502,6 +503,22 @@ def test_a_retired_audit_row_never_labels_a_payment(admin_client, chain):
     # Retired, then restored: no label.
     _correct_by_hand(iid, old["id"], void=True)
     restore()
+    page = admin_client.get(f"/admin/studio/invoices/{iid}").text
+    assert "chk-1" not in page
+    assert "Recorded payment" in _payment_line(page)[0]
+
+
+def test_an_old_audit_row_does_not_label_a_different_row_with_the_same_id(admin_client, chain):
+    """Same id, invoice, kind and amount, but not the same payment (another created_at):
+    the id alone must not carry the old method and reference across."""
+    pid, iid = chain()
+    assert _record(admin_client, iid, method="check", reference="chk-1").status_code == 303
+    old = dict(db.one("SELECT * FROM payments WHERE invoice_id=?", (iid,)))
+    _correct_by_hand(iid, old["id"], void=False)
+    db.run(
+        "INSERT INTO payments (id, invoice_id, amount_cents, kind, created_at) VALUES (?,?,?,?,?)",
+        (old["id"], iid, old["amount_cents"], old["kind"], "2026-11-01 17:00:00"),
+    )
     page = admin_client.get(f"/admin/studio/invoices/{iid}").text
     assert "chk-1" not in page
     assert "Recorded payment" in _payment_line(page)[0]

@@ -170,10 +170,12 @@
         <ul class="inv-payments">
           {% for pay in payments %}
           {% set off = offline.get(pay.id) %}
-          {% if off %}
+          {% if pay.stripe_event_id %}
+          <li><span>{{ pay.kind|replace('_', ' ')|title }}<small>Stripe · {{ pay.created_at }}</small></span><strong>${{ pay.amount_cents|usd }}</strong></li>
+          {% elif off %}
           <li data-offline-payment><span>{{ pay.kind|replace('_', ' ')|title }}<small>{{ offline_methods.get(off.method, off.method) }} · received {{ off.received_on }}{% if off.reference %} · {{ off.reference }}{% endif %}</small></span><strong>${{ pay.amount_cents|usd }}</strong></li>
           {% else %}
-          <li><span>{{ pay.kind|replace('_', ' ')|title }}<small>Stripe · {{ pay.created_at }}</small></span><strong>${{ pay.amount_cents|usd }}</strong></li>
+          <li><span>{{ pay.kind|replace('_', ' ')|title }}<small>Recorded payment · {{ pay.created_at }}</small></span><strong>${{ pay.amount_cents|usd }}</strong></li>
           {% endif %}
           {% endfor %}
         </ul>

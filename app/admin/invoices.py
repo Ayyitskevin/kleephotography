@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import logging
 import re
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -30,6 +31,22 @@ OFFLINE_METHODS = {
 }
 MAX_REFERENCE = 200
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _exact_cents(raw) -> int:
+    """Dollars → integer cents, exactly, for the offline-payment route only.
+
+    common.parse_form_cents rounds a float: 299.999 becomes 30000 cents, and
+    1e309 or inf raise OverflowError. Its other callers keep that behaviour; a
+    payment amount must not. Raises ValueError for anything that is not a finite
+    amount with at most two decimal places and under $1 trillion."""
+    try:
+        value = Decimal((raw or "").strip())
+    except InvalidOperation:
+        raise ValueError("not a number")
+    if not value.is_finite() or value.as_tuple().exponent < -2 or value.adjusted() > 12:
+        raise ValueError("not an exact amount")
+    return int(value * 100)
 
 
 def get_invoice(invoice_id: int) -> "db.sqlite3.Row":
@@ -64,13 +81,28 @@ def invoice_detail(request: Request, invoice_id: int):
     rows = items + [{} for _ in range(max(0, MAX_ITEM_ROWS - len(items)))]
     payments = db.all_("SELECT * FROM payments WHERE invoice_id=? ORDER BY id", (invoice_id,))
     # How each offline payment was paid lives in its audit row (no schema change).
+    # payments.id is reused after a correction deletes a row (INTEGER PRIMARY KEY,
+    # no AUTOINCREMENT), so an audit row labels a payment only when:
+    #   - the payment has no Stripe event (a Stripe payment is never labelled offline);
+    #   - the diff matches the payment row itself: invoice, kind, amount, created_at;
+    #   - no later offline_payment_voided row retires it (audit_log is append-only).
+    # Rows are read oldest first, so if two still match, the newest wins.
     offline = {
-        r["entity_id"]: json.loads(r["diff_json"])
+        r["payment_id"]: json.loads(r["diff_json"])
         for r in db.all_(
-            """SELECT a.entity_id, a.diff_json FROM audit_log a
-                 JOIN payments p ON p.id = a.entity_id
-                WHERE a.entity_type='payment' AND a.action='offline_payment'
-                  AND p.invoice_id=?""",
+            """SELECT p.id AS payment_id, a.diff_json FROM payments p
+                 JOIN audit_log a ON a.entity_type='payment' AND a.action='offline_payment'
+                                 AND a.entity_id = p.id
+                WHERE p.invoice_id=? AND p.stripe_event_id IS NULL
+                  AND json_extract(a.diff_json, '$.invoice_id') = p.invoice_id
+                  AND json_extract(a.diff_json, '$.kind') = p.kind
+                  AND json_extract(a.diff_json, '$.amount_cents') = p.amount_cents
+                  AND json_extract(a.diff_json, '$.payment_created_at') = p.created_at
+                  AND NOT EXISTS (
+                        SELECT 1 FROM audit_log v
+                         WHERE v.entity_type='payment' AND v.action='offline_payment_voided'
+                           AND json_extract(v.diff_json, '$.voids') = a.id)
+                ORDER BY a.id""",
             (invoice_id,),
         )
     }
@@ -197,9 +229,11 @@ def _record_offline_payment(invoice_id: int, form):
     if method not in OFFLINE_METHODS:
         raise HTTPException(status_code=400, detail="pick cash, check, bank transfer or other")
     try:
-        amount = common.parse_form_cents(form, "amount")
+        amount = _exact_cents(form.get("amount"))
     except ValueError:
-        raise HTTPException(status_code=400, detail="bad amount")
+        raise HTTPException(
+            status_code=400, detail="enter the amount in dollars, at most two decimal places"
+        )
     if amount != owed_cents:
         raise HTTPException(
             status_code=400,
@@ -229,6 +263,11 @@ def _record_offline_payment(invoice_id: int, form):
             payment_id, notion_job = pay.record_invoice_payment(
                 con, current, kind, amount, received_at=f"{received.isoformat()} 12:00:00"
             )
+            # payments.id is reused after a row is deleted (no AUTOINCREMENT), so the
+            # audit row also carries what identifies this exact payment row.
+            created_at = con.execute(
+                "SELECT created_at FROM payments WHERE id=?", (payment_id,)
+            ).fetchone()["created_at"]
             audit.log(
                 con,
                 "payment",
@@ -241,6 +280,7 @@ def _record_offline_payment(invoice_id: int, form):
                     "method": method,
                     "received_on": received.isoformat(),
                     "reference": reference,
+                    "payment_created_at": created_at,
                 },
             )
     except pay.PaymentStateConflict:
