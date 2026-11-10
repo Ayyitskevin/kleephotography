@@ -118,7 +118,16 @@ _HOME_KEYS = {
 _ROW_KEYS = {
     "orphans": {"id", "slug", "title"},
     "link_clients": {"id", "name", "company"},
-    "open_tasks": {"id", "title", "due_date", "project_id", "project_title", "overdue"},
+    "open_tasks": {
+        "id",
+        "title",
+        "due_date",
+        "project_id",
+        "project_title",
+        "prospect_id",
+        "business",
+        "overdue",
+    },
     "horizon_shoots": {
         "id",
         "title",
@@ -306,7 +315,7 @@ def test_home_scalar_values_keep_their_types(admin_client, seeded_dashboard):
 
 def _tasks_due() -> int:
     return db.one(
-        "SELECT COUNT(*) AS n FROM tasks WHERE done=0 AND due_date IS NOT NULL "
+        "SELECT COUNT(*) AS n FROM tasks WHERE done=0 AND canceled_at IS NULL AND due_date IS NOT NULL "
         "AND due_date <= date('now', 'localtime')"
     )["n"]
 

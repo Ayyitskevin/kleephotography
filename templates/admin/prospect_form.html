@@ -7,7 +7,7 @@
     <h1>{{ values.business if prospect_id else 'Add prospect' }}</h1>
     <p class="pgtop-sub">Outbound prospect · {{ 'Edit research and qualification' if prospect_id else 'Check existing records before saving' }}</p>
   </div>
-  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects">All prospects</a></div>
+  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/follow-ups">Daily follow-ups</a><a class="pgtop-link" href="/admin/studio/prospects">All prospects</a></div>
 </header>
 {% endblock %}
 {% block admin_body %}
@@ -23,6 +23,10 @@
   </section>
   {% elif reviewed %}
     <p class="sr-prospect-review" role="status">No exact matches found among prospects, clients or inbound inquiries. Review the details, then save. Different spellings or contact details can still hide a duplicate.</p>
+  {% endif %}
+  {% if prospect_id %}
+    {% include "admin/_prospect_activity.html" %}
+    <h2 class="sr-prospect-research-heading">Research and qualification</h2>
   {% endif %}
   <form method="post" class="stack-form sr-prospect-form" action="{{ '/admin/studio/prospects/' ~ prospect_id if prospect_id else '/admin/studio/prospects/review' }}">
     <div class="sr-prospect-grid">

@@ -317,7 +317,7 @@ def test_migration_preserves_existing_records_and_reruns_safely(tmp_path, monkey
     old_migrations = tmp_path / "old-migrations"
     old_migrations.mkdir()
     for path in original.glob("*.sql"):
-        if not path.name.startswith("084_"):
+        if path.name < "084_":
             shutil.copy(path, old_migrations / path.name)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "upgrade.db")
     monkeypatch.setattr(db, "MIGRATIONS_DIR", old_migrations)

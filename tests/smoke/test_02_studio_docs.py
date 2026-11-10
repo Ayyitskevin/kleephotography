@@ -484,10 +484,10 @@ def test_reports_range_toggle(admin):
 
 
 def test_tasks_board_view(admin):
-    # The strict-1:1 Tasks page is a 3-column board (Today / This week / Done),
+    # Tasks is a 3-column board (Today / Later / Done),
     # bucketed server-side from due_date. Encodes WHY the buckets matter: a task
     # due today (or overdue) belongs in Today; an open task with no/later due
-    # date belongs in This week. Guard the column labels and the bucketing.
+    # date belongs in Later / undated. Guard the labels and the bucketing.
     import datetime as _dt
 
     today_iso = _dt.date.today().isoformat()
@@ -499,7 +499,7 @@ def test_tasks_board_view(admin):
     admin.post("/admin/tasks", data={"title": "Undated board task"}, follow_redirects=False)
     page = admin.get("/admin/tasks").text
     assert "tk-grid" in page
-    for label in (">Today<", ">This week<", ">Done<"):
+    for label in (">Today<", ">Later / undated<", ">Done<"):
         assert label in page
     # the due-today task sorts ahead of the undated one (Today column renders
     # before This week) — both present, the urgent one first in document order.
