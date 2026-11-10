@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app import argus_analyze, config, db, jobs
 from app.main import app
+from tests.jobtest import freeze_job_pool
 
 pytestmark = pytest.mark.integration
 
@@ -18,7 +19,10 @@ def _configure_tmp_db(tmp_path, monkeypatch):
     # while a worker is still inside a job, and that worker re-reads DB_PATH at
     # its next db.connect() — so it follows us onto the new database instead of
     # staying on the old one. Draining first is what actually closes the race.
-    jobs.stop(wait=True)
+    # These tests assert enqueueing, or call the transport explicitly with a
+    # mocked urlopen. Never let a real worker send their synthetic gallery path
+    # to the placeholder Argus URL when the TestClient starts its lifespan.
+    freeze_job_pool(monkeypatch)
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "mise.db")
     monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "media")
@@ -84,6 +88,10 @@ def test_publish_enqueues_argus_job(admin_client, monkeypatch):
     )
     assert r.status_code == 303
     assert n_jobs() == 1
+    assert jobs._pool is None
+    assert (
+        db.one("SELECT status FROM jobs WHERE kind='argus_analyze_gallery'")["status"] == "queued"
+    )
     admin_client.post(
         f"/admin/galleries/{gid}/settings",
         data={"title": "Argus Pub", "pin": "1234", "published": "true"},
