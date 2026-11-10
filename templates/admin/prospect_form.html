@@ -1,0 +1,59 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ values.business if prospect_id else 'Add prospect' }} · Mise{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead">
+    <h1>{{ values.business if prospect_id else 'Add prospect' }}</h1>
+    <p class="pgtop-sub">Outbound prospect · {{ 'Edit research and qualification' if prospect_id else 'Check existing records before saving' }}</p>
+  </div>
+  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects">All prospects</a></div>
+</header>
+{% endblock %}
+{% block admin_body %}
+<main class="admin-main sr-prospects">
+  {% if error %}<p class="sr-error" role="alert">{{ error }}</p>{% endif %}
+  {% if matches %}
+  <section class="sr-prospect-review" aria-labelledby="match-title">
+    <h2 id="match-title">Review existing records</h2>
+    <p>This contact may already be in your CRM. Open the matching record before adding another. Your entries below have not been saved.</p>
+    <ul>{% for match in matches %}
+      <li><a href="{{ match.href }}">{{ match.label }}</a>{% if match.contact %} · {{ match.contact }}{% endif %}<br>{{ match.kind }} · {{ match.reason }}</li>
+    {% endfor %}</ul>
+  </section>
+  {% elif reviewed %}
+    <p class="sr-prospect-review" role="status">No exact matches found among prospects, clients or inbound inquiries. Review the details, then save. Different spellings or contact details can still hide a duplicate.</p>
+  {% endif %}
+  <form method="post" class="stack-form sr-prospect-form" action="{{ '/admin/studio/prospects/' ~ prospect_id if prospect_id else '/admin/studio/prospects/review' }}">
+    <div class="sr-prospect-grid">
+      <label class="sr-field"><span class="sr-label">Business / venue <span class="sr-req">*</span></span>
+        <input name="business" value="{{ values.business or '' }}" required maxlength="200" autocomplete="organization"></label>
+      <label class="sr-field"><span class="sr-label">Contact name</span>
+        <input name="contact_name" value="{{ values.contact_name or '' }}" maxlength="200" autocomplete="name"></label>
+      <label class="sr-field"><span class="sr-label">Email</span>
+        <input type="email" name="email" value="{{ values.email or '' }}" maxlength="254" autocomplete="email"></label>
+      <label class="sr-field"><span class="sr-label">Phone</span>
+        <input type="tel" name="phone" value="{{ values.phone or '' }}" maxlength="40" autocomplete="tel" aria-describedby="phone-hint">
+        <span class="sr-hint" id="phone-hint">US ten-digit or country-code number. Put extensions in notes.</span></label>
+      <label class="sr-field"><span class="sr-label">Photography specialty</span>
+        <select name="specialty"><option value="">Not decided</option>{% for key, spec in specialties.items() %}<option value="{{ key }}"{% if values.specialty == key %} selected{% endif %}>{{ spec.name }}</option>{% endfor %}</select></label>
+      <label class="sr-field"><span class="sr-label">Qualification</span>
+        <select name="qualification">{% for key, label in qualifications.items() %}<option value="{{ key }}"{% if values.qualification == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    </div>
+    <label class="sr-field"><span class="sr-label">Where you found them <span class="sr-req">*</span></span>
+      <input name="source" value="{{ values.source or '' }}" required maxlength="200" placeholder="For example: referral, website or local visit"></label>
+    <label class="sr-field"><span class="sr-label">Research notes</span>
+      <textarea name="notes" rows="5" maxlength="4000">{{ values.notes or '' }}</textarea></label>
+    <p class="muted">Contact details can stay blank while you research. Saving records your research; it does not contact anyone.</p>
+    <div class="sr-prospect-actions">
+      {% if prospect_id %}
+        <button type="submit" class="sr-btn">Save changes</button>
+      {% else %}
+        <button type="submit" class="sr-btn{{ ' sr-btn--ghost' if reviewed else '' }}">Check existing records</button>
+        {% if reviewed and not matches %}<button type="submit" class="sr-btn" formaction="/admin/studio/prospects">Save prospect</button>{% endif %}
+      {% endif %}
+      <a href="/admin/studio/prospects">Back to prospects</a>
+    </div>
+  </form>
+</main>
+{% endblock %}
