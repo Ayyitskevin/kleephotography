@@ -93,6 +93,11 @@ def detail_context(prospect_id: int) -> dict:
     return {
         **_options(),
         "prospect": dict(prospect) if prospect else None,
+        "handoff": db.one(
+            "SELECT h.*, p.title AS project_title FROM prospect_handoffs h "
+            "JOIN projects p ON p.id=h.project_id WHERE h.prospect_id=?",
+            (prospect_id,),
+        ),
         "pending_task": next((t for t in tasks if not t["done"] and not t["canceled_at"]), None),
         "followup_history": tasks,
         "contact_events": contacts,
@@ -176,13 +181,14 @@ def followup_queue(request: Request, filter: str = "due", q: str = "", page: int
     predicates = {
         "due": "t.id IS NOT NULL AND t.due_date <= ?",
         "upcoming": "t.id IS NOT NULL AND t.due_date > ?",
-        "unplanned": "t.id IS NULL AND p.qualification != 'not_fit'",
+        "unplanned": "t.id IS NULL AND p.qualification != 'not_fit' AND h.prospect_id IS NULL",
         "all": "1=1",
     }
     # Every interpolated SQL fragment is selected here, never supplied by a form.
     source = (
         "FROM prospects p LEFT JOIN tasks t ON t.prospect_id=p.id "
         "AND t.done=0 AND t.canceled_at IS NULL "
+        "LEFT JOIN prospect_handoffs h ON h.prospect_id=p.id "
     )
     where = (
         "WHERE instr(lower(p.business || ' ' || p.contact_name || ' ' || p.email || ' ' "
@@ -192,7 +198,7 @@ def followup_queue(request: Request, filter: str = "due", q: str = "", page: int
     total = db.one("SELECT COUNT(*) AS n " + source + where, args)["n"]
     page = min(max(1, page), max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE))
     rows = db.all_(
-        "SELECT p.*, t.id AS task_id, t.title, t.due_date, t.version, "
+        "SELECT p.*, t.id AS task_id, t.title, t.due_date, t.version, h.project_id AS linked_project_id, "
         "(SELECT x.cancel_reason FROM tasks x WHERE x.prospect_id=p.id "
         "ORDER BY x.id DESC LIMIT 1) AS last_cancel_reason, "
         "(SELECT MAX(c.occurred_on) FROM prospect_contact_events c "

@@ -33,7 +33,7 @@
         <tr>
           <td><a href="/admin/studio/prospects/{{ p.id }}">{{ p.business }}</a>{% if p.contact_name %}<br>{{ p.contact_name }}{% endif %}</td>
           <td>{{ specialties[p.specialty].name if p.specialty else 'Not decided' }}</td>
-          <td><span class="sr-badge">{{ qualifications[p.qualification] }}</span></td>
+          <td><span class="sr-badge">{{ qualifications[p.qualification] }}</span>{% if p.linked_project_id %}<br><a href="/admin/studio/projects/{{ p.linked_project_id }}">Linked project</a>{% endif %}</td>
           <td>{{ p.source }}</td>
         </tr>
       {% else %}

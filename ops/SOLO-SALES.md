@@ -80,9 +80,9 @@ audit history intact; older code ignores them. Do not drop captured research.
    legacy mode, at desktop and phone widths. The remote browser could not reach
    this session's local preview, so visual verification remains open.
 3. Use the normal reviewed deployment procedure when the origin is accessible.
-4. Next build: dated next actions and contact outcomes linked to prospect IDs,
-   followed by operator-reviewed drafts. Define prospect-to-client conversion
-   and communication preference inheritance before adding any sender/import.
+4. Dated next actions, contact outcomes and the reviewed project handoff are
+   described below. Operator-reviewed drafts and communication preference
+   inheritance remain later work before adding any sender/import.
 
 `tests/test_outbound_prospects.py` exercises authentication, cross-origin refusal,
 read-only review/GET, input validation, escaping, duplicate matches, stale
@@ -198,6 +198,93 @@ and the date/form script behavior. Local Chromium could not launch because the
 workspace denied socket creation, so desktop/mobile visual review remains open.
 No deployment, production admin write, contact or message send was performed.
 
+## Fourth slice: reviewed prospect-to-project handoff
+
+The prospect page now offers **Start opportunity**. First select an existing
+client or a new client copied from the prospect, then choose a new opportunity
+or an open project belonging to that client. Capture the photography need,
+optional specialty and requested target date, explicitly confirm a real
+opportunity, and review the complete plan before saving.
+
+A new project starts in the existing `inquiry_received` stage (Inquiry), with
+the photography need as its notes. It is an unbooked opportunity, not a new
+inbound inquiry. The requested target lives on the handoff and does not set
+`projects.shoot_date`. Linking an existing client/project preserves all its
+details and its stage. No proposal, contract, invoice, payment, booking, message,
+job or qualification change is created by this action.
+
+New-client creation checks normalized email, phone and business, including a
+different contact at the same business. A match requires explicitly choosing
+an existing client. The write repeats this check under the transaction lock;
+this is still exact matching, not fuzzy entity resolution or a uniqueness rule
+over other legacy client-creation routes.
+
+If a prospect has a pending follow-up, explicitly keep, complete or cancel it.
+Complete/cancel requires an outcome or reason. Keeping it retains the same
+prospect-owned task and due date, visible from the linked project. Contact
+events stay on the prospect; the project and client link back to them. A saved
+snapshot retains the original research even if the prospect is later edited.
+Linked prospects leave the **Needs next step** queue, while their scheduled
+actions remain in the due/upcoming views. Handoff alone records no reply.
+
+The review binds the exact form and the prospect/client/project/pending-task
+state for one hour. A changed record requires review again. An exact retry
+returns the saved project; another operation cannot convert the same prospect
+again. The client/project creation, task decision, handoff and audit rows commit
+together or roll back together. Future shoots start from the linked client's
+normal project controls.
+
+### Migration and recovery
+
+`086_prospect_handoffs.sql` adds the handoff table and project ownership index.
+Existing data is not rewritten. Foreign keys retain the source prospect, client,
+project and selected task; a linked client cannot be force-deleted. The delete
+route checks that restriction before unlinking galleries or removing brand
+files, serialized against a simultaneous handoff. The write lock remains held
+during brand cleanup so another client cannot reuse the deleted integer ID and
+its directory before cleanup finishes.
+
+This is an additive, forward-only schema change requiring human review and
+merge. Keep the handoff table and audit history on an application rollback.
+Older client-delete handlers do not understand its retention constraint and
+could remove files/unlink galleries before the database refuses deletion:
+**suspend client deletion if reverting application code after handoffs exist**,
+then use a forward fix or a reviewed consistent restore. The follow-up rollback
+restrictions above still apply. A manual browser check in both UI modes at
+desktop/mobile widths remains required before deployment.
+
+### Handoff verification (2026-11-10)
+
+`tests/test_prospect_handoffs.py` uses isolated SQLite databases without lifespan
+workers and synthetic records. It exercises read-only review, new/reused records,
+unbooked dates, preserved history, explicit task choices, stale state, review
+expiry/tampering, retry/concurrent saves, competing client deletion, duplicate
+business races, audit/constraint rollback, migration preservation, authentication,
+origin checks and escaped rendered forms in both UI modes.
+
+Based on main `29d819f`, using Python 3.12.14 and locked dependencies:
+
+| Check | Result |
+| --- | --- |
+| New handoff integration cases | 55 passed |
+| Full unit gate | 457 passed |
+| Full integration gate | 1,192 passed |
+| Full smoke gate | 188 passed |
+| Existing JavaScript tests | 50 passed |
+| Combined integration/smoke app coverage | 89% (required floor: 78%) |
+| Handoff route module coverage | 96% |
+| Ruff lint/format, migration numbering, whitespace | Passed |
+| Bandit high-severity scan and repository secret scan | Passed |
+| Locked runtime dependency audit | No known vulnerabilities found |
+
+No selected tests were skipped; marker deselections select other gates. The
+existing third-party TestClient deprecation warning remains. Broad test data
+used disposable workspace directories above the storage reserve. The suites
+use their existing synthetic fixtures and explicit transport mocks; no live
+provider behavior was validated. Self-review and rendered-form checks completed;
+this slice has not received an independent review or visual-browser verification.
+No deployment, production admin write or message send was performed.
+
 ## Remaining slices
 
 1. Contextual message drafts reviewed and sent by the operator; bind every draft
@@ -205,7 +292,7 @@ No deployment, production admin write, contact or message send was performed.
 2. Stop/snooze rules with a recorded reason; preserve communication preferences
    across projects. A silent prospect is not automatically lost or opted out.
 
-Prospect/task persistence needs a separately reviewed schema PR. Sending/provider
+Further persistence changes need a separately reviewed schema PR. Sending/provider
 work, payment changes, contracts and deployment keep their existing review gates.
 Do not infer that a manual send or an external call succeeded from a button click.
 

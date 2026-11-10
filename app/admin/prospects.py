@@ -169,7 +169,8 @@ def prospect_list(request: Request, q: str = "", page: int = 1):
     total = db.one(f"SELECT COUNT(*) AS n FROM prospects WHERE {where}", (q,))["n"]
     page = min(page, max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE))
     rows = db.all_(
-        f"SELECT * FROM prospects WHERE {where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+        f"SELECT *, (SELECT h.project_id FROM prospect_handoffs h WHERE h.prospect_id=prospects.id) AS linked_project_id "
+        f"FROM prospects WHERE {where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
         (q, PAGE_SIZE, (page - 1) * PAGE_SIZE),
     )
     return templates.TemplateResponse(

@@ -38,7 +38,7 @@
       {{ date_field('due_date', 'New due date', v.due_date, 'command-due-date') }}
       <p class="sr-hint">Required only when rescheduling.</p>
     </div>
-    <p class="sr-hint">Completing or canceling leaves this prospect needing a next step.</p>
+    <p class="sr-hint">{{ 'The project remains linked when this action is completed or canceled.' if handoff else 'Completing or canceling leaves this prospect needing a next step.' }}</p>
     <div class="sr-prospect-actions"><button type="submit" class="sr-btn sr-btn--ghost"{% if blocked %} disabled{% endif %}>Update next action</button></div>
   </form>
 {% endmacro %}
@@ -155,7 +155,7 @@
           {{ command_form({'version': pending_task.version, 'task_id': pending_task.id}, '/admin/studio/prospects/' ~ prospect_id ~ '/follow-ups/' ~ pending_task.id) }}
         </details>
       {% else %}
-        <p class="sr-badge is-warn">Needs next step</p>
+        <p class="sr-badge{{ '' if handoff else ' is-warn' }}">{{ 'Linked to project' if handoff else 'Needs next step' }}</p>
         <p>No next action is scheduled.</p>
         {{ schedule_form({'operation_key': schedule_operation_key}, '/admin/studio/prospects/' ~ prospect_id ~ '/follow-ups') }}
       {% endif %}
