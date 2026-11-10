@@ -7,10 +7,11 @@ import re
 import sqlite3
 import uuid
 
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse
 
 from .. import audit, db, security
+from ..redirects import redirect_local
 from ..render import templates
 from . import studio as studio_mod
 
@@ -164,7 +165,18 @@ def _prospect(con, prospect_id):
 
 
 def _redirect(prospect_id):
-    return RedirectResponse(f"/admin/studio/prospects/{prospect_id}", status_code=303)
+    """Back to this prospect. Only a numeric id may be part of the path.
+
+    Anything else, including a scheme or a backslash host, stays on the list.
+    ``redirect_local`` still refuses a target that is not a same-site path.
+    """
+    default = "/admin/studio/prospects"
+    if isinstance(prospect_id, bool) or not isinstance(prospect_id, int):
+        return redirect_local(default)
+    try:
+        return redirect_local(f"{default}/{prospect_id}")
+    except HTTPException:
+        return redirect_local(default)
 
 
 @router.get("/follow-ups", response_class=HTMLResponse)

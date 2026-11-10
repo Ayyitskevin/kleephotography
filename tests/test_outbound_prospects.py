@@ -1,15 +1,17 @@
 """Prospect capture against disposable SQLite; no lifespan or background senders."""
 
 import json
+import re
 import shutil
 import sqlite3
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app import config, db, ratelimit
-from app.admin import prospects
+from app.admin import prospect_followups, prospects
 from app.main import app
 
 ROOT = "/admin/studio/prospects"
@@ -97,6 +99,76 @@ def test_phone_identity(raw, expected):
     assert prospects._phone_key(raw) == expected
 
 
+# The capture form used to accept this set. The check has to stay equivalent for
+# addresses at or under the field limit, without the old quadratic backtracking.
+_PREVIOUS_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+_EMAIL_SAMPLES = (
+    "a@b.c",
+    "first.last@x.co",
+    "user+tag@host.co.uk",
+    "chef@prospect.example",
+    "a@b.c.d",
+    "a@b..c",
+    "a@.b",
+    "a@b.",
+    "a@b.c.",
+    "a@@b.c",
+    "a@b.c ",
+    " a@b.c",
+    "",
+    "@b.c",
+    "a@b",
+    "a@b\n.c",
+    "a@b.c\r",
+    "not-an-address",
+)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("sample", _EMAIL_SAMPLES)
+def test_email_rule_matches_the_previous_pattern(sample):
+    assert prospects._email_ok(sample) == bool(_PREVIOUS_EMAIL.fullmatch(sample))
+
+
+@pytest.mark.unit
+def test_email_rule_rejects_over_long_addresses():
+    long_ok = ("a" * 250) + "@b.co"
+    assert len(long_ok) > prospects.LIMITS["email"]
+    assert _PREVIOUS_EMAIL.fullmatch(long_ok)
+    assert prospects._email_ok(long_ok) is False
+
+
+@pytest.mark.unit
+def test_pathological_email_returns_quickly():
+    # A trailing space makes the old pattern fail, and the overlapping dot
+    # quantifiers make that failure quadratic in the number of dots.
+    slow = "!@!." + "!." * 20000 + " "
+    started = time.perf_counter()
+    assert prospects._email_ok(slow) is False
+    assert time.perf_counter() - started < 0.05
+    near = ("!@!." + "!." * 80 + " ")[: prospects.LIMITS["email"]]
+    started = time.perf_counter()
+    assert prospects._email_ok(near) == bool(_PREVIOUS_EMAIL.fullmatch(near))
+    assert time.perf_counter() - started < 0.05
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("target", ["//evil.com", "https://evil.com", "/\\evil.com"])
+def test_malicious_prospect_redirect_targets_are_rejected(target):
+    response = prospect_followups._redirect(target)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/studio/prospects"
+    assert "evil.com" not in response.headers["location"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("prospect_id", [1, 12, 0, -1])
+def test_prospect_redirect_keeps_numeric_detail_pages(prospect_id):
+    response = prospect_followups._redirect(prospect_id)
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/admin/studio/prospects/{prospect_id}"
+
+
 @pytest.mark.integration
 def test_routes_require_admin_and_cross_origin_posts_are_rejected(admin):
     anonymous = TestClient(app)
@@ -112,6 +184,31 @@ def test_routes_require_admin_and_cross_origin_posts_are_rejected(admin):
         assert db.one("SELECT COUNT(*) AS n FROM prospects")["n"] == 0
     finally:
         anonymous.close()
+
+
+@pytest.mark.integration
+def test_capture_success_redirects_through_the_safe_helper(admin, monkeypatch):
+    seen = []
+    original = prospect_followups._redirect
+
+    def spy(prospect_id):
+        seen.append(prospect_id)
+        return original(prospect_id)
+
+    monkeypatch.setattr(prospects.prospect_followups, "_redirect", spy)
+    response = admin.post(ROOT, data=FORM, follow_redirects=False)
+    assert response.status_code == 303
+    prospect_id = db.one("SELECT id FROM prospects")["id"]
+    assert seen == [prospect_id]
+    assert response.headers["location"] == f"{ROOT}/{prospect_id}"
+    response = admin.post(
+        f"{ROOT}/{prospect_id}",
+        data=FORM | {"notes": "Updated research."},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert seen == [prospect_id, prospect_id]
+    assert response.headers["location"] == f"{ROOT}/{prospect_id}"
 
 
 @pytest.mark.integration
