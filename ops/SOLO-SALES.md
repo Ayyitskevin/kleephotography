@@ -113,14 +113,96 @@ repository's worker-freezing fixture: their earlier TestClient lifespan could
 dispatch synthetic gallery jobs to a placeholder URL. Transport tests continue
 to use their explicit HTTP mocks; production Argus behavior is unchanged.
 
+## Third slice: follow-ups and manual contact history
+
+The prospect follow-up workspace is at `/admin/studio/prospects/follow-ups`,
+linked from Home, Tasks and the prospect list. Due work, upcoming work and
+prospects needing a next step are separate views. Every scheduled row explains
+the action and due date; an unplanned prospect is not automatically overdue.
+Not-fit prospects are excluded from the unplanned view, but an explicitly
+scheduled task still appears until the operator changes it.
+
+Each prospect can have one open next-action task. The existing `tasks` table
+remains the obligation store; general and project tasks retain their behavior.
+Prospect follow-ups use explicit complete, reschedule and cancel commands with
+an outcome/reason note. Shared task toggle/delete routes refuse prospect tasks
+and link operators to the prospect page. Cancellation is distinct from
+completion, preserves history, and excludes the task from due and completed
+counts. It does not mark the prospect lost, paused or opted out.
+
+Dates use `studio._today()`: Today, Tomorrow and Next week mean that date,
+plus one day and plus seven days. The form displays the resolved dates and
+offers an arbitrary date picker. This is day-level planning, not an appointment
+or a promise to call at an exact local time.
+
+Contact history is manually recorded with a channel, direction, outcome and
+occurrence date. The server also keeps when the entry was recorded. An outgoing
+attempt and an incoming reply are different facts; a voicemail cannot become a
+reply. No provider delivery is inferred. Logging contact keeps the pending task
+unless the operator explicitly selects complete or reschedule. A selected task
+change, contact entry and audit commit together or not at all. Task completion
+alone does not manufacture a contact event or client response.
+
+Write versions prevent stale pages from overwriting a newer task decision.
+Operation keys bind retry-sensitive saves to their original payload. Retrying a
+successful submission cannot create a second contact event; reusing its key for
+different contents is rejected. The DB enforces one open task, exclusive
+prospect/project ownership and contact-event/task ownership.
+
+The existing project client-activity clock and sales-review criteria remain
+unchanged. This feature creates no inquiries, clients, projects, messages,
+provider jobs, financial records or qualification transitions. Calendar
+integration and automated resolution are outside this slice.
+
+### Migration and recovery
+
+`085_prospect_followups.sql` adds task columns/indexes and a manual
+`prospect_contact_events` table. Existing tasks retain their values. The
+migration runs in the existing atomic, forward-only runner. A human reviews and
+merges the schema PR; deploying to the origin is a separate action.
+
+Keep the additive schema and history on an application rollback. **Older app
+versions do not understand prospect ownership or cancellation:** their shared
+Tasks controls can misclassify/corrupt these rows. If reverting application code
+after prospect follow-ups have been created, suspend Task writes and use a
+forward fix or restore a reviewed consistent code/database snapshot. Do not
+drop follow-up/contact history as a routine rollback.
+
+### Follow-up verification (2026-11-10 UTC)
+
+Based on main `12470f2`, using Python 3.12.14 and the locked dependencies:
+
+| Check | Result |
+| --- | --- |
+| New follow-up integration cases | 51 passed |
+| Full unit gate | 457 passed |
+| Full integration gate | 1,137 passed |
+| Full smoke gate | 188 passed |
+| Existing JavaScript tests | 50 passed |
+| Combined integration/smoke app coverage | 89% (required floor: 78%) |
+| Follow-up route module coverage | 97% |
+| Ruff lint/format, migration numbering, whitespace | Passed |
+| Bandit high-severity scan and repository secret scan | Passed |
+| Locked runtime dependency audit | No known vulnerabilities found |
+
+No tests were skipped in these selected gates; marker deselections select other
+gates. The existing third-party TestClient deprecation warning remains. Broad
+test data used disposable workspace directories above the storage reserve; new
+feature tests use isolated SQLite databases without starting background workers.
+
+An independent review found no remaining P1/P2 issues and reran nine focused
+cases covering concurrency, migration preservation, retries, stale writes, atomic
+rollback, ownership and shared task controls. Rendered-template checks covered
+both UI modes, form nesting, unique IDs, CSP nonces, preserved retry identities
+and the date/form script behavior. Local Chromium could not launch because the
+workspace denied socket creation, so desktop/mobile visual review remains open.
+No deployment, production admin write, contact or message send was performed.
+
 ## Remaining slices
 
-1. Explicit next-action dates, contact attempts and outcomes. Keep outbound
-   attempts separate from client responses. Due tasks should use their own clock,
-   not the current stage-age fallback.
-2. Contextual message drafts reviewed and sent by the operator; bind every draft
+1. Contextual message drafts reviewed and sent by the operator; bind every draft
    to its contact/project so switching records cannot send the wrong text.
-3. Stop/snooze rules with a recorded reason; preserve communication preferences
+2. Stop/snooze rules with a recorded reason; preserve communication preferences
    across projects. A silent prospect is not automatically lost or opted out.
 
 Prospect/task persistence needs a separately reviewed schema PR. Sending/provider

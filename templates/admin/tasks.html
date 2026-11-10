@@ -7,6 +7,7 @@
     <p class="pgtop-sub"><b class="pos">{{ open_count }} open</b> · {{ done_week }} done this week</p>
   </div>
   <div class="pgtop-actions">
+    <a class="pgtop-link" href="/admin/studio/prospects/follow-ups">Prospect follow-ups</a>
     <button type="button" class="pgtop-new" id="tk-add-btn" aria-expanded="false">
       <span class="qc-plus" aria-hidden="true">+</span> Add task</button>
   </div>
@@ -34,23 +35,30 @@
       </div>
       <div class="tk-col-cards">
         {% for t in col.tasks %}
+        {% if t.prospect_id %}
+        <article class="tk-card{% if col.key == 'done' %} is-done{% endif %}">
+        {% else %}
         <form method="post" action="/admin/tasks/{{ t.id }}/toggle"
               class="tk-card{% if col.key == 'done' %} is-done{% endif %}">
           <button type="submit" class="tk-check"
                   aria-label="{{ 'Reopen' if col.key == 'done' else 'Mark done' }}">{{ '✓' if col.key == 'done' }}</button>
+        {% endif %}
           <div class="tk-card-body">
             <div class="tk-card-title">{{ t.title }}</div>
             <div class="tk-card-meta">
-              {% if t.project_id %}<a class="tk-chip" href="/admin/studio/projects/{{ t.project_id }}">{{ t.project }}</a>
+              {% if t.prospect_id %}<a class="tk-chip" href="/admin/studio/prospects/{{ t.prospect_id }}#prospect-activity">{{ t.business }} · Follow-up</a>
+              {% elif t.project_id %}<a class="tk-chip" href="/admin/studio/projects/{{ t.project_id }}">{{ t.project }}</a>
               {% else %}<span class="tk-chip">{{ t.project }}</span>{% endif %}
               {% if t.due %}<span class="tk-due{% if t.urgent %} is-urgent{% endif %}">{{ t.due }}</span>{% endif %}
-              <button type="submit" class="link danger"
+              {% if t.prospect_id %}
+              <a href="/admin/studio/prospects/{{ t.prospect_id }}#prospect-activity">{{ 'View history' if col.key == 'done' else 'Review next action' }}</a>
+              {% else %}<button type="submit" class="link danger"
                       formaction="/admin/tasks/{{ t.id }}/delete"
                       data-confirm="Delete this task? It disappears from the board for good."
-                      aria-label="Delete task">Delete</button>
+                      aria-label="Delete task">Delete</button>{% endif %}
             </div>
           </div>
-        </form>
+        {% if t.prospect_id %}</article>{% else %}</form>{% endif %}
         {% else %}
         <p class="tk-col-empty muted">Nothing here.</p>
         {% endfor %}

@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, db, security, specialties
 from ..render import templates
+from . import prospect_followups
 
 router = APIRouter(prefix="/admin/studio/prospects", dependencies=[Depends(security.require_admin)])
 QUALIFICATIONS = {
@@ -142,10 +143,12 @@ def _matches(con, values: dict, exclude_id: int | None = None) -> list[dict]:
 
 
 def _form(request, values, *, prospect_id=None, error=None, matches=(), reviewed=False, status=200):
+    activity = prospect_followups.detail_context(prospect_id) if prospect_id else {}
     return templates.TemplateResponse(
         request,
         "admin/prospect_form.html",
         {
+            **activity,
             "values": values,
             "prospect_id": prospect_id,
             "error": error,
