@@ -13,6 +13,11 @@
 .admin-shell .sr-prospects-table { overflow-x: auto; }
 .admin-shell .sr-prospects-table td { overflow-wrap: anywhere; max-width: 22rem; }
 .admin-shell .sr-prospect-activity { margin-bottom: 2.5rem; scroll-margin-top: 1rem; }
+.admin-shell .sr-handoff-card { padding: 1.25rem; border: 1px solid var(--line); margin-bottom: 1.5rem; max-width: 58rem; overflow-wrap: anywhere; }
+.sr .sr-handoff-card { border-color: var(--sr-line); }
+.admin-shell .sr-handoff-card h2:first-child { margin-top: 0; }
+.admin-shell .sr-prospect-form .sr-handoff-confirm { display: flex; gap: .75rem; align-items: flex-start; }
+.admin-shell .sr-prospect-form .sr-handoff-confirm input { width: auto; margin-top: .3rem; }
 .admin-shell .sr-followup-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: 0 0 1rem; }
 .admin-shell .sr-followup-heading h2 { margin: 0; }
 .admin-shell .sr-followup-heading p { margin: .5rem 0; }
