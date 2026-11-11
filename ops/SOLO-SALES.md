@@ -493,11 +493,44 @@ socket creation. Rendered-template checks do not establish desktop/mobile appear
 No independent review, production writes, deployment or message sends are part of
 this slice.
 
+## Guided prospect review (2026-11-11)
+
+The Due, Upcoming and Needs next step queues now offer “Review one at a time”
+at `/admin/studio/prospects/review-work`. Review uses the same ordered, searched
+and outreach-filtered projection as the list, without a first-page limit. It
+shows one prospect, research notes, current outreach restrictions, next action,
+manual contact forms and history. Message preparation opens separately.
+
+Task/contact saves and validation errors preserve the chosen queue and search.
+The existing command routes still enforce versions, operation-key retries,
+transactional audit and scheduling holds. No new write semantics or schema are
+introduced. Recording historical contact is still distinct from permission to
+send; blocked channels and linked-source restrictions remain visible.
+
+Navigation and counts are live, not a persisted session or completion metric.
+Next wraps to the first eligible prospect, records nothing and does not complete
+an action. A completed/rescheduled/held prospect that leaves the selected queue
+shows an explicit state-change page with a link to the next eligible record.
+GET requests never manufacture contact, completion, consent or progress.
+
+The focused integration cases cover auth/no-store, read-only navigation, ordering,
+holds and all-channel exclusion, changing eligibility, idempotent saves, stale
+forms, preserved error inputs, search escaping and crossing list pagination.
+They use isolated SQLite without lifespan workers. Existing full-suite provider
+mocks remain; visual desktop/mobile review and production deployment are separate.
+
+On Python 3.12.14 with the current hash locks, this change passed 496 unit,
+1,299 integration (including 9 new review cases), 188 smoke and 60 JavaScript
+tests. Ruff lint/format, Bandit, secrets, migration numbering and requirements
+consistency checks passed. Each broad suite used fresh disposable workspace data.
+Existing AnyIO/Starlette test deprecation warnings remain. Hosted checks must pass
+before merge; no independent review or browser appearance verification is claimed.
+
 ## Remaining slices
 
-1. Use the complete prospect → draft → manual contact → follow-up → opportunity
-   loop to identify friction. A guided daily outreach session is a useful next
-   candidate: review the next eligible prospect without losing queue context.
+1. Use the guided review and complete prospect → draft → manual contact →
+   follow-up → opportunity loop to identify remaining friction. Queue counts
+   are live obligations, not an outreach performance metric.
 2. Consider richer drafting only after using the grounded starters. A provider
    integration needs explicit context boundaries and review; sending remains a
    separate action and must enforce communication preferences at send time.

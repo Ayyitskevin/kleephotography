@@ -7,6 +7,7 @@ import re
 import sqlite3
 import uuid
 from contextlib import closing
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -122,6 +123,7 @@ def _error(request, prospect_id, values, kind, error):
         "admin/prospect_activity_error.html",
         {
             **detail_context(prospect_id),
+            **_review_context(request),
             "prospect_id": prospect_id,
             "values": values,
             "form_kind": kind,
@@ -173,7 +175,15 @@ def _prospect(con, prospect_id):
         raise ActivityError("Prospect not found.", 404)
 
 
-def _redirect(prospect_id):
+def _review_context(request):
+    review = request.query_params.get("review", "")
+    if review not in {"due", "upcoming", "unplanned"}:
+        return {}
+    q = request.query_params.get("q", "").strip()[:200]
+    return {"review_query": "?" + urlencode({"review": review, "q": q})}
+
+
+def _redirect(prospect_id, request=None):
     """Back to this prospect. Only a numeric id may be part of the path.
 
     Anything else, including a scheme or a backslash host, stays on the list.
@@ -182,17 +192,17 @@ def _redirect(prospect_id):
     default = "/admin/studio/prospects"
     if isinstance(prospect_id, bool) or not isinstance(prospect_id, int):
         return redirect_local(default)
+    if request is not None and (context := _review_context(request)):
+        return redirect_local(
+            default + "/review-work" + context["review_query"] + f"&prospect_id={prospect_id}"
+        )
     try:
         return redirect_local(f"{default}/{prospect_id}")
     except HTTPException:
         return redirect_local(default)
 
 
-@router.get("/follow-ups", response_class=HTMLResponse)
-def followup_queue(request: Request, filter: str = "due", q: str = "", page: int = 1):
-    if filter not in {"due", "upcoming", "unplanned", "held", "all"}:
-        filter = "due"
-    q = q.strip()[:200]
+def _queue_rows(filter, q):
     today = studio_mod._today().isoformat()
     predicates = {
         "due": "t.id IS NOT NULL AND t.due_date <= ?",
@@ -231,6 +241,15 @@ def followup_queue(request: Request, filter: str = "due", q: str = "", page: int
         rows = [{**dict(r), "outreach": policies[r["id"]]} for r in con.execute(query, args)]
         if filter != "all":
             rows = [r for r in rows if r["outreach"]["held"] == (filter == "held")]
+    return rows
+
+
+@router.get("/follow-ups", response_class=HTMLResponse)
+def followup_queue(request: Request, filter: str = "due", q: str = "", page: int = 1):
+    if filter not in {"due", "upcoming", "unplanned", "held", "all"}:
+        filter = "due"
+    q = q.strip()[:200]
+    rows = _queue_rows(filter, q)
     # Filter before pagination so held rows never crowd active work off a page.
     total = len(rows)
     page = min(max(1, page), max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE))
@@ -247,6 +266,43 @@ def followup_queue(request: Request, filter: str = "due", q: str = "", page: int
             "filter": filter,
             "q": q,
         },
+    )
+
+
+@router.get("/review-work", response_class=HTMLResponse)
+def review_work(request: Request, review: str = "due", q: str = "", prospect_id: int | None = None):
+    if review not in {"due", "upcoming", "unplanned"}:
+        review = "due"
+    q = q.strip()[:200]
+    rows = _queue_rows(review, q)
+    ids = [row["id"] for row in rows]
+    selected = prospect_id if prospect_id is not None else (ids[0] if ids else None)
+    position = ids.index(selected) if selected in ids else None
+    context = detail_context(selected) if position is not None else {}
+    # The policy can change between the queue projection and detail reads.
+    if (context.get("outreach") or {}).get("held"):
+        context = {}
+    next_id = ids[(position + 1) % len(ids)] if position is not None else (ids[0] if ids else None)
+    query = "?" + urlencode({"review": review, "q": q})
+    return templates.TemplateResponse(
+        request,
+        "admin/prospect_review.html",
+        {
+            **_options(),
+            **context,
+            "prospect_id": selected,
+            "review": review,
+            "q": q,
+            "review_query": query,
+            "queue_url": "/admin/studio/prospects/follow-ups?"
+            + urlencode({"filter": review, "q": q}),
+            "next_url": "/admin/studio/prospects/review-work" + query + f"&prospect_id={next_id}"
+            if next_id is not None
+            else None,
+            "total": len(ids),
+            "position": position + 1 if position is not None else None,
+        },
+        headers={"Cache-Control": "no-store"},
     )
 
 
@@ -275,7 +331,7 @@ def schedule_followup(
                         "This operation key already belongs to another saved action. Review the current record.",
                         409,
                     )
-                return _redirect(prospect_id)
+                return _redirect(prospect_id, request)
             policy = outreach.for_prospect(con, prospect_id, studio_mod._today().isoformat())
             if reason := outreach.blocked_reason(policy):
                 raise ActivityError(reason, 409)
@@ -310,7 +366,7 @@ def schedule_followup(
                 409,
             ),
         )
-    return _redirect(prospect_id)
+    return _redirect(prospect_id, request)
 
 
 def _change_task(
@@ -404,7 +460,7 @@ def change_followup(
             _change_task(con, prospect_id, task_id, parsed_version, action, clean_note, clean_date)
     except ActivityError as error:
         return _error(request, prospect_id, values, "command", error)
-    return _redirect(prospect_id)
+    return _redirect(prospect_id, request)
 
 
 @router.post("/{prospect_id}/contacts")
@@ -488,7 +544,7 @@ def record_contact(
                         "This operation key already belongs to a different saved contact. Review the current history.",
                         409,
                     )
-                return _redirect(prospect_id)
+                return _redirect(prospect_id, request)
             if linked_task is not None:
                 _change_task(
                     con,
@@ -545,4 +601,4 @@ def record_contact(
                 409,
             ),
         )
-    return _redirect(prospect_id)
+    return _redirect(prospect_id, request)

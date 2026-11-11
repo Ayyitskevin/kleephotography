@@ -11,7 +11,7 @@
 {% endmacro %}
 
 {% macro schedule_form(v, action, blocked=false) %}
-  <form method="post" action="{{ action }}" class="sr-prospect-form sr-followup-form">
+  <form method="post" action="{{ action }}{{ review_query|default('') }}" class="sr-prospect-form sr-followup-form">
     <input type="hidden" name="operation_key" value="{{ v.operation_key }}">
     <label class="sr-field"><span class="sr-label">Next action <span class="sr-req">*</span></span>
       <input name="title" value="{{ v.title or '' }}" maxlength="200" required placeholder="For example: Call about spring menu photography"></label>
@@ -22,7 +22,7 @@
 {% endmacro %}
 
 {% macro command_form(v, action, blocked=false) %}
-  <form method="post" action="{{ action }}" class="sr-prospect-form sr-followup-form" data-followup-command>
+  <form method="post" action="{{ action }}{{ review_query|default('') }}" class="sr-prospect-form sr-followup-form" data-followup-command>
     <input type="hidden" name="version" value="{{ v.version }}">
     <input type="hidden" name="task_id" value="{{ v.task_id }}">
     <label class="sr-field"><span class="sr-label">What happened to this action? <span class="sr-req">*</span></span>
@@ -44,7 +44,7 @@
 {% endmacro %}
 
 {% macro contact_form(v, action, task, blocked=false) %}
-  <form method="post" action="{{ action }}" class="sr-prospect-form sr-followup-form" data-contact-form>
+  <form method="post" action="{{ action }}{{ review_query|default('') }}" class="sr-prospect-form sr-followup-form" data-contact-form>
     <input type="hidden" name="operation_key" value="{{ v.operation_key }}">
     <input type="hidden" name="task_id" value="{{ v.task_id or '' }}">
     <input type="hidden" name="version" value="{{ v.version or '' }}">
