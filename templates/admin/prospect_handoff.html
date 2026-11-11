@@ -1,0 +1,93 @@
+{% extends "admin/base_admin.html" %}
+{% from "admin/_outreach_preferences.html" import summary as outreach_summary %}
+{% block title %}Start opportunity · {{ prospect.business }} · Mise{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead"><h1>{{ 'Project handoff' if handoff else 'Start a photography opportunity' }}</h1><p class="pgtop-sub">{{ prospect.business }} · Outbound prospect</p></div>
+  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}#prospect-activity">Prospect and contact history</a></div>
+</header>
+{% endblock %}
+{% block admin_body %}
+<main class="admin-main sr-prospects">
+  {% if error %}<section class="sr-prospect-review"><p class="sr-error" role="alert">{{ error }}</p><p>Your entries are preserved below.</p>{% if conflict %}<a href="/admin/studio/prospects/{{ prospect_id }}/handoff" target="_blank" rel="noopener">Reopen the current handoff in a new tab</a>{% endif %}</section>{% endif %}
+  {% if handoff %}
+    <section class="sr-card sr-handoff-card" aria-labelledby="handoff-saved-heading">
+      <h2 id="handoff-saved-heading">Linked to {{ handoff.project_title }}</h2>
+      <p>Handoff recorded {{ handoff.created_at|localtime }}. Future shoots can be created from this client’s record.</p>
+      <div class="sr-prospect-actions"><a class="sr-btn" href="/admin/studio/projects/{{ handoff.project_id }}">Open project</a><a href="/admin/studio/clients/{{ handoff.client_id }}">Open client</a></div>
+      <h3>Brief at handoff</h3><p class="sr-followup-notes">{{ handoff.photography_need }}</p>
+      <p>{{ specialties[handoff.specialty].name if handoff.specialty else 'Specialty not decided' }}{% if handoff.target_date %} · Requested target: {{ handoff.target_date }} (not a confirmed booking){% endif %}</p>
+      <p>Follow-up decision: {{ {'none':'No pending action', 'keep':'Kept on the prospect', 'complete':'Completed explicitly', 'cancel':'Canceled explicitly'}[handoff.task_disposition] }}{% if handoff.task_note %} · {{ handoff.task_note }}{% endif %}</p>
+      <details><summary>Research recorded at handoff</summary><p>{{ handoff_snapshot.business }}{% if handoff_snapshot.contact_name %} · {{ handoff_snapshot.contact_name }}{% endif %}</p><p>{{ handoff_snapshot.email }}{% if handoff_snapshot.phone %} · {{ handoff_snapshot.phone }}{% endif %}</p><p>Source: {{ handoff_snapshot.source }}</p><p class="sr-followup-notes">{{ handoff_snapshot.notes }}</p></details>
+    </section>
+  {% endif %}
+
+  {% if review %}
+    <section class="sr-card sr-handoff-card" aria-labelledby="handoff-review-heading">
+      <h2 id="handoff-review-heading">Review before creating or linking</h2>
+      <dl class="sr-followup-recent">
+        <div><dt>Client</dt><dd>{% if review.client %}Use existing: {{ review.client.company or review.client.name }} · {{ review.client.name }}{% else %}Create: {{ review.prospect.business }} · {{ review.prospect.contact_name or review.prospect.business }}{% endif %}</dd></div>
+        <div><dt>Contact details</dt><dd>{% set contact = review.client or review.prospect %}{{ contact.email or 'No email recorded' }} · {{ contact.phone or 'No phone recorded' }}</dd></div>
+        <div><dt>Project</dt><dd>{% if review.project %}Link existing: {{ review.project.title }} · {{ review.project.status }}. Its details and stage stay as they are.{% else %}Create: {{ values.title }}. Starts as an unbooked opportunity in Inquiry, the first pipeline stage.{% endif %}</dd></div>
+        <div><dt>Photography need</dt><dd class="sr-followup-notes">{{ values.photography_need }}</dd></div>
+        <div><dt>Specialty / target</dt><dd>{{ specialties[values.specialty].name if values.specialty else 'Not decided' }} · {{ values.target_date or 'No target date' }}{% if values.target_date %} (requested, not booked){% endif %}</dd></div>
+        <div><dt>Pending follow-up</dt><dd>{% if review.pending %}{{ review.pending.title }} · due {{ review.pending.due_date }}<br>{{ {'keep':'Keep this action on the prospect', 'complete':'Complete this action', 'cancel':'Cancel this action'}[values.task_disposition] }}{% if values.task_note %}<p class="sr-followup-notes">{{ values.task_note }}</p>{% endif %}{% else %}No pending action to change.{% endif %}</dd></div>
+      </dl>
+      <p class="sr-hint">Research and contact history stay linked to the prospect. Existing client details stay unchanged. You can prepare a proposal from the project afterward.</p>
+      <p>After this handoff, restrictions from this prospect and any other prospects linked to the selected client apply across that client’s outbound sales work. Review the combined controls below.</p>
+      {{ outreach_summary(review.outreach) }}
+      <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/handoff" class="sr-prospect-actions">
+        {% for field, value in values.items() %}<input type="hidden" name="{{ field }}" value="{{ value }}">{% endfor %}
+        <input type="hidden" name="review_token" value="{{ review_token }}">
+        <button type="submit" class="sr-btn">{{ 'Link existing project' if review.project else 'Create opportunity' }}</button>
+        <button type="submit" class="sr-btn sr-btn--ghost" formaction="/admin/studio/prospects/{{ prospect_id }}/handoff/edit">Back to edit</button>
+      </form>
+    </section>
+  {% elif not handoff or error %}
+    <section class="sr-handoff-card sr-card" aria-labelledby="handoff-client-heading">
+      <h2 id="handoff-client-heading">1. Review the client</h2>
+      {% if matches %}<p>These records match the prospect. Review them before creating another client.</p><ul>{% for c in matches %}<li><a href="?client_id={{ c.id }}">Use {{ c.company or c.name }} · {{ c.name }}</a> — {{ c.reason }} · <a href="/admin/studio/clients/{{ c.id }}" target="_blank" rel="noopener">View record</a></li>{% endfor %}</ul>{% else %}<p>No exact client match found. Check the list for another spelling or contact before choosing a new client.</p>{% endif %}
+      <form method="get" action="/admin/studio/prospects/{{ prospect_id }}/handoff" class="sr-prospect-form">
+        <label class="sr-field"><span class="sr-label">Client</span><select name="client_id" required>
+          <option value="">Choose a client</option><option value="new"{% if values.client_id == 'new' %} selected{% endif %}>Create a client from this prospect</option>
+          {% for c in clients %}<option value="{{ c.id }}"{% if values.client_id == c.id|string %} selected{% endif %}>{{ c.company or c.name }} · {{ c.name }}{% if c.email %} · {{ c.email }}{% endif %}</option>{% endfor %}
+        </select></label>
+        <button class="sr-btn sr-btn--ghost" type="submit">Choose client</button>
+        {% if values.client_id %}<p class="sr-hint">Changing clients starts a fresh form. Copy any unsaved brief below first.</p>{% endif %}
+      </form>
+    </section>
+    {% if values.client_id == 'new' or selected_client or error %}
+    <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/handoff/review" class="sr-prospect-form sr-handoff-card sr-card">
+      <input type="hidden" name="client_id" value="{{ values.client_id }}"><input type="hidden" name="operation_key" value="{{ values.operation_key }}">
+      <input type="hidden" name="task_id" value="{{ values.task_id }}"><input type="hidden" name="task_version" value="{{ values.task_version }}">
+      <h2>2. Define the opportunity</h2>
+      {% if selected_client %}<p>Existing client: <strong>{{ selected_client.company or selected_client.name }} · {{ selected_client.name }}</strong><br>{{ selected_client.email or 'No email recorded' }} · {{ selected_client.phone or 'No phone recorded' }}</p>
+      {% else %}<p>New client from prospect: <strong>{{ prospect.business }} · {{ prospect.contact_name or prospect.business }}</strong><br>{{ prospect.email or 'No email recorded' }} · {{ prospect.phone or 'No phone recorded' }}</p>{% endif %}
+      <label class="sr-field"><span class="sr-label">Project</span><select name="project_id" required>
+        <option value="new"{% if values.project_id == 'new' %} selected{% endif %}>Create a new opportunity</option>
+        {% for p in projects %}<option value="{{ p.id }}"{% if values.project_id == p.id|string %} selected{% endif %}>Link {{ p.title }} · {{ p.status }}</option>{% endfor %}
+        {% if values.project_id != 'new' and values.project_id not in projects|map(attribute='id')|map('string')|list %}<option value="{{ values.project_id }}" selected>Submitted project {{ values.project_id }} — choose an available project</option>{% endif %}
+      </select></label>
+      <label class="sr-field"><span class="sr-label">Title for a new opportunity</span><input name="title" value="{{ values.title }}" maxlength="200"><span class="sr-hint">Required for a new project; existing project titles stay unchanged.</span></label>
+      <label class="sr-field"><span class="sr-label">What photography do they need? <span class="sr-req">*</span></span><textarea name="photography_need" rows="4" maxlength="4000" required>{{ values.photography_need }}</textarea></label>
+      <div class="sr-prospect-grid">
+        <label class="sr-field"><span class="sr-label">Specialty</span><select name="specialty"><option value="">Not decided</option>{% for key, spec in specialties.items() %}<option value="{{ key }}"{% if values.specialty == key %} selected{% endif %}>{{ spec.name }}</option>{% endfor %}</select></label>
+        <label class="sr-field"><span class="sr-label">Requested target date (optional)</span><input type="date" name="target_date" value="{{ values.target_date }}"><span class="sr-hint">Planning context. A confirmed shoot date is set separately on the project.</span></label>
+      </div>
+      <h2>3. Decide the next step</h2>
+      {% if values.task_id %}
+        {% if pending_task %}<p>Current follow-up: <strong>{{ pending_task.title }}</strong> · due {{ pending_task.due_date }}</p>{% else %}<p>The submitted follow-up is no longer pending. Reopen the handoff to review the current record.</p>{% endif %}
+        <label class="sr-field"><span class="sr-label">What happens to the submitted follow-up? <span class="sr-req">*</span></span><select name="task_disposition" required>
+          <option value="">Choose explicitly</option>{% for key, label in [('keep','Keep it on the prospect'),('complete','Complete it with an outcome'),('cancel','Cancel it with a reason')] %}<option value="{{ key }}"{% if values.task_disposition == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></label>
+        <label class="sr-field"><span class="sr-label">Follow-up outcome / reason</span><textarea name="task_note" rows="2" maxlength="1000">{{ values.task_note }}</textarea><span class="sr-hint">Required for complete or cancel. Keeping it preserves the same due task and its history.</span></label>
+      {% else %}<input type="hidden" name="task_disposition" value="{{ values.task_disposition }}"><input type="hidden" name="task_note" value="{{ values.task_note }}"><p>No pending follow-up was selected.</p>{% endif %}
+      <label class="sr-handoff-confirm"><input type="checkbox" name="interest_confirmed" value="yes"{% if values.interest_confirmed == 'yes' %} checked{% endif %} required><span>I have confirmed a real photography opportunity and reviewed the client and project choice.</span></label>
+      <p class="sr-hint">A new opportunity starts in Inquiry. No proposal, booking or payment is created by this handoff.</p>
+      <div class="sr-prospect-actions"><button type="submit" class="sr-btn"{% if handoff %} disabled{% endif %}>Review handoff</button><a href="/admin/studio/prospects/{{ prospect_id }}">Back to prospect</a></div>
+    </form>
+    {% endif %}
+  {% endif %}
+</main>
+{% endblock %}

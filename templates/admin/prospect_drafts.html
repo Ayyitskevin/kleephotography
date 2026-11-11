@@ -1,0 +1,75 @@
+{% extends "admin/base_admin.html" %}
+{% from "admin/_outreach_preferences.html" import summary as outreach_summary %}
+{% block title %}Message drafts · {{ current.prospect.business }} · Mise{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead"><h1>Message drafts</h1><p class="pgtop-sub">{{ current.prospect.business }} · Prepare, review, copy</p></div>
+  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}#prospect-activity">Prospect and contact history</a><a class="pgtop-link" href="/admin/studio/prospects/follow-ups">Daily follow-ups</a></div>
+</header>
+{% endblock %}
+{% block admin_body %}
+<main class="admin-main sr-prospects">
+  {{ outreach_summary(outreach, prospect_id) }}
+  {% set ctx = context or current %}
+  {% set editing = 'body' in values %}
+  {% set channel = draft.channel if draft else values.channel|default('') %}
+  {% set purpose = draft.purpose if draft else values.purpose|default('') %}
+  {% if error %}<section class="sr-prospect-review"><p class="sr-error" role="alert">{{ error }}</p><p>Your entries below have not been replaced. <a href="/admin/studio/prospects/{{ prospect_id }}/drafts{% if draft %}/{{ draft.id }}{% endif %}" target="_blank" rel="noopener">Open the current record in a new tab</a>.</p></section>{% endif %}
+  {% if stale %}<p class="sr-prospect-review" role="alert">{{ stale }} <a href="/admin/studio/prospects/{{ prospect_id }}/drafts" target="_blank" rel="noopener">Start a fresh draft</a>.</p>{% endif %}
+  <section class="sr-card sr-handoff-card" aria-labelledby="draft-recipient">
+    <h2 id="draft-recipient">{{ 'Prepared for' if context else 'Recipient' }}: {{ ctx.prospect.contact_name or ctx.prospect.business }}</h2>
+    <p>{{ ctx.prospect.business }} · Contact details from this prospect</p>
+    {% if editing and channel %}<p><strong>{{ channels[channel] }}:</strong> {{ ctx.prospect.email if channel == 'email' else ctx.prospect.phone }}</p>
+    {% else %}<p>Email: {{ ctx.prospect.email or 'Not recorded' }} · Phone: {{ ctx.prospect.phone or 'Not recorded' }}</p>{% endif %}
+    {% if purpose in purposes %}<p>{{ purposes[purpose] }}{% if draft %} · Saved draft #{{ draft.id }} · Updated {{ draft.updated_at|localtime }}{% endif %}</p>{% endif %}
+    <p class="sr-hint">Review the recipient and contact preferences before using this text. Linked client details do not replace the prospect contact.</p>
+    <details class="sr-followup-disclosure"><summary>{{ 'Context used for this draft' if context else 'Research and planning context' }}</summary>
+      <p>Source: {{ ctx.prospect.source }} · Qualification: {{ ctx.prospect.qualification|replace('_', ' ') }}</p>
+      <p class="sr-followup-notes">{{ ctx.prospect.notes or 'No research notes recorded.' }}</p>
+      {% if ctx.handoff %}<h3><a href="/admin/studio/projects/{{ ctx.handoff.project_id }}">{{ ctx.handoff.title }}</a></h3><p class="sr-followup-notes">{{ ctx.handoff.photography_need }}</p>{% if ctx.handoff.target_date %}<p>Requested target: {{ ctx.handoff.target_date }} · Not a confirmed booking</p>{% endif %}{% endif %}
+      {% if ctx.pending %}<p>Planned action: {{ ctx.pending.title }} · due {{ ctx.pending.due_date }}</p>{% endif %}
+      {% if ctx.event %}<h3>Selected contact record</h3><p>{{ ctx.event.occurred_on }} · {{ channels[ctx.event.channel] }} · {{ outcomes[ctx.event.outcome] }}</p><p class="sr-followup-notes">{{ ctx.event.notes or 'No additional notes.' }}</p>{% endif %}
+      {% if ctx.latest_contact %}<p>Most recently logged contact: {{ ctx.latest_contact.occurred_on }} · {{ outcomes[ctx.latest_contact.outcome] }}. <a href="/admin/studio/prospects/{{ prospect_id }}#prospect-activity">Review full history</a>.</p>{% endif %}
+    </details>
+  </section>
+
+  {% if editing %}
+  <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/drafts{% if draft %}/{{ draft.id }}{% endif %}" class="sr-card sr-handoff-card sr-prospect-form" data-draft-editor data-prospect-id="{{ prospect_id }}" data-draft-id="{{ draft.id if draft else '' }}" data-unsaved="{{ 'true' if not draft or values.subject != draft.subject or values.body != draft.body else 'false' }}"{% if draft %} data-copy-url="/admin/studio/prospects/{{ prospect_id }}/drafts/{{ draft.id }}/copy"{% endif %}>
+    <h2>{{ 'Edit saved draft' if draft else 'Review your starting draft' }}</h2>
+    <input type="hidden" name="token" value="{{ token }}">
+    {% if channel == 'sms' %}<input type="hidden" name="subject" value="{{ values.subject }}">
+    {% else %}<label class="sr-field"><span class="sr-label">Email subject</span><input name="subject" value="{{ values.subject }}" maxlength="240" required></label>{% endif %}
+    <label class="sr-field"><span class="sr-label">{{ 'Text message' if channel == 'sms' else 'Email message' }}</span><textarea name="body" rows="9" maxlength="{{ 1600 if channel == 'sms' else 4000 }}" required>{{ values.body }}</textarea></label>
+    <p class="sr-hint" data-draft-count></p><p class="sr-hint" data-draft-dirty>{{ 'Unsaved draft' if not draft else 'Saved draft' }}</p>
+    <p>Check the wording and keep one clear next step. Saving or copying does not send a message or record contact.</p>
+    <div class="sr-prospect-actions">
+      <button class="sr-btn" type="submit"{% if stale %} disabled{% endif %}>{{ 'Save changes' if draft else 'Save draft' }}</button>
+      {% if draft %}<button class="sr-btn sr-btn--ghost" type="button" data-draft-copy="body"{% if stale or error %} disabled{% endif %}>Copy message</button>{% if channel == 'email' %}<button class="sr-btn sr-btn--ghost" type="button" data-draft-copy="subject"{% if stale or error %} disabled{% endif %}>Copy subject</button>{% endif %}{% endif %}
+    </div>
+    <p class="sr-hint" role="status" aria-live="polite" data-draft-feedback></p>
+    <noscript><p>Select and copy the reviewed text manually. Save edits before leaving this page.</p></noscript>
+    <p><a href="/admin/studio/prospects/{{ prospect_id }}/drafts" target="_blank" rel="noopener">Start another draft in a new tab</a> · <a href="/admin/studio/prospects/{{ prospect_id }}#prospect-activity">Record contact after you send</a></p>
+  </form>
+  {% else %}
+  <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/drafts/preview" class="sr-card sr-handoff-card sr-prospect-form">
+    <h2>Prepare a starting draft</h2><p>Choose a purpose and add a sentence you want to share. Research and planning notes stay in the reference panel unless you include them.</p>
+    <input type="hidden" name="operation_key" value="{{ values.operation_key }}">
+    <div class="sr-prospect-grid">
+      <label class="sr-field"><span class="sr-label">Channel</span><select name="channel">{% for key in ['email','sms'] %}<option value="{{ key }}"{% if values.channel == key %} selected{% endif %}>{{ channels[key] }}</option>{% endfor %}</select></label>
+      <label class="sr-field"><span class="sr-label">Purpose</span><select name="purpose">{% for key,label in purposes.items() %}<option value="{{ key }}"{% if values.purpose == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    </div>
+    <label class="sr-field"><span class="sr-label">Contact record to reference</span><select name="reference_event_id"><option value="">None — introduction</option>{% for event in events %}<option value="{{ event.id }}"{% if values.reference_event_id == event.id|string %} selected{% endif %}>{{ event.occurred_on }} · {{ 'Outgoing' if event.direction == 'out' else 'Incoming' }} {{ channels[event.channel] }} · {{ outcomes[event.outcome] }} · {{ event.notes[:100] or 'No note' }}</option>{% endfor %}</select><span class="sr-hint">Follow-ups need an outgoing attempt. Post-conversation drafts need a conversation or received reply. Shows the 100 most recent records.</span></label>
+    <label class="sr-field"><span class="sr-label">Personal sentence to include (optional)</span><textarea name="personalization" rows="3" maxlength="500">{{ values.personalization }}</textarea><span class="sr-hint">Use a verified detail appropriate to share, such as the photography need they described. This sentence appears exactly as written.</span></label>
+    <label class="sr-field"><span class="sr-label">One next step (optional)</span><textarea name="next_step" rows="2" maxlength="250">{{ values.next_step }}</textarea><span class="sr-hint">Leave blank for a simple question suited to the selected purpose.</span></label>
+    <button class="sr-btn" type="submit"{% if outreach and outreach.held %} disabled{% endif %}>Prepare draft</button>
+  </form>
+  {% endif %}
+
+  <section class="sr-card sr-handoff-card" aria-labelledby="saved-drafts"><h2 id="saved-drafts">Saved drafts</h2><p>Preparation only. Sending and contact history are recorded separately.</p>
+    <ul class="sr-followup-log">{% for saved in drafts %}<li><a href="/admin/studio/prospects/{{ prospect_id }}/drafts/{{ saved.id }}">{{ saved.subject or purposes[saved.purpose] }}</a> · {{ channels[saved.channel] }} · {{ saved.updated_at|localtime }}</li>{% else %}<li>No saved drafts yet.</li>{% endfor %}</ul>
+    <nav class="sr-prospect-actions" aria-label="Draft pages">{% if page > 1 %}<a href="/admin/studio/prospects/{{ prospect_id }}/drafts?page={{ page - 1 }}">Previous drafts</a>{% endif %}{% if has_next %}<a href="/admin/studio/prospects/{{ prospect_id }}/drafts?page={{ page + 1 }}">Older drafts</a>{% endif %}</nav>
+  </section>
+</main>
+<script nonce="{{ csp_nonce }}" src="/static/prospect_drafts.js?v={{ static_rev }}" defer></script>
+{% endblock %}

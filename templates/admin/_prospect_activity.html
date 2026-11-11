@@ -38,7 +38,7 @@
       {{ date_field('due_date', 'New due date', v.due_date, 'command-due-date') }}
       <p class="sr-hint">Required only when rescheduling.</p>
     </div>
-    <p class="sr-hint">Completing or canceling leaves this prospect needing a next step.</p>
+    <p class="sr-hint">{{ 'The project remains linked when this action is completed or canceled.' if handoff else 'Completing or canceling leaves this prospect needing a next step.' }}</p>
     <div class="sr-prospect-actions"><button type="submit" class="sr-btn sr-btn--ghost"{% if blocked %} disabled{% endif %}>Update next action</button></div>
   </form>
 {% endmacro %}
@@ -147,17 +147,18 @@
   <div class="sr-followup-overview">
     <section class="sr-card sr-followup-card" aria-labelledby="next-action-heading">
       <h3 id="next-action-heading">Next action</h3>
+      {% if outreach and outreach.held %}<p class="sr-hint">{{ outreach.label }}. Existing work is retained in <a href="/admin/studio/prospects/follow-ups?filter=held">On hold</a>.</p>{% endif %}
       {% if pending_task %}
         <p class="sr-followup-title">{{ pending_task.title }}</p>
         <p><span class="sr-badge{{ ' is-danger' if pending_task.due_date < today else ' is-signal' if pending_task.due_date == today else '' }}">{{ 'Overdue' if pending_task.due_date < today else 'Due today' if pending_task.due_date == today else 'Upcoming' }}</span> <time datetime="{{ pending_task.due_date }}">{{ pending_task.due_date }}</time></p>
-        {% if prospect.qualification == 'not_fit' %}<p class="sr-hint">Marked “Not a fit.” This action stays in your queue until you explicitly complete or cancel it.</p>{% endif %}
+        {% if prospect.qualification == 'not_fit' %}<p class="sr-hint">Marked “Not a fit.” This action is retained until you explicitly complete or cancel it.</p>{% endif %}
         <details class="sr-followup-disclosure"><summary>Complete, reschedule or cancel</summary>
           {{ command_form({'version': pending_task.version, 'task_id': pending_task.id}, '/admin/studio/prospects/' ~ prospect_id ~ '/follow-ups/' ~ pending_task.id) }}
         </details>
       {% else %}
-        <p class="sr-badge is-warn">Needs next step</p>
+        <p class="sr-badge{{ '' if handoff else ' is-warn' }}">{{ 'Linked to project' if handoff else 'Needs next step' }}</p>
         <p>No next action is scheduled.</p>
-        {{ schedule_form({'operation_key': schedule_operation_key}, '/admin/studio/prospects/' ~ prospect_id ~ '/follow-ups') }}
+        {{ schedule_form({'operation_key': schedule_operation_key}, '/admin/studio/prospects/' ~ prospect_id ~ '/follow-ups', blocked=outreach.held if outreach else false) }}
       {% endif %}
     </section>
     <section class="sr-card sr-followup-card" aria-labelledby="contact-heading">

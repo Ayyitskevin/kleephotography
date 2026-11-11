@@ -13,6 +13,11 @@
 .admin-shell .sr-prospects-table { overflow-x: auto; }
 .admin-shell .sr-prospects-table td { overflow-wrap: anywhere; max-width: 22rem; }
 .admin-shell .sr-prospect-activity { margin-bottom: 2.5rem; scroll-margin-top: 1rem; }
+.admin-shell .sr-handoff-card { padding: 1.25rem; border: 1px solid var(--line); margin-bottom: 1.5rem; max-width: 58rem; overflow-wrap: anywhere; }
+.sr .sr-handoff-card { border-color: var(--sr-line); }
+.admin-shell .sr-handoff-card h2:first-child { margin-top: 0; }
+.admin-shell .sr-prospect-form .sr-handoff-confirm { display: flex; gap: .75rem; align-items: flex-start; }
+.admin-shell .sr-prospect-form .sr-handoff-confirm input { width: auto; margin-top: .3rem; }
 .admin-shell .sr-followup-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: 0 0 1rem; }
 .admin-shell .sr-followup-heading h2 { margin: 0; }
 .admin-shell .sr-followup-heading p { margin: .5rem 0; }
@@ -56,6 +61,7 @@
 .admin-shell .sr-followup-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto; gap: 1.5rem; align-items: start; }
 .admin-shell .sr-followup-row h2 { font-size: 1.2rem; margin: 0 0 .5rem; overflow-wrap: anywhere; }
 .admin-shell .sr-followup-row p { margin: 0 0 .75rem; }
+.admin-shell .sr-followup-row > .sr-prospect-actions { margin: 0; }
 .admin-shell .sr-followup-recent--queue { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 0; font-size: .9rem; }
 .admin-shell .sr-followup-log { list-style: none; padding: 0; }
 .admin-shell .sr-followup-log li { border-bottom: 1px solid var(--line); padding: .75rem 0; overflow-wrap: anywhere; }
@@ -74,7 +80,8 @@
 @media (max-width: 1000px) {
   .admin-shell .sr-followup-overview { grid-template-columns: 1fr; }
   .admin-shell .sr-followup-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
-  .admin-shell .sr-followup-row > .sr-btn { grid-column: 1 / -1; justify-self: start; }
+  .admin-shell .sr-followup-row > .sr-btn,
+  .admin-shell .sr-followup-row > .sr-prospect-actions { grid-column: 1 / -1; justify-self: start; }
 }
 @media (max-width: 650px) {
   .admin-shell .sr-prospect-grid { grid-template-columns: 1fr; }
