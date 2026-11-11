@@ -2,15 +2,15 @@
 {% import "admin/_prospect_activity.html" as activity with context %}
 {% block title %}Review follow-up · {{ prospect.business }} · Mise{% endblock %}
 {% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
-{% block topbar %}<header class="admin-topbar pgtop"><div class="pgtop-lead"><h1>Review your entry</h1><p class="pgtop-sub">{{ prospect.business }}</p></div><div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}#prospect-activity">Back to prospect</a></div></header>{% endblock %}
+{% block topbar %}<header class="admin-topbar pgtop"><div class="pgtop-lead"><h1>Review your entry</h1><p class="pgtop-sub">{{ prospect.business }}</p></div><div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}{{ review_query|default('') }}#prospect-activity">Back to prospect</a></div></header>{% endblock %}
 {% block admin_body %}
 <main class="admin-main sr-prospects">
-  {% if review_query %}<p><a href="/admin/studio/prospects/review-work{{ review_query }}&amp;prospect_id={{ prospect_id }}">Back to guided review</a></p>{% endif %}
+  {% if review_query %}<p><a href="/admin/studio/prospects/review-work{{ review_query }}&amp;prospect_id={{ review_origin|default(prospect_id) }}">Back to guided review</a></p>{% endif %}
   <section class="sr-prospect-review sr-followup-error" aria-labelledby="followup-error-heading">
     <h2 id="followup-error-heading">{{ 'The record changed' if conflict else 'Check your entry' }}</h2>
     <p class="sr-error" role="alert">{{ error }}</p>
     <p>Your submitted values are preserved below.</p>
-    {% if conflict %}<p>Review the current prospect before trying again. This form still refers to the original action and cannot update a newer action.</p><a class="sr-btn sr-btn--ghost sr-btn--sm" href="/admin/studio/prospects/{{ prospect_id }}#prospect-activity" target="_blank" rel="noopener">Review current prospect in a new tab</a>{% endif %}
+    {% if conflict %}<p>Review the current prospect before trying again. This form still refers to the original action and cannot update a newer action.</p><a class="sr-btn sr-btn--ghost sr-btn--sm" href="/admin/studio/prospects/{{ prospect_id }}{{ review_query|default('') }}#prospect-activity" target="_blank" rel="noopener">Review current prospect in a new tab</a>{% endif %}
   </section>
   {% if conflict %}<aside class="sr-card sr-followup-current" aria-label="Current next action"><h2>Current next action</h2>{% if pending_task %}<p><strong>{{ pending_task.title }}</strong> · due {{ pending_task.due_date }}</p><p class="muted">Action #{{ pending_task.id }} · version {{ pending_task.version }}</p>{% else %}<p>No next action is currently scheduled.</p>{% endif %}</aside>{% endif %}
   <section class="sr-card sr-followup-retry" aria-labelledby="saved-entry-heading">

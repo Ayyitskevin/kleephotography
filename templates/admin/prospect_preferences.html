@@ -5,14 +5,15 @@
 {% block topbar %}
 <header class="admin-topbar pgtop">
   <div class="pgtop-lead"><h1>Outreach preferences</h1><p class="pgtop-sub">{{ prospect.business }}</p></div>
-  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}">Back to prospect</a><a class="pgtop-link" href="/admin/studio/prospects/follow-ups?filter=held">On hold</a></div>
+  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}{{ review_query|default('') }}">Back to prospect</a><a class="pgtop-link" href="/admin/studio/prospects/follow-ups?filter=held">On hold</a></div>
 </header>
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main sr-prospects">
-  {% if error %}<p class="sr-error" role="alert">{{ error }}</p><p>Your entries are preserved below. <a href="/admin/studio/prospects/{{ prospect_id }}/outreach" target="_blank" rel="noopener">Reopen current preferences in a new tab</a>.</p>{% endif %}
-  {{ summary(outreach) }}
-  <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/outreach" class="sr-prospect-form sr-card sr-handoff-card">
+  {% if review_query %}<p><a href="/admin/studio/prospects/review-work{{ review_query }}&amp;prospect_id={{ review_origin|default(prospect_id) }}">Back to guided review</a></p>{% endif %}
+  {% if error %}<p class="sr-error" role="alert">{{ error }}</p><p>Your entries are preserved below. <a href="/admin/studio/prospects/{{ prospect_id }}/outreach{{ review_query|default('') }}" target="_blank" rel="noopener">Reopen current preferences in a new tab</a>.</p>{% endif %}
+  {{ summary(outreach, none, review_query|default('')) }}
+  <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/outreach{{ review_query|default('') }}" class="sr-prospect-form sr-card sr-handoff-card">
     <h2>Controls recorded on {{ prospect.business }}</h2>
     <input type="hidden" name="token" value="{{ token }}">
     <label class="sr-field"><span class="sr-label">Outbound outreach status</span><select name="mode" required>{% for key, label in modes.items() %}<option value="{{ key }}"{% if values.mode == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>

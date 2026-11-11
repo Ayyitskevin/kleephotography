@@ -165,6 +165,7 @@ def _form(request, values, *, prospect_id=None, error=None, matches=(), reviewed
         "admin/prospect_form.html",
         {
             **activity,
+            **(prospect_followups._review_context(request) if prospect_id else {}),
             "values": values,
             "prospect_id": prospect_id,
             "error": error,
@@ -285,4 +286,4 @@ def update_prospect(request: Request, prospect_id: int, values: dict = Depends(_
                 field: [old[field], value] for field, value in values.items() if old[field] != value
             },
         )
-    return prospect_followups._redirect(prospect_id)
+    return prospect_followups._redirect(prospect_id, request)

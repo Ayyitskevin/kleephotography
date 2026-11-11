@@ -526,6 +526,37 @@ consistency checks passed. Each broad suite used fresh disposable workspace data
 Existing AnyIO/Starlette test deprecation warnings remain. Hosted checks must pass
 before merge; no independent review or browser appearance verification is claimed.
 
+### Returning from research and preference edits (2026-11-11)
+
+Guided review now carries its queue, search and original prospect through research
+edits and outreach-preference pages, including a linked source's controls. “Back
+to guided review” returns without saving; successful explicit saves return to the
+same live review. Validation errors, duplicate matches and stale preference forms
+keep their submitted values and return context. A hold or qualification change
+can make the original prospect ineligible; the existing state-change view explains
+that outcome instead of silently selecting a different prospect.
+
+Return handling accepts only the existing queue enum, a bounded search and an
+optional positive numeric origin ID (at most 18 digits). It builds a fixed local
+review route, never accepts an arbitrary return URL, and never uses the origin ID
+as the write target. Invalid context falls back to each standalone page's existing
+navigation. Preference scope tokens, optimistic checks, exact retries, audit and
+outreach enforcement are unchanged. Drafts still open separately; project handoff
+and other general navigation remain outside this return flow.
+
+The additional integration cases cover research saves/errors/duplicate conflicts,
+holds, preference retries and stale tokens, linked-source navigation versus write
+identity, and malformed return IDs. They use disposable SQLite without lifespan
+workers. PR #160's post-merge CI and CodeQL both passed before this slice began.
+
+On Python 3.12.14 with unchanged hash locks, the final candidate passed 496 unit,
+1,308 integration (9 additional cases), 188 smoke and 60 JavaScript tests, plus
+Ruff lint/format, Bandit, secrets, migration numbering and lock consistency checks.
+The existing safe-redirect test spy was updated to forward the optional request;
+the complete integration gate then passed. No selected tests were skipped.
+Existing provider mocks and AnyIO/Starlette warnings remain. Hosted CI/CodeQL must
+pass before merge; no browser appearance verification or deployment is claimed.
+
 ## Remaining slices
 
 1. Use the guided review and complete prospect → draft → manual contact →

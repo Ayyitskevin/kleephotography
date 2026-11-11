@@ -58,6 +58,7 @@ def _page(request, prospect_id, *, values=None, token="", error=None, status=200
         request,
         "admin/prospect_preferences.html",
         {
+            **followups._review_context(request),
             "prospect": prospect,
             "prospect_id": prospect_id,
             "outreach": state,
@@ -71,6 +72,12 @@ def _page(request, prospect_id, *, values=None, token="", error=None, status=200
         status_code=status,
         headers={"Cache-Control": "no-store"},
     )
+
+
+def _redirect(request, prospect_id):
+    if followups._review_context(request):
+        return followups._redirect(prospect_id, request)
+    return redirect_local(f"/admin/studio/prospects/{prospect_id}/outreach")
 
 
 @router.get("/{prospect_id}/outreach", response_class=HTMLResponse)
@@ -137,7 +144,7 @@ def save_preferences(
             _, state, own = _state(con, prospect_id)
             version = own["version"] if own else 0
             if own and version == ticket["version"] + 1 and own["last_command_digest"] == digest:
-                return redirect_local(f"/admin/studio/prospects/{prospect_id}/outreach")
+                return _redirect(request, prospect_id)
             if version != ticket["version"] or ticket.get("state") != followups._digest(state):
                 raise followups.ActivityError(
                     "Preferences or linked client records changed. Your entries are preserved; reopen to review the current scope.",
@@ -190,4 +197,4 @@ def save_preferences(
             error="The record changed. Reopen preferences and review again.",
             status=409,
         )
-    return redirect_local(f"/admin/studio/prospects/{prospect_id}/outreach")
+    return _redirect(request, prospect_id)
