@@ -1,0 +1,32 @@
+{% extends "admin/base_admin.html" %}
+{% import "admin/_outreach_preferences.html" as preferences %}
+{% block title %}Guided prospect review · Mise{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead"><h1>Guided prospect review</h1><p class="pgtop-sub">{{ {'due': 'Due & overdue', 'upcoming': 'Upcoming', 'unplanned': 'Needs next step'}[review] }}{% if q %} · {{ q }}{% endif %}</p></div>
+  <div class="pgtop-actions"><a class="pgtop-link" href="{{ queue_url }}">Back to queue</a></div>
+</header>
+{% endblock %}
+{% block admin_body %}
+<main class="admin-main sr-prospects">
+  <nav class="sr-prospect-actions" aria-label="Review navigation">
+    <span>{{ total }} currently eligible{% if prospect %} · Position {{ position }}{% endif %}</span>
+    {% if next_url %}<a class="sr-btn sr-btn--ghost" href="{{ next_url }}">{{ 'Next prospect' if prospect else 'Review next eligible prospect' }}</a>{% endif %}
+  </nav>
+  <p class="sr-hint">Navigation records no activity. The queue refreshes on each visit; skipping leaves the next action unchanged. After the last prospect, navigation returns to the first eligible prospect. Choose an explicit outcome below for work you actually did.</p>
+  {% if prospect %}
+    <section class="sr-card sr-followup-card" aria-labelledby="review-business">
+      <h2 id="review-business">{{ prospect.business }}</h2>
+      <p>{{ {'needs_research': 'Needs research', 'potential_fit': 'Potential fit', 'not_fit': 'Not a fit'}.get(prospect.qualification, prospect.qualification) }}</p>
+      <p class="sr-followup-notes">{{ prospect.notes }}</p>
+      <p class="muted">Source: {{ prospect.source }}</p>
+      <div class="sr-prospect-actions"><a href="/admin/studio/prospects/{{ prospect_id }}">Edit prospect</a><a href="/admin/studio/prospects/{{ prospect_id }}/drafts" target="_blank" rel="noopener">Prepare message in a new tab</a></div>
+    </section>
+    {{ preferences.summary(outreach, prospect_id) }}
+    {% include "admin/_prospect_activity.html" %}
+  {% else %}
+    <section class="sr-card sr-followup-empty"><h2>{{ 'This prospect is no longer in this queue' if total else 'No eligible prospects in this queue' }}</h2><p>Saved actions, outreach holds, qualification changes or your search can change this list. No contact or completion is inferred. Return to the queue or review the next eligible prospect.</p></section>
+  {% endif %}
+</main>
+{% endblock %}

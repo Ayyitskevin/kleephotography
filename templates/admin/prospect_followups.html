@@ -19,6 +19,7 @@
   </form>
   <div class="sr-followup-heading"><p>{{ total }} prospect{{ 's' if total != 1 }}{% if q %} matching your search{% endif %} · Page {{ page }}</p><p class="muted">Contact is recorded manually. Nothing is sent from this queue.</p></div>
   {% if filter == 'unplanned' %}<p class="sr-hint">These prospects have no pending next action. Review them and decide what comes next.</p>{% endif %}
+  {% if total and filter in ['due', 'upcoming', 'unplanned'] %}<p><a class="sr-btn" href="/admin/studio/prospects/review-work?review={{ filter }}&amp;q={{ q|urlencode }}">Review one at a time</a></p>{% endif %}
   <ul class="sr-followup-queue">
   {% for p in prospects %}
     <li class="sr-card sr-followup-row">

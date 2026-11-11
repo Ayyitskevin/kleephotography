@@ -5,6 +5,7 @@
 {% block topbar %}<header class="admin-topbar pgtop"><div class="pgtop-lead"><h1>Review your entry</h1><p class="pgtop-sub">{{ prospect.business }}</p></div><div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}#prospect-activity">Back to prospect</a></div></header>{% endblock %}
 {% block admin_body %}
 <main class="admin-main sr-prospects">
+  {% if review_query %}<p><a href="/admin/studio/prospects/review-work{{ review_query }}&amp;prospect_id={{ prospect_id }}">Back to guided review</a></p>{% endif %}
   <section class="sr-prospect-review sr-followup-error" aria-labelledby="followup-error-heading">
     <h2 id="followup-error-heading">{{ 'The record changed' if conflict else 'Check your entry' }}</h2>
     <p class="sr-error" role="alert">{{ error }}</p>
