@@ -180,7 +180,16 @@ def _review_context(request):
     if review not in {"due", "upcoming", "unplanned"}:
         return {}
     q = request.query_params.get("q", "").strip()[:200]
-    return {"review_query": "?" + urlencode({"review": review, "q": q})}
+    params = {"review": review, "q": q}
+    context = {}
+    # Navigation only: never accept an arbitrary return URL or use this id for writes.
+    if "review_origin" in request.query_params:
+        origin = request.query_params["review_origin"]
+        if not re.fullmatch(r"[0-9]{1,18}", origin) or int(origin) < 1:
+            return {}
+        context["review_origin"] = int(origin)
+        params["review_origin"] = str(int(origin))
+    return {**context, "review_query": "?" + urlencode(params)}
 
 
 def _redirect(prospect_id, request=None):
@@ -194,7 +203,10 @@ def _redirect(prospect_id, request=None):
         return redirect_local(default)
     if request is not None and (context := _review_context(request)):
         return redirect_local(
-            default + "/review-work" + context["review_query"] + f"&prospect_id={prospect_id}"
+            default
+            + "/review-work"
+            + context["review_query"]
+            + f"&prospect_id={context.get('review_origin', prospect_id)}"
         )
     try:
         return redirect_local(f"{default}/{prospect_id}")

@@ -177,3 +177,143 @@ def test_hold_arriving_between_queue_and_detail_hides_forms(admin, monkeypatch):
     monkeypatch.setattr(prospect_followups, "detail_context", changed)
     page = admin.get(f"{ROOT}/review-work")
     assert not page.context.get("prospect") and "data-contact-form" not in page.text
+
+
+def test_research_detour_keeps_search_errors_and_changed_eligibility(admin):
+    from html import unescape
+
+    pid = prospect("Cafe & Bar", due=None)
+    context = f"?review=unplanned&q=Cafe+%26+Bar&review_origin={pid}"
+    page = admin.get(f"{ROOT}/review-work?review=unplanned&q=Cafe+%26+Bar")
+    assert f'href="{ROOT}/{pid}{context}"' in unescape(page.text)
+    before = counts()
+    edit = admin.get(f"{ROOT}/{pid}{context}")
+    assert f'action="{ROOT}/{pid}{context}"' in unescape(edit.text)
+    assert "Back to guided review" in edit.text and counts() == before
+    data = dict(edit.context["values"])
+    invalid = admin.post(f"{ROOT}/{pid}{context}", data=data | {"source": ""})
+    assert invalid.status_code == 400 and invalid.context["values"]["source"] == ""
+    assert invalid.context["review_query"] == context
+    saved = admin.post(
+        f"{ROOT}/{pid}{context}", data=data | {"qualification": "not_fit"}, follow_redirects=False
+    )
+    assert saved.status_code == 303
+    target = urlsplit(saved.headers["location"])
+    assert target.path == f"{ROOT}/review-work"
+    assert parse_qs(target.query)["q"] == ["Cafe & Bar"]
+    assert parse_qs(target.query)["prospect_id"] == [str(pid)]
+    assert not admin.get(saved.headers["location"]).context.get("prospect")
+    assert (
+        db.one("SELECT qualification FROM prospects WHERE id=?", (pid,))["qualification"]
+        == "not_fit"
+    )
+
+
+def test_duplicate_research_error_preserves_detour(admin):
+    pid = prospect("Original")
+    other = prospect("Existing")
+    context = f"?review=due&q=Original&review_origin={pid}"
+    data = dict(admin.get(f"{ROOT}/{pid}{context}").context["values"])
+    error = admin.post(f"{ROOT}/{pid}{context}", data=data | {"business": "Existing"})
+    assert error.status_code == 409 and error.context["review_query"] == context
+    assert error.context["values"]["business"] == "Existing"
+    assert db.one("SELECT business FROM prospects WHERE id=?", (pid,))["business"] == "Original"
+    assert any(match["href"] == f"{ROOT}/{other}" for match in error.context["matches"])
+
+
+def test_preference_detour_hold_errors_and_retry_return_to_review(admin):
+    from html import unescape
+
+    pid = prospect("Preferences")
+    context = f"?review=due&q=Preferences&review_origin={pid}"
+    before = counts()
+    page = admin.get(f"{ROOT}/{pid}/outreach{context}")
+    assert counts() == before
+    assert f'action="{ROOT}/{pid}/outreach{context}"' in unescape(page.text)
+    data = {"token": page.context["token"], "mode": "stopped", "reason": ""}
+    error = admin.post(f"{ROOT}/{pid}/outreach{context}", data=data)
+    assert error.status_code == 400 and error.context["token"] == data["token"]
+    assert error.context["review_query"] == context
+    data["reason"] = "Synthetic request to stop"
+    saved = admin.post(f"{ROOT}/{pid}/outreach{context}", data=data, follow_redirects=False)
+    assert saved.status_code == 303
+    assert urlsplit(saved.headers["location"]).path == f"{ROOT}/review-work"
+    before = counts()
+    retry = admin.post(f"{ROOT}/{pid}/outreach{context}", data=data, follow_redirects=False)
+    assert retry.headers["location"] == saved.headers["location"] and counts() == before
+    returned = admin.get(saved.headers["location"])
+    assert not returned.context.get("prospect") and "data-contact-form" not in returned.text
+    assert db.one("SELECT done FROM tasks WHERE prospect_id=?", (pid,))["done"] == 0
+
+
+def test_source_preference_detour_returns_to_original_and_preserves_stale_token(admin):
+    from html import unescape
+
+    origin = prospect("Review origin")
+    source = prospect("Other source")
+    context = f"?review=due&q=Review&review_origin={origin}"
+    # Shared summary links carry the origin even when a linked source is edited.
+    from app.render import templates
+
+    state = {
+        "label": "Synthetic linked scope",
+        "members": [{"id": source, "business": "Other source"}],
+        "sources": [{"prospect_id": source, "mode": "active", "reason": "Fixture"}],
+    }
+    markup = templates.get_template("admin/_outreach_preferences.html").module.summary(
+        state, origin, context
+    )
+    assert f'href="{ROOT}/{source}/outreach{context}"' in unescape(markup)
+    url = f"{ROOT}/{source}/outreach{context}"
+    page = admin.get(url)
+    data = {
+        "token": page.context["token"],
+        "mode": "active",
+        "reason": "Synthetic preference",
+        "email_blocked": "1",
+    }
+    saved = admin.post(url, data=data, follow_redirects=False)
+    assert parse_qs(urlsplit(saved.headers["location"]).query)["prospect_id"] == [str(origin)]
+    assert admin.get(saved.headers["location"]).context["prospect_id"] == origin
+    assert (
+        db.one(
+            "SELECT email_blocked FROM prospect_outreach_preferences WHERE prospect_id=?", (source,)
+        )["email_blocked"]
+        == 1
+    )
+    assert not db.one("SELECT * FROM prospect_outreach_preferences WHERE prospect_id=?", (origin,))
+    stale = admin.post(url, data=data | {"reason": "A different command"})
+    assert stale.status_code == 409 and stale.context["token"] == data["token"]
+    assert stale.context["review_query"] == context
+    assert f'href="{ROOT}/{source}/outreach{context}"' in unescape(stale.text)
+
+
+@pytest.mark.parametrize("origin", ["//evil.example", "-1", "0", "1/../2", "9" * 19])
+def test_invalid_detour_origin_falls_back_to_standalone(admin, origin):
+    from urllib.parse import urlencode
+
+    pid = prospect("Local only")
+    context = "?" + urlencode(
+        {
+            "review": "due",
+            "q": "Local",
+            "review_origin": origin,
+            "return_url": "https://evil.example",
+        }
+    )
+    page = admin.get(f"{ROOT}/{pid}{context}")
+    assert "review_query" not in page.context
+    data = dict(page.context["values"])
+    saved = admin.post(f"{ROOT}/{pid}{context}", data=data, follow_redirects=False)
+    assert saved.headers["location"] == f"{ROOT}/{pid}"
+    preferences = admin.get(f"{ROOT}/{pid}/outreach{context}")
+    result = admin.post(
+        f"{ROOT}/{pid}/outreach{context}",
+        data={
+            "token": preferences.context["token"],
+            "mode": "active",
+            "reason": "Synthetic review",
+        },
+        follow_redirects=False,
+    )
+    assert result.headers["location"] == f"{ROOT}/{pid}/outreach"

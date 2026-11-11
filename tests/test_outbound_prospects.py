@@ -191,9 +191,9 @@ def test_capture_success_redirects_through_the_safe_helper(admin, monkeypatch):
     seen = []
     original = prospect_followups._redirect
 
-    def spy(prospect_id):
+    def spy(prospect_id, request=None):
         seen.append(prospect_id)
-        return original(prospect_id)
+        return original(prospect_id, request)
 
     monkeypatch.setattr(prospects.prospect_followups, "_redirect", spy)
     response = admin.post(ROOT, data=FORM, follow_redirects=False)

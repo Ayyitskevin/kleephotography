@@ -1,4 +1,4 @@
-{% macro summary(state, prospect_id=none) %}
+{% macro summary(state, prospect_id=none, review_query='') %}
 {% if state %}
 <section class="panel sr-card sr-handoff-card" aria-label="Outbound outreach preferences">
   <h2>Outbound outreach</h2>
@@ -9,10 +9,10 @@
   {% if state.members|selectattr('client_id')|list %}<p>These restrictions apply to outbound sales outreach across this client’s linked prospects and projects. Each source below keeps its own controls; resuming one does not clear another.</p>{% endif %}
   <p class="sr-hint">These controls cover prospect drafts and sales queues. They do not control Inbox sends, external apps or client-service messages. No hold recorded does not establish consent.</p>
   {% if state.sources %}<ul>{% for source in state.sources %}<li>
-    <a href="/admin/studio/prospects/{{ source.prospect_id }}/outreach">{% for member in state.members if member.id == source.prospect_id %}{{ member.business }}{% endfor %} · Review preferences</a>
+    <a href="/admin/studio/prospects/{{ source.prospect_id }}/outreach{{ review_query }}">{% for member in state.members if member.id == source.prospect_id %}{{ member.business }}{% endfor %} · Review preferences</a>
     <p>{{ {'active': 'No outreach hold on this source', 'stopped': 'Outbound outreach stopped', 'snoozed': 'Pause recorded through ' ~ (source.snoozed_until or '')}[source.mode] }} · {{ source.reason }}</p>
   </li>{% endfor %}</ul>{% endif %}
-  {% if prospect_id %}<a href="/admin/studio/prospects/{{ prospect_id }}/outreach">Manage this prospect’s outreach</a>{% endif %}
+  {% if prospect_id %}<a href="/admin/studio/prospects/{{ prospect_id }}/outreach{{ review_query }}">Manage this prospect’s outreach</a>{% endif %}
 </section>
 {% endif %}
 {% endmacro %}

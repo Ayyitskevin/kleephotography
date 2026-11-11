@@ -16,14 +16,15 @@
   </nav>
   <p class="sr-hint">Navigation records no activity. The queue refreshes on each visit; skipping leaves the next action unchanged. After the last prospect, navigation returns to the first eligible prospect. Choose an explicit outcome below for work you actually did.</p>
   {% if prospect %}
+    {% set detour_query = review_query ~ '&review_origin=' ~ prospect_id %}
     <section class="sr-card sr-followup-card" aria-labelledby="review-business">
       <h2 id="review-business">{{ prospect.business }}</h2>
       <p>{{ {'needs_research': 'Needs research', 'potential_fit': 'Potential fit', 'not_fit': 'Not a fit'}.get(prospect.qualification, prospect.qualification) }}</p>
       <p class="sr-followup-notes">{{ prospect.notes }}</p>
       <p class="muted">Source: {{ prospect.source }}</p>
-      <div class="sr-prospect-actions"><a href="/admin/studio/prospects/{{ prospect_id }}">Edit prospect</a><a href="/admin/studio/prospects/{{ prospect_id }}/drafts" target="_blank" rel="noopener">Prepare message in a new tab</a></div>
+      <div class="sr-prospect-actions"><a href="/admin/studio/prospects/{{ prospect_id }}{{ detour_query }}">Edit prospect</a><a href="/admin/studio/prospects/{{ prospect_id }}/drafts" target="_blank" rel="noopener">Prepare message in a new tab</a></div>
     </section>
-    {{ preferences.summary(outreach, prospect_id) }}
+    {{ preferences.summary(outreach, prospect_id, detour_query) }}
     {% include "admin/_prospect_activity.html" %}
   {% else %}
     <section class="sr-card sr-followup-empty"><h2>{{ 'This prospect is no longer in this queue' if total else 'No eligible prospects in this queue' }}</h2><p>Saved actions, outreach holds, qualification changes or your search can change this list. No contact or completion is inferred. Return to the queue or review the next eligible prospect.</p></section>
