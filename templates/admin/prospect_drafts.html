@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_outreach_preferences.html" import summary as outreach_summary %}
 {% block title %}Message drafts · {{ current.prospect.business }} · Mise{% endblock %}
 {% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
 {% block topbar %}
@@ -9,6 +10,7 @@
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main sr-prospects">
+  {{ outreach_summary(outreach, prospect_id) }}
   {% set ctx = context or current %}
   {% set editing = 'body' in values %}
   {% set channel = draft.channel if draft else values.channel|default('') %}
@@ -60,7 +62,7 @@
     <label class="sr-field"><span class="sr-label">Contact record to reference</span><select name="reference_event_id"><option value="">None — introduction</option>{% for event in events %}<option value="{{ event.id }}"{% if values.reference_event_id == event.id|string %} selected{% endif %}>{{ event.occurred_on }} · {{ 'Outgoing' if event.direction == 'out' else 'Incoming' }} {{ channels[event.channel] }} · {{ outcomes[event.outcome] }} · {{ event.notes[:100] or 'No note' }}</option>{% endfor %}</select><span class="sr-hint">Follow-ups need an outgoing attempt. Post-conversation drafts need a conversation or received reply. Shows the 100 most recent records.</span></label>
     <label class="sr-field"><span class="sr-label">Personal sentence to include (optional)</span><textarea name="personalization" rows="3" maxlength="500">{{ values.personalization }}</textarea><span class="sr-hint">Use a verified detail appropriate to share, such as the photography need they described. This sentence appears exactly as written.</span></label>
     <label class="sr-field"><span class="sr-label">One next step (optional)</span><textarea name="next_step" rows="2" maxlength="250">{{ values.next_step }}</textarea><span class="sr-hint">Leave blank for a simple question suited to the selected purpose.</span></label>
-    <button class="sr-btn" type="submit">Prepare draft</button>
+    <button class="sr-btn" type="submit"{% if outreach and outreach.held %} disabled{% endif %}>Prepare draft</button>
   </form>
   {% endif %}
 

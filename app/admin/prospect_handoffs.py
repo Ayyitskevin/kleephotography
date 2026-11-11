@@ -8,7 +8,7 @@ from contextlib import closing
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import audit, db, security, specialties
+from .. import audit, db, outreach, security, specialties
 from ..render import templates
 from . import prospect_followups as followups
 from . import prospects
@@ -168,7 +168,19 @@ def _resolve(con, prospect_id, values):
             "The follow-up is no longer pending. Reopen the handoff to review the current record.",
             409,
         )
-    return {"prospect": prospect, "client": client, "project": project, "pending": pending}
+    policy = outreach.for_prospect(
+        con,
+        prospect_id,
+        followups.studio_mod._today().isoformat(),
+        extra_client_id=client["id"] if client else None,
+    )
+    return {
+        "prospect": prospect,
+        "client": client,
+        "project": project,
+        "pending": pending,
+        "outreach": policy,
+    }
 
 
 def _page(
@@ -331,7 +343,7 @@ def commit_handoff(
             state = _resolve(con, prospect_id, values)
             if receipt.get("state") != followups._digest(state):
                 raise followups.ActivityError(
-                    "The prospect, client, project or follow-up changed after review. Review the handoff again before saving.",
+                    "The prospect, client, project, follow-up or outreach preferences changed after review. Review the handoff again before saving.",
                     409,
                 )
             prospect = state["prospect"]

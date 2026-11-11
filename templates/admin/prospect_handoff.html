@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_outreach_preferences.html" import summary as outreach_summary %}
 {% block title %}Start opportunity · {{ prospect.business }} · Mise{% endblock %}
 {% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
 {% block topbar %}
@@ -34,6 +35,8 @@
         <div><dt>Pending follow-up</dt><dd>{% if review.pending %}{{ review.pending.title }} · due {{ review.pending.due_date }}<br>{{ {'keep':'Keep this action on the prospect', 'complete':'Complete this action', 'cancel':'Cancel this action'}[values.task_disposition] }}{% if values.task_note %}<p class="sr-followup-notes">{{ values.task_note }}</p>{% endif %}{% else %}No pending action to change.{% endif %}</dd></div>
       </dl>
       <p class="sr-hint">Research and contact history stay linked to the prospect. Existing client details stay unchanged. You can prepare a proposal from the project afterward.</p>
+      <p>After this handoff, restrictions from this prospect and any other prospects linked to the selected client apply across that client’s outbound sales work. Review the combined controls below.</p>
+      {{ outreach_summary(review.outreach) }}
       <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/handoff" class="sr-prospect-actions">
         {% for field, value in values.items() %}<input type="hidden" name="{{ field }}" value="{{ value }}">{% endfor %}
         <input type="hidden" name="review_token" value="{{ review_token }}">

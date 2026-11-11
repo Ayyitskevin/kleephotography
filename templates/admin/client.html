@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_outreach_preferences.html" import summary as outreach_summary %}
 {% block title %}{{ c.name }} · Studio · Mise{% endblock %}
 {% import "admin/_copy_link.html" as cp %}
 {% block topbar %}
@@ -24,6 +25,7 @@
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main">
+  {{ outreach_summary(outreach) }}
   {# Jump nav — this page is long; sessions/portal first, config folds last.
      Sections below keep their ids; folds remember open state (details_persist). #}
   <nav class="sr-anchors" aria-label="On this page">

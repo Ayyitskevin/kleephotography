@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, security
+from .. import config, db, outreach, security
 from ..render import templates
 from . import studio as studio_mod
 
@@ -68,8 +68,13 @@ def tasks_view(request: Request):
            ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id DESC"""
     )
     today_iso = today.isoformat()
+    held = outreach.held_ids(outreach.read_index(today_iso))
+    held_count = 0
     today_col, week_col = [], []
     for r in open_rows:
+        if r["prospect_id"] in held:
+            held_count += 1
+            continue
         due = r["due_date"]
         if due and due[:10] <= today_iso:  # overdue or due today
             today_col.append(card(r))
@@ -111,6 +116,7 @@ def tasks_view(request: Request):
         {
             "columns": columns,
             "open_count": len(today_col) + len(week_col),
+            "held_count": held_count,
             "done_week": done_week,
             "projects": projects,
         },

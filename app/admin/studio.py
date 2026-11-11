@@ -15,6 +15,7 @@ from .. import (
     config,
     db,
     jobs,
+    outreach,
     platekit,
     pricing,
     security,
@@ -374,6 +375,7 @@ def client_detail(request: Request, client_id: int):
             "money": money,
             "platekit": platekit_packs,
             "blockers": _client_blockers(client_id),
+            "outreach": outreach.read_index(_today().isoformat())["clients"].get(client_id),
             "prospect_sources": db.all_(
                 "SELECT h.prospect_id,h.project_id,p.business,j.title AS project_title "
                 "FROM prospect_handoffs h JOIN prospects p ON p.id=h.prospect_id "
@@ -736,6 +738,7 @@ def project_detail(request: Request, project_id: int):
             "payments": payments,
             "delivery": _delivery_check(p),
             "stock_chip": _project_stock_chip(project_id),
+            "outreach": outreach.read_index(_today().isoformat())["clients"].get(p["client_id"]),
             "prospect_sources": db.all_(
                 "SELECT h.*,pr.business,t.id AS pending_task_id,t.title AS pending_title,t.due_date AS pending_due "
                 "FROM prospect_handoffs h JOIN prospects pr ON pr.id=h.prospect_id "
