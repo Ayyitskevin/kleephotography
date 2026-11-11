@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_outreach_preferences.html" import summary as outreach_summary %}
 {% block title %}{{ values.business if prospect_id else 'Add prospect' }} · Mise{% endblock %}
 {% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
 {% block topbar %}
@@ -25,6 +26,7 @@
     <p class="sr-prospect-review" role="status">No exact matches found among prospects, clients or inbound inquiries. Review the details, then save. Different spellings or contact details can still hide a duplicate.</p>
   {% endif %}
   {% if prospect_id %}
+    {{ outreach_summary(outreach, prospect_id) }}
     <section class="sr-card sr-handoff-card" aria-label="Project handoff">
       {% if handoff %}<h2>Project: {{ handoff.project_title }}</h2><p>Research and contact history stay here. Changes to this prospect do not overwrite the client or project.</p><div class="sr-prospect-actions"><a class="sr-btn" href="/admin/studio/projects/{{ handoff.project_id }}">Open project</a><a href="/admin/studio/prospects/{{ prospect_id }}/handoff">View handoff</a></div>
       {% else %}<h2>Ready for an opportunity?</h2><p>After confirming interest, review the client and bring this prospect into your project workflow.</p><a class="sr-btn sr-btn--ghost" href="/admin/studio/prospects/{{ prospect_id }}/handoff">Start opportunity</a>{% endif %}

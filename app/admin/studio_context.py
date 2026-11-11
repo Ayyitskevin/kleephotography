@@ -6,7 +6,7 @@ import json
 
 from fastapi import Request
 
-from .. import db
+from .. import db, outreach
 from . import common
 from .lookups import PROJECT_STATUSES
 
@@ -143,12 +143,13 @@ def _ctx_pipeline(today_iso: str) -> dict:
     }
 
 
-def _sales_review(projects) -> dict:
+def _sales_review(projects, held_clients=frozenset()) -> dict:
     """A review queue, never a send schedule or a claim that contact is due.
 
     Reuse the pipeline projection and its value semantics. A missing client
     touch is explicitly distinct from client inactivity: days_quiet then uses
-    the existing stage/creation fallback. No new clock, query or write.
+    the existing stage/creation fallback. The caller supplies held clients;
+    no clock, query or write here.
     """
     actions = {
         "inquiry_received": "Review outreach",
@@ -157,7 +158,7 @@ def _sales_review(projects) -> dict:
     }
     rows = []
     for p in projects:
-        if p["status"] not in actions:
+        if p["status"] not in actions or (held_clients and p["client_id"] in held_clients):
             continue
         age = p["days_quiet"]
         if age is None or age < QUIET_DAYS:
@@ -601,13 +602,14 @@ def _studio_context(request: Request) -> dict:
     today = studio._today()
     today_iso = today.isoformat()
     pipeline = _ctx_pipeline(today_iso)
+    held_clients = outreach.held_ids(outreach.read_index(today_iso), "clients")
     return {
         "statuses": PROJECT_STATUSES,
         "stale_days": STALE_DAYS,
         "quiet_days": QUIET_DAYS,
         "intel": _ctx_intel(),
         **pipeline,
-        **_sales_review(pipeline["projects"]),
+        **_sales_review(pipeline["projects"], held_clients),
         "outstanding": common.open_invoice_balance(),
         **_ctx_inquiries(),
         "licenses_expiring": _ctx_licenses_expiring(),

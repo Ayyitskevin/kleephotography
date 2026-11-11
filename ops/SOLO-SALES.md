@@ -380,13 +380,127 @@ Desktop/mobile visual review remains open: the workspace denied Chromium's socke
 creation. Rendered-form and JavaScript checks do not establish visual appearance.
 No independent review, deployment, live admin write or message send was performed.
 
+## Sixth slice: outreach holds and channel preferences
+
+From a prospect, open **Manage this prospect’s outreach**. Record a reason and
+choose no hold, pause through a date, or stop outbound outreach. Email, text and
+phone exclusions remain independent of the hold; a preferred channel is advisory.
+An excluded channel cannot be preferred on the same source record. Excluding all
+three channels holds sales work even with status “No outreach hold.” The default
+means no restriction has been recorded, never consent to contact.
+
+A pause includes its end date on `studio._today()`. It expires by reading the
+current day, without a worker or a write. The next day, pending tasks return with
+their original due dates and may be overdue. Stops require an explicit edit and
+reason to resume. A silent prospect is never automatically stopped or marked lost;
+resuming does not erase a historical Not interested response or Not a fit status.
+
+### Enforcement and history
+
+Held prospects are excluded from Due, Upcoming and Needs next step, from Home’s
+open tasks and task action count, and from the Tasks board’s active columns. The
+**On hold** queue retains them; **All prospects** also shows their restrictions.
+Filtering happens before counts and pagination. The Tasks board links retained
+work to On hold. General/project delivery tasks and completed history remain.
+
+Draft preview, initial save, edit and the Copy check re-read the effective hold
+and selected channel. New follow-up scheduling also checks the hold inside its
+write transaction. Existing task completion, cancellation and rescheduling, and
+manual recording of contact that already happened, remain available. An exact
+retry of an already saved command returns without adding another write or audit.
+
+Any explicit preference change invalidates previously prepared drafts, including
+a stop followed by a resume. Text stays available for reference. Drafts created
+before this slice remain current when no preferences exist and other context is
+unchanged. The freshness check describes the instant it runs, not a later manual
+send. Nothing here sends, invokes a provider, creates contact history, changes
+qualification/stage, completes tasks, or rewrites due dates.
+
+### Explicit client scope
+
+Before a handoff, controls apply to one prospect. After handoff, restrictions from
+**all prospects explicitly linked to the same client** combine across that client’s
+outbound sales work, including future projects. One stop wins; pauses use the latest
+active end date; channel exclusions combine. Conflicting preferred channels require
+review instead of choosing one automatically. Resuming one source never clears a
+restriction from another source. Source links and reasons appear on prospect,
+draft, client and project pages. Held clients leave the advisory Sales review queue;
+pipeline membership, stages and financial values remain unchanged.
+
+The handoff review shows the combined controls and explicitly explains the scope
+change before linking. Its signed snapshot includes current preference versions
+and linked source membership. Preference edit forms bind that same scope: a new
+handoff or a change on another source after opening a form requires fresh review.
+No email/business-name matching silently expands this scope, and client parent/
+child relationships do not inherit controls. A client-wide hold is intentionally
+coarser than person-level consent; the UI names this boundary.
+
+These are **outbound prospect sales controls**, not a global do-not-contact system.
+Inbox/provider sends, external apps, inbound inquiry queues and transactional client
+service are outside enforcement. Review restrictions before using those surfaces.
+No contact permissions, legal conclusions or external opt-out acknowledgements are
+inferred from the stored controls.
+
+### Persistence, scale and recovery
+
+`088_prospect_outreach_preferences.sql` adds one record per prospect with validated
+status/date/channel fields and a version. It does not rewrite existing records.
+Each change and its before/after values, reason and reviewed scope commit with an
+audit event in one transaction. Optimistic checks reject stale submissions; exact
+most-recent retries are idempotent. GET is read-only and forms use no-store responses.
+
+The shared projection reads the small solo CRM once per consumer, with no per-row
+policy queries or persistent cache. Queue filtering and pagination happen in memory
+after ordered reads. Revisit indexed SQL projections before bulk imports or large
+team workloads; this slice is not a bulk-outreach engine.
+
+Schema changes require Kevin’s review and a separate deploy. Keep the additive
+table and audit history on rollback. **Older code ignores these controls:** if an
+application rollback is needed, suspend outbound drafting/queue use until an
+operator reviews the retained restrictions and restores enforcing code. Do not
+interpret an older queue as permission to resume outreach.
+
+### Preference verification (2026-11-11)
+
+`tests/test_prospect_preferences.py` exercises stop/snooze/channel enforcement,
+expiry boundaries, linked-source unions, future projects, scope changes during
+handoff, stale drafts, exact retries, concurrent writes, audit rollback, unchanged
+workflow/provider tables, migration constraints, pagination, escaping, auth/origin
+checks and both UI modes on disposable SQLite without lifespan workers.
+
+Based on main `31c303e`, using Python 3.12.14 and the locked dependencies:
+
+| Check | Result |
+| --- | --- |
+| New preference integration cases (included below) | 40 passed |
+| Full unit gate | 457 passed |
+| Full integration gate | 1,289 passed |
+| Full smoke gate | 188 passed |
+| Full JavaScript test set (`tests/js/*.test.mjs`) | 60 passed |
+| Combined integration/smoke app coverage | 89% (required floor: 78%) |
+| Preference route / shared policy coverage | 99% / 100% |
+| Ruff lint/format, migration numbering, whitespace | Passed (90 migration files) |
+| Bandit high-severity scan and repository secret scan | Passed |
+| Locked runtime dependency audit | No known vulnerabilities found |
+
+No selected tests were skipped. Marker deselections select other gates. Broad
+suites use disposable workspace data directories and their existing explicit
+transport mocks; live provider behavior is outside this verification. The existing
+Starlette TestClient deprecation warning remains.
+
+Browser visual review remains open: this workspace previously denied Chromium
+socket creation. Rendered-template checks do not establish desktop/mobile appearance.
+No independent review, production writes, deployment or message sends are part of
+this slice.
+
 ## Remaining slices
 
-1. Stop/snooze rules with a recorded reason; preserve communication preferences
-   across projects. A silent prospect is not automatically lost or opted out.
+1. Use the complete prospect → draft → manual contact → follow-up → opportunity
+   loop to identify friction. A guided daily outreach session is a useful next
+   candidate: review the next eligible prospect without losing queue context.
 2. Consider richer drafting only after using the grounded starters. A provider
    integration needs explicit context boundaries and review; sending remains a
-   separate action and must respect communication preferences.
+   separate action and must enforce communication preferences at send time.
 
 Further persistence changes need a separately reviewed schema PR. Sending/provider
 work, payment changes, contracts and deployment keep their existing review gates.

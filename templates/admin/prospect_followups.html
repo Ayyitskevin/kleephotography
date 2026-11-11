@@ -10,7 +10,7 @@
 {% block admin_body %}
 <main class="admin-main sr-prospects">
   <nav class="sr-followup-filters" aria-label="Follow-up queue">
-    {% for key, label in [('due', 'Due & overdue'), ('upcoming', 'Upcoming'), ('unplanned', 'Needs next step'), ('all', 'All prospects')] %}
+    {% for key, label in [('due', 'Due & overdue'), ('upcoming', 'Upcoming'), ('unplanned', 'Needs next step'), ('held', 'On hold'), ('all', 'All prospects')] %}
       <a class="sr-btn sr-btn--ghost sr-btn--sm{% if filter == key %} is-active{% endif %}" href="/admin/studio/prospects/follow-ups?filter={{ key }}&amp;q={{ q|urlencode }}"{% if filter == key %} aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
   </nav>
@@ -24,15 +24,19 @@
     <li class="sr-card sr-followup-row">
       <div class="sr-followup-identity"><h2><a href="/admin/studio/prospects/{{ p.id }}#prospect-activity">{{ p.business }}</a></h2>{% if p.contact_name %}<p class="muted">{{ p.contact_name }}</p>{% endif %}</div>
       <div class="sr-followup-plan">
+        {% if p.outreach.held %}<p class="sr-badge is-warn">{{ p.outreach.label }}</p>{% endif %}
+        {% if p.outreach.blocked %}<p class="sr-hint">Excluded: {{ p.outreach.blocked|join(', ') }}</p>{% endif %}
+        {% if p.outreach.preferred_channel %}<p class="sr-hint">Preferred: {{ p.outreach.preferred_channel }}</p>{% endif %}
+        {% if p.outreach.preference_conflict %}<p class="sr-hint">Review conflicting channel preferences.</p>{% endif %}
         {% if p.task_id %}<p class="sr-followup-title">{{ p.title }}</p><p><span class="sr-badge{{ ' is-danger' if p.due_date < today else ' is-signal' if p.due_date == today else '' }}">{{ 'Overdue' if p.due_date < today else 'Due today' if p.due_date == today else 'Upcoming' }}</span> <time datetime="{{ p.due_date }}">{{ p.due_date }}</time></p>{% if p.qualification == 'not_fit' %}<p class="sr-hint">Not a fit · review this pending action.</p>{% endif %}
         {% else %}<p class="sr-badge{{ '' if p.linked_project_id else ' is-warn' }}">{{ 'Linked to project' if p.linked_project_id else 'Needs next step' }}</p><p>No next action scheduled.</p>{% if p.last_cancel_reason %}<p class="muted sr-followup-notes">Last cancellation: {{ p.last_cancel_reason }}</p>{% endif %}{% endif %}
         {% if p.linked_project_id %}<p><a href="/admin/studio/projects/{{ p.linked_project_id }}">Open linked project</a></p>{% endif %}
         <dl class="sr-followup-recent sr-followup-recent--queue"><div><dt>Last outgoing attempt</dt><dd>{{ p.last_attempt_on or 'None recorded' }}</dd></div><div><dt>Last reported reply</dt><dd>{{ p.last_reply_on or 'None recorded' }}</dd></div></dl>
       </div>
-      <div class="sr-prospect-actions"><a class="sr-btn sr-btn--ghost sr-btn--sm" href="/admin/studio/prospects/{{ p.id }}#prospect-activity">{{ 'Review follow-up' if p.task_id else 'Plan next action' }}<span class="sr-followup-sr-only"> for {{ p.business }}</span></a><a href="/admin/studio/prospects/{{ p.id }}/drafts">Prepare message<span class="sr-followup-sr-only"> for {{ p.business }}</span></a></div>
+      <div class="sr-prospect-actions"><a class="sr-btn sr-btn--ghost sr-btn--sm" href="/admin/studio/prospects/{{ p.id }}#prospect-activity">{{ 'Review follow-up' if p.task_id else 'Plan next action' }}<span class="sr-followup-sr-only"> for {{ p.business }}</span></a>{% if not p.outreach.held %}<a href="/admin/studio/prospects/{{ p.id }}/drafts">Prepare message<span class="sr-followup-sr-only"> for {{ p.business }}</span></a>{% endif %}<a href="/admin/studio/prospects/{{ p.id }}/outreach">Outreach preferences<span class="sr-followup-sr-only"> for {{ p.business }}</span></a></div>
     </li>
   {% else %}
-    <li class="sr-card sr-followup-empty"><h2>{{ 'No matching prospects' if q else 'You’re up to date' if filter == 'due' else 'No upcoming actions' if filter == 'upcoming' else 'No prospects need a next step' if filter == 'unplanned' else 'Start with a prospect' }}</h2><p>{{ 'Try a different search or queue.' if q else 'Nothing is due today or overdue. Check upcoming actions or prospects that need a next step.' if filter == 'due' else 'Scheduled actions after today will appear here.' if filter == 'upcoming' else 'Unlinked prospects without a pending action appear here. Not-fit prospects are excluded.' if filter == 'unplanned' else 'Add a business, then choose a next action and due date.' }}</p></li>
+    <li class="sr-card sr-followup-empty"><h2>{{ 'No matching prospects' if q else 'You’re up to date' if filter == 'due' else 'No upcoming actions' if filter == 'upcoming' else 'No prospects need a next step' if filter == 'unplanned' else 'No prospects on hold' if filter == 'held' else 'Start with a prospect' }}</h2><p>{{ 'Try a different search or queue.' if q else 'Nothing is due today or overdue. Check upcoming actions or prospects that need a next step.' if filter == 'due' else 'Scheduled actions after today will appear here.' if filter == 'upcoming' else 'Unlinked prospects without a pending action appear here. Not-fit prospects are excluded.' if filter == 'unplanned' else 'Paused or stopped prospects and prospects with all channels excluded appear here.' if filter == 'held' else 'Add a business, then choose a next action and due date.' }}</p></li>
   {% endfor %}
   </ul>
   <nav class="sr-prospect-actions" aria-label="Follow-up pages">{% if page > 1 %}<a href="?filter={{ filter }}&amp;q={{ q|urlencode }}&amp;page={{ page - 1 }}">Previous</a>{% endif %}{% if has_next %}<a href="?filter={{ filter }}&amp;q={{ q|urlencode }}&amp;page={{ page + 1 }}">Next</a>{% endif %}</nav>

@@ -6,11 +6,12 @@ import json
 import re
 import sqlite3
 import uuid
+from contextlib import closing
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import audit, db, security
+from .. import audit, db, outreach, security
 from ..render import templates
 from . import studio as studio_mod
 
@@ -92,6 +93,9 @@ def detail_context(prospect_id: int) -> dict:
     prospect = db.one("SELECT * FROM prospects WHERE id=?", (prospect_id,))
     return {
         **_options(),
+        "outreach": outreach.read_index(studio_mod._today().isoformat())["prospects"].get(
+            prospect_id
+        ),
         "prospect": dict(prospect) if prospect else None,
         "handoff": db.one(
             "SELECT h.*, p.title AS project_title FROM prospect_handoffs h "
@@ -174,7 +178,7 @@ def _redirect(prospect_id):
 
 @router.get("/follow-ups", response_class=HTMLResponse)
 def followup_queue(request: Request, filter: str = "due", q: str = "", page: int = 1):
-    if filter not in {"due", "upcoming", "unplanned", "all"}:
+    if filter not in {"due", "upcoming", "unplanned", "held", "all"}:
         filter = "due"
     q = q.strip()[:200]
     today = studio_mod._today().isoformat()
@@ -183,6 +187,7 @@ def followup_queue(request: Request, filter: str = "due", q: str = "", page: int
         "upcoming": "t.id IS NOT NULL AND t.due_date > ?",
         "unplanned": "t.id IS NULL AND p.qualification != 'not_fit' AND h.prospect_id IS NULL",
         "all": "1=1",
+        "held": "1=1",
     }
     # Every interpolated SQL fragment is selected here, never supplied by a form.
     source = (
@@ -195,9 +200,7 @@ def followup_queue(request: Request, filter: str = "due", q: str = "", page: int
         "|| p.phone), lower(?)) > 0 AND " + predicates[filter]
     )
     args = (q, today) if filter in {"due", "upcoming"} else (q,)
-    total = db.one("SELECT COUNT(*) AS n " + source + where, args)["n"]
-    page = min(max(1, page), max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE))
-    rows = db.all_(
+    query = (
         "SELECT p.*, t.id AS task_id, t.title, t.due_date, t.version, h.project_id AS linked_project_id, "
         "(SELECT x.cancel_reason FROM tasks x WHERE x.prospect_id=p.id "
         "ORDER BY x.id DESC LIMIT 1) AS last_cancel_reason, "
@@ -208,9 +211,18 @@ def followup_queue(request: Request, filter: str = "due", q: str = "", page: int
         "AND c.outcome IN ('reply_received','conversation','not_interested')) AS last_reply_on "
         + source
         + where
-        + " ORDER BY (t.due_date IS NULL), t.due_date ASC, p.id ASC LIMIT ? OFFSET ?",
-        (*args, PAGE_SIZE, (page - 1) * PAGE_SIZE),
+        + " ORDER BY (t.due_date IS NULL), t.due_date ASC, p.id ASC"
     )
+    with closing(db.connect()) as con:
+        con.execute("BEGIN")
+        policies = outreach.index(con, today)["prospects"]
+        rows = [{**dict(r), "outreach": policies[r["id"]]} for r in con.execute(query, args)]
+        if filter != "all":
+            rows = [r for r in rows if r["outreach"]["held"] == (filter == "held")]
+    # Filter before pagination so held rows never crowd active work off a page.
+    total = len(rows)
+    page = min(max(1, page), max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE))
+    rows = rows[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]
     return templates.TemplateResponse(
         request,
         "admin/prospect_followups.html",
@@ -252,6 +264,9 @@ def schedule_followup(
                         409,
                     )
                 return _redirect(prospect_id)
+            policy = outreach.for_prospect(con, prospect_id, studio_mod._today().isoformat())
+            if reason := outreach.blocked_reason(policy):
+                raise ActivityError(reason, 409)
             if con.execute(
                 "SELECT 1 FROM tasks WHERE prospect_id=? AND done=0 AND canceled_at IS NULL",
                 (prospect_id,),

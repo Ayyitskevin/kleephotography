@@ -8,7 +8,7 @@ from contextlib import closing
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from .. import audit, config, db, security, specialties
+from .. import audit, config, db, outreach, security, specialties
 from ..redirects import redirect_local
 from ..render import templates
 from . import prospect_followups as followups
@@ -81,7 +81,7 @@ def _context(con, prospect_id, event_id=""):
         record = con.execute(sql, (prospect_id,)).fetchone()
         return dict(record) if record else None
 
-    return {
+    state = {
         "prospect": dict(row),
         "event": event,
         "latest_contact": one(
@@ -103,8 +103,18 @@ def _context(con, prospect_id, event_id=""):
         ),
     }
 
+    policy = outreach.for_prospect(con, prospect_id, followups.studio_mod._today().isoformat())
+    # Unrestricted drafts created before preferences shipped remain usable.
+    if policy["sources"]:
+        state["outreach"] = policy
+    return state
+
 
 def _usable(state, values):
+    if state.get("outreach"):
+        reason = outreach.blocked_reason(state["outreach"], values["channel"])
+        if reason:
+            raise followups.ActivityError(reason, 409)
     if state["prospect"]["qualification"] == "not_fit":
         raise followups.ActivityError("Review this prospect's Not a fit qualification first.", 409)
     if state["latest_response"] and state["latest_response"]["outcome"] == "not_interested":
@@ -263,8 +273,15 @@ def _page(
                     )
                 )
         if values is None:
+            policy = current.get("outreach", {})
+            available = [
+                c
+                for c, field in (("email", "email"), ("sms", "phone"))
+                if current["prospect"][field] and c not in policy.get("blocked", [])
+            ]
+            preferred = policy.get("preferred_channel")
             values = {
-                "channel": "email" if current["prospect"]["email"] else "sms",
+                "channel": preferred if preferred in available else next(iter(available), "email"),
                 "purpose": "introduction",
                 "reference_event_id": "",
                 "personalization": "",
@@ -277,6 +294,7 @@ def _page(
         {
             "prospect_id": prospect_id,
             "current": current,
+            "outreach": current.get("outreach"),
             "context": state,
             "values": values,
             "draft": row,
