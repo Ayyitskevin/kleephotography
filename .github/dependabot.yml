@@ -40,7 +40,14 @@ updates:
     labels:
       - "dependencies"
     groups:
+      # CodeQL init/analyze share internal configuration and must move together.
+      # SHA-only updates may not classify as minor/patch, so group by name.
+      codeql-actions:
+        patterns:
+          - "github/codeql-action/*"
       actions-minor-patch:
+        exclude-patterns:
+          - "github/codeql-action/*"
         update-types:
           - "minor"
           - "patch"

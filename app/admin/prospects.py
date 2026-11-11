@@ -4,7 +4,7 @@ import re
 from contextlib import closing
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from .. import audit, db, security, specialties
 from ..render import templates
@@ -62,6 +62,22 @@ def _form_values(
     }
 
 
+def _email_ok(value: str) -> bool:
+    """One @ and a dotted domain. Same addresses as the old pattern, read once.
+
+    ``[^@\\s]`` also matches ``.``, so ``[^@\\s]+\\.[^@\\s]+`` tried every dot
+    on a near-miss. Anything past the field limit is refused before that scan.
+    """
+    if not value or len(value) > LIMITS["email"] or any(ch.isspace() for ch in value):
+        return False
+    local, sep, domain = value.partition("@")
+    if not sep or not local or not domain or "@" in domain:
+        return False
+    # A dot counts when a character sits on both sides, so a trailing dot
+    # (``a@b.c.``) still matches and ``a@b.`` does not.
+    return "." in domain[1:-1]
+
+
 def _validate(values: dict) -> str | None:
     if not values["business"] or not values["source"]:
         return "Enter a business or venue and where you found it."
@@ -74,7 +90,7 @@ def _validate(values: dict) -> str | None:
         return "Choose one of the listed photography specialties."
     if values["qualification"] not in QUALIFICATIONS:
         return "Choose one of the listed qualifications."
-    if values["email"] and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", values["email"]):
+    if values["email"] and not _email_ok(values["email"]):
         return "Enter a complete email address, or leave it blank."
     phone = values["phone"]
     if phone and (
@@ -224,7 +240,7 @@ def create_prospect(request: Request, values: dict = Depends(_form_values)):
             ),
         ).lastrowid
         audit.log(con, "prospect", pid, "create", diff=values)
-    return RedirectResponse(f"/admin/studio/prospects/{pid}", status_code=303)
+    return prospect_followups._redirect(pid)
 
 
 @router.get("/{prospect_id}", response_class=HTMLResponse)
@@ -269,4 +285,4 @@ def update_prospect(request: Request, prospect_id: int, values: dict = Depends(_
                 field: [old[field], value] for field, value in values.items() if old[field] != value
             },
         )
-    return RedirectResponse(f"/admin/studio/prospects/{prospect_id}", status_code=303)
+    return prospect_followups._redirect(prospect_id)
