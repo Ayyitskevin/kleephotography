@@ -20,6 +20,7 @@
       <div class="panel-head"><h2 id="prospect-sources-heading">Outbound prospect history</h2></div>
       {% for source in prospect_sources %}
         <p><a href="/admin/studio/prospects/{{ source.prospect_id }}#prospect-activity">{{ source.business }} · Contact and follow-up history</a> · <a href="/admin/studio/prospects/{{ source.prospect_id }}/handoff">Handoff details</a></p>
+        <p><a href="/admin/studio/prospects/{{ source.prospect_id }}/drafts">Prepare outreach to this prospect</a></p>
         <p style="white-space: pre-wrap; overflow-wrap: anywhere;">{{ source.photography_need }}</p>
         {% if source.target_date %}<p class="muted">Requested target at handoff: {{ source.target_date }} · Confirmed shoot date is set separately.</p>{% endif %}
         {% if source.pending_task_id %}<p><a href="/admin/studio/prospects/{{ source.prospect_id }}#prospect-activity">Next action: {{ source.pending_title }}</a> · due {{ source.pending_due }}</p>{% endif %}
