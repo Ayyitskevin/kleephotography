@@ -1,0 +1,196 @@
+{# Native forms are shared with the validation page so retry values stay intact. #}
+{% macro date_field(name, label, selected, id, required=false) %}
+  <label class="sr-field" for="{{ id }}"><span class="sr-label">{{ label }}{% if required %} <span class="sr-req">*</span>{% endif %}</span>
+    <input type="date" id="{{ id }}" name="{{ name }}" value="{{ selected or '' }}"{% if required %} required{% endif %}>
+  </label>
+  <div class="sr-followup-presets" role="group" aria-label="Choose {{ label|lower }}" data-date-presets hidden>
+    {% for label, day in [('Today', today), ('Tomorrow', tomorrow), ('In 7 days', next_week)] %}
+      <button type="button" class="sr-btn sr-btn--ghost sr-btn--sm" data-date-target="{{ id }}" data-date-value="{{ day }}">{{ label }} <span>{{ day }}</span></button>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro schedule_form(v, action, blocked=false) %}
+  <form method="post" action="{{ action }}" class="sr-prospect-form sr-followup-form">
+    <input type="hidden" name="operation_key" value="{{ v.operation_key }}">
+    <label class="sr-field"><span class="sr-label">Next action <span class="sr-req">*</span></span>
+      <input name="title" value="{{ v.title or '' }}" maxlength="200" required placeholder="For example: Call about spring menu photography"></label>
+    {{ date_field('due_date', 'Due date', v.due_date, 'schedule-due-date', true) }}
+    <p class="sr-hint">One pending next action per prospect. Choose the day you want it in your queue.</p>
+    <div class="sr-prospect-actions"><button type="submit" class="sr-btn"{% if blocked %} disabled{% endif %}>Schedule next action</button></div>
+  </form>
+{% endmacro %}
+
+{% macro command_form(v, action, blocked=false) %}
+  <form method="post" action="{{ action }}" class="sr-prospect-form sr-followup-form" data-followup-command>
+    <input type="hidden" name="version" value="{{ v.version }}">
+    <input type="hidden" name="task_id" value="{{ v.task_id }}">
+    <label class="sr-field"><span class="sr-label">What happened to this action? <span class="sr-req">*</span></span>
+      <select name="action" required data-task-action>
+        <option value="">Choose an update</option>
+        {% if v.action and v.action not in ['complete', 'reschedule', 'cancel'] %}<option value="{{ v.action }}" selected>{{ v.action }} — choose a listed update</option>{% endif %}
+        {% for key, label in [('complete', 'Completed'), ('reschedule', 'Reschedule'), ('cancel', 'Cancel this action')] %}<option value="{{ key }}"{% if v.action == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select></label>
+    <label class="sr-field"><span class="sr-label">Completion note / reason <span class="sr-req">*</span></span>
+      <textarea name="note" rows="2" maxlength="1000" required>{{ v.note or '' }}</textarea>
+      <span class="sr-hint">Record what you did, or why the plan changed. This does not record a contact attempt.</span></label>
+    <div data-reschedule-fields>
+      {{ date_field('due_date', 'New due date', v.due_date, 'command-due-date') }}
+      <p class="sr-hint">Required only when rescheduling.</p>
+    </div>
+    <p class="sr-hint">{{ 'The project remains linked when this action is completed or canceled.' if handoff else 'Completing or canceling leaves this prospect needing a next step.' }}</p>
+    <div class="sr-prospect-actions"><button type="submit" class="sr-btn sr-btn--ghost"{% if blocked %} disabled{% endif %}>Update next action</button></div>
+  </form>
+{% endmacro %}
+
+{% macro contact_form(v, action, task, blocked=false) %}
+  <form method="post" action="{{ action }}" class="sr-prospect-form sr-followup-form" data-contact-form>
+    <input type="hidden" name="operation_key" value="{{ v.operation_key }}">
+    <input type="hidden" name="task_id" value="{{ v.task_id or '' }}">
+    <input type="hidden" name="version" value="{{ v.version or '' }}">
+    <p class="sr-hint">Record contact that already happened outside Mise. This form does not send messages or make calls.</p>
+    <div class="sr-prospect-grid">
+      <label class="sr-field"><span class="sr-label">Direction <span class="sr-req">*</span></span>
+        <select name="direction" required data-contact-direction>
+          {% if v.direction and v.direction not in directions %}<option value="{{ v.direction }}" selected>{{ v.direction }} — choose a listed direction</option>{% endif %}
+          {% for key, label in directions.items() %}<option value="{{ key }}"{% if v.direction == key %} selected{% endif %}>{{ 'I contacted them' if key == 'out' else 'They contacted me / replied' }}</option>{% endfor %}
+        </select></label>
+      <label class="sr-field"><span class="sr-label">Channel <span class="sr-req">*</span></span>
+        <select name="channel" required data-contact-channel>
+          <option value="">Choose a channel</option>
+          {% if v.channel and v.channel not in channels %}<option value="{{ v.channel }}" selected>{{ v.channel }} — choose a listed channel</option>{% endif %}
+          {% for key, label in channels.items() %}<option value="{{ key }}"{% if v.channel == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></label>
+      <label class="sr-field"><span class="sr-label">Date it happened <span class="sr-req">*</span></span>
+        <input type="date" name="occurred_on" value="{{ v.occurred_on|default(today) }}" max="{{ today }}" required></label>
+      <label class="sr-field"><span class="sr-label">Outcome <span class="sr-req">*</span></span>
+        <select name="outcome" required data-contact-outcome>
+          <option value="">Choose what happened</option>
+          {% if v.outcome and v.outcome not in outcomes %}<option value="{{ v.outcome }}" selected>{{ v.outcome }} — choose a listed outcome</option>{% endif %}
+          {% for key, label in outcomes.items() %}<option value="{{ key }}"{% if v.outcome == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <span class="sr-hint">No answer / voicemail: outgoing calls. Sent: outgoing email or text. Reply received: incoming contact.</span></label>
+    </div>
+    <label class="sr-field"><span class="sr-label">Contact notes</span>
+      <textarea name="notes" rows="3" maxlength="4000">{{ v.notes or '' }}</textarea></label>
+    {% if task or v.task_id %}
+    <fieldset class="sr-followup-task-choice">
+      <legend>Next action after this contact</legend>
+      {% if task %}<p>{{ task.title }} · due <time datetime="{{ task.due_date }}">{{ task.due_date }}</time></p>{% else %}<p>Original action #{{ v.task_id }} · version {{ v.version }}</p>{% endif %}
+      <label class="sr-field"><span class="sr-label">Update next action</span>
+        <select name="task_action" data-task-action>
+          {% if v.task_action and v.task_action not in ['keep', 'complete', 'reschedule'] %}<option value="{{ v.task_action }}" selected>{{ v.task_action }} — choose a listed update</option>{% endif %}
+          {% for key, label in [('keep', 'Keep the current next action'), ('complete', 'Mark this action complete'), ('reschedule', 'Reschedule this action')] %}<option value="{{ key }}"{% if v.task_action == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></label>
+      <div data-task-note-fields>
+        <label class="sr-field"><span class="sr-label">Action completion note / reason</span>
+          <textarea name="task_note" rows="2" maxlength="1000">{{ v.task_note or '' }}</textarea>
+          <span class="sr-hint">Required when completing or rescheduling the action.</span></label>
+      </div>
+      <div data-reschedule-fields>{{ date_field('due_date', 'New due date', v.due_date, 'contact-due-date') }}<p class="sr-hint">Required only when rescheduling.</p></div>
+    </fieldset>
+    {% else %}
+      <input type="hidden" name="task_action" value="{{ v.task_action|default('keep') }}">
+      <p class="sr-hint">No next action is scheduled. Recording contact will not schedule one automatically.</p>
+    {% endif %}
+    <div class="sr-prospect-actions"><button type="submit" class="sr-btn"{% if blocked %} disabled{% endif %}>Record contact</button></div>
+  </form>
+{% endmacro %}
+
+{% macro scripts() %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+  document.querySelectorAll('[data-date-presets]').forEach(function (group) { group.hidden = false; });
+  document.querySelectorAll('[data-date-target]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var input = document.getElementById(button.dataset.dateTarget);
+      if (input) { input.value = button.dataset.dateValue; input.focus(); }
+    });
+  });
+  document.querySelectorAll('[data-task-action]').forEach(function (select) {
+    var form = select.closest('form');
+    function update() {
+      var reschedule = form.querySelector('[data-reschedule-fields]');
+      var note = form.querySelector('[data-task-note-fields]');
+      if (reschedule) {
+        reschedule.hidden = !form.closest('.sr-followup-retry') && select.value !== 'reschedule';
+        reschedule.querySelector('input[type=date]').required = select.value === 'reschedule';
+      }
+      if (note) {
+        note.hidden = !form.closest('.sr-followup-retry') && select.value === 'keep';
+        note.querySelector('textarea').required = select.value === 'complete' || select.value === 'reschedule';
+      }
+    }
+    select.addEventListener('change', update); update();
+  });
+  document.querySelectorAll('[data-contact-form]').forEach(function (form) {
+    var direction = form.querySelector('[data-contact-direction]');
+    var channel = form.querySelector('[data-contact-channel]');
+    var outcome = form.querySelector('[data-contact-outcome]');
+    function validateOutcome() {
+      var value = outcome.value;
+      var invalid = (direction.value === 'in' && ['attempted', 'no_answer', 'voicemail', 'sent'].includes(value)) ||
+        (direction.value === 'out' && value === 'reply_received') ||
+        (['no_answer', 'voicemail'].includes(value) && channel.value !== 'call') ||
+        (value === 'sent' && !['email', 'sms'].includes(channel.value));
+      outcome.setCustomValidity(invalid ? 'Choose an outcome that matches the direction and channel.' : '');
+    }
+    [direction, channel, outcome].forEach(function (input) { input.addEventListener('change', validateOutcome); });
+    validateOutcome();
+  });
+})();
+</script>
+{% endmacro %}
+
+<section class="sr-prospect-activity" id="prospect-activity" aria-labelledby="prospect-activity-heading">
+  <div class="sr-followup-heading"><div><h2 id="prospect-activity-heading">Follow-up</h2><p class="muted">Your next step and the contact you have recorded.</p></div><a href="/admin/studio/prospects/follow-ups">Daily follow-ups</a></div>
+  <div class="sr-followup-overview">
+    <section class="sr-card sr-followup-card" aria-labelledby="next-action-heading">
+      <h3 id="next-action-heading">Next action</h3>
+      {% if outreach and outreach.held %}<p class="sr-hint">{{ outreach.label }}. Existing work is retained in <a href="/admin/studio/prospects/follow-ups?filter=held">On hold</a>.</p>{% endif %}
+      {% if pending_task %}
+        <p class="sr-followup-title">{{ pending_task.title }}</p>
+        <p><span class="sr-badge{{ ' is-danger' if pending_task.due_date < today else ' is-signal' if pending_task.due_date == today else '' }}">{{ 'Overdue' if pending_task.due_date < today else 'Due today' if pending_task.due_date == today else 'Upcoming' }}</span> <time datetime="{{ pending_task.due_date }}">{{ pending_task.due_date }}</time></p>
+        {% if prospect.qualification == 'not_fit' %}<p class="sr-hint">Marked “Not a fit.” This action is retained until you explicitly complete or cancel it.</p>{% endif %}
+        <details class="sr-followup-disclosure"><summary>Complete, reschedule or cancel</summary>
+          {{ command_form({'version': pending_task.version, 'task_id': pending_task.id}, '/admin/studio/prospects/' ~ prospect_id ~ '/follow-ups/' ~ pending_task.id) }}
+        </details>
+      {% else %}
+        <p class="sr-badge{{ '' if handoff else ' is-warn' }}">{{ 'Linked to project' if handoff else 'Needs next step' }}</p>
+        <p>No next action is scheduled.</p>
+        {{ schedule_form({'operation_key': schedule_operation_key}, '/admin/studio/prospects/' ~ prospect_id ~ '/follow-ups', blocked=outreach.held if outreach else false) }}
+      {% endif %}
+    </section>
+    <section class="sr-card sr-followup-card" aria-labelledby="contact-heading">
+      <h3 id="contact-heading">Contact</h3>
+      {% if prospect.contact_name or prospect.email or prospect.phone %}<div class="sr-followup-contact-details">{% if prospect.contact_name %}<p><strong>{{ prospect.contact_name }}</strong></p>{% endif %}{% if prospect.email %}<p>{{ prospect.email }}</p>{% endif %}{% if prospect.phone %}<p>{{ prospect.phone }}</p>{% endif %}</div>{% endif %}
+      <dl class="sr-followup-recent">
+        <div><dt>Last outgoing attempt</dt><dd>{% if last_attempt %}<time datetime="{{ last_attempt.occurred_on }}">{{ last_attempt.occurred_on }}</time> · {{ channels.get(last_attempt.channel, last_attempt.channel) }}<br>{{ outcomes.get(last_attempt.outcome, last_attempt.outcome) }}{% else %}None recorded{% endif %}</dd></div>
+        <div><dt>Last reported reply</dt><dd>{% if last_reply %}<time datetime="{{ last_reply.occurred_on }}">{{ last_reply.occurred_on }}</time> · {{ channels.get(last_reply.channel, last_reply.channel) }}<br>{{ outcomes.get(last_reply.outcome, last_reply.outcome) }}{% else %}None recorded{% endif %}</dd></div>
+      </dl>
+      <details class="sr-followup-disclosure"><summary>Record contact</summary>
+        {{ contact_form({'operation_key': contact_operation_key, 'direction': 'out', 'occurred_on': today, 'task_action': 'keep', 'task_id': pending_task.id if pending_task else '', 'version': pending_task.version if pending_task else ''}, '/admin/studio/prospects/' ~ prospect_id ~ '/contacts', pending_task) }}
+      </details>
+    </section>
+  </div>
+  <details class="sr-followup-disclosure sr-followup-history">
+    <summary>History <span class="muted">· {{ contact_events|length }} contact record{{ 's' if contact_events|length != 1 }} · {{ followup_history|length }} action{{ 's' if followup_history|length != 1 }}</span></summary>
+    <div class="sr-followup-overview">
+      <section aria-labelledby="contact-history-heading"><h3 id="contact-history-heading">Contact history</h3>
+        <ol class="sr-followup-log">
+          {% for event in contact_events %}<li><p><strong>{{ 'Outgoing attempt' if event.direction == 'out' else 'Incoming contact' }}</strong> · <time datetime="{{ event.occurred_on }}">{{ event.occurred_on }}</time></p><p>{{ channels.get(event.channel, event.channel) }} · {{ outcomes.get(event.outcome, event.outcome) }}</p>{% if event.notes %}<p class="sr-followup-notes">{{ event.notes }}</p>{% endif %}<p class="muted">Recorded manually {{ event.recorded_at|localtime }}</p></li>
+          {% else %}<li class="muted">No contact recorded yet.</li>{% endfor %}
+        </ol>
+      </section>
+      <section aria-labelledby="action-history-heading"><h3 id="action-history-heading">Action history</h3>
+        <ol class="sr-followup-log">
+          {% for task in followup_history %}<li><p><strong>{{ task.title }}</strong></p><p><span class="sr-badge">{{ 'Canceled' if task.canceled_at else 'Completed' if task.done else 'Pending' }}</span> Due <time datetime="{{ task.due_date }}">{{ task.due_date }}</time></p>{% if task.canceled_at %}<p class="muted">Canceled {{ task.canceled_at|localtime }}</p><p class="sr-followup-notes">{{ task.cancel_reason }}</p>{% elif task.done %}<p class="muted">Completed {{ task.done_at|localtime }}</p><p class="sr-followup-notes">{{ task.completion_note }}</p>{% endif %}
+            {% for change in task.changes if change.action == 'reschedule' %}<div class="sr-followup-change"><p><strong>Rescheduled</strong> {{ change.created_at|localtime }}</p><p>{{ change.diff.due_date[0] }} → {{ change.diff.due_date[1] }}</p><p class="sr-followup-notes">{{ change.diff.note }}</p></div>{% endfor %}
+          </li>
+          {% else %}<li class="muted">No actions scheduled yet.</li>{% endfor %}
+        </ol>
+      </section>
+    </div>
+  </details>
+</section>
+{{ scripts() }}

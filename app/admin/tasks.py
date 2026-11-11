@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, security
+from .. import config, db, outreach, security
 from ..render import templates
 from . import studio as studio_mod
 
@@ -42,10 +42,8 @@ def _task_due_label(due: str | None, today: dt.date) -> tuple[str, bool]:
 
 @router.get("/tasks", response_class=HTMLResponse)
 def tasks_view(request: Request):
-    """Studio to-do board (strict-1:1 prototype): three columns — Today (due
-    today or overdue), This week (every other open task), Done (recently
-    completed). Each card toggles done via a POST form; due_date feeds the
-    calendar."""
+    """Today, later/undated and completed work. Prospect tasks link to their
+    explicit outcome controls so generic toggles cannot erase their history."""
     today = studio_mod._today()
 
     def card(r) -> dict:
@@ -55,19 +53,28 @@ def tasks_view(request: Request):
             "title": r["title"],
             "project": r["project_title"] or "General",
             "project_id": r["project_id"],
+            "prospect_id": r["prospect_id"],
+            "business": r["business"],
             "due": label,
             "urgent": urgent,
         }
 
     open_rows = db.all_(
-        """SELECT t.id, t.title, t.due_date, t.project_id, p.title AS project_title
+        """SELECT t.id, t.title, t.due_date, t.project_id, p.title AS project_title,
+                  t.prospect_id, pr.business
            FROM tasks t LEFT JOIN projects p ON p.id=t.project_id
-           WHERE t.done=0
+           LEFT JOIN prospects pr ON pr.id=t.prospect_id
+           WHERE t.done=0 AND t.canceled_at IS NULL
            ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id DESC"""
     )
     today_iso = today.isoformat()
+    held = outreach.held_ids(outreach.read_index(today_iso))
+    held_count = 0
     today_col, week_col = [], []
     for r in open_rows:
+        if r["prospect_id"] in held:
+            held_count += 1
+            continue
         due = r["due_date"]
         if due and due[:10] <= today_iso:  # overdue or due today
             today_col.append(card(r))
@@ -76,9 +83,10 @@ def tasks_view(request: Request):
 
     done_rows = db.all_(
         """SELECT t.id, t.title, t.due_date, t.done_at, t.project_id,
-                  p.title AS project_title
+                  p.title AS project_title, t.prospect_id, pr.business
            FROM tasks t LEFT JOIN projects p ON p.id=t.project_id
-           WHERE t.done=1 ORDER BY t.done_at DESC LIMIT 12"""
+           LEFT JOIN prospects pr ON pr.id=t.prospect_id
+           WHERE t.done=1 AND t.canceled_at IS NULL ORDER BY t.done_at DESC LIMIT 12"""
     )
     done_col = []
     for r in done_rows:
@@ -88,13 +96,14 @@ def tasks_view(request: Request):
         done_col.append(c)
 
     week_ago = (today - dt.timedelta(days=7)).isoformat()
-    done_week = db.one("SELECT COUNT(*) n FROM tasks WHERE done=1 AND done_at >= ?", (week_ago,))[
-        "n"
-    ]
+    done_week = db.one(
+        "SELECT COUNT(*) n FROM tasks WHERE done=1 AND canceled_at IS NULL AND done_at >= ?",
+        (week_ago,),
+    )["n"]
 
     columns = [
         {"key": "today", "label": "Today", "dot": "#7C2F38", "tasks": today_col},
-        {"key": "week", "label": "This week", "dot": "#EDB23C", "tasks": week_col},
+        {"key": "week", "label": "Later / undated", "dot": "#EDB23C", "tasks": week_col},
         {"key": "done", "label": "Done", "dot": "#2f7d57", "tasks": done_col},
     ]
     projects = db.all_(
@@ -107,6 +116,7 @@ def tasks_view(request: Request):
         {
             "columns": columns,
             "open_count": len(today_col) + len(week_col),
+            "held_count": held_count,
             "done_week": done_week,
             "projects": projects,
         },
@@ -129,7 +139,14 @@ def task_create(title: str = Form(...), due_date: str = Form(""), project_id: st
 
 @router.post("/tasks/{task_id}/toggle")
 def task_toggle(task_id: int):
-    t = db.get_or_404("SELECT done FROM tasks WHERE id=?", (task_id,), detail="no such task")
+    t = db.get_or_404(
+        "SELECT done, prospect_id FROM tasks WHERE id=?", (task_id,), detail="no such task"
+    )
+    if t["prospect_id"] is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Open the prospect to complete, reschedule or cancel this follow-up.",
+        )
     if t["done"]:
         db.run("UPDATE tasks SET done=0, done_at=NULL WHERE id=?", (task_id,))
     else:
@@ -140,7 +157,12 @@ def task_toggle(task_id: int):
 
 @router.post("/tasks/{task_id}/delete")
 def task_delete(task_id: int):
-    db.get_or_404("SELECT 1 FROM tasks WHERE id=?", (task_id,), detail="no such task")
+    t = db.get_or_404("SELECT prospect_id FROM tasks WHERE id=?", (task_id,), detail="no such task")
+    if t["prospect_id"] is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Open the prospect to cancel this follow-up and keep its history.",
+        )
     db.run("DELETE FROM tasks WHERE id=?", (task_id,))
     log.info("task %s deleted", task_id)
     return RedirectResponse("/admin/tasks", status_code=303)

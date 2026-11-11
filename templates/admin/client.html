@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% from "admin/_outreach_preferences.html" import summary as outreach_summary %}
 {% block title %}{{ c.name }} · Studio · Mise{% endblock %}
 {% import "admin/_copy_link.html" as cp %}
 {% block topbar %}
@@ -24,6 +25,7 @@
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main">
+  {{ outreach_summary(outreach) }}
   {# Jump nav — this page is long; sessions/portal first, config folds last.
      Sections below keep their ids; folds remember open state (details_persist). #}
   <nav class="sr-anchors" aria-label="On this page">
@@ -37,6 +39,9 @@
   </nav>
 
   <h2 id="new-session">Sessions</h2>
+  {% if prospect_sources %}
+  <section class="panel" aria-label="Outbound prospect history"><h3>Outbound prospect history</h3><ul>{% for source in prospect_sources %}<li><a href="/admin/studio/prospects/{{ source.prospect_id }}#prospect-activity">{{ source.business }} · Contact history</a> · <a href="/admin/studio/projects/{{ source.project_id }}">{{ source.project_title }}</a></li>{% endfor %}</ul></section>
+  {% endif %}
   <form method="post" action="/admin/studio/clients/{{ c.id }}/projects" class="inline-form">
     <input type="text" name="title" placeholder="Session title (e.g. Spring menu shoot)" required>
     <button type="submit">New session</button>
@@ -333,11 +338,13 @@
     {% else %}
       {% set blocker_summary = "Delete " ~ c.name ~ "? This is final." %}
     {% endif %}
+    {% if prospect_sources %}<p class="muted">This client has retained prospect handoff history. Deletion is unavailable.</p>{% else %}
     <form method="post" action="/admin/studio/clients/{{ c.id }}/delete"
           class="inline" data-confirm="{{ blocker_summary }}">
       {% if blockers %}<input type="hidden" name="force" value="1">{% endif %}
       <button class="link danger">Delete client{% if blockers %} (despite {{ blockers|length }} blocker{{ "s" if blockers|length != 1 }}){% endif %}</button>
     </form>
+    {% endif %}
     {% if blockers %}<p class="muted">Blockers: {{ blockers|join(" · ") }}</p>{% endif %}
   </details>
 </main>

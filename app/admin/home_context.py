@@ -3,7 +3,7 @@
 import calendar as cal
 import datetime as dt
 
-from .. import config, db
+from .. import config, db, outreach
 from . import common, studio
 
 # Active sales-funnel stages for the Home pipeline strip (archived is terminal,
@@ -77,12 +77,14 @@ def _ctx_headline_counts(today_iso: str) -> dict:
         """SELECT COUNT(*) AS n FROM invoices
            WHERE recurring_plan_id IS NOT NULL AND status='draft'"""
     )["n"]
-    tasks_due = db.one(
-        """SELECT COUNT(*) AS n FROM tasks
-           WHERE done=0 AND due_date IS NOT NULL
+    held = outreach.held_ids(outreach.read_index(today_iso))
+    due_rows = db.all_(
+        """SELECT prospect_id FROM tasks
+           WHERE done=0 AND canceled_at IS NULL AND due_date IS NOT NULL
              AND due_date <= ?""",
         (today_iso,),
-    )["n"]
+    )
+    tasks_due = sum(r["prospect_id"] not in held for r in due_rows)
     return {
         "new_inquiries": new_inquiries,
         "outstanding": outstanding,
@@ -135,15 +137,20 @@ def _ctx_kpi() -> dict:
 def _ctx_open_tasks(today_iso: str) -> list:
     """Undone tasks, soonest due first, undated last. Overdue is judged on the
     wall clock so a task doesn't turn red an evening early."""
-    return db.all_(
+    held = outreach.held_ids(outreach.read_index(today_iso))
+    rows = db.all_(
         """SELECT t.id, t.title, t.due_date, t.project_id, p.title AS project_title,
+                  t.prospect_id, pr.business,
                   (t.due_date IS NOT NULL AND t.due_date < ?)
                     AS overdue
            FROM tasks t LEFT JOIN projects p ON p.id=t.project_id
-           WHERE t.done=0
-           ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id DESC LIMIT 6""",
+           LEFT JOIN prospects pr ON pr.id=t.prospect_id
+           WHERE t.done=0 AND t.canceled_at IS NULL
+           ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id DESC""",
         (today_iso,),
     )
+
+    return [r for r in rows if r["prospect_id"] not in held][:6]
 
 
 def _ctx_reply_queue() -> dict:

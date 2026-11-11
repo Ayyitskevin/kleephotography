@@ -1,0 +1,27 @@
+{% extends "admin/base_admin.html" %}
+{% from "admin/_outreach_preferences.html" import summary %}
+{% block title %}Outreach preferences · {{ prospect.business }} · Mise{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block topbar %}
+<header class="admin-topbar pgtop">
+  <div class="pgtop-lead"><h1>Outreach preferences</h1><p class="pgtop-sub">{{ prospect.business }}</p></div>
+  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}">Back to prospect</a><a class="pgtop-link" href="/admin/studio/prospects/follow-ups?filter=held">On hold</a></div>
+</header>
+{% endblock %}
+{% block admin_body %}
+<main class="admin-main sr-prospects">
+  {% if error %}<p class="sr-error" role="alert">{{ error }}</p><p>Your entries are preserved below. <a href="/admin/studio/prospects/{{ prospect_id }}/outreach" target="_blank" rel="noopener">Reopen current preferences in a new tab</a>.</p>{% endif %}
+  {{ summary(outreach) }}
+  <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/outreach" class="sr-prospect-form sr-card sr-handoff-card">
+    <h2>Controls recorded on {{ prospect.business }}</h2>
+    <input type="hidden" name="token" value="{{ token }}">
+    <label class="sr-field"><span class="sr-label">Outbound outreach status</span><select name="mode" required>{% for key, label in modes.items() %}<option value="{{ key }}"{% if values.mode == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="sr-field"><span class="sr-label">Pause through (inclusive)</span><input type="date" name="snoozed_until" min="{{ today }}" value="{{ values.snoozed_until or '' }}"><span class="sr-hint">Required for a pause. Outreach returns the following day unless another restriction remains. Existing tasks keep their original dates and may return overdue. Ignored for other statuses.</span></label>
+    <fieldset><legend>Exclude from outbound channels</legend>{% for key, label in preference_channels.items() %}<label><input type="checkbox" name="{{ key }}_blocked" value="1"{% if values[key ~ '_blocked'] %} checked{% endif %}> {{ label }}</label>{% endfor %}</fieldset>
+    <label class="sr-field"><span class="sr-label">Preferred channel (advisory)</span><select name="preferred_channel"><option value="">None recorded</option>{% for key, label in preference_channels.items() %}<option value="{{ key }}"{% if values.preferred_channel == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="sr-field"><span class="sr-label">Reason for this change <span class="sr-req">*</span></span><textarea name="reason" rows="3" maxlength="1000" required>{{ values.reason }}</textarea><span class="sr-hint">Record what was requested or why you are changing the controls. Resuming does not clear a recorded Not interested response or establish consent.</span></label>
+    <p>Stopping or pausing hides pending prospect work from active queues and prevents new drafts and follow-ups. Contact history, due dates, project stages and completed work stay intact.</p>
+    <button type="submit" class="sr-btn">Save outreach preferences</button>
+  </form>
+</main>
+{% endblock %}

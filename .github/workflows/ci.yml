@@ -49,10 +49,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-3.14-
 
-      - name: Install system dependencies (ffmpeg for video pipeline tests)
+      - name: Ensure ffmpeg for video pipeline tests
+        timeout-minutes: 5
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update -qq -o APT::Update::Error-Mode=any \
+              -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+            sudo apt-get install -y -qq ffmpeg \
+              -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+          fi
+          ffmpeg -version
+          ffprobe -version
 
       - name: Create venv and install deps
         run: |

@@ -5,4 +5,5 @@ itsdangerous==2.2.0
 pillow==13.0.0
 pillow-heif==1.8.1
 python-multipart==0.0.33
-stripe==16.1.0
+# Keep the locked SDK/API version until the Stripe 16 compatibility pass.
+stripe==15.3.0

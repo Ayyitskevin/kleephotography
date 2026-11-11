@@ -15,6 +15,7 @@ from .. import (
     config,
     db,
     jobs,
+    outreach,
     platekit,
     pricing,
     security,
@@ -374,6 +375,13 @@ def client_detail(request: Request, client_id: int):
             "money": money,
             "platekit": platekit_packs,
             "blockers": _client_blockers(client_id),
+            "outreach": outreach.read_index(_today().isoformat())["clients"].get(client_id),
+            "prospect_sources": db.all_(
+                "SELECT h.prospect_id,h.project_id,p.business,j.title AS project_title "
+                "FROM prospect_handoffs h JOIN prospects p ON p.id=h.prospect_id "
+                "JOIN projects j ON j.id=h.project_id WHERE h.client_id=? ORDER BY h.created_at DESC",
+                (client_id,),
+            ),
             "markets": pricing.MARKETS,
             "base_url": config.BASE_URL,
         },
@@ -399,6 +407,11 @@ def _client_blockers(client_id: int) -> list[str]:
     n_proj = n("SELECT COUNT(*) AS n FROM projects WHERE client_id=?", client_id)
     if n_proj:
         blockers.append(f"{n_proj} project{'s' if n_proj != 1 else ''}")
+    n_sources = n("SELECT COUNT(*) AS n FROM prospect_handoffs WHERE client_id=?", client_id)
+    if n_sources:
+        blockers.append(
+            f"{n_sources} prospect handoff(s) with retained history (deletion unavailable)"
+        )
     n_brand = n("SELECT COUNT(*) AS n FROM brand_assets WHERE client_id=?", client_id)
     if n_brand:
         blockers.append(f"{n_brand} brand asset{'s' if n_brand != 1 else ''}")
@@ -428,35 +441,47 @@ def _client_blockers(client_id: int) -> list[str]:
 
 @router.post("/clients/{client_id}/delete")
 def delete_client(client_id: int, force: bool = Form(False)):
-    get_client(client_id)
     # Children are a HARD blocker: force cannot bypass it, and the DB's
     # ON DELETE RESTRICT would reject the delete anyway. Tree restructuring
     # happens only through the set-parent control, never as a delete side-effect.
-    n_kids = db.one("SELECT COUNT(*) AS n FROM clients WHERE parent_id=?", (client_id,))["n"]
-    if n_kids:
-        raise HTTPException(
-            status_code=400,
-            detail=f"client still has {n_kids} child client"
-            f"{'s' if n_kids != 1 else ''}; reparent or detach "
-            "them first (force cannot override this).",
-        )
-    blockers = _client_blockers(client_id)
-    if blockers and not force:
-        raise HTTPException(
-            status_code=400,
-            detail="client still has "
-            + ", ".join(blockers)
-            + ". Re-submit with force=1 to delete anyway.",
-        )
-    # galleries.client_id has no ON DELETE clause (defaults to NO ACTION on
-    # SQLite), so explicitly unlink before deleting the client. Galleries
-    # survive as unowned; brand asset files on disk need explicit rmtree
-    # (only the DB rows cascade through the FK).
-    db.run("UPDATE galleries SET client_id=NULL WHERE client_id=?", (client_id,))
-    brand_dir = path_within(config.BRAND_DIR, str(client_id))
-    if brand_dir.exists():
-        shutil.rmtree(brand_dir, ignore_errors=True)
-    db.run("DELETE FROM clients WHERE id=?", (client_id,))
+    # Serialize against a handoff linking this client. Refuse before unlinking
+    # galleries or removing files; a raced FK refusal must not partially delete.
+    with db.tx() as con:
+        if not con.execute("SELECT 1 FROM clients WHERE id=?", (client_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Not found")
+        n_kids = con.execute(
+            "SELECT COUNT(*) AS n FROM clients WHERE parent_id=?", (client_id,)
+        ).fetchone()["n"]
+        if n_kids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"client still has {n_kids} child client"
+                f"{'s' if n_kids != 1 else ''}; reparent or detach "
+                "them first (force cannot override this).",
+            )
+        if con.execute(
+            "SELECT 1 FROM prospect_handoffs WHERE client_id=?", (client_id,)
+        ).fetchone():
+            raise HTTPException(
+                status_code=400,
+                detail="Client has retained prospect handoff history; force cannot delete it.",
+            )
+        blockers = _client_blockers(client_id)
+        if blockers and not force:
+            raise HTTPException(
+                status_code=400,
+                detail="client still has "
+                + ", ".join(blockers)
+                + ". Re-submit with force=1 to delete anyway.",
+            )
+        con.execute("UPDATE galleries SET client_id=NULL WHERE client_id=?", (client_id,))
+        con.execute("DELETE FROM clients WHERE id=?", (client_id,))
+        # Galleries survive as unowned; only brand DB rows cascade. Delete files
+        # after the SQL deletion passes its constraints, but while the write lock
+        # still prevents a new client reusing this integer ID and its directory.
+        brand_dir = path_within(config.BRAND_DIR, str(client_id))
+        if brand_dir.exists():
+            shutil.rmtree(brand_dir, ignore_errors=True)
     log.info("client %s deleted (force=%s, blockers=%d)", client_id, force, len(blockers))
     return RedirectResponse("/admin/studio", status_code=303)
 
@@ -713,6 +738,14 @@ def project_detail(request: Request, project_id: int):
             "payments": payments,
             "delivery": _delivery_check(p),
             "stock_chip": _project_stock_chip(project_id),
+            "outreach": outreach.read_index(_today().isoformat())["clients"].get(p["client_id"]),
+            "prospect_sources": db.all_(
+                "SELECT h.*,pr.business,t.id AS pending_task_id,t.title AS pending_title,t.due_date AS pending_due "
+                "FROM prospect_handoffs h JOIN prospects pr ON pr.id=h.prospect_id "
+                "LEFT JOIN tasks t ON t.prospect_id=h.prospect_id AND t.done=0 AND t.canceled_at IS NULL "
+                "WHERE h.project_id=? ORDER BY h.created_at DESC,h.prospect_id",
+                (project_id,),
+            ),
         },
     )
 

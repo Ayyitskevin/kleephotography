@@ -267,7 +267,8 @@ def test_the_form_field_size_is_scoped_to_the_marketing_shell():
     )
     unshelled = [u for u in users if not any("site-body" in b for b in _bodyclass(u))]
     assert [u for u in users if u not in unshelled] == ["site/contact.html", "site/form.html"]
-    assert len(unshelled) == 14 and all(u.startswith(("admin/", "public/")) for u in unshelled), (
+    assert "admin/prospect_form.html" in unshelled
+    assert len(unshelled) == 15 and all(u.startswith(("admin/", "public/")) for u in unshelled), (
         unshelled
     )
     for name in ("screening.css", "screening-admin.css", "screening-room-tokens.css"):
