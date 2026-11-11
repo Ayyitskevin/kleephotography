@@ -285,12 +285,108 @@ provider behavior was validated. Self-review and rendered-form checks completed;
 this slice has not received an independent review or visual-browser verification.
 No deployment, production admin write or message send was performed.
 
+## Fifth slice: contextual outreach drafts
+
+Open **Message drafts** from a prospect, **Prepare message** from the follow-up
+queue, or the prospect source panel on its linked project. The workspace creates
+editable email/text starters for an introduction, follow-up to an outgoing
+attempt, or a recorded conversation/reply. A preview is read-only; saving creates
+a draft, then its editor supports changes and separate subject/message copying.
+
+This first version uses fixed, original wording with the prospect's identity,
+photography specialty and a selected contact record. It does not call an AI
+provider. The operator can add a personal sentence and one next step; these are
+included verbatim. Research notes, the photography brief, task title and requested
+date stay in a reference panel unless the operator chooses to put them in the
+message. A voicemail cannot supply the basis for “Thanks for your reply.” Missing
+names/specialties use neutral wording; no price, availability, result or booking
+claim is invented.
+
+The recipient always comes from the **prospect** and the selected channel must
+have a recorded address/number. A linked client's contact does not silently take
+its place. The latest meaningful response marked Not interested, or a prospect
+marked Not a fit, blocks preparing/saving/copying a new message. This is a review
+guard, not a cross-project preference or opt-out system; explicit stop/snooze and
+communication preferences remain future work.
+
+### Saved text and current context
+
+Each draft retains its channel, purpose, selected contact, research and project
+context at preparation. A one-hour signed preview binds creation to that exact
+prospect and context. The final transaction repeats the check, saves the draft
+and appends an audit row atomically. An operation key makes exact retries return
+the same saved draft; changing its payload cannot replace an existing draft.
+
+Saved edits use a signed, record-specific version so another tab cannot overwrite
+newer work. Invalid or conflicting edits retain their submitted text. Context
+changes (recipient/research, contact history, selected event, linked project/brief
+or pending task) require a fresh draft; the older text remains accessible for
+reference. Saved drafts paginate per prospect. Starting another draft opens a
+new tab and does not replace the current editor.
+
+The Copy control first checks the editor's version and current context through a
+read-only endpoint, then copies the selected field, including unsaved edits. It
+refuses a wrong-record response or text changed while the check was pending.
+Clipboard failure leaves the text available for manual selection. Copied edits
+still need Save to persist; navigation warns about unsaved text. Responses carry
+`Cache-Control: no-store`; there is no browser-storage cache.
+
+The check establishes freshness at the time it runs, not at a later manual send.
+Review the recipient again in the email/text app. This slice does not send, invoke
+Inbox/provider handlers, create a contact event, complete a task, change a stage
+or update client activity. After sending outside Mise, use the existing explicit
+contact-history form. A copy success is not a delivery receipt.
+
+### Migration and recovery
+
+`087_prospect_message_drafts.sql` adds only the draft table and its history index;
+existing rows are not rewritten. The prospect foreign key preserves ownership.
+Keep the additive table and audit history on application rollback; older code
+ignores drafts. Existing follow-up/handoff rollback restrictions above still
+apply. This schema change goes through a human-reviewed PR and a separate deploy.
+
+### Draft verification (2026-11-11)
+
+`tests/test_prospect_drafts.py` checks grounded wording, private-note exclusion,
+contact ownership, missing channels, selected-contact eligibility, recipient and
+context changes, retries, concurrent edits, audit rollback, migration preservation,
+pagination, auth/origin checks, escaping and both UI modes on isolated SQLite.
+`tests/js/prospect-drafts.test.mjs` exercises copying unsaved edits, wrong-record
+responses, stale context, in-flight changes, tab/navigation changes, duplicate
+clicks, expired login, unavailable clipboard and unsaved navigation.
+
+Based on main `e9eb5c5`, using Python 3.12.14 and the locked dependencies:
+
+| Check | Result |
+| --- | --- |
+| New draft integration cases | 57 passed |
+| New copy/editor JavaScript cases | 10 passed |
+| Full unit gate | 457 passed |
+| Full integration gate | 1,249 passed |
+| Full smoke gate | 188 passed |
+| Full JavaScript test set (`tests/js/*.test.mjs`) | 60 passed |
+| Combined integration/smoke app coverage | 89% (required floor: 78%) |
+| Draft route module coverage | 99% |
+| Ruff lint/format, migration numbering, whitespace | Passed |
+| Bandit high-severity scan and repository secret scan | Passed |
+| Locked runtime dependency audit | No known vulnerabilities found |
+
+No selected tests were skipped; marker deselections select other gates. The
+existing TestClient deprecation warning remains. Broad suites use disposable
+workspace data directories above the storage reserve and their existing explicit
+transport mocks; live provider behavior is outside this verification.
+
+Desktop/mobile visual review remains open: the workspace denied Chromium's socket
+creation. Rendered-form and JavaScript checks do not establish visual appearance.
+No independent review, deployment, live admin write or message send was performed.
+
 ## Remaining slices
 
-1. Contextual message drafts reviewed and sent by the operator; bind every draft
-   to its contact/project so switching records cannot send the wrong text.
-2. Stop/snooze rules with a recorded reason; preserve communication preferences
+1. Stop/snooze rules with a recorded reason; preserve communication preferences
    across projects. A silent prospect is not automatically lost or opted out.
+2. Consider richer drafting only after using the grounded starters. A provider
+   integration needs explicit context boundaries and review; sending remains a
+   separate action and must respect communication preferences.
 
 Further persistence changes need a separately reviewed schema PR. Sending/provider
 work, payment changes, contracts and deployment keep their existing review gates.

@@ -7,7 +7,7 @@
     <h1>{{ values.business if prospect_id else 'Add prospect' }}</h1>
     <p class="pgtop-sub">Outbound prospect · {{ 'Edit research and qualification' if prospect_id else 'Check existing records before saving' }}</p>
   </div>
-  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/follow-ups">Daily follow-ups</a><a class="pgtop-link" href="/admin/studio/prospects">All prospects</a></div>
+  <div class="pgtop-actions">{% if prospect_id %}<a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}/drafts">Message drafts</a>{% endif %}<a class="pgtop-link" href="/admin/studio/prospects/follow-ups">Daily follow-ups</a><a class="pgtop-link" href="/admin/studio/prospects">All prospects</a></div>
 </header>
 {% endblock %}
 {% block admin_body %}

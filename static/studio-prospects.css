@@ -61,6 +61,7 @@
 .admin-shell .sr-followup-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto; gap: 1.5rem; align-items: start; }
 .admin-shell .sr-followup-row h2 { font-size: 1.2rem; margin: 0 0 .5rem; overflow-wrap: anywhere; }
 .admin-shell .sr-followup-row p { margin: 0 0 .75rem; }
+.admin-shell .sr-followup-row > .sr-prospect-actions { margin: 0; }
 .admin-shell .sr-followup-recent--queue { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 0; font-size: .9rem; }
 .admin-shell .sr-followup-log { list-style: none; padding: 0; }
 .admin-shell .sr-followup-log li { border-bottom: 1px solid var(--line); padding: .75rem 0; overflow-wrap: anywhere; }
@@ -79,7 +80,8 @@
 @media (max-width: 1000px) {
   .admin-shell .sr-followup-overview { grid-template-columns: 1fr; }
   .admin-shell .sr-followup-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
-  .admin-shell .sr-followup-row > .sr-btn { grid-column: 1 / -1; justify-self: start; }
+  .admin-shell .sr-followup-row > .sr-btn,
+  .admin-shell .sr-followup-row > .sr-prospect-actions { grid-column: 1 / -1; justify-self: start; }
 }
 @media (max-width: 650px) {
   .admin-shell .sr-prospect-grid { grid-template-columns: 1fr; }
