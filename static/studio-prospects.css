@@ -1,4 +1,6 @@
 /* Responsive layout; the shared shell supplies fields, buttons and colors. */
+html { scroll-padding-top: var(--prospect-focus-top, 1rem); scroll-padding-bottom: 6rem; }
+.sr-prospects [data-prospect-focus]:focus { outline: 2px solid currentColor; outline-offset: 4px; }
 .admin-shell .pgtop-actions { flex-wrap: wrap; min-width: 0; }
 .admin-shell .pgtop-lead { min-width: 0; overflow-wrap: anywhere; }
 .admin-shell .sr-prospects { max-width: 75rem; }

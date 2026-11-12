@@ -1,6 +1,6 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Daily follow-ups · Mise{% endblock %}
-{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}"><script src="/static/prospect-focus.js?v={{ static_rev }}" defer></script>{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
   <div class="pgtop-lead"><h1>Daily follow-ups</h1><p class="pgtop-sub">Who needs your attention next · <time datetime="{{ today }}">{{ today }}</time></p></div>

@@ -1,7 +1,7 @@
 {% extends "admin/base_admin.html" %}
 {% from "admin/_outreach_preferences.html" import summary %}
 {% block title %}Outreach preferences · {{ prospect.business }} · Mise{% endblock %}
-{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}"><script src="/static/prospect-focus.js?v={{ static_rev }}" defer></script>{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
   <div class="pgtop-lead"><h1>Outreach preferences</h1><p class="pgtop-sub">{{ prospect.business }}</p></div>
@@ -11,10 +11,10 @@
 {% block admin_body %}
 <main class="admin-main sr-prospects">
   {% if review_query %}<p><a href="/admin/studio/prospects/review-work{{ review_query }}&amp;prospect_id={{ review_origin|default(prospect_id) }}">Back to guided review</a></p>{% endif %}
-  {% if error %}<p class="sr-error" role="alert">{{ error }}</p><p>Your entries are preserved below. <a href="/admin/studio/prospects/{{ prospect_id }}/outreach{{ review_query|default('') }}" target="_blank" rel="noopener">Reopen current preferences in a new tab</a>.</p>{% endif %}
+  {% if error %}<p class="sr-error" role="alert" tabindex="-1" data-prospect-focus>{{ error }}</p><p>Your entries are preserved below. <a href="/admin/studio/prospects/{{ prospect_id }}/outreach{{ review_query|default('') }}" target="_blank" rel="noopener">Reopen current preferences in a new tab</a>.</p>{% endif %}
   {{ summary(outreach, none, review_query|default('')) }}
   <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/outreach{{ review_query|default('') }}" class="sr-prospect-form sr-card sr-handoff-card">
-    <h2>Controls recorded on {{ prospect.business }}</h2>
+    <h2{% if review_query and not error %} tabindex="-1" data-prospect-focus{% endif %}>Controls recorded on {{ prospect.business }}</h2>
     <input type="hidden" name="token" value="{{ token }}">
     <label class="sr-field"><span class="sr-label">Outbound outreach status</span><select name="mode" required>{% for key, label in modes.items() %}<option value="{{ key }}"{% if values.mode == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
     <label class="sr-field"><span class="sr-label">Pause through (inclusive)</span><input type="date" name="snoozed_until" min="{{ today }}" value="{{ values.snoozed_until or '' }}"><span class="sr-hint">Required for a pause. Outreach returns the following day unless another restriction remains. Existing tasks keep their original dates and may return overdue. Ignored for other statuses.</span></label>

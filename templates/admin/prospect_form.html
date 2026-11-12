@@ -1,7 +1,7 @@
 {% extends "admin/base_admin.html" %}
 {% from "admin/_outreach_preferences.html" import summary as outreach_summary %}
 {% block title %}{{ values.business if prospect_id else 'Add prospect' }} · Mise{% endblock %}
-{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}"><script src="/static/prospect-focus.js?v={{ static_rev }}" defer></script>{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
   <div class="pgtop-lead">
@@ -14,7 +14,7 @@
 {% block admin_body %}
 <main class="admin-main sr-prospects">
   {% if review_query %}<p><a href="/admin/studio/prospects/review-work{{ review_query }}&amp;prospect_id={{ review_origin|default(prospect_id) }}">Back to guided review</a></p>{% endif %}
-  {% if error %}<p class="sr-error" role="alert">{{ error }}</p>{% endif %}
+  {% if error %}<p class="sr-error" role="alert" tabindex="-1" data-prospect-focus>{{ error }}</p>{% endif %}
   {% if matches %}
   <section class="sr-prospect-review" aria-labelledby="match-title">
     <h2 id="match-title">Review existing records</h2>
@@ -33,7 +33,7 @@
       {% else %}<h2>Ready for an opportunity?</h2><p>After confirming interest, review the client and bring this prospect into your project workflow.</p><a class="sr-btn sr-btn--ghost" href="/admin/studio/prospects/{{ prospect_id }}/handoff">Start opportunity</a>{% endif %}
     </section>
     {% include "admin/_prospect_activity.html" %}
-    <h2 class="sr-prospect-research-heading">Research and qualification</h2>
+    <h2 class="sr-prospect-research-heading"{% if review_query and not error %} tabindex="-1" data-prospect-focus{% endif %}>Research and qualification</h2>
   {% endif %}
   <form method="post" class="stack-form sr-prospect-form" action="{{ '/admin/studio/prospects/' ~ prospect_id if prospect_id else '/admin/studio/prospects/review' }}{{ review_query|default('') }}">
     <div class="sr-prospect-grid">
