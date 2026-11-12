@@ -557,6 +557,33 @@ the complete integration gate then passed. No selected tests were skipped.
 Existing provider mocks and AnyIO/Starlette warnings remain. Hosted CI/CodeQL must
 pass before merge; no browser appearance verification or deployment is claimed.
 
+### Keyboard navigation and return focus (2026-11-12)
+
+The command palette and full index use native modal dialogs. Opening one moves
+focus inside; Tab stays in the dialog, and Escape or its close button returns
+focus to the invoker. The full index remains plain grouped navigation links.
+Command search offers Daily follow-ups; arrow keys focus results, and Enter on
+a result follows that actual link. Background controls stay inert while a dialog
+is open. The command palette also retains the legacy theme.
+
+Guided review focuses the current prospect heading (or the explicit empty/changed
+state). Research and preference detours focus their form heading; returned server
+errors focus the error text, with submitted values still intact. Successful saves
+return to the live review heading. Focus does not log an action or change queue
+eligibility. The script leaves an already active control alone, and scroll padding
+accounts for the sticky header and mobile navigation.
+
+Two additional browser journeys at desktop/mobile widths use real Tab, Shift+Tab,
+Enter, Escape, arrow and typing events, without programmatically setting focus or
+clicking through the workflow. They cover menu containment/return, the focused
+command link, research edits, conflicting preferences and recovery, a manually
+recorded contact, task completion and scheduling the next action. Focus targets
+must be visible and unobscured. Existing pointer journeys and stale-form checks
+remain, with accessibility reports for opened dialogs and keyboard error states.
+The fixture uses synthetic prospects and disables workers/provider connections.
+Execution stays on GitHub-hosted Chromium; screen-reader and other-browser review
+remain separate. No schema, write semantics, deployment or live outreach changed.
+
 ## Remaining slices
 
 1. Use the guided review and complete prospect → draft → manual contact →

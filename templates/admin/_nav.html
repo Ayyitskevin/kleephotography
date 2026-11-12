@@ -9,13 +9,13 @@
   <a class="sr-rail-brand" href="/admin/home" aria-label="Kevin Lee — the deck">K</a>
   <a href="/admin/home" title="Deck"{% if _p.startswith('/admin/home') or _p.startswith('/admin/today') or _p.startswith('/admin/inbox') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-deck"/></svg></span><span class="sr-rail-lbl">Deck</span></a>
   <a href="/admin/studio" title="Projects"{% if _p.startswith('/admin/studio') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-grid"/></svg></span><span class="sr-rail-lbl">Proj</span></a>
-  <button type="button" class="sr-rail-cmd" id="ns-cmd-open" aria-haspopup="dialog"
+  <button type="button" class="sr-rail-cmd" id="ns-cmd-open" aria-haspopup="dialog" aria-controls="ns-pal" aria-expanded="false"
           title="⌘K — jump, act, create" aria-label="⌘K — Command menu (Ctrl + K or Command + K)"><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-command"/></svg></span><span class="sr-rail-lbl">&#8984;K</span></button>
   <a href="/admin/financials" title="Money"{% if _p.startswith('/admin/financials') or _p.startswith('/admin/reports') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-dollar"/></svg></span><span class="sr-rail-lbl">Ledger</span></a>
   <a href="/admin/galleries" title="Library"{% if _p.startswith('/admin/galleries') or _p.startswith('/admin/transfers') %} class="is-active"{% endif %}><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-film"/></svg></span><span class="sr-rail-lbl">Lib</span></a>
   <a href="/admin/scheduling" title="Day" class="sr-rail-day{% if _p.startswith('/admin/scheduling') or _p.startswith('/admin/calendar') %} is-active{% endif %}"><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-clock"/></svg></span><span class="sr-rail-lbl">Day</span></a>
   <button type="button" class="sr-rail-cmd{% for mp in more_prefixes %}{% if _p.startswith(mp) %} is-active{% endif %}{% endfor %}" id="sr-more-open"
-          aria-haspopup="menu" aria-expanded="false" aria-controls="sr-more"
+          aria-haspopup="dialog" aria-expanded="false" aria-controls="sr-more"
           title="More — every admin page"><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-menu"/></svg></span><span class="sr-rail-lbl">More</span></button>
   <form method="post" action="/admin/logout" class="sr-rail-signout">
     <button type="submit" class="sr-rail-cmd" aria-label="Sign out" title="Sign out"><span class="sr-rail-ico" aria-hidden="true"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-external"/></svg></span><span class="sr-rail-lbl">Out</span></button>
@@ -26,11 +26,11 @@
 {# The full index — server-rendered plain links (no fuzzy search; that's ⌘K's
    job). Groups mirror the palette's. Toggle script lives at the foot of this
    partial, next to the palette script. #}
-<div class="sr-more" id="sr-more" hidden>
-  <div class="sr-more-sheet" role="menu" aria-label="Every admin page">
+<dialog class="sr-more" id="sr-more" aria-labelledby="sr-more-title">
+  <div class="sr-more-sheet">
     <div class="sr-more-head">
-      <span class="sr-mono sr-mono--signal">The full index</span>
-      <button type="button" class="sr-icon-btn" id="sr-more-close" aria-label="Close the index"><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-x"/></svg></button>
+      <span class="sr-mono sr-mono--signal" id="sr-more-title">The full index</span>
+      <button type="button" class="sr-icon-btn" id="sr-more-close" aria-label="Close the index" autofocus><svg class="sr-icon" aria-hidden="true"><use href="/static/icons.svg?v={{ static_rev }}#i-x"/></svg></button>
     </div>
     <div class="sr-more-groups">
       <nav class="sr-more-group" aria-label="Desk">
@@ -72,7 +72,7 @@
       </nav>
     </div>
   </div>
-</div>
+</dialog>
 {% else %}
 {# Legacy sidebar — recreated 1:1 from the Claude Design "Admin Sidebar"
    prototype: honey-badger crest, gold "CRM" lockup, ⌘K command palette, an
@@ -87,7 +87,7 @@
     <span class="ns-crest" aria-hidden="true"><svg class="ns-crest-badger" viewBox="0 0 32 32" width="26" height="26" fill="none"><path d="M16 3.6 22.6 5.8 V14.2 C22.6 19.4 19.6 23 16 24.8 C12.4 23 9.4 19.4 9.4 14.2 V5.8 Z" fill="#E0A43B" stroke="#2a1d10" stroke-width="1.3" stroke-linejoin="round"/><path d="M16 8.6c3.3 0 5.3 2.2 5.3 5.4 0 3.4-2.4 6-5.3 6s-5.3-2.6-5.3-6c0-3.2 2-5.4 5.3-5.4Z" fill="#17110c"/><path d="M13.8 10.5c-.7 1.1-.95 3.3-.6 5.1l1.35-.25-.3-4.45Z" fill="#F7F1E1"/><path d="M18.2 10.5c.7 1.1 .95 3.3 .6 5.1l-1.35-.25.3-4.45Z" fill="#F7F1E1"/><circle cx="13.95" cy="13.9" r="0.6" fill="#F7F1E1"/><circle cx="18.05" cy="13.9" r="0.6" fill="#F7F1E1"/><ellipse cx="16" cy="17.3" rx="1.35" ry="1.6" fill="#3a2a20"/><ellipse cx="16" cy="17.9" rx="0.6" ry="0.5" fill="#17110c"/></svg><svg class="ns-crest-sly" viewBox="0 0 32 32" width="26" height="26" fill="none"><path d="M16 3.6 22.6 5.8 V14.2 C22.6 19.4 19.6 23 16 24.8 C12.4 23 9.4 19.4 9.4 14.2 V5.8 Z" fill="#1a472a" stroke="#C8CED3" stroke-width="1.3" stroke-linejoin="round"/><path d="M18.6 8.4 C13.8 9 13.6 13 16.6 13.9 C19.8 14.9 19.5 18.6 14.4 19.4" stroke="#C8CED3" stroke-width="2" stroke-linecap="round"/><circle cx="18.7" cy="8.2" r="1.5" fill="#C8CED3"/><circle cx="19.2" cy="7.9" r="0.42" fill="#0a1f14"/><path d="M13.7 19.9 11.8 20.7 M13.7 19.9 11.9 18.9" stroke="#C8CED3" stroke-width="1" stroke-linecap="round"/></svg></span>
     <span class="ns-brandtext"><span class="mark">Kevin <b>Lee</b></span><span class="ns-crm">CRM</span></span>
   </a>
-  <button type="button" class="ns-cmd" id="ns-cmd-open" aria-haspopup="dialog" aria-label="Search — Command menu (Ctrl or ⌘ + K)">
+  <button type="button" class="ns-cmd" id="ns-cmd-open" aria-haspopup="dialog" aria-controls="ns-pal" aria-expanded="false" aria-label="Search — Command menu (Ctrl or ⌘ + K)">
     <span class="ns-cmd-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
     <span class="ns-cmd-txt">Search…</span>
     <span class="ns-kbd" aria-hidden="true">⌘K</span>
@@ -120,21 +120,22 @@
 {% endif %}
 
 {# ── Command palette (⌘K) — overlay, lives once per page ──────────────────── #}
-<div class="ns-pal" id="ns-pal" role="presentation" hidden>
-  <div class="ns-pal-box" role="dialog" aria-modal="true" aria-label="Command menu">
+<dialog class="ns-pal" id="ns-pal" aria-label="Command menu">
+  <div class="ns-pal-box">
     <div class="ns-pal-head">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#3B5A48" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input class="ns-pal-input" id="ns-pal-input" type="text" autocomplete="off" spellcheck="false" placeholder="Jump, act, or create — try “inv” + a client…" aria-label="Search pages and actions">
-      <span class="ns-pal-esc">ESC</span>
+      <input class="ns-pal-input" id="ns-pal-input" type="text" autofocus autocomplete="off" spellcheck="false" placeholder="Jump, act, or create — try “inv” + a client…" aria-label="Search pages and actions">
+      <button type="button" class="ns-pal-esc" id="ns-pal-close" aria-label="ESC — Close command menu">ESC</button>
     </div>
     <div class="ns-pal-list" id="ns-pal-list"></div>
     <div class="ns-pal-foot"><span>↑↓ Move</span><span>↵ Run</span><span>esc Close</span><span class="ns-pal-hint">type &gt; for actions only</span></div>
   </div>
-</div>
+</dialog>
 <script nonce="{{ csp_nonce }}">
 (function () {
   "use strict";
   var CMDS = [
+    { label: "Daily follow-ups", group: "Workspace", href: "/admin/studio/prospects/follow-ups", glyph: "P", kw: "daily follow ups prospect review next action" },
     { label: "Outbound prospects", group: "Workspace", href: "/admin/studio/prospects", glyph: "P", kw: "prospects outbound business research qualification" },
     { label: "Home",            group: "Workspace", href: "/admin/home",                  glyph: "H", kw: "home dashboard overview today" },
     { label: "Galleries",       group: "Workspace", href: "/admin/galleries",             glyph: "G", kw: "galleries gallery deliver photos proof pixieset" },
@@ -252,83 +253,110 @@
   }
 
   function render() {
+    var focusedHref = list.contains(document.activeElement) ? document.activeElement.getAttribute("href") : null;
     rows = visible();
     if (sel >= rows.length) sel = Math.max(0, rows.length - 1);
     if (!rows.length) {
       list.innerHTML = '<div class="ns-pal-empty">No matches for &ldquo;' + esc(input.value) + '&rdquo;</div>';
+      if (focusedHref) input.focus();
       return;
     }
     var html = "", lastGroup = null;
     rows.forEach(function (c, i) {
       if (c.group !== lastGroup) { html += '<div class="ns-pal-group">' + esc(c.group) + "</div>"; lastGroup = c.group; }
       html += '<a href="' + esc(c.href) + '" class="ns-pal-row' + (i === sel ? " sel" : "") + '" data-i="' + i + '">' +
-              '<span class="ns-pal-ic">' + esc(c.glyph) + "</span>" +
+              '<span class="ns-pal-ic" aria-hidden="true">' + esc(c.glyph) + "</span>" +
               '<span class="ns-pal-lab">' + esc(c.label) + "</span>" +
               '<span class="ns-pal-sub">' + esc(c.group) + "</span>" +
-              '<span class="ns-pal-go">↵</span></a>';
+              '<span class="ns-pal-go" aria-hidden="true">↵</span></a>';
     });
     list.innerHTML = html;
+    if (focusedHref) {
+      var match = Array.from(list.querySelectorAll("a")).find(function (a) {
+        return a.getAttribute("href") === focusedHref;
+      });
+      (match || input).focus();
+    }
   }
 
-  function scrollSel() {
-    var el = list.querySelector(".ns-pal-row.sel");
-    if (!el) return;
-    var lt = list.scrollTop, lb = lt + list.clientHeight, et = el.offsetTop, eb = et + el.offsetHeight;
-    if (et < lt) list.scrollTop = Math.max(0, et - 8);
-    else if (eb > lb) list.scrollTop = eb - list.clientHeight + 8;
+  function selectRow(index) {
+    sel = index;
+    list.querySelectorAll(".ns-pal-row").forEach(function (row, i) {
+      row.classList.toggle("sel", i === sel);
+    });
   }
 
   function show() {
-    open = true; sel = 0; input.value = ""; pal.hidden = false;
-    pal.classList.add("open"); loadExtras(); render();
-    setTimeout(function () { input.focus(); }, 40);
+    if (open) return;
+    if (more && more.open) setMore(false);
+    open = true; sel = 0; input.value = "";
+    pal.classList.add("open"); render(); pal.showModal(); input.focus();
+    if (openBtn) openBtn.setAttribute("aria-expanded", "true");
+    loadExtras();
   }
-  function hide() { open = false; pal.classList.remove("open"); pal.hidden = true; }
+  function hide() {
+    open = false; pal.classList.remove("open"); pal.close();
+    if (openBtn) openBtn.setAttribute("aria-expanded", "false");
+  }
 
   if (openBtn) openBtn.addEventListener("click", show);
+  document.getElementById("ns-pal-close").addEventListener("click", hide);
+  pal.addEventListener("cancel", function (e) { e.preventDefault(); hide(); });
   pal.addEventListener("click", function (e) { if (e.target === pal) hide(); });
   input.addEventListener("input", function () { sel = 0; render(); });
   list.addEventListener("mousemove", function (e) {
-    var row = e.target.closest(".ns-pal-row"); if (!row) return;
-    var i = parseInt(row.getAttribute("data-i"), 10);
-    if (!isNaN(i) && i !== sel) { sel = i; render(); }
+    var row = e.target.closest(".ns-pal-row");
+    if (row) selectRow(Number(row.getAttribute("data-i")));
+  });
+  list.addEventListener("focusin", function (e) {
+    var row = e.target.closest(".ns-pal-row");
+    if (row) selectRow(Number(row.getAttribute("data-i")));
   });
   list.addEventListener("click", function (e) {
-    var row = e.target.closest(".ns-pal-row"); if (row) remember(row.getAttribute("href"));
+    var row = e.target.closest(".ns-pal-row");
+    if (row) remember(row.getAttribute("href"));
   });
-
-  document.addEventListener("keydown", function (e) {
-    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
-      e.preventDefault(); open ? hide() : show(); return;
-    }
-    if (!open) return;
-    if (e.key === "Escape") { e.preventDefault(); hide(); }
-    else if (e.key === "ArrowDown") { e.preventDefault(); sel = Math.min(sel + 1, rows.length - 1); render(); scrollSel(); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); sel = Math.max(sel - 1, 0); render(); scrollSel(); }
-    else if (e.key === "Enter") {
+  pal.addEventListener("keydown", function (e) {
+    var row = e.target.closest(".ns-pal-row");
+    // Enter on a link/close button keeps its native behavior, including modifiers.
+    if (e.target === input && e.key === "Enter" && !e.isComposing) {
       e.preventDefault();
-      var t = rows[sel];
-      if (t) { remember(t.href); window.location.href = t.href; }
+      var target = rows[sel];
+      if (target) { remember(target.href); window.location.href = target.href; }
+    } else if ((e.target === input || row) && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      e.preventDefault();
+      var index = row ? Number(row.getAttribute("data-i")) + (e.key === "ArrowDown" ? 1 : -1)
+                      : (e.key === "ArrowDown" ? 0 : rows.length - 1);
+      var next = list.querySelectorAll(".ns-pal-row")[index];
+      (next || input).focus();
+    }
+  });
+  document.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K") && !e.isComposing) {
+      e.preventDefault(); open ? hide() : show();
     }
   });
 
-  /* More sheet — the full index: plain links, no fuzzy search (that's ⌘K).
-     Same open/close etiquette as the palette (backdrop, link, Escape). */
+  // Native modal dialogs contain focus and restore the invoker on close.
+  // The index contains ordinary navigation links, not ARIA menu widgets.
   var moreBtn = document.getElementById("sr-more-open");
   var more = document.getElementById("sr-more");
+  function setMore(on) {
+    if (!more) return;
+    if (on) {
+      if (open) hide();
+      more.showModal();
+    } else {
+      more.close();
+    }
+    moreBtn.setAttribute("aria-expanded", on ? "true" : "false");
+  }
   if (moreBtn && more) {
-    var moreClose = document.getElementById("sr-more-close");
-    var setMore = function (on) {
-      more.hidden = !on;
-      moreBtn.setAttribute("aria-expanded", on ? "true" : "false");
-    };
-    moreBtn.addEventListener("click", function () { setMore(more.hidden); });
-    if (moreClose) moreClose.addEventListener("click", function () { setMore(false); });
+    moreBtn.addEventListener("click", function () { setMore(!more.open); });
+    document.getElementById("sr-more-close").addEventListener("click", function () { setMore(false); });
+    more.addEventListener("cancel", function (e) { e.preventDefault(); setMore(false); });
     more.addEventListener("click", function (e) {
       if (e.target === more || e.target.closest("a")) setMore(false);
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && !more.hidden) { e.preventDefault(); setMore(false); }
     });
   }
 

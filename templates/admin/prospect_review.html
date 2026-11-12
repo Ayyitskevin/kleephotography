@@ -1,7 +1,7 @@
 {% extends "admin/base_admin.html" %}
 {% import "admin/_outreach_preferences.html" as preferences %}
 {% block title %}Guided prospect review · Mise{% endblock %}
-{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}"><script src="/static/prospect-focus.js?v={{ static_rev }}" defer></script>{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
   <div class="pgtop-lead"><h1>Guided prospect review</h1><p class="pgtop-sub">{{ {'due': 'Due & overdue', 'upcoming': 'Upcoming', 'unplanned': 'Needs next step'}[review] }}{% if q %} · {{ q }}{% endif %}</p></div>
@@ -18,7 +18,7 @@
   {% if prospect %}
     {% set detour_query = review_query ~ '&review_origin=' ~ prospect_id %}
     <section class="sr-card sr-followup-card" aria-labelledby="review-business">
-      <h2 id="review-business">{{ prospect.business }}</h2>
+      <h2 id="review-business" tabindex="-1" data-prospect-focus>{{ prospect.business }}</h2>
       <p>{{ {'needs_research': 'Needs research', 'potential_fit': 'Potential fit', 'not_fit': 'Not a fit'}.get(prospect.qualification, prospect.qualification) }}</p>
       <p class="sr-followup-notes">{{ prospect.notes }}</p>
       <p class="muted">Source: {{ prospect.source }}</p>
@@ -27,7 +27,7 @@
     {{ preferences.summary(outreach, prospect_id, detour_query) }}
     {% include "admin/_prospect_activity.html" %}
   {% else %}
-    <section class="sr-card sr-followup-empty"><h2>{{ 'This prospect is no longer in this queue' if total else 'No eligible prospects in this queue' }}</h2><p>Saved actions, outreach holds, qualification changes or your search can change this list. No contact or completion is inferred. Return to the queue or review the next eligible prospect.</p></section>
+    <section class="sr-card sr-followup-empty"><h2 tabindex="-1" data-prospect-focus>{{ 'This prospect is no longer in this queue' if total else 'No eligible prospects in this queue' }}</h2><p>Saved actions, outreach holds, qualification changes or your search can change this list. No contact or completion is inferred. Return to the queue or review the next eligible prospect.</p></section>
   {% endif %}
 </main>
 {% endblock %}

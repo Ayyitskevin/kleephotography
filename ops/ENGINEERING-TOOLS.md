@@ -60,7 +60,7 @@ required: both existing CI unit jobs discover the tests normally.
 ## Browser journeys (2026-11-12)
 
 `tests/browser/` has pinned Playwright and axe dependencies with an npm lockfile.
-CI installs its Chromium revision on Ubuntu 24.04, then runs two journeys at
+CI installs its Chromium revision on Ubuntu 24.04, then runs four journeys at
 1280×900 and 390×844. Dependabot includes this tooling directory; CI audits the
 npm lock. These are Chromium viewport checks, not Safari/Firefox or real-phone
 coverage, and screenshots are diagnostic evidence rather than visual baselines.
@@ -71,6 +71,12 @@ explicitly completes an action, moves to the next eligible prospect and records 
 stop. It verifies return context and the changed/empty queue views. The second
 checks a conflicting channel selection and a stale preference form, retained input,
 and reopening current preferences in a separate tab.
+
+Two keyboard journeys additionally exercise native dialog focus containment and
+return, focused-link activation, research edits, validation recovery, recorded
+contact and completion/scheduling with actual keyboard events. They inspect focus
+and obstruction without setting focus in JavaScript. See the keyboard section in
+[SOLO-SALES.md](SOLO-SALES.md). The original pointer journeys are retained.
 
 Whole-page axe scans include the expanded action/contact forms, research and
 preference pages, validation/conflict messages and changed/empty queue states.
@@ -112,7 +118,7 @@ remain separate; automated scans do not prove full accessibility or WCAG complia
 Cloudflare Access, background workers and live providers are outside these tests.
 Production deployment is separate.
 
-Local preflight passed the synthetic login/queue check, Playwright discovery of
+The initial browser PR preflight passed the synthetic login/queue check, discovery of
 four journeys, npm audit, 504 unit, 1,308 integration, 188 smoke and 66 JavaScript
 cases on Python 3.12.14. Ruff lint/format, Bandit, migration/lock checks and the
 tracked-file secret scan also passed. Each Python suite used fresh disposable
