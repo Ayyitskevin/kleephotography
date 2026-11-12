@@ -76,3 +76,12 @@ def phone_key(value: str | None) -> str:
     # Extensions are not accepted by capture; keep legacy extensions distinct.
     digits = re.sub(r"[^0-9]", "", value or "")
     return "1" + digits if len(digits) == 10 else digits
+
+
+def task_change_values(action, version, note, due_date):
+    if action not in {"complete", "reschedule", "cancel"}:
+        raise ActivityError("Choose complete, reschedule, or cancel.")
+    parsed_version = positive_id(version, "action version")
+    note = clean_text(note, "a completion note or change reason", 1000, required=True)
+    due_date = date_value(due_date, "due date") if action == "reschedule" else ""
+    return parsed_version, note, due_date

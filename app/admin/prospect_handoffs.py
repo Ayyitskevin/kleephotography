@@ -10,8 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, db, outreach, security, specialties
 from ..render import templates
-from ..sales import rules
-from . import prospect_followups as followups
+from ..sales import commands, rules
 from . import studio
 
 router = APIRouter(prefix="/admin/studio/prospects", dependencies=[Depends(security.require_admin)])
@@ -385,7 +384,7 @@ def commit_handoff(
                 )
             task_id = state["pending"]["id"] if state["pending"] else None
             if values["task_disposition"] in {"complete", "cancel"}:
-                followups._change_task(
+                commands.apply_task_change(
                     con,
                     prospect_id,
                     task_id,

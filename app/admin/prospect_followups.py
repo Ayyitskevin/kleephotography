@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 
 from .. import audit, db, outreach, security
 from ..render import templates
-from ..sales import rules
+from ..sales import commands, rules
 from . import prospect_context
 from . import studio as studio_mod
 
@@ -112,11 +112,6 @@ def _error(request, prospect_id, values, kind, error):
         },
         status_code=error.status,
     )
-
-
-def _prospect(con, prospect_id):
-    if not con.execute("SELECT 1 FROM prospects WHERE id=?", (prospect_id,)).fetchone():
-        raise rules.ActivityError("Prospect not found.", 404)
 
 
 def _queue_rows(filter, q):
@@ -240,7 +235,7 @@ def schedule_followup(
             {"prospect_id": prospect_id, "title": title, "due_date": due_date}
         )
         with db.tx() as con:
-            _prospect(con, prospect_id)
+            commands.require_prospect(con, prospect_id)
             previous = con.execute(
                 "SELECT * FROM tasks WHERE schedule_key=?", (operation_key,)
             ).fetchone()
@@ -288,71 +283,6 @@ def schedule_followup(
     return prospect_context.redirect_to_prospect(prospect_id, request)
 
 
-def _change_task(
-    con, prospect_id, task_id, version, action, note, due_date="", *, allow_retry=True
-):
-    task = con.execute(
-        "SELECT * FROM tasks WHERE id=? AND prospect_id=?", (task_id, prospect_id)
-    ).fetchone()
-    if task is None:
-        raise rules.ActivityError("This follow-up does not belong to this prospect.", 404)
-    digest = rules.command_digest(
-        {
-            "prospect_id": prospect_id,
-            "task_id": task_id,
-            "version": version,
-            "action": action,
-            "note": note,
-            "due_date": due_date,
-        }
-    )
-    if allow_retry and task["version"] == version + 1 and task["last_command_digest"] == digest:
-        return  # Exact retry of the most recent successful command; no audit/write.
-    if task["version"] != version or task["done"] or task["canceled_at"]:
-        raise rules.ActivityError(
-            "This action changed since the form opened. Your entries are preserved; review the current action before trying again.",
-            409,
-        )
-    if action == "complete":
-        con.execute(
-            "UPDATE tasks SET done=1, done_at=datetime('now'), completion_note=?, version=version+1, last_command_digest=? WHERE id=?",
-            (note, digest, task_id),
-        )
-    elif action == "cancel":
-        con.execute(
-            "UPDATE tasks SET canceled_at=datetime('now'), cancel_reason=?, version=version+1, last_command_digest=? WHERE id=?",
-            (note, digest, task_id),
-        )
-    else:
-        con.execute(
-            "UPDATE tasks SET due_date=?, version=version+1, last_command_digest=? WHERE id=?",
-            (due_date, digest, task_id),
-        )
-    audit.log(
-        con,
-        "prospect_task",
-        task_id,
-        action,
-        diff={
-            "prospect_id": prospect_id,
-            "version": [version, version + 1],
-            "note": note,
-            "due_date": [task["due_date"], due_date]
-            if action == "reschedule"
-            else task["due_date"],
-        },
-    )
-
-
-def _command_values(action, version, note, due_date):
-    if action not in {"complete", "reschedule", "cancel"}:
-        raise rules.ActivityError("Choose complete, reschedule, or cancel.")
-    parsed_version = rules.positive_id(version, "action version")
-    note = rules.clean_text(note, "a completion note or change reason", 1000, required=True)
-    due_date = rules.date_value(due_date, "due date") if action == "reschedule" else ""
-    return parsed_version, note, due_date
-
-
 @router.post("/{prospect_id}/follow-ups/{task_id}")
 def change_followup(
     request: Request,
@@ -371,12 +301,14 @@ def change_followup(
         "task_id": str(task_id),
     }
     try:
-        parsed_version, clean_note, clean_date = _command_values(
-            action, version, values["note"], values["due_date"]
+        commands.change_followup(
+            prospect_id,
+            task_id,
+            action=action,
+            version=version,
+            note=values["note"],
+            due_date=values["due_date"],
         )
-        with db.tx() as con:
-            _prospect(con, prospect_id)
-            _change_task(con, prospect_id, task_id, parsed_version, action, clean_note, clean_date)
     except rules.ActivityError as error:
         return _error(request, prospect_id, values, "command", error)
     return prospect_context.redirect_to_prospect(prospect_id, request)
@@ -438,7 +370,7 @@ def record_contact(
         linked_task, parsed_version, clean_note, clean_date = None, None, "", ""
         if task_action != "keep":
             linked_task = rules.positive_id(task_id, "action identity")
-            parsed_version, clean_note, clean_date = _command_values(
+            parsed_version, clean_note, clean_date = rules.task_change_values(
                 task_action, version, values["task_note"], values["due_date"]
             )
         digest = rules.command_digest(
@@ -457,7 +389,7 @@ def record_contact(
             }
         )
         with db.tx() as con:
-            _prospect(con, prospect_id)
+            commands.require_prospect(con, prospect_id)
             previous = con.execute(
                 "SELECT * FROM prospect_contact_events WHERE operation_key=?", (operation_key,)
             ).fetchone()
@@ -469,7 +401,7 @@ def record_contact(
                     )
                 return prospect_context.redirect_to_prospect(prospect_id, request)
             if linked_task is not None:
-                _change_task(
+                commands.apply_task_change(
                     con,
                     prospect_id,
                     linked_task,

@@ -604,9 +604,9 @@ navigation-only. Drafts/handoffs read the same monkeypatchable studio clock dire
 `app/outreach.py` remains the outreach-policy owner. No schema, SQL, transaction,
 audit, provider, template or JavaScript behavior changes are intended.
 
-This slice leaves the task command in `prospect_followups._change_task` and the
-shared detail projection in `prospect_followups.detail_context`. Move a command
-only with its transaction/version/retry/audit contract in the next scoped PR.
+At this first slice, task mutation and the shared detail projection remained in
+the follow-up router. The command extraction below now owns task mutation; the
+detail projection remains incremental follow-on work.
 The architecture document records subsequent handoff browser coverage, truthful
 outbound reporting and conditional AI work separately.
 
@@ -625,6 +625,47 @@ Browser fixture preflight passed without opening a listening socket. The eight
 hosted Chromium journeys and CodeQL remain required PR checks; their actual
 results are attached to the PR, not claimed as a local browser run. No manual
 visual, screen-reader, other-browser or production verification was performed.
+
+## Transactional follow-up command
+
+`app/sales/commands.py` now owns the standalone complete/reschedule/cancel use
+case. `change_followup` accepts form-shaped values, validates before opening
+`db.tx()`, reloads current prospect/task state under `BEGIN IMMEDIATE`, and commits
+the requested task change plus audit together. The HTTP adapter retains auth,
+CSRF, submitted/error context and local redirects. No request or response object
+crosses this command boundary; it returns no presentation result.
+
+`apply_task_change` is the shared transition used by the command, historical
+contact recording and opportunity handoff. It requires already validated values
+and the caller's open `db.tx()` connection. It never opens or commits a separate
+transaction. Contact/handoff pass `allow_retry=False`: only their full operation
+receipts can recognize a retry, and a new operation cannot borrow an older task
+transition. Standalone exact retries remain write/audit-free; changed payloads,
+older versions and a task belonging to another prospect retain their existing
+errors. All audit failure paths roll back.
+
+`rules.task_change_values` keeps shared action/version/note/date validation pure.
+`commands.require_prospect` reuses the existing transactional presence check for
+schedule/contact writers. Scheduling, full contact/handoff orchestration and
+read projections remain in their current routes. Handoff no longer imports the
+follow-up router. Existing task controls remain available under a hold; changing
+a dated obligation does not initiate contact or lift outreach restrictions.
+
+The command tests call this boundary without HTTP and cover atomic audit,
+validation before transaction acquisition, ownership, terminal actions, stale
+versions, exact retries, caller rollback, held tasks and competing writers.
+Existing route/combined-contact/handoff/browser tests retain their assertions.
+Local candidate verification on Python 3.12.14 passed 508 unit, 1,328 integration
+(including 20 new direct command cases), 188 smoke and 66 JavaScript cases, with
+no selected skips. Combined integration/smoke coverage was 89.06% against the 78%
+floor. Ruff lint/format, Bandit, migration/lock checks, tracked-file secret scanning,
+both Python lock audits and the disposable browser-server preflight passed.
+Each Python suite used fresh workspace data and `MISE_ENV_FILE=/nonexistent`;
+existing provider mocks and dependency warnings remain. Source review confirmed
+the shared transition, prospect lookup and validation retained their prior logic.
+Hosted CI/CodeQL and eight Chromium journeys remain required PR checks, with
+results recorded on the PR. No local Chromium, manual visual, live-provider or
+production deployment verification was performed.
 
 ## Remaining slices
 
