@@ -85,8 +85,10 @@ jobs:
         run: |
           .venv/bin/ruff check . --output-format=github
           .venv/bin/ruff format --check .
-      - name: Audit runtime dependencies
-        run: .venv/bin/pip-audit -r requirements.lock
+      - name: Audit runtime and development dependencies
+        run: |
+          .venv/bin/pip-audit -r requirements.lock
+          .venv/bin/pip-audit -r requirements-dev.lock
 
       - name: Scan Python for high-severity security defects
         # Medium findings are reviewed in the security audit; fail CI on high

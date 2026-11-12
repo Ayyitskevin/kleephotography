@@ -36,3 +36,6 @@ _design/
 # Agent scratch worktrees: full checkouts an agent session creates and deletes.
 # Committing one would nest a copy of the tree inside itself.
 .claude/worktrees/
+
+# Generated property-test examples (synthetic; local replay cache)
+.hypothesis/
