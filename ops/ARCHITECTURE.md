@@ -8,11 +8,11 @@ Kevin approved this direction for incremental implementation on 12 November 2026
 
 ## Implementation status
 
-- **Implemented in this change:** shared sales values/validation/identity rules in `app/sales/rules.py` and review-return navigation in `app/admin/prospect_context.py`. All prospect routes use these shared owners. Drafts and preferences no longer import the follow-up router; handoffs no longer import the capture router.
-- **Next:** extract one transactional command with its version/retry/audit invariants. Handoff still delegates task changes to `prospect_followups._change_task`, and capture still reuses `prospect_followups.detail_context`; those boundaries are deliberately not moved in the first slice.
+- **Implemented in #166:** shared sales values/validation/identity rules in `app/sales/rules.py` and review-return navigation in `app/admin/prospect_context.py`. All prospect routes use these shared owners. Drafts and preferences no longer import the follow-up router; handoffs no longer import the capture router.
+- **Implemented in this slice:** `commands.change_followup` validates and commits a standalone complete/reschedule/cancel command with its audit record. Contact and handoff workflows reuse `commands.apply_task_change` on their existing transaction connections; handoff no longer imports the follow-up router. Scheduling/contact/draft/handoff orchestration and capture’s `prospect_followups.detail_context` remain incremental follow-on work.
 - **Then:** full handoff browser coverage, followed by a bounded outbound outcome report. Operational readiness is a separate track before deployment; AI remains conditional on a demonstrated operator need.
 
-The verified starting point below is historical evidence from before this extraction. Current PR checks and the implementation notes in [SOLO-SALES.md](SOLO-SALES.md#shared-sales-rules-and-review-navigation) record this slice’s verification.
+The verified starting point below is historical evidence from before this extraction. Current PR checks and the implementation notes in [SOLO-SALES.md](SOLO-SALES.md#transactional-follow-up-command) record the current command slice’s verification.
 
 ## 1. Verified starting point
 
@@ -63,14 +63,14 @@ The picture is deliberately simplified: synchronous provider operations and inbo
 | Boundary | Existing implementation | Intended direction |
 | --- | --- | --- |
 | HTTP and presentation | `app/admin/prospect_*.py`, `prospects.py`, templates and static files | Parse requests, authenticate, check CSRF, verify signed input, invoke a workflow, render/redirect |
-| Sales rules and commands | Shared validation/identity rules in `app/sales/rules.py`; commands still in prospect route modules | Small `app/sales/` modules with explicit callable interfaces; extract only code with actual shared use |
+| Sales rules and commands | Shared rules in `app/sales/rules.py`; follow-up changes in `app/sales/commands.py`; remaining workflow orchestration in routes | Small `app/sales/` modules with explicit callable interfaces; extract only code with actual shared use |
 | Outreach policy | `app/outreach.py` | Retain one policy owner and conservative aggregation across explicit client links |
 | Studio and billing | Existing studio, proposals, contracts, invoices and public payment modules | Keep financial/legal invariants behind their existing reviewed boundaries |
 | Data and audit | `app/db.py`, numbered migrations, `app/audit.py` | Explicit SQL, transactions, version checks and audit records; no generic repository framework |
 | Background work | `app/jobs.py`, scheduler and existing handlers | Reuse durable jobs, retries and health reporting; measure contention before separating worker processes |
 | Integrations | Existing mail, SMS, calendar, Notion and machine API modules | External results enter through validated adapters, with narrow credentials and clear provenance |
 
-The starting maintainability issue was shared private helpers: drafts, handoffs and preferences imported validation from the follow-up router, and handoffs imported identity helpers from capture. The first slice separates those rules and review navigation. Queue/detail reads and transactional commands remain in routes until their own behavior-preserving extractions; a future API or assistant should consume those explicit shared boundaries.
+The starting maintainability issue was shared private helpers: drafts, handoffs and preferences imported validation from the follow-up router, and handoffs imported identity helpers from capture. The first slice separates those rules and review navigation. The second slice extracts the standalone follow-up command and shared task transition. Queue/detail reads and other workflow orchestration remain in routes until their own behavior-preserving extractions; a future API or assistant should consume those explicit shared boundaries.
 
 A gradual code layout is appropriate:
 
@@ -80,7 +80,7 @@ A gradual code layout is appropriate:
 - `app/admin/prospect_context.py`: validated request navigation context and fixed local return destinations. This is presentation logic, not a business rule.
 - `app/outreach.py`: stays the shared outreach policy owner.
 
-`rules.py` and `prospect_context.py` are implemented; commands and queries are proposed destinations, not files to scaffold in advance. Routes should depend on shared logic; shared logic should not import route modules. Keep existing URLs, form fields, token payloads and rendering behavior stable during extraction.
+`rules.py`, the first `commands.py` use case and `prospect_context.py` are implemented; additional commands and shared queries should be extracted only as their actual consumers need them. Routes should depend on shared logic; shared logic should not import route modules. Keep existing URLs, form fields, token payloads and rendering behavior stable during extraction.
 
 ## 4. Data ownership and truthful state
 
@@ -122,7 +122,7 @@ Operational readiness is a parallel track before any deployment: verify the runn
 
 ## 6. Delivery sequence
 
-The first scope is implemented in this change; later rows are planned PR scopes, not calendar commitments. Each should be independently reviewable and retain the required local and hosted gates.
+Scopes 1 and the first use case of 2 are implemented. Later rows and additional command extractions are planned PR scopes, not calendar commitments. Each should be independently reviewable and retain the required local and hosted gates.
 
 | Order | Bounded change | Acceptance evidence |
 | --- | --- | --- |
@@ -133,7 +133,7 @@ The first scope is implemented in this change; later rows are planned PR scopes,
 | Parallel | Verify operational readiness and isolate dependency maintenance | Restore evidence and monitoring checks before deployment; Stripe PR #164 gets a separate SDK/API compatibility and lockfile pass |
 | Conditional | Introduce assisted research/drafting after operator usage identifies a worthwhile gap | Bounded context, provenance, stale-context rejection, manual acceptance, timeouts and deterministic fallback |
 
-The first slice extracts helpers reused across existing sales modules and moves request navigation context to its own presentation module, without schema, provider or user-visible changes. Larger command extraction follows only after this seam is proven.
+The first slice extracts helpers reused across existing sales modules and moves request navigation context to its own presentation module, without schema, provider or user-visible changes. The second slice moves follow-up changes into a command that owns its transaction, with the shared task transition joining contact/handoff transactions. Additional orchestration can follow incrementally without changing these contracts.
 
 Before committing to more features, Kevin should exercise a short representative pilot: capture, draft, manual contact, next action, confirmed opportunity and handoff. Record where he repeats research, loses context or has to reconstruct an outcome. Those observations choose the next usability change.
 
