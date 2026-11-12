@@ -10,7 +10,7 @@ from hypothesis import strategies as st
 from starlette.requests import Request
 
 from app import outreach
-from app.admin import prospect_followups
+from app.admin import prospect_context
 
 pytestmark = pytest.mark.unit
 ROOT = "/admin/studio/prospects"
@@ -108,7 +108,7 @@ def request(params):
 @example(review="unplanned", query="x" * 250, origin=10**18 - 1)
 def test_review_redirect_round_trips_search_without_changing_destination(review, query, origin):
     req = request({"review": review, "q": query, "review_origin": str(origin)})
-    location = prospect_followups._redirect(42, req).headers["location"]
+    location = prospect_context.redirect_to_prospect(42, req).headers["location"]
     parsed = urlsplit(location)
     assert not parsed.scheme and not parsed.netloc and not parsed.fragment
     assert parsed.path == ROOT + "/review-work"
@@ -128,7 +128,7 @@ def test_review_redirect_round_trips_search_without_changing_destination(review,
 def test_invalid_return_identity_never_becomes_a_destination(origin, query):
     valid = 1 <= len(origin) <= 18 and all(c in "0123456789" for c in origin) and int(origin) > 0
     req = request({"review": "due", "q": query, "review_origin": origin})
-    response = prospect_followups._redirect(42, req)
+    response = prospect_context.redirect_to_prospect(42, req)
     if not valid:
         assert response.headers["location"] == ROOT + "/42"
     else:
@@ -142,6 +142,8 @@ def test_invalid_return_identity_never_becomes_a_destination(origin, query):
 def test_unknown_review_queue_keeps_the_standalone_destination(review):
     if review not in {"due", "upcoming", "unplanned"}:
         assert (
-            prospect_followups._redirect(42, request({"review": review})).headers["location"]
+            prospect_context.redirect_to_prospect(42, request({"review": review})).headers[
+                "location"
+            ]
             == ROOT + "/42"
         )

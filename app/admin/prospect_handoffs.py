@@ -10,8 +10,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, db, outreach, security, specialties
 from ..render import templates
+from ..sales import rules
 from . import prospect_followups as followups
-from . import prospects
+from . import studio
 
 router = APIRouter(prefix="/admin/studio/prospects", dependencies=[Depends(security.require_admin)])
 REVIEW_MAX_AGE = 3600
@@ -49,34 +50,34 @@ def _form_values(
 
 def _clean(values):
     v = dict(values)
-    followups._key(v["operation_key"])
+    rules.operation_key(v["operation_key"])
     for field in ("client_id", "project_id"):
         if v[field] != "new":
-            followups._positive(v[field], field.replace("_", " "))
+            rules.positive_id(v[field], field.replace("_", " "))
     if v["client_id"] == "new" and v["project_id"] != "new":
-        raise followups.ActivityError("A new client needs a new opportunity.")
-    v["title"] = followups._text(
+        raise rules.ActivityError("A new client needs a new opportunity.")
+    v["title"] = rules.clean_text(
         v["title"], "an opportunity title", 200, required=v["project_id"] == "new"
     )
-    v["photography_need"] = followups._text(
+    v["photography_need"] = rules.clean_text(
         v["photography_need"], "the photography need", 4000, required=True
     )
     if v["specialty"] and v["specialty"] not in specialties.SPECIALTIES:
-        raise followups.ActivityError("Choose a listed photography specialty.")
+        raise rules.ActivityError("Choose a listed photography specialty.")
     if v["target_date"]:
-        followups._date(v["target_date"], "target date")
+        rules.date_value(v["target_date"], "target date")
     if v["interest_confirmed"] != "yes":
-        raise followups.ActivityError(
+        raise rules.ActivityError(
             "Confirm that this is a real photography opportunity before continuing."
         )
     if v["task_disposition"] not in {"none", "keep", "complete", "cancel"}:
-        raise followups.ActivityError("Choose what happens to the pending follow-up.")
+        raise rules.ActivityError("Choose what happens to the pending follow-up.")
     if v["task_disposition"] != "none":
-        followups._positive(v["task_id"], "follow-up identity")
-        followups._positive(v["task_version"], "follow-up version")
+        rules.positive_id(v["task_id"], "follow-up identity")
+        rules.positive_id(v["task_version"], "follow-up version")
     elif v["task_id"] or v["task_version"]:
-        raise followups.ActivityError("Review the pending follow-up before continuing.", 409)
-    v["task_note"] = followups._text(
+        raise rules.ActivityError("Review the pending follow-up before continuing.", 409)
+    v["task_note"] = rules.clean_text(
         v["task_note"],
         "a follow-up outcome or reason",
         1000,
@@ -94,15 +95,13 @@ def _client_matches(con, prospect):
     matched = []
     for row in con.execute("SELECT id, name, company, email, phone FROM clients ORDER BY name, id"):
         reasons = []
-        if prospect["email"] and prospects._text_key(prospect["email"]) == prospects._text_key(
-            row["email"]
-        ):
+        if prospect["email"] and rules.text_key(prospect["email"]) == rules.text_key(row["email"]):
             reasons.append("same email")
-        if prospect["phone"] and prospects._phone_key(prospect["phone"]) == prospects._phone_key(
+        if prospect["phone"] and rules.phone_key(prospect["phone"]) == rules.phone_key(
             row["phone"]
         ):
             reasons.append("same phone")
-        if prospects._text_key(prospect["business"]) == prospects._text_key(row["company"]):
+        if rules.text_key(prospect["business"]) == rules.text_key(row["company"]):
             reasons.append("same business")
         if reasons:
             matched.append({**dict(row), "reason": ", ".join(reasons)})
@@ -123,13 +122,13 @@ def _resolve(con, prospect_id, values):
         raise HTTPException(404, "Prospect not found")
     prospect = dict(row)
     if prospect["qualification"] == "not_fit":
-        raise followups.ActivityError(
+        raise rules.ActivityError(
             "This prospect is marked Not a fit. Review its qualification first."
         )
     client = project = None
     if values["client_id"] == "new":
         if _client_matches(con, prospect):
-            raise followups.ActivityError(
+            raise rules.ActivityError(
                 "A matching client exists. Select and review an existing client before continuing.",
                 409,
             )
@@ -138,7 +137,7 @@ def _resolve(con, prospect_id, values):
             "SELECT * FROM clients WHERE id=?", (int(values["client_id"]),)
         ).fetchone()
         if not row:
-            raise followups.ActivityError(
+            raise rules.ActivityError(
                 "The selected client is no longer available. Choose a client again.", 409
             )
         client = dict(row)
@@ -148,7 +147,7 @@ def _resolve(con, prospect_id, values):
             (int(values["project_id"]), int(values["client_id"])),
         ).fetchone()
         if not row or row["status"] in {"archived", "project_closed"}:
-            raise followups.ActivityError(
+            raise rules.ActivityError(
                 "Choose an open project belonging to the selected client.", 409
             )
         project = dict(row)
@@ -159,19 +158,19 @@ def _resolve(con, prospect_id, values):
             or str(pending["id"]) != values["task_id"]
             or str(pending["version"]) != values["task_version"]
         ):
-            raise followups.ActivityError(
+            raise rules.ActivityError(
                 "The pending follow-up changed. Reopen the handoff and review its current action.",
                 409,
             )
     elif values["task_disposition"] != "none":
-        raise followups.ActivityError(
+        raise rules.ActivityError(
             "The follow-up is no longer pending. Reopen the handoff to review the current record.",
             409,
         )
     policy = outreach.for_prospect(
         con,
         prospect_id,
-        followups.studio_mod._today().isoformat(),
+        studio._today().isoformat(),
         extra_client_id=client["id"] if client else None,
     )
     return {
@@ -281,19 +280,19 @@ def review_handoff(request: Request, prospect_id: int, values: dict = Depends(_f
             if con.execute(
                 "SELECT 1 FROM prospect_handoffs WHERE prospect_id=?", (prospect_id,)
             ).fetchone():
-                raise followups.ActivityError(
+                raise rules.ActivityError(
                     "This prospect already has a project handoff. Open the linked project.", 409
                 )
             state = _resolve(con, prospect_id, values)
         receipt = {
             "kind": "prospect_handoff",
             "prospect_id": prospect_id,
-            "request": followups._digest(values),
-            "state": followups._digest(state),
+            "request": rules.command_digest(values),
+            "state": rules.command_digest(state),
         }
         token = security.sign(json.dumps(receipt, sort_keys=True))
         return _page(request, prospect_id, values, review=state, token=token)
-    except followups.ActivityError as exc:
+    except rules.ActivityError as exc:
         return _page(request, prospect_id, values, error=str(exc), status=exc.status)
 
 
@@ -306,7 +305,7 @@ def commit_handoff(
 ):
     try:
         values = _clean(values)
-        digest = followups._digest(values)
+        digest = rules.command_digest(values)
         raw = security.unsign(review_token, max_age=REVIEW_MAX_AGE)
         try:
             receipt = json.loads(raw) if isinstance(raw, str) else {}
@@ -318,7 +317,7 @@ def commit_handoff(
             or receipt.get("prospect_id") != prospect_id
             or receipt.get("request") != digest
         ):
-            raise followups.ActivityError(
+            raise rules.ActivityError(
                 "Review this exact handoff before saving. The review may have expired or its entries changed.",
                 409,
             )
@@ -336,13 +335,13 @@ def commit_handoff(
                     return RedirectResponse(
                         f"/admin/studio/projects/{previous['project_id']}", status_code=303
                     )
-                raise followups.ActivityError(
+                raise rules.ActivityError(
                     "This handoff was already saved. Review the linked project instead of creating another.",
                     409,
                 )
             state = _resolve(con, prospect_id, values)
-            if receipt.get("state") != followups._digest(state):
-                raise followups.ActivityError(
+            if receipt.get("state") != rules.command_digest(state):
+                raise rules.ActivityError(
                     "The prospect, client, project, follow-up or outreach preferences changed after review. Review the handoff again before saving.",
                     409,
                 )
@@ -431,7 +430,7 @@ def commit_handoff(
                 },
             )
         return RedirectResponse(f"/admin/studio/projects/{project_id}", status_code=303)
-    except followups.ActivityError as exc:
+    except rules.ActivityError as exc:
         return _page(request, prospect_id, values, error=str(exc), status=exc.status)
     except sqlite3.IntegrityError:
         return _page(

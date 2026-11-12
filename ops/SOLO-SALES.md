@@ -589,6 +589,43 @@ The fixture uses synthetic prospects and disables workers/provider connections.
 Execution stays on GitHub-hosted Chromium; screen-reader and other-browser review
 remain separate. No schema, write semantics, deployment or live outreach changed.
 
+## Shared sales rules and review navigation
+
+The [architecture roadmap](ARCHITECTURE.md) is the implementation reference.
+Its first slice moves shared validation, contact values, command digests and
+identity normalization into `app/sales/rules.py`, with no dependency on routes,
+configuration, storage or providers. `app/admin/prospect_context.py` owns validated
+queue/search/origin context and fixed local return paths. Route callers import
+these owners directly, including error types and channel/outcome labels.
+
+Error messages/statuses, digest serialization, identity comparisons, URLs, form
+fields and token payloads retain their existing behavior. Review origin remains
+navigation-only. Drafts/handoffs read the same monkeypatchable studio clock directly;
+`app/outreach.py` remains the outreach-policy owner. No schema, SQL, transaction,
+audit, provider, template or JavaScript behavior changes are intended.
+
+This slice leaves the task command in `prospect_followups._change_task` and the
+shared detail projection in `prospect_followups.detail_context`. Move a command
+only with its transaction/version/retry/audit contract in the next scoped PR.
+The architecture document records subsequent handoff browser coverage, truthful
+outbound reporting and conditional AI work separately.
+
+Local verification on Python 3.12.14: 508 unit (four new compatibility/boundary
+cases), 1,308 integration, 188 smoke and 66 JavaScript cases passed, with no
+selected skips. Combined integration/smoke coverage was 89.05% against the 78%
+floor. Ruff lint/format, Bandit, migration/lock consistency, tracked-file secret
+scanning and both Python lock audits passed. Each Python suite used a fresh
+workspace data directory and `MISE_ENV_FILE=/nonexistent`. Existing provider mocks
+and AnyIO/Starlette warnings remain; no live providers were exercised.
+
+Review compared the extracted helpers and remaining route functions against the
+base AST after the explicit reference renames; their logic matched. The original
+redirect and property assertions now target the shared presentation module.
+Browser fixture preflight passed without opening a listening socket. The eight
+hosted Chromium journeys and CodeQL remain required PR checks; their actual
+results are attached to the PR, not claimed as a local browser run. No manual
+visual, screen-reader, other-browser or production verification was performed.
+
 ## Remaining slices
 
 1. Use the guided review and complete prospect → draft → manual contact →

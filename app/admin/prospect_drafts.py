@@ -11,7 +11,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from .. import audit, config, db, outreach, security, specialties
 from ..redirects import redirect_local
 from ..render import templates
-from . import prospect_followups as followups
+from ..sales import rules
+from . import studio
 
 router = APIRouter(prefix="/admin/studio/prospects", dependencies=[Depends(security.require_admin)])
 PURPOSES = {
@@ -49,15 +50,15 @@ def _inputs(
 def _clean(values):
     v = dict(values)
     if v["channel"] not in {"email", "sms"} or v["purpose"] not in PURPOSES:
-        raise followups.ActivityError("Choose a listed channel and message purpose.")
-    followups._key(v["operation_key"])
+        raise rules.ActivityError("Choose a listed channel and message purpose.")
+    rules.operation_key(v["operation_key"])
     if v["purpose"] == "introduction":
         if v["reference_event_id"]:
-            raise followups.ActivityError("Choose no prior contact for an introduction.")
+            raise rules.ActivityError("Choose no prior contact for an introduction.")
     else:
-        followups._positive(v["reference_event_id"], "reference contact")
-    v["personalization"] = followups._text(v["personalization"], "a personal sentence", 500)
-    v["next_step"] = followups._text(v["next_step"], "one next step", 250)
+        rules.positive_id(v["reference_event_id"], "reference contact")
+    v["personalization"] = rules.clean_text(v["personalization"], "a personal sentence", 500)
+    v["next_step"] = rules.clean_text(v["next_step"], "one next step", 250)
     return v
 
 
@@ -72,9 +73,7 @@ def _context(con, prospect_id, event_id=""):
             (int(event_id), prospect_id),
         ).fetchone()
         if not row_event:
-            raise followups.ActivityError(
-                "Choose a contact record belonging to this prospect.", 409
-            )
+            raise rules.ActivityError("Choose a contact record belonging to this prospect.", 409)
         event = dict(row_event)
 
     def one(sql):
@@ -103,7 +102,7 @@ def _context(con, prospect_id, event_id=""):
         ),
     }
 
-    policy = outreach.for_prospect(con, prospect_id, followups.studio_mod._today().isoformat())
+    policy = outreach.for_prospect(con, prospect_id, studio._today().isoformat())
     # Unrestricted drafts created before preferences shipped remain usable.
     if policy["sources"]:
         state["outreach"] = policy
@@ -114,29 +113,27 @@ def _usable(state, values):
     if state.get("outreach"):
         reason = outreach.blocked_reason(state["outreach"], values["channel"])
         if reason:
-            raise followups.ActivityError(reason, 409)
+            raise rules.ActivityError(reason, 409)
     if state["prospect"]["qualification"] == "not_fit":
-        raise followups.ActivityError("Review this prospect's Not a fit qualification first.", 409)
+        raise rules.ActivityError("Review this prospect's Not a fit qualification first.", 409)
     if state["latest_response"] and state["latest_response"]["outcome"] == "not_interested":
-        raise followups.ActivityError(
+        raise rules.ActivityError(
             "The latest recorded response is Not interested. Review the contact history first.", 409
         )
     recipient = state["prospect"]["email" if values["channel"] == "email" else "phone"]
     if not recipient.strip():
-        raise followups.ActivityError(
-            "Add this channel's recipient to the prospect before drafting."
-        )
+        raise rules.ActivityError("Add this channel's recipient to the prospect before drafting.")
     event = state["event"]
     if values["purpose"] == "follow_up" and (
         not event
         or event["direction"] != "out"
         or event["outcome"] not in {"attempted", "no_answer", "voicemail", "sent", "conversation"}
     ):
-        raise followups.ActivityError("Select a recorded outgoing attempt for this follow-up.")
+        raise rules.ActivityError("Select a recorded outgoing attempt for this follow-up.")
     if values["purpose"] == "conversation" and (
         not event or event["outcome"] not in {"conversation", "reply_received"}
     ):
-        raise followups.ActivityError("Select a recorded conversation or received reply.")
+        raise rules.ActivityError("Select a recorded conversation or received reply.")
 
 
 def _starter(state, values):
@@ -173,12 +170,10 @@ def _starter(state, values):
 
 
 def _message(subject, body, channel):
-    subject = followups._text(subject, "a subject", 240, required=channel == "email")
+    subject = rules.clean_text(subject, "a subject", 240, required=channel == "email")
     if "\n" in subject or "\r" in subject or (channel == "sms" and subject):
-        raise followups.ActivityError(
-            "Use a single-line email subject; text drafts have no subject."
-        )
-    body = followups._text(body, "a message", 1600 if channel == "sms" else 4000, required=True)
+        raise rules.ActivityError("Use a single-line email subject; text drafts have no subject.")
+    body = rules.clean_text(body, "a message", 1600 if channel == "sms" else 4000, required=True)
     return {"subject": subject, "body": body}
 
 
@@ -189,7 +184,7 @@ def _ticket(token, expected):
     except ValueError:
         data = None
     if not isinstance(data, dict) or any(data.get(k) != v for k, v in expected.items()):
-        raise followups.ActivityError(
+        raise rules.ActivityError(
             "This draft form changed or expired. Reopen it; your text is preserved below.", 409
         )
     return data
@@ -209,8 +204,8 @@ def _fresh(con, row):
     saved = json.loads(row["context_json"])
     state = _context(con, row["prospect_id"], saved["inputs"]["reference_event_id"])
     _usable(state, saved["inputs"])
-    if followups._digest(state) != row["context_digest"]:
-        raise followups.ActivityError(
+    if rules.command_digest(state) != row["context_digest"]:
+        raise rules.ActivityError(
             "The recipient or context changed. Keep this text for reference and start a fresh draft.",
             409,
         )
@@ -254,7 +249,7 @@ def _page(
             state = json.loads(row["context_json"])["state"]
             try:
                 _fresh(con, row)
-            except followups.ActivityError as exc:
+            except rules.ActivityError as exc:
                 stale = str(exc)
             if values is None:
                 values = {"subject": row["subject"], "body": row["body"]}
@@ -306,8 +301,8 @@ def _page(
             "page": page,
             "has_next": page * PAGE_SIZE < total,
             "purposes": PURPOSES,
-            "channels": followups.CHANNELS,
-            "outcomes": followups.OUTCOMES,
+            "channels": rules.CHANNELS,
+            "outcomes": rules.OUTCOMES,
         },
         status_code=status,
         headers={"Cache-Control": "no-store"},
@@ -334,13 +329,13 @@ def preview(request: Request, prospect_id: int, values: dict = Depends(_inputs))
                     "kind": "prospect_draft_create",
                     "prospect_id": prospect_id,
                     "inputs": values,
-                    "context_digest": followups._digest(state),
+                    "context_digest": rules.command_digest(state),
                     "state": state,
                 }
             )
         )
         return _page(request, prospect_id, values=values | text, state=state, token=token)
-    except followups.ActivityError as exc:
+    except rules.ActivityError as exc:
         return _page(request, prospect_id, values=values, error=str(exc), status=exc.status)
 
 
@@ -360,7 +355,7 @@ def create(
         state = receipt["state"]
         values = inputs | values
         values.update(_message(subject, body, inputs["channel"]))
-        digest = followups._digest(values | {"context_digest": receipt["context_digest"]})
+        digest = rules.command_digest(values | {"context_digest": receipt["context_digest"]})
         with db.tx() as con:
             previous = con.execute(
                 "SELECT * FROM prospect_message_drafts WHERE operation_key=?",
@@ -368,7 +363,7 @@ def create(
             ).fetchone()
             if previous:
                 if previous["prospect_id"] != prospect_id or previous["request_digest"] != digest:
-                    raise followups.ActivityError(
+                    raise rules.ActivityError(
                         "That draft was already saved with different text. Open the saved draft or start another.",
                         409,
                     )
@@ -377,8 +372,8 @@ def create(
                 )
             current = _context(con, prospect_id, inputs["reference_event_id"])
             _usable(current, inputs)
-            if followups._digest(current) != receipt["context_digest"]:
-                raise followups.ActivityError(
+            if rules.command_digest(current) != receipt["context_digest"]:
+                raise rules.ActivityError(
                     "The recipient or context changed after preview. Start a fresh draft; your text is preserved below.",
                     409,
                 )
@@ -408,7 +403,7 @@ def create(
                 },
             )
         return redirect_local(f"/admin/studio/prospects/{prospect_id}/drafts/{draft_id}")
-    except (followups.ActivityError, sqlite3.IntegrityError) as exc:
+    except (rules.ActivityError, sqlite3.IntegrityError) as exc:
         return _page(
             request,
             prospect_id,
@@ -416,9 +411,9 @@ def create(
             state=state,
             token=token,
             error=str(exc)
-            if isinstance(exc, followups.ActivityError)
+            if isinstance(exc, rules.ActivityError)
             else "A draft record changed. Reopen it before saving.",
-            status=exc.status if isinstance(exc, followups.ActivityError) else 409,
+            status=exc.status if isinstance(exc, rules.ActivityError) else 409,
         )
 
 
@@ -440,7 +435,7 @@ def _edit_ticket(token, row):
         },
     )
     if type(data.get("version")) is not int:
-        raise followups.ActivityError("Reopen this draft before editing.", 409)
+        raise rules.ActivityError("Reopen this draft before editing.", 409)
     return data["version"]
 
 
@@ -464,7 +459,7 @@ def edit(
             if row["version"] == version + 1 and same:
                 return redirect_local(f"/admin/studio/prospects/{prospect_id}/drafts/{draft_id}")
             if row["version"] != version:
-                raise followups.ActivityError(
+                raise rules.ActivityError(
                     "Another tab saved this draft. Your edits are preserved; open the latest version before retrying.",
                     409,
                 )
@@ -482,7 +477,7 @@ def edit(
                     diff={"prospect_id": prospect_id, "version": [version, version + 1]},
                 )
         return redirect_local(f"/admin/studio/prospects/{prospect_id}/drafts/{draft_id}")
-    except followups.ActivityError as exc:
+    except rules.ActivityError as exc:
         return _page(
             request,
             prospect_id,
@@ -508,7 +503,7 @@ def copy_text(
             con.execute("BEGIN")
             row = _row(con, prospect_id, draft_id)
             if _edit_ticket(token, row) != row["version"]:
-                raise followups.ActivityError(
+                raise rules.ActivityError(
                     "Another tab saved this draft. Reopen the latest version before copying.", 409
                 )
             text = _message(subject, body, row["channel"])
@@ -517,7 +512,7 @@ def copy_text(
             {**text, "draft_id": draft_id, "prospect_id": prospect_id},
             headers={"Cache-Control": "no-store"},
         )
-    except followups.ActivityError as exc:
+    except rules.ActivityError as exc:
         return JSONResponse(
             {"error": str(exc)}, status_code=exc.status, headers={"Cache-Control": "no-store"}
         )

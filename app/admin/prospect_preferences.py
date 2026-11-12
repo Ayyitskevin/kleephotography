@@ -10,8 +10,8 @@ from fastapi.responses import HTMLResponse
 from .. import audit, db, outreach, security
 from ..redirects import redirect_local
 from ..render import templates
-from . import prospect_followups as followups
-from . import studio
+from ..sales import rules
+from . import prospect_context, studio
 
 router = APIRouter(prefix="/admin/studio/prospects", dependencies=[Depends(security.require_admin)])
 TOKEN_AGE = 3600
@@ -50,7 +50,7 @@ def _page(request, prospect_id, *, values=None, token="", error=None, status=200
                     "kind": "outreach_preferences",
                     "prospect_id": prospect_id,
                     "version": own["version"] if own else 0,
-                    "state": followups._digest(state),
+                    "state": rules.command_digest(state),
                 }
             )
         )
@@ -58,7 +58,7 @@ def _page(request, prospect_id, *, values=None, token="", error=None, status=200
         request,
         "admin/prospect_preferences.html",
         {
-            **followups._review_context(request),
+            **prospect_context.review_context(request),
             "prospect": prospect,
             "prospect_id": prospect_id,
             "outreach": state,
@@ -75,8 +75,8 @@ def _page(request, prospect_id, *, values=None, token="", error=None, status=200
 
 
 def _redirect(request, prospect_id):
-    if followups._review_context(request):
-        return followups._redirect(prospect_id, request)
+    if prospect_context.review_context(request):
+        return prospect_context.redirect_to_prospect(prospect_id, request)
     return redirect_local(f"/admin/studio/prospects/{prospect_id}/outreach")
 
 
@@ -119,39 +119,39 @@ def save_preferences(
             or ticket.get("prospect_id") != prospect_id
             or type(ticket.get("version")) is not int
         ):
-            raise followups.ActivityError(
+            raise rules.ActivityError(
                 "This form changed or expired. Reopen preferences and review again.", 409
             )
         if mode not in MODES or preferred_channel not in {"", *outreach.CHANNELS}:
-            raise followups.ActivityError("Choose a listed outreach status and channel.")
+            raise rules.ActivityError("Choose a listed outreach status and channel.")
         cleaned = dict(values)
         for channel in outreach.CHANNELS:
             field = channel + "_blocked"
             if values[field] not in {"", "1"}:
-                raise followups.ActivityError("Choose the listed channel exclusions.")
+                raise rules.ActivityError("Choose the listed channel exclusions.")
             cleaned[field] = int(values[field] == "1")
         if preferred_channel and cleaned[preferred_channel + "_blocked"]:
-            raise followups.ActivityError(
-                "A preferred channel cannot also be excluded on this record."
-            )
-        cleaned["reason"] = followups._text(reason, "a reason for this change", 1000, required=True)
+            raise rules.ActivityError("A preferred channel cannot also be excluded on this record.")
+        cleaned["reason"] = rules.clean_text(
+            reason, "a reason for this change", 1000, required=True
+        )
         if mode == "snoozed":
-            followups._date(snoozed_until, "pause end date")
+            rules.date_value(snoozed_until, "pause end date")
         else:
             cleaned["snoozed_until"] = None
-        digest = followups._digest({"ticket": ticket, "values": cleaned})
+        digest = rules.command_digest({"ticket": ticket, "values": cleaned})
         with db.tx() as con:
             _, state, own = _state(con, prospect_id)
             version = own["version"] if own else 0
             if own and version == ticket["version"] + 1 and own["last_command_digest"] == digest:
                 return _redirect(request, prospect_id)
-            if version != ticket["version"] or ticket.get("state") != followups._digest(state):
-                raise followups.ActivityError(
+            if version != ticket["version"] or ticket.get("state") != rules.command_digest(state):
+                raise rules.ActivityError(
                     "Preferences or linked client records changed. Your entries are preserved; reopen to review the current scope.",
                     409,
                 )
             if mode == "snoozed" and snoozed_until < studio._today().isoformat():
-                raise followups.ActivityError("Pause through today or a future date.")
+                raise rules.ActivityError("Pause through today or a future date.")
             con.execute(
                 "INSERT INTO prospect_outreach_preferences "
                 "(prospect_id,mode,snoozed_until,email_blocked,sms_blocked,call_blocked,preferred_channel,reason,version,last_command_digest) "
@@ -184,7 +184,7 @@ def save_preferences(
                     "scope_members": state["members"],
                 },
             )
-    except followups.ActivityError as exc:
+    except rules.ActivityError as exc:
         return _page(
             request, prospect_id, values=values, token=token, error=str(exc), status=exc.status
         )
