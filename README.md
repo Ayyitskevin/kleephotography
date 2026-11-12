@@ -45,6 +45,9 @@ without an integration in between.
 
 The [architecture and implementation roadmap](ops/ARCHITECTURE.md) records the
 modular-monolith direction, current sales boundaries and the next bounded slices.
+The [sales workbench specification](ops/SALES-WORKBENCH-SPEC.md) defines the proposed
+review, history, quick-note, Home and reporting features, with data contracts and
+an incremental PR sequence.
 
 Three audiences, one process, one SQLite file:
 
