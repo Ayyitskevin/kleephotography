@@ -36,7 +36,8 @@ async function scan(page, info, name) {
     body: JSON.stringify(results, null, 2), contentType: 'application/json',
   });
   await info.attach(`${name}-screenshot`, {
-    body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
+    // Keep the emulated mobile viewport fixed during native page transitions.
+    body: await page.screenshot({ animations: 'disabled' }), contentType: 'image/png',
   });
   expect.soft(results.violations.map(v => ({
     id: v.id, impact: v.impact,
@@ -76,7 +77,7 @@ test('review, edit, record a manual outcome, complete and hold', async ({ page }
   await command.focus();
   await page.keyboard.press('Enter');
   await page.getByLabel('What happened to this action?').selectOption('reschedule');
-  await expect(page.locator('[data-followup-command]').getByLabel('New due date')).toBeVisible();
+  await expect(page.locator('[data-followup-command]').getByLabel('New due date', { exact: true })).toBeVisible();
   await scan(page, info, 'review-expanded');
 
   await edit.click();
