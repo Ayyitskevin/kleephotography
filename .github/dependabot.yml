@@ -5,6 +5,24 @@
 # updates are enabled on the repo.
 version: 2
 updates:
+  - package-ecosystem: "npm"
+    directory: "/tests/browser"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+    groups:
+      browser-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
   - package-ecosystem: "pip"
     directory: "/"
     schedule:

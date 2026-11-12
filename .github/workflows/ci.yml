@@ -156,3 +156,44 @@ jobs:
       - name: Run integration tests
         run: |
           .venv/bin/python -m pytest tests/ --ignore=tests/smoke -q -m integration --tb=short
+
+  browser:
+    name: Guided review browser and accessibility checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Check requirement locks and install test dependencies
+        run: |
+          python scripts/check_requirement_locks.py
+          python -m venv .venv
+          .venv/bin/pip install --require-hashes -r requirements-dev.lock
+          npm ci --prefix tests/browser
+          npm audit --prefix tests/browser --audit-level=moderate
+      - name: Install pinned Chromium and system dependencies
+        timeout-minutes: 5
+        working-directory: tests/browser
+        run: npx playwright install --with-deps chromium
+      - name: Check disposable server and run browser journeys
+        run: |
+          .venv/bin/python tests/browser/server.py --check
+          npm test --prefix tests/browser
+      - name: Preserve synthetic screenshots, axe results and failure traces
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prospect-browser-report
+          path: |
+            tests/browser/playwright-report/
+            tests/browser/test-results/
+          retention-days: 7
