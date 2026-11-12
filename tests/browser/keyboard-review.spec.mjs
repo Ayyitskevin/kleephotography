@@ -16,8 +16,11 @@ async function focusedAndClear(target) {
   await expect.poll(() => target.evaluate(el => {
     const rect = el.getBoundingClientRect();
     const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+    const view = window.visualViewport;
+    const left = view ? view.offsetLeft : 0, top = view ? view.offsetTop : 0;
+    const width = view ? view.width : innerWidth, height = view ? view.height : innerHeight;
     const hit = document.elementFromPoint(x, y);
-    return x >= 0 && y >= 0 && x < innerWidth && y < innerHeight
+    return x >= left && y >= top && x < left + width && y < top + height
       && (hit === el || el.contains(hit));
   })).toBe(true);
 }

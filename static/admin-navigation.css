@@ -1,4 +1,4 @@
-/* Admin navigation must reveal focus immediately, without a cross-page fade. */
+/* Match login: reveal admin focus immediately, without a cross-page fade. */
 @view-transition { navigation: none; }
 
 /* Native modal behavior; retain the existing palette/index layouts in both themes. */
@@ -20,3 +20,12 @@
 .admin-shell .ns-pal-esc:focus-visible,
 .admin-shell .sr-more a:focus-visible,
 .admin-shell .sr-more button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+
+/* Keep the dashboard's route to follow-ups and navigation inside the viewport. */
+.admin-shell .dash-top { flex-wrap: wrap; }
+.admin-shell .dash-top-lead { min-width: 0; }
+.admin-shell .dash-top-lead p { white-space: normal; }
+.admin-shell .dash-search { min-width: 12rem; max-width: 100%; }
+.admin-shell .dash-top-actions { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.admin-shell .dash-top-actions > form { display: flex; flex-wrap: wrap; gap: .5rem; }
+.sr-admin .ns-pal-sub { color: var(--sr-ink-soft); }

@@ -573,8 +573,10 @@ errors focus the error text, with submitted values still intact. Successful save
 return to the live review heading. Focus does not log an action or change queue
 eligibility. The script leaves an already active control alone, and scroll padding
 accounts for the sticky header and mobile navigation.
-The admin shell opts out of the shared cross-page fade so focused content is
+The admin shell and login opt out of the cross-page fade so focused content is
 revealed immediately; public pages keep their existing transition behavior.
+Dashboard header actions wrap on narrow screens, and command-result category
+labels use a stronger ink token to stay legible against the selected row.
 
 Two additional browser journeys at desktop/mobile widths use real Tab, Shift+Tab,
 Enter, Escape, arrow and typing events, without programmatically setting focus or

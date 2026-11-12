@@ -1,4 +1,6 @@
 {% extends "base_cream.html" %}
+{# Match the admin shell's immediate navigation, including the login boundary. #}
+{% block cream_head %}<style>@view-transition { navigation: none; }</style>{% endblock %}
 {# The crew pass (Screening Room): the admin login is a ticket stub on the
    house, same anatomy as the client gates. Form action, field names, lockout
    copy, and Cloudflare note are identical — auth logic is red-light and
