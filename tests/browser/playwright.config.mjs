@@ -17,6 +17,7 @@ export default defineConfig({
     baseURL,
     browserName: 'chromium',
     serviceWorkers: 'block',
+    actionTimeout: 10_000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

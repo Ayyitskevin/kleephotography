@@ -76,8 +76,9 @@ Whole-page axe scans include the expanded action/contact forms, research and
 preference pages, validation/conflict messages and changed/empty queue states.
 No rules or elements are suppressed. Tests fail on WCAG 2.1 A/AA violations,
 horizontal page overflow, browser exceptions, server errors or external requests.
-Each scan attaches JSON (including inconclusive checks) and a viewport screenshot.
-Captures keep the mobile viewport fixed while native page transitions are active.
+Each scan attaches JSON (including inconclusive checks), layout diagnostics and a
+viewport screenshot. Overflow is checked against the configured viewport width,
+so mobile auto-scaling cannot mask a page wider than the screen.
 CI retains the HTML report and failure traces for seven days. There are no retries
 that could hide a flaky first attempt.
 
@@ -112,7 +113,7 @@ Cloudflare Access, background workers and live providers are outside these tests
 Production deployment is separate.
 
 Local preflight passed the synthetic login/queue check, Playwright discovery of
-four journeys, npm audit, 504 unit, 1,308 integration, 188 smoke and 60 JavaScript
+four journeys, npm audit, 504 unit, 1,308 integration, 188 smoke and 66 JavaScript
 cases on Python 3.12.14. Ruff lint/format, Bandit, migration/lock checks and the
 tracked-file secret scan also passed. Each Python suite used fresh disposable
 data. Hosted browser results are reported by the dedicated CI job; no local
@@ -121,8 +122,10 @@ Chromium run or manual visual assessment is claimed.
 The first hosted run caught a shared-navigation accessible-name mismatch: the
 visible `⌘K` shortcut was missing from the command button's accessible name. The
 name now includes the visible label as well as the shortcut's spoken description.
-The initial run also exposed a test locator matching both a date field and its
-preset group; the locator now uses the exact field label.
+The initial runs also exposed ambiguous test locators; these now use an exact
+field label or the relevant form. Hosted mobile traces showed a 390px viewport
+expanding to 496px: the prospect header's action links could not wrap. The prospect
+stylesheet now lets that action row wrap and long business headings break.
 
 ## Property-test verification (2026-11-11)
 
