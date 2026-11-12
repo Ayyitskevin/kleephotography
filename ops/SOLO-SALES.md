@@ -560,8 +560,9 @@ pass before merge; no browser appearance verification or deployment is claimed.
 ### Keyboard navigation and return focus (2026-11-12)
 
 The command palette and full index use native modal dialogs. Opening one moves
-focus inside; Tab stays in the dialog, and Escape or its close button returns
-focus to the invoker. The full index remains plain grouped navigation links.
+focus inside; Tab keeps page focus in the dialog (native browser controls remain
+reachable), and Escape or its close button returns focus to the invoker. The full
+index remains plain grouped navigation links.
 Command search offers Daily follow-ups; arrow keys focus results, and Enter on
 a result follows that actual link. Background controls stay inert while a dialog
 is open. The command palette also retains the legacy theme.
@@ -572,6 +573,8 @@ errors focus the error text, with submitted values still intact. Successful save
 return to the live review heading. Focus does not log an action or change queue
 eligibility. The script leaves an already active control alone, and scroll padding
 accounts for the sticky header and mobile navigation.
+The admin shell opts out of the shared cross-page fade so focused content is
+revealed immediately; public pages keep their existing transition behavior.
 
 Two additional browser journeys at desktop/mobile widths use real Tab, Shift+Tab,
 Enter, Escape, arrow and typing events, without programmatically setting focus or

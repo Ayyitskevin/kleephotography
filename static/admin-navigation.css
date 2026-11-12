@@ -1,3 +1,6 @@
+/* Admin navigation must reveal focus immediately, without a cross-page fade. */
+@view-transition { navigation: none; }
+
 /* Native modal behavior; retain the existing palette/index layouts in both themes. */
 .admin-shell dialog.ns-pal,
 .admin-shell dialog.sr-more {
@@ -8,7 +11,8 @@
 .admin-shell dialog.sr-more { padding: 0; }
 .admin-shell dialog.ns-pal:not([open]),
 .admin-shell dialog.sr-more:not([open]) { display: none; }
-.admin-shell dialog::backdrop { background: transparent; }
+.admin-shell dialog.ns-pal::backdrop,
+.admin-shell dialog.sr-more::backdrop { background: transparent; }
 .admin-shell .ns-pal-input { min-width: 0; }
 .admin-shell button.ns-pal-esc { border: 0; cursor: pointer; }
 .admin-shell .ns-pal-row:focus-visible,

@@ -22,6 +22,18 @@ async function focusedAndClear(target) {
   })).toBe(true);
 }
 
+async function modalTab(page, dialog, target, key = 'Tab') {
+  // Native dialogs may visit browser chrome at the boundary (W3C H102).
+  // No other page content may receive focus while the modal is open.
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press(key);
+    if (await target.evaluate(el => el === document.activeElement)) return;
+    expect(await dialog.evaluate(el => el.contains(document.activeElement)
+      || (!document.hasFocus() && document.activeElement === document.body))).toBe(true);
+  }
+  await expect(target).toBeFocused();
+}
+
 async function activate(page, target) {
   await tabTo(page, target);
   await focusedAndClear(target);
@@ -50,9 +62,11 @@ async function login(page) {
   await type(page, page.getByLabel('Password', { exact: true }), 'test-pw');
   await activate(page, page.getByRole('button', { name: 'Take the deck' }));
   await expect(page).toHaveURL(/\/admin\/home$/);
+  await page.waitForLoadState('domcontentloaded');
 }
 
 async function dailyQueue(page) {
+  await page.waitForLoadState('domcontentloaded');
   await page.keyboard.press('Control+k');
   await expect(page.getByLabel('Search pages and actions')).toBeFocused();
   await page.keyboard.type('Daily follow-ups');
@@ -66,9 +80,9 @@ test('navigation dialogs contain and restore keyboard focus', async ({ page }, i
   const moreButton = page.locator('#sr-more-open');
   await activate(page, moreButton);
   await focusedAndClear(page.getByRole('button', { name: 'Close the index' }));
-  await page.keyboard.press('Shift+Tab');
+  await modalTab(page, more, more.getByRole('link', { name: 'Reference', exact: true }), 'Shift+Tab');
   await focusedAndClear(more.getByRole('link', { name: 'Reference', exact: true }));
-  await page.keyboard.press('Tab');
+  await modalTab(page, more, page.getByRole('button', { name: 'Close the index' }));
   await expect(page.getByRole('button', { name: 'Close the index' })).toBeFocused();
   await scan(page, info, 'keyboard-index');
   await page.keyboard.press('Escape');
@@ -84,9 +98,9 @@ test('navigation dialogs contain and restore keyboard focus', async ({ page }, i
   const search = page.getByLabel('Search pages and actions');
   await expect(search).toBeFocused();
   await page.keyboard.type('prospect');
-  await page.keyboard.press('Shift+Tab');
+  await modalTab(page, page.locator('#ns-pal'), page.locator('#ns-pal .ns-pal-row').last(), 'Shift+Tab');
   await expect(page.locator('#ns-pal .ns-pal-row').last()).toBeFocused();
-  await page.keyboard.press('Tab');
+  await modalTab(page, page.locator('#ns-pal'), search);
   await expect(search).toBeFocused();
   await scan(page, info, 'keyboard-command');
   await page.keyboard.press('Escape');
