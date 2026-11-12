@@ -11,8 +11,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import config, db, ratelimit
-from app.admin import prospect_followups, prospects
+from app.admin import prospect_context, prospects
 from app.main import app
+from app.sales import rules
 
 ROOT = "/admin/studio/prospects"
 FORM = {
@@ -96,7 +97,7 @@ def counts():
     ],
 )
 def test_phone_identity(raw, expected):
-    assert prospects._phone_key(raw) == expected
+    assert rules.phone_key(raw) == expected
 
 
 # The capture form used to accept this set. The check has to stay equivalent for
@@ -155,7 +156,7 @@ def test_pathological_email_returns_quickly():
 @pytest.mark.unit
 @pytest.mark.parametrize("target", ["//evil.com", "https://evil.com", "/\\evil.com"])
 def test_malicious_prospect_redirect_targets_are_rejected(target):
-    response = prospect_followups._redirect(target)
+    response = prospect_context.redirect_to_prospect(target)
     assert response.status_code == 303
     assert response.headers["location"] == "/admin/studio/prospects"
     assert "evil.com" not in response.headers["location"]
@@ -164,7 +165,7 @@ def test_malicious_prospect_redirect_targets_are_rejected(target):
 @pytest.mark.unit
 @pytest.mark.parametrize("prospect_id", [1, 12, 0, -1])
 def test_prospect_redirect_keeps_numeric_detail_pages(prospect_id):
-    response = prospect_followups._redirect(prospect_id)
+    response = prospect_context.redirect_to_prospect(prospect_id)
     assert response.status_code == 303
     assert response.headers["location"] == f"/admin/studio/prospects/{prospect_id}"
 
@@ -189,13 +190,13 @@ def test_routes_require_admin_and_cross_origin_posts_are_rejected(admin):
 @pytest.mark.integration
 def test_capture_success_redirects_through_the_safe_helper(admin, monkeypatch):
     seen = []
-    original = prospect_followups._redirect
+    original = prospect_context.redirect_to_prospect
 
     def spy(prospect_id, request=None):
         seen.append(prospect_id)
         return original(prospect_id, request)
 
-    monkeypatch.setattr(prospects.prospect_followups, "_redirect", spy)
+    monkeypatch.setattr(prospect_context, "redirect_to_prospect", spy)
     response = admin.post(ROOT, data=FORM, follow_redirects=False)
     assert response.status_code == 303
     prospect_id = db.one("SELECT id FROM prospects")["id"]

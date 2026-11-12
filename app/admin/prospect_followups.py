@@ -1,49 +1,23 @@
 """Dated prospect work and manual contact history. No provider or Inbox effects."""
 
 import datetime as dt
-import hashlib
 import json
-import re
 import sqlite3
 import uuid
 from contextlib import closing
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
 
 from .. import audit, db, outreach, security
-from ..redirects import redirect_local
 from ..render import templates
+from ..sales import rules
+from . import prospect_context
 from . import studio as studio_mod
 
 router = APIRouter(prefix="/admin/studio/prospects", dependencies=[Depends(security.require_admin)])
 PAGE_SIZE = 50
-CHANNELS = {
-    "email": "Email",
-    "sms": "Text message",
-    "call": "Phone call",
-    "in_person": "In person",
-    "other": "Other",
-}
-DIRECTIONS = {"out": "Outbound", "in": "Inbound"}
-OUTCOMES = {
-    "attempted": "Attempted contact",
-    "no_answer": "No answer",
-    "voicemail": "Left voicemail",
-    "sent": "Manually sent",
-    "conversation": "Had a conversation",
-    "reply_received": "Received a reply",
-    "not_interested": "Not interested",
-    "other": "Other",
-}
-REPLY_OUTCOMES = {"reply_received", "conversation", "not_interested"}
-
-
-class ActivityError(Exception):
-    def __init__(self, message: str, status: int = 400):
-        super().__init__(message)
-        self.status = status
 
 
 def _options() -> dict:
@@ -52,9 +26,9 @@ def _options() -> dict:
         "today": today.isoformat(),
         "tomorrow": (today + dt.timedelta(days=1)).isoformat(),
         "next_week": (today + dt.timedelta(days=7)).isoformat(),
-        "channels": CHANNELS,
-        "directions": DIRECTIONS,
-        "outcomes": OUTCOMES,
+        "channels": rules.CHANNELS,
+        "directions": rules.DIRECTIONS,
+        "outcomes": rules.OUTCOMES,
     }
 
 
@@ -109,7 +83,12 @@ def detail_context(prospect_id: int) -> dict:
         "contact_events": contacts,
         "last_attempt": next((c for c in contacts if c["direction"] == "out"), None),
         "last_reply": next(
-            (c for c in contacts if c["direction"] == "in" and c["outcome"] in REPLY_OUTCOMES), None
+            (
+                c
+                for c in contacts
+                if c["direction"] == "in" and c["outcome"] in rules.REPLY_OUTCOMES
+            ),
+            None,
         ),
         "schedule_operation_key": str(uuid.uuid4()),
         "contact_operation_key": str(uuid.uuid4()),
@@ -123,7 +102,7 @@ def _error(request, prospect_id, values, kind, error):
         "admin/prospect_activity_error.html",
         {
             **detail_context(prospect_id),
-            **_review_context(request),
+            **prospect_context.review_context(request),
             "prospect_id": prospect_id,
             "values": values,
             "form_kind": kind,
@@ -135,83 +114,9 @@ def _error(request, prospect_id, values, kind, error):
     )
 
 
-def _digest(values: dict) -> str:
-    return hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
-
-
-def _text(value: str, label: str, limit: int, *, required: bool = False) -> str:
-    value = value.strip()
-    if "\x00" in value or len(value) > limit or (required and not value):
-        raise ActivityError(f"Enter {label} between {1 if required else 0} and {limit} characters.")
-    return value
-
-
-def _date(value: str, label: str) -> str:
-    try:
-        parsed = dt.date.fromisoformat(value)
-        if parsed.isoformat() != value:
-            raise ValueError
-    except ValueError:
-        raise ActivityError(f"Choose a real {label} in YYYY-MM-DD format.") from None
-    return value
-
-
-def _positive(value: str, label: str) -> int:
-    if not re.fullmatch(r"[0-9]{1,18}", value) or int(value) < 1:
-        raise ActivityError(f"The {label} is invalid. Reopen this prospect and review the form.")
-    return int(value)
-
-
-def _key(value: str) -> str:
-    if not re.fullmatch(r"[A-Za-z0-9_-]{16,100}", value):
-        raise ActivityError(
-            "The operation key is invalid. Reopen this prospect to start a new form."
-        )
-    return value
-
-
 def _prospect(con, prospect_id):
     if not con.execute("SELECT 1 FROM prospects WHERE id=?", (prospect_id,)).fetchone():
-        raise ActivityError("Prospect not found.", 404)
-
-
-def _review_context(request):
-    review = request.query_params.get("review", "")
-    if review not in {"due", "upcoming", "unplanned"}:
-        return {}
-    q = request.query_params.get("q", "").strip()[:200]
-    params = {"review": review, "q": q}
-    context = {}
-    # Navigation only: never accept an arbitrary return URL or use this id for writes.
-    if "review_origin" in request.query_params:
-        origin = request.query_params["review_origin"]
-        if not re.fullmatch(r"[0-9]{1,18}", origin) or int(origin) < 1:
-            return {}
-        context["review_origin"] = int(origin)
-        params["review_origin"] = str(int(origin))
-    return {**context, "review_query": "?" + urlencode(params)}
-
-
-def _redirect(prospect_id, request=None):
-    """Back to this prospect. Only a numeric id may be part of the path.
-
-    Anything else, including a scheme or a backslash host, stays on the list.
-    ``redirect_local`` still refuses a target that is not a same-site path.
-    """
-    default = "/admin/studio/prospects"
-    if isinstance(prospect_id, bool) or not isinstance(prospect_id, int):
-        return redirect_local(default)
-    if request is not None and (context := _review_context(request)):
-        return redirect_local(
-            default
-            + "/review-work"
-            + context["review_query"]
-            + f"&prospect_id={context.get('review_origin', prospect_id)}"
-        )
-    try:
-        return redirect_local(f"{default}/{prospect_id}")
-    except HTTPException:
-        return redirect_local(default)
+        raise rules.ActivityError("Prospect not found.", 404)
 
 
 def _queue_rows(filter, q):
@@ -328,10 +233,12 @@ def schedule_followup(
 ):
     values = {"title": title.strip(), "due_date": due_date.strip(), "operation_key": operation_key}
     try:
-        title = _text(values["title"], "an action title", 200, required=True)
-        due_date = _date(values["due_date"], "due date")
-        operation_key = _key(operation_key)
-        digest = _digest({"prospect_id": prospect_id, "title": title, "due_date": due_date})
+        title = rules.clean_text(values["title"], "an action title", 200, required=True)
+        due_date = rules.date_value(values["due_date"], "due date")
+        operation_key = rules.operation_key(operation_key)
+        digest = rules.command_digest(
+            {"prospect_id": prospect_id, "title": title, "due_date": due_date}
+        )
         with db.tx() as con:
             _prospect(con, prospect_id)
             previous = con.execute(
@@ -339,19 +246,19 @@ def schedule_followup(
             ).fetchone()
             if previous:
                 if previous["prospect_id"] != prospect_id or previous["schedule_digest"] != digest:
-                    raise ActivityError(
+                    raise rules.ActivityError(
                         "This operation key already belongs to another saved action. Review the current record.",
                         409,
                     )
-                return _redirect(prospect_id, request)
+                return prospect_context.redirect_to_prospect(prospect_id, request)
             policy = outreach.for_prospect(con, prospect_id, studio_mod._today().isoformat())
             if reason := outreach.blocked_reason(policy):
-                raise ActivityError(reason, 409)
+                raise rules.ActivityError(reason, 409)
             if con.execute(
                 "SELECT 1 FROM tasks WHERE prospect_id=? AND done=0 AND canceled_at IS NULL",
                 (prospect_id,),
             ).fetchone():
-                raise ActivityError(
+                raise rules.ActivityError(
                     "This prospect already has a next action. Review or reschedule it first.", 409
                 )
             task_id = con.execute(
@@ -365,7 +272,7 @@ def schedule_followup(
                 "schedule",
                 diff={"prospect_id": prospect_id, "title": title, "due_date": due_date},
             )
-    except ActivityError as error:
+    except rules.ActivityError as error:
         return _error(request, prospect_id, values, "schedule", error)
     except sqlite3.IntegrityError:
         return _error(
@@ -373,12 +280,12 @@ def schedule_followup(
             prospect_id,
             values,
             "schedule",
-            ActivityError(
+            rules.ActivityError(
                 "This action could not be saved because the record changed. Review the current next action.",
                 409,
             ),
         )
-    return _redirect(prospect_id, request)
+    return prospect_context.redirect_to_prospect(prospect_id, request)
 
 
 def _change_task(
@@ -388,8 +295,8 @@ def _change_task(
         "SELECT * FROM tasks WHERE id=? AND prospect_id=?", (task_id, prospect_id)
     ).fetchone()
     if task is None:
-        raise ActivityError("This follow-up does not belong to this prospect.", 404)
-    digest = _digest(
+        raise rules.ActivityError("This follow-up does not belong to this prospect.", 404)
+    digest = rules.command_digest(
         {
             "prospect_id": prospect_id,
             "task_id": task_id,
@@ -402,7 +309,7 @@ def _change_task(
     if allow_retry and task["version"] == version + 1 and task["last_command_digest"] == digest:
         return  # Exact retry of the most recent successful command; no audit/write.
     if task["version"] != version or task["done"] or task["canceled_at"]:
-        raise ActivityError(
+        raise rules.ActivityError(
             "This action changed since the form opened. Your entries are preserved; review the current action before trying again.",
             409,
         )
@@ -439,10 +346,10 @@ def _change_task(
 
 def _command_values(action, version, note, due_date):
     if action not in {"complete", "reschedule", "cancel"}:
-        raise ActivityError("Choose complete, reschedule, or cancel.")
-    parsed_version = _positive(version, "action version")
-    note = _text(note, "a completion note or change reason", 1000, required=True)
-    due_date = _date(due_date, "due date") if action == "reschedule" else ""
+        raise rules.ActivityError("Choose complete, reschedule, or cancel.")
+    parsed_version = rules.positive_id(version, "action version")
+    note = rules.clean_text(note, "a completion note or change reason", 1000, required=True)
+    due_date = rules.date_value(due_date, "due date") if action == "reschedule" else ""
     return parsed_version, note, due_date
 
 
@@ -470,9 +377,9 @@ def change_followup(
         with db.tx() as con:
             _prospect(con, prospect_id)
             _change_task(con, prospect_id, task_id, parsed_version, action, clean_note, clean_date)
-    except ActivityError as error:
+    except rules.ActivityError as error:
         return _error(request, prospect_id, values, "command", error)
-    return _redirect(prospect_id, request)
+    return prospect_context.redirect_to_prospect(prospect_id, request)
 
 
 @router.post("/{prospect_id}/contacts")
@@ -505,32 +412,36 @@ def record_contact(
         "due_date": due_date.strip(),
     }
     try:
-        _key(operation_key)
-        if channel not in CHANNELS or direction not in DIRECTIONS or outcome not in OUTCOMES:
-            raise ActivityError("Choose a listed channel, direction, and outcome.")
+        rules.operation_key(operation_key)
+        if (
+            channel not in rules.CHANNELS
+            or direction not in rules.DIRECTIONS
+            or outcome not in rules.OUTCOMES
+        ):
+            raise rules.ActivityError("Choose a listed channel, direction, and outcome.")
         if (direction == "in" and outcome in {"attempted", "no_answer", "voicemail", "sent"}) or (
             direction == "out" and outcome == "reply_received"
         ):
-            raise ActivityError("That outcome does not match the contact direction.")
+            raise rules.ActivityError("That outcome does not match the contact direction.")
         if outcome in {"no_answer", "voicemail"} and channel != "call":
-            raise ActivityError("No answer and left voicemail apply to phone calls.")
+            raise rules.ActivityError("No answer and left voicemail apply to phone calls.")
         if outcome == "sent" and channel not in {"email", "sms"}:
-            raise ActivityError("Manually sent applies to email or text messages.")
-        occurred_on = _date(values["occurred_on"], "contact date")
+            raise rules.ActivityError("Manually sent applies to email or text messages.")
+        occurred_on = rules.date_value(values["occurred_on"], "contact date")
         if occurred_on > studio_mod._today().isoformat():
-            raise ActivityError(
+            raise rules.ActivityError(
                 "Contact history cannot be dated in the future. Schedule a next action instead."
             )
-        notes = _text(values["notes"], "contact notes", 4000)
+        notes = rules.clean_text(values["notes"], "contact notes", 4000)
         if task_action not in {"keep", "complete", "reschedule"}:
-            raise ActivityError("Choose keep, complete, or reschedule for the next action.")
+            raise rules.ActivityError("Choose keep, complete, or reschedule for the next action.")
         linked_task, parsed_version, clean_note, clean_date = None, None, "", ""
         if task_action != "keep":
-            linked_task = _positive(task_id, "action identity")
+            linked_task = rules.positive_id(task_id, "action identity")
             parsed_version, clean_note, clean_date = _command_values(
                 task_action, version, values["task_note"], values["due_date"]
             )
-        digest = _digest(
+        digest = rules.command_digest(
             {
                 "prospect_id": prospect_id,
                 "channel": channel,
@@ -552,11 +463,11 @@ def record_contact(
             ).fetchone()
             if previous:
                 if previous["prospect_id"] != prospect_id or previous["request_digest"] != digest:
-                    raise ActivityError(
+                    raise rules.ActivityError(
                         "This operation key already belongs to a different saved contact. Review the current history.",
                         409,
                     )
-                return _redirect(prospect_id, request)
+                return prospect_context.redirect_to_prospect(prospect_id, request)
             if linked_task is not None:
                 _change_task(
                     con,
@@ -600,7 +511,7 @@ def record_contact(
                     "task_action": task_action,
                 },
             )
-    except ActivityError as error:
+    except rules.ActivityError as error:
         return _error(request, prospect_id, values, "contact", error)
     except sqlite3.IntegrityError:
         return _error(
@@ -608,9 +519,9 @@ def record_contact(
             prospect_id,
             values,
             "contact",
-            ActivityError(
+            rules.ActivityError(
                 "This contact could not be saved because the record changed. Review the current history and next action.",
                 409,
             ),
         )
-    return _redirect(prospect_id, request)
+    return prospect_context.redirect_to_prospect(prospect_id, request)

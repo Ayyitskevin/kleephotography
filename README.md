@@ -43,6 +43,9 @@ without an integration in between.
 
 ## Architecture
 
+The [architecture and implementation roadmap](ops/ARCHITECTURE.md) records the
+modular-monolith direction, current sales boundaries and the next bounded slices.
+
 Three audiences, one process, one SQLite file:
 
 | Surface | Code | Audience | Auth |
@@ -55,6 +58,8 @@ Three audiences, one process, one SQLite file:
 | Area | Path | Role |
 |------|------|------|
 | Entry | `app/main.py` | Middleware (rate limit, CSRF, canonical origin, CSP nonce), routers, `/healthz` |
+| Sales rules | `app/sales/rules.py` | Shared validation, contact values and identity normalization; no HTTP/DB access |
+| Review navigation | `app/admin/prospect_context.py` | Validated queue context and fixed local return paths |
 | Data | `app/db.py` | WAL SQLite, forward-only migrations |
 | Config / flags | `app/config.py`, `app/features.py` | Env-driven; integrations dormant until keyed |
 | Money | `app/public/pay.py` + `app/admin/invoices.py` | Checkout + webhook vs draft/send |

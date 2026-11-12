@@ -8,7 +8,8 @@ from fastapi.responses import HTMLResponse
 
 from .. import audit, db, security, specialties
 from ..render import templates
-from . import prospect_followups
+from ..sales import rules
+from . import prospect_context, prospect_followups
 
 router = APIRouter(prefix="/admin/studio/prospects", dependencies=[Depends(security.require_admin)])
 QUALIFICATIONS = {
@@ -27,17 +28,6 @@ LIMITS = {
 IDENTITY_FIELDS = ("business", "contact_name", "email", "phone")
 FIELDS = (*IDENTITY_FIELDS, "specialty", "source", "qualification", "notes")
 PAGE_SIZE = 50
-
-
-def _text_key(value: str | None) -> str:
-    return " ".join((value or "").split()).casefold()
-
-
-def _phone_key(value: str | None) -> str:
-    # US ten-digit and +1 forms are equivalent. Never guess other country codes.
-    # Extensions are not accepted by capture; keep legacy extensions distinct.
-    digits = re.sub(r"[^0-9]", "", value or "")
-    return "1" + digits if len(digits) == 10 else digits
 
 
 def _form_values(
@@ -108,10 +98,10 @@ def _matches(con, values: dict, exclude_id: int | None = None) -> list[dict]:
     A small solo CRM can scan these columns; imports need an indexed identity model.
     Archived/converted inquiries still count, preserving their conversation history.
     """
-    email = _text_key(values["email"])
-    phone = _phone_key(values["phone"])
-    business = _text_key(values["business"])
-    name = _text_key(values["contact_name"])
+    email = rules.text_key(values["email"])
+    phone = rules.phone_key(values["phone"])
+    business = rules.text_key(values["business"])
+    name = rules.text_key(values["contact_name"])
     sources = (
         (
             "Outbound prospect",
@@ -135,11 +125,13 @@ def _matches(con, values: dict, exclude_id: int | None = None) -> list[dict]:
             if kind == "Outbound prospect" and row["id"] == exclude_id:
                 continue
             reasons = []
-            if email and email == _text_key(row["email"]):
+            if email and email == rules.text_key(row["email"]):
                 reasons.append("same email")
-            if phone and phone == _phone_key(row["phone"]):
+            if phone and phone == rules.phone_key(row["phone"]):
                 reasons.append("same phone")
-            if business == _text_key(row["business"]) and name == _text_key(row["contact_name"]):
+            if business == rules.text_key(row["business"]) and name == rules.text_key(
+                row["contact_name"]
+            ):
                 reasons.append("same business and contact")
             if reasons:
                 href = f"{prefix}{row['id']}"
@@ -165,7 +157,7 @@ def _form(request, values, *, prospect_id=None, error=None, matches=(), reviewed
         "admin/prospect_form.html",
         {
             **activity,
-            **(prospect_followups._review_context(request) if prospect_id else {}),
+            **(prospect_context.review_context(request) if prospect_id else {}),
             "values": values,
             "prospect_id": prospect_id,
             "error": error,
@@ -234,14 +226,14 @@ def create_prospect(request: Request, values: dict = Depends(_form_values)):
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 *(values[field] for field in FIELDS),
-                _text_key(values["business"]),
-                _text_key(values["contact_name"]),
-                _text_key(values["email"]) or None,
-                _phone_key(values["phone"]) or None,
+                rules.text_key(values["business"]),
+                rules.text_key(values["contact_name"]),
+                rules.text_key(values["email"]) or None,
+                rules.phone_key(values["phone"]) or None,
             ),
         ).lastrowid
         audit.log(con, "prospect", pid, "create", diff=values)
-    return prospect_followups._redirect(pid)
+    return prospect_context.redirect_to_prospect(pid)
 
 
 @router.get("/{prospect_id}", response_class=HTMLResponse)
@@ -270,10 +262,10 @@ def update_prospect(request: Request, prospect_id: int, values: dict = Depends(_
             "phone_key=?, updated_at=datetime('now') WHERE id=?",
             (
                 *(values[field] for field in FIELDS),
-                _text_key(values["business"]),
-                _text_key(values["contact_name"]),
-                _text_key(values["email"]) or None,
-                _phone_key(values["phone"]) or None,
+                rules.text_key(values["business"]),
+                rules.text_key(values["contact_name"]),
+                rules.text_key(values["email"]) or None,
+                rules.phone_key(values["phone"]) or None,
                 prospect_id,
             ),
         )
@@ -286,4 +278,4 @@ def update_prospect(request: Request, prospect_id: int, values: dict = Depends(_
                 field: [old[field], value] for field, value in values.items() if old[field] != value
             },
         )
-    return prospect_followups._redirect(prospect_id, request)
+    return prospect_context.redirect_to_prospect(prospect_id, request)
