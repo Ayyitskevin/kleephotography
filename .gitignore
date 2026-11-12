@@ -39,3 +39,9 @@ _design/
 
 # Generated property-test examples (synthetic; local replay cache)
 .hypothesis/
+
+# Disposable browser fixtures, installed tooling and diagnostic artifacts
+.browser-tmp/
+tests/browser/node_modules/
+tests/browser/playwright-report/
+tests/browser/test-results/
