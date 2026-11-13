@@ -669,6 +669,23 @@ production deployment verification was performed.
 
 ## Remaining slices
 
+The proposed [sales workbench build specification](SALES-WORKBENCH-SPEC.md)
+expands the next work into review navigation/handoff, history, internal notes,
+Home commitments and outbound reporting. It records current behavior separately
+from planned features, with explicit data, retry, policy and acceptance contracts.
+Start with S1/S2 and the complete browser journey; do not implement all slices in
+one PR. No feature, schema or runtime behavior changes as part of this spec.
+
+Specification review (12 November 2026): reconciled current behavior against main
+`0c9a8f0` and the source tables/routes, checked 46 local Markdown links, and ran
+the unchanged baseline gates in the isolated planning worktree: 508 unit, 1,328
+integration, 188 smoke and 66 JavaScript cases passed, with no selected skips.
+Ruff lint/format, Bandit, secret scanning, migration/lock checks and the disposable
+browser-server preflight passed. Existing provider mocks and AnyIO/Starlette
+warnings remain. These checks validate the documentation candidate's baseline,
+not the proposed features. Hosted results belong on the planning PR; no local
+Chromium, production or live-provider verification was performed.
+
 1. Use the guided review and complete prospect → draft → manual contact →
    follow-up → opportunity loop to identify remaining friction. Queue counts
    are live obligations, not an outreach performance metric.
