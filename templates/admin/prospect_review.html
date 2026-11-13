@@ -12,9 +12,10 @@
 <main class="admin-main sr-prospects">
   <nav class="sr-prospect-actions" aria-label="Review navigation">
     <span>{{ total }} currently eligible{% if prospect %} · Position {{ position }}{% endif %}</span>
+    {% if previous_url %}<a class="sr-btn sr-btn--ghost" href="{{ previous_url }}">Previous prospect</a>{% endif %}
     {% if next_url %}<a class="sr-btn sr-btn--ghost" href="{{ next_url }}">{{ 'Next prospect' if prospect else 'Review next eligible prospect' }}</a>{% endif %}
   </nav>
-  <p class="sr-hint">Navigation records no activity. The queue refreshes on each visit; skipping leaves the next action unchanged. After the last prospect, navigation returns to the first eligible prospect. Choose an explicit outcome below for work you actually did.</p>
+  <p class="sr-hint">Navigation records no activity. The queue refreshes on each visit; skipping leaves the next action unchanged. With more than one eligible prospect, Next wraps from the last to the first and Previous wraps from the first to the last. Choose an explicit outcome below for work you actually did.</p>
   {% if prospect %}
     {% set detour_query = review_query ~ '&review_origin=' ~ prospect_id %}
     <section class="sr-card sr-followup-card" aria-labelledby="review-business">

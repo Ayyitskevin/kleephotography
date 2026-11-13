@@ -37,8 +37,8 @@ async function modalTab(page, dialog, target, key = 'Tab') {
   await expect(target).toBeFocused();
 }
 
-async function activate(page, target) {
-  await tabTo(page, target);
+async function activate(page, target, key = 'Tab') {
+  await tabTo(page, target, key);
   await focusedAndClear(target);
   await page.keyboard.press('Enter');
 }
@@ -136,6 +136,8 @@ test('keyboard-only research, validation, contact and next action', async ({ pag
   await activate(page, page.getByRole('link', { name: 'Review one at a time' }));
   const heading = page.getByRole('heading', { name: business, exact: true });
   await focusedAndClear(heading);
+  await expect(page.getByRole('link', { name: 'Previous prospect', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Next prospect', exact: true })).toHaveCount(0);
   await activate(page, page.getByRole('link', { name: 'Edit prospect', exact: true }));
   await focusedAndClear(page.getByRole('heading', { name: 'Research and qualification' }));
   await type(page, page.getByLabel('Research notes', { exact: true }), 'Keyboard-only research.');
@@ -181,4 +183,31 @@ test('keyboard-only research, validation, contact and next action', async ({ pag
   await activate(page, page.getByRole('link', { name: 'Back to queue', exact: true }));
   await activate(page, page.getByRole('link', { name: 'Due & overdue', exact: true }));
   await expect(page.getByText('Call about the seasonal menu', { exact: true })).toBeVisible();
+});
+
+test('keyboard review moves both ways through the live filtered queue', async ({ page }, info) => {
+  const business = `${info.project.name} Navigation Café`;
+  await login(page);
+  await dailyQueue(page);
+  await type(page, page.getByLabel('Find a prospect'), business);
+  await activate(page, page.getByRole('button', { name: 'Search', exact: true }));
+  await activate(page, page.getByRole('link', { name: 'Review one at a time' }));
+  const navigation = page.getByRole('navigation', { name: 'Review navigation' });
+  await focusedAndClear(page.getByRole('heading', { name: `${business} A`, exact: true }));
+  await expect(navigation).toContainText('3 currently eligible · Position 1');
+  for (const [direction, letter, position] of [
+    ['Previous prospect', 'C', 3],
+    ['Previous prospect', 'B', 2],
+    ['Next prospect', 'C', 3],
+    ['Next prospect', 'A', 1],
+  ]) {
+    // Destination focus is on the heading below navigation; reach the links with Shift+Tab.
+    await activate(page, navigation.getByRole('link', { name: direction, exact: true }), 'Shift+Tab');
+    await focusedAndClear(page.getByRole('heading', { name: `${business} ${letter}`, exact: true }));
+    await expect(page).toHaveURL(url => url.searchParams.get('review') === 'due'
+      && url.searchParams.get('q') === business);
+    await expect(navigation).toContainText(`3 currently eligible · Position ${position}`);
+    await expect(page.getByText(`Review ${business} ${letter}`, { exact: true }).first()).toBeVisible();
+  }
+  await scan(page, info, 'keyboard-review-navigation');
 });

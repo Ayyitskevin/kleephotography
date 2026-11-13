@@ -48,7 +48,15 @@ def run(*, check=False):
         assert config.DB_PATH.parent == Path(data)
         db.migrate()
         for viewport in ("desktop", "mobile"):
-            for name in ("Café & Bar A", "Café & Bar B", "Stale Bistro", "Keyboard Bistro"):
+            for name in (
+                "Café & Bar A",
+                "Café & Bar B",
+                "Stale Bistro",
+                "Keyboard Bistro",
+                "Navigation Café A",
+                "Navigation Café B",
+                "Navigation Café C",
+            ):
                 business = f"{viewport} {name}"
                 pid = db.run(
                     "INSERT INTO prospects (business,source,qualification,business_key,contact_key) "
@@ -77,7 +85,7 @@ def run(*, check=False):
                     )
                     page = with_client.get("/admin/studio/prospects/follow-ups")
                     assert page.status_code == 200 and "desktop Café &amp; Bar A" in page.text
-                    assert db.one("SELECT COUNT(*) n FROM prospects")["n"] == 8
+                    assert db.one("SELECT COUNT(*) n FROM prospects")["n"] == 14
                     print("Browser fixtures and real login/queue routes passed; workers off.")
                 finally:
                     with_client.close()

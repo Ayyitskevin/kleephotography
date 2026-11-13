@@ -194,7 +194,15 @@ def review_work(request: Request, review: str = "due", q: str = "", prospect_id:
     # The policy can change between the queue projection and detail reads.
     if (context.get("outreach") or {}).get("held"):
         context = {}
-    next_id = ids[(position + 1) % len(ids)] if position is not None else (ids[0] if ids else None)
+        ids.remove(selected)
+        position = None
+    previous_id = next_id = None
+    if position is not None and len(ids) > 1:
+        previous_id = ids[(position - 1) % len(ids)]
+        next_id = ids[(position + 1) % len(ids)]
+    elif position is None and ids:
+        # An absent selection has no live position. Require an explicit next step.
+        next_id = ids[0]
     query = "?" + urlencode({"review": review, "q": q})
     return templates.TemplateResponse(
         request,
@@ -208,6 +216,11 @@ def review_work(request: Request, review: str = "due", q: str = "", prospect_id:
             "review_query": query,
             "queue_url": "/admin/studio/prospects/follow-ups?"
             + urlencode({"filter": review, "q": q}),
+            "previous_url": "/admin/studio/prospects/review-work"
+            + query
+            + f"&prospect_id={previous_id}"
+            if previous_id is not None
+            else None,
             "next_url": "/admin/studio/prospects/review-work" + query + f"&prospect_id={next_id}"
             if next_id is not None
             else None,
