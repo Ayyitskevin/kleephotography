@@ -70,6 +70,102 @@ def test_auth_read_only_order_and_navigation(admin):
 
 
 @pytest.mark.parametrize(
+    "review,due", [("due", DAY), ("upcoming", "2037-04-16"), ("unplanned", None)]
+)
+def test_navigation_wraps_both_ways_and_preserves_search(admin, review, due):
+    search = "Café & Bar / menu"
+    ids = [prospect(f"{search} {letter}", due) for letter in "ABC"]
+    prospect("Outside this search", due)
+    before = counts()
+    tasks = [dict(row) for row in db.all_("SELECT * FROM tasks ORDER BY id")]
+    page = admin.get(f"{ROOT}/review-work", params={"review": review, "q": search})
+    assert page.context["total"] == 3 and page.context["prospect_id"] == ids[0]
+    for direction, selected, position in [
+        ("previous_url", ids[2], 3),
+        ("previous_url", ids[1], 2),
+        ("next_url", ids[2], 3),
+        ("next_url", ids[0], 1),
+    ]:
+        target = urlsplit(page.context[direction])
+        assert target.path == f"{ROOT}/review-work"
+        assert parse_qs(target.query) == {
+            "review": [review],
+            "q": [search],
+            "prospect_id": [str(selected)],
+        }
+        page = admin.get(page.context[direction])
+        assert page.context["prospect_id"] == selected and page.context["position"] == position
+        assert "Previous prospect</a>" in page.text and "Next prospect</a>" in page.text
+    assert counts() == before
+    assert [dict(row) for row in db.all_("SELECT * FROM tasks ORDER BY id")] == tasks
+
+
+@pytest.mark.parametrize(
+    "review,due", [("due", DAY), ("upcoming", "2037-04-16"), ("unplanned", None)]
+)
+def test_single_and_empty_queues_do_not_offer_self_navigation(admin, review, due):
+    page = admin.get(f"{ROOT}/review-work", params={"review": review})
+    assert page.context["total"] == 0 and page.context["position"] is None
+    assert page.context["previous_url"] is None and page.context["next_url"] is None
+    assert "No eligible prospects in this queue" in page.text
+    pid = prospect("Only match", due)
+    before = counts()
+    page = admin.get(f"{ROOT}/review-work", params={"review": review})
+    assert page.context["prospect_id"] == pid and page.context["position"] == 1
+    assert page.context["total"] == 1
+    assert page.context["previous_url"] is None and page.context["next_url"] is None
+    assert "Previous prospect</a>" not in page.text and "Next prospect</a>" not in page.text
+    assert "Position 1" in page.text and counts() == before
+
+
+def test_removed_selection_requires_explicit_navigation_without_previous(admin):
+    removed = prospect("Complete me")
+    remaining = prospect("Still due")
+    task = db.one("SELECT * FROM tasks WHERE prospect_id=?", (removed,))
+    response = admin.post(
+        f"{ROOT}/{removed}/follow-ups/{task['id']}?review=due",
+        data={"action": "complete", "version": task["version"], "note": "Reviewed manually"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    before = counts()
+    page = admin.get(response.headers["location"])
+    assert page.context["prospect_id"] == removed and not page.context.get("prospect")
+    assert page.context["position"] is None and page.context["previous_url"] is None
+    assert page.context["total"] == 1 and "This prospect is no longer in this queue" in page.text
+    assert "Review next eligible prospect</a>" in page.text and "data-contact-form" not in page.text
+    page = admin.get(page.context["next_url"])
+    assert page.context["prospect_id"] == remaining
+    assert page.context["previous_url"] is None and page.context["next_url"] is None
+    assert counts() == before
+
+
+def test_navigation_uses_due_order_and_skips_holds_but_keeps_partial_preferences(admin):
+    last = prospect("Due today")
+    first = prospect("Oldest due", "2037-04-12")
+    held = prospect("Held oldest", "2037-04-11")
+    middle = prospect("Partially restricted", "2037-04-13")
+    for pid, mode in [(held, "stopped"), (middle, "active")]:
+        db.run(
+            "INSERT INTO prospect_outreach_preferences "
+            "(prospect_id,mode,email_blocked,reason,version,last_command_digest) "
+            "VALUES (?,?,1,'Fixture restriction',1,'fixture')",
+            (pid, mode),
+        )
+    before = counts()
+    page = admin.get(f"{ROOT}/review-work")
+    assert page.context["prospect_id"] == first and page.context["total"] == 3
+    assert admin.get(page.context["previous_url"]).context["prospect_id"] == last
+    page = admin.get(page.context["next_url"])
+    assert page.context["prospect_id"] == middle and "Excluded channels: email" in page.text
+    assert admin.get(page.context["previous_url"]).context["prospect_id"] == first
+    page = admin.get(page.context["next_url"])
+    assert page.context["prospect_id"] == last
+    assert admin.get(page.context["next_url"]).context["prospect_id"] == first
+    assert counts() == before
+
+
+@pytest.mark.parametrize(
     "mode,until,blocked", [("stopped", None, 0), ("snoozed", DAY, 0), ("active", None, 1)]
 )
 def test_held_prospect_cannot_be_selected(admin, mode, until, blocked):
@@ -139,7 +235,10 @@ def test_search_escaping_unplanned_and_no_page_boundary(admin):
         last = prospect(f"Bistro {i}", due=None)
     page = admin.get(f"{ROOT}/review-work?review=unplanned&prospect_id={last}")
     assert page.context["total"] == 51 and page.context["position"] == 51
-    assert admin.get(page.context["next_url"]).context["position"] == 1
+    assert admin.get(page.context["previous_url"]).context["position"] == 50
+    first = admin.get(page.context["next_url"])
+    assert first.context["position"] == 1
+    assert admin.get(first.context["previous_url"]).context["prospect_id"] == last
     page = admin.get(
         f"{ROOT}/review-work",
         params={"q": "<script>alert(1)</script>", "review": "https://evil.example"},
@@ -165,18 +264,32 @@ def test_stale_task_error_and_invalid_return_context(admin):
     assert result.headers["location"] == f"{ROOT}/{pid}"
 
 
-def test_hold_arriving_between_queue_and_detail_hides_forms(admin, monkeypatch):
-    prospect("Race")
+@pytest.mark.parametrize("peers", [False, True])
+def test_hold_arriving_between_queue_and_detail_hides_forms(admin, monkeypatch, peers):
+    first = prospect("Still eligible first") if peers else None
+    held = prospect("Race")
+    if peers:
+        prospect("Still eligible last")
     original = prospect_followups.detail_context
 
     def changed(pid):
         context = original(pid)
-        context["outreach"]["held"] = True
+        if pid == held:
+            context["outreach"]["held"] = True
         return context
 
     monkeypatch.setattr(prospect_followups, "detail_context", changed)
-    page = admin.get(f"{ROOT}/review-work")
+    before = counts()
+    page = admin.get(f"{ROOT}/review-work?prospect_id={held}")
     assert not page.context.get("prospect") and "data-contact-form" not in page.text
+    assert page.context["previous_url"] is None and page.context["position"] is None
+    assert page.context["total"] == (2 if peers else 0)
+    if peers:
+        assert admin.get(page.context["next_url"]).context["prospect_id"] == first
+    else:
+        assert page.context["next_url"] is None
+        assert "No eligible prospects in this queue" in page.text
+    assert counts() == before
 
 
 def test_research_detour_keeps_search_errors_and_changed_eligibility(admin):

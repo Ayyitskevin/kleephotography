@@ -508,8 +508,10 @@ introduced. Recording historical contact is still distinct from permission to
 send; blocked channels and linked-source restrictions remain visible.
 
 Navigation and counts are live, not a persisted session or completion metric.
-Next wraps to the first eligible prospect, records nothing and does not complete
-an action. A completed/rescheduled/held prospect that leaves the selected queue
+Previous/Next wrap in both directions when multiple prospects are eligible; a
+single eligible record has no redundant self-links. Navigation records nothing
+and does not complete an action. A completed/rescheduled/held prospect that leaves
+the selected queue
 shows an explicit state-change page with a link to the next eligible record.
 GET requests never manufacture contact, completion, consent or progress.
 
@@ -525,6 +527,35 @@ tests. Ruff lint/format, Bandit, secrets, migration numbering and requirements
 consistency checks passed. Each broad suite used fresh disposable workspace data.
 Existing AnyIO/Starlette test deprecation warnings remain. Hosted checks must pass
 before merge; no independent review or browser appearance verification is claimed.
+
+### Bidirectional review navigation (2026-11-13, S1)
+
+Previous and Next use the existing due-date/ID ordering for Due, Upcoming and
+Needs next step, including records beyond the first list page. Both links retain
+the queue and bounded search. An empty queue has no navigation; a removed selection
+keeps the explicit state-change view and offers an explicit next eligible record,
+without inventing a Previous position. If a hold arrives after the queue read,
+the detected held record is removed from the displayed count and position before
+rendering; work forms remain suppressed. Every destination rechecks live policy.
+
+The change stays in the current route/template; a shared query extraction is not
+needed for this single consumer. No command, token, task, contact, schema or
+provider semantics change. Integration cases cover both directions, wraps,
+search/queue preservation, single/empty/removed selections, hold races and partial
+channel restrictions. The hosted keyboard journey traverses both directions on
+desktop/mobile and checks focus, viewport overflow and automated accessibility.
+Handoff continuity and the full draft/contact/opportunity journey remain S2.
+
+Verification on Python 3.12.14 against main `36d916f`: 27 focused review cases,
+508 unit, 1,337 integration (nine additional cases), 188 smoke and 66 JavaScript
+cases passed, with no selected skips. Combined integration/smoke coverage was
+89% against the 78% floor. Ruff lint/format, Bandit, secret scanning, migration/lock
+checks, both dependency audits and the disposable browser-server preflight passed.
+Each suite used fresh workspace data; existing provider mocks and AnyIO/Starlette
+warnings remain. Hosted CI/CodeQL and ten desktop/mobile browser journeys are
+required at the final PR head; their results are recorded on the PR. No local
+Chromium, manual screen-reader/visual or live-provider/deployment verification was
+performed.
 
 ### Returning from research and preference edits (2026-11-11)
 
@@ -673,8 +704,8 @@ The proposed [sales workbench build specification](SALES-WORKBENCH-SPEC.md)
 expands the next work into review navigation/handoff, history, internal notes,
 Home commitments and outbound reporting. It records current behavior separately
 from planned features, with explicit data, retry, policy and acceptance contracts.
-Start with S1/S2 and the complete browser journey; do not implement all slices in
-one PR. No feature, schema or runtime behavior changes as part of this spec.
+S1 is implemented above; continue with S2 and the complete browser journey, one
+slice per PR. The original specification PR #168 changed documentation only.
 
 Specification review (12 November 2026): reconciled current behavior against main
 `0c9a8f0` and the source tables/routes, checked 46 local Markdown links, and ran

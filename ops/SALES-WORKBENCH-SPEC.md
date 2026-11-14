@@ -2,13 +2,15 @@
 
 Prepared for Kevin · 12 November 2026 · planning timezone: America/New_York
 
-**Status: proposed implementation contract.** Kevin requested a specification and preparation for the next features. This document implements no feature and authorizes no deployment, sending or payment operation. It extends [ARCHITECTURE.md](ARCHITECTURE.md); the existing [SOLO-SALES.md](SOLO-SALES.md) behavior remains authoritative until each implementation PR lands.
+**Status: incremental implementation contract.** S1 (bidirectional review navigation) is implemented in this change; S2–S7 remain planned. This document authorizes no deployment, sending or payment operation. It extends [ARCHITECTURE.md](ARCHITECTURE.md); [SOLO-SALES.md](SOLO-SALES.md) records the implemented behavior and verification.
 
 ## 1. Outcome and verified baseline
 
 Make a short photography sales session flow from **choose work → understand context → prepare a message → record what actually happened → choose the next step → review a real opportunity**. Kevin should not have to reconstruct context between those steps. Completion remains a deliberate action, not a side effect of navigation.
 
 Baseline: main `0c9a8f001d709f46dc8e2055daa180499c9dfff5`, after #167. Its post-merge [CI](https://github.com/Ayyitskevin/kleephotography/actions/runs/43311642128) and [CodeQL](https://github.com/Ayyitskevin/kleephotography/actions/runs/43311641989) passed. This is repository evidence, not a statement about the version deployed on Flow.
+
+The following table describes that historical baseline. S1 now adds Previous/Next wraparound, omits self-navigation for a single eligible record and clears a stale position when a hold arrives between queue and detail reads. Handoff continuity is still S2.
 
 | Capability | Current code | Remaining work |
 | --- | --- | --- |
@@ -152,9 +154,9 @@ Compute each aggregate at its own source grain before combining results. Do not 
 | S6 — Outbound outcomes | Reporting projection and existing Reports template | Exact source-row reconciliation, historical window boundaries, distinct-project counts, zero fan-out, source drill-downs and no invented conversion rate |
 | S7 — Associated commercial results | Separate optional financial-read extension | Reviewed payment definitions and reconciliation before adding associated cash; no financial mutations |
 
-Implement S1 then S2 first. S3 precedes S4. S5 and S6 can reuse query work after S2/S3, but remain separate PRs and should follow the same serial review discipline to avoid overlapping writers. S7 depends on S6 and explicit review of financial semantics. S4 is the only planned new schema; do not bundle it with navigation or reporting. Defer it if a pilot shows that the research summary is sufficient.
+S1 is implemented in this change; S2 is next after its merge. S3 precedes S4. S5 and S6 can reuse query work after S2/S3, but remain separate PRs and should follow the same serial review discipline to avoid overlapping writers. S7 depends on S6 and explicit review of financial semantics. S4 is the only planned new schema; do not bundle it with navigation or reporting. Defer it if a pilot shows that the research summary is sufficient.
 
-Suggested first branch: `claude/review-navigation`. Start from freshly fetched main after this spec is merged, inspect open PRs and create an isolated worktree. Do not reuse a previous feature branch base. Keep Stripe dependency PR #164 separate from these features.
+S1 branch: `claude/review-navigation`. For S2, start from freshly fetched main after S1 is merged, inspect open PRs and create an isolated worktree. Do not reuse a previous feature branch base. Keep Stripe dependency PR #164 separate from these features.
 
 ## 7. Acceptance and verification matrix
 
