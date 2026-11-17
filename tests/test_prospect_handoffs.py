@@ -8,6 +8,7 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -660,9 +661,11 @@ class Forms(HTMLParser):
         self.depth = 0
         self.ids = []
         self.inputs = {}
+        self.elements = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        self.elements.append((tag, attrs))
         if tag == "form":
             assert self.depth == 0
             self.depth += 1
@@ -676,6 +679,189 @@ class Forms(HTMLParser):
         if tag == "form":
             self.depth -= 1
             assert self.depth >= 0
+
+
+def navigation(pid, **changes):
+    return {"review": "due", "q": "Synthetic & café", "review_origin": str(pid)} | changes
+
+
+def test_guided_handoff_preserves_navigation_on_every_read_and_form(admin):
+    pid = prospect("Synthetic & café")
+    task(pid)
+    cid = client(company="Synthetic & café")
+    nav = navigation(pid)
+    query = "?" + urlencode(nav)
+    values = form(admin, pid, client_id=str(cid))
+    before = (count("clients"), count("projects"), count("audit_log"), unrelated())
+    responses = [
+        admin.get(f"{ROOT}/{pid}/handoff{query}"),
+        admin.get(f"{ROOT}/{pid}/handoff{query}&client_id={cid}"),
+        admin.post(f"{ROOT}/{pid}/handoff/review{query}", data=values),
+        admin.post(f"{ROOT}/{pid}/handoff/edit{query}", data=values),
+        admin.post(f"{ROOT}/{pid}/handoff/review{query}", data=values | {"title": ""}),
+        admin.post(f"{ROOT}/{pid}/handoff{query}", data=values),
+    ]
+    assert [r.status_code for r in responses] == [200, 200, 200, 200, 400, 409]
+    for response in responses:
+        parser = Forms()
+        parser.feed(response.text)
+        assert "Back to guided review" in response.text
+        for tag, attrs in parser.elements:
+            target = attrs.get("formaction") or attrs.get("action") or attrs.get("href", "")
+            if tag == "form" and attrs.get("method") == "get":
+                assert all(parser.inputs[key] == value for key, value in nav.items())
+            elif "/handoff" in target or (tag == "a" and "client_id=" in target):
+                assert all(
+                    parse_qs(urlsplit(target).query)[key] == [value] for key, value in nav.items()
+                )
+    assert (count("clients"), count("projects"), count("audit_log"), unrelated()) == before
+
+
+@pytest.mark.parametrize("choice", ["new", "client", "project"])
+@pytest.mark.parametrize("disposition", ["none", "keep", "complete", "cancel"])
+def test_guided_handoff_returns_recorded_link_without_inventing_work(admin, choice, disposition):
+    pid = prospect("Synthetic & café")
+    if disposition != "none":
+        tid = task(pid)
+    changes = {"task_disposition": disposition, "task_note": "Explicit decision"}
+    if choice != "new":
+        cid = client()
+        changes["client_id"] = str(cid)
+        if choice == "project":
+            project_id = db.run(
+                "INSERT INTO projects(client_id,title,status) VALUES (?, 'Existing opportunity', 'proposal_sent')",
+                (cid,),
+            )
+            changes["project_id"] = str(project_id)
+    values = form(admin, pid, **changes)
+    payload = reviewed(admin, pid, values)
+    nav = navigation(pid, review="unplanned" if disposition == "none" else "due")
+    query = "?" + urlencode(nav)
+    before = unrelated()
+    result = admin.post(f"{ROOT}/{pid}/handoff{query}", data=payload, follow_redirects=False)
+    assert result.status_code == 303
+    url = urlsplit(result.headers["location"])
+    assert url.path == ROOT + "/review-work"
+    assert parse_qs(url.query) == {k: [v] for k, v in (nav | {"prospect_id": str(pid)}).items()}
+    saved = db.one("SELECT * FROM prospect_handoffs WHERE prospect_id=?", (pid,))
+    counts = (count("clients"), count("projects"), count("tasks"), count("audit_log"))
+    page = admin.get(result.headers["location"])
+    assert "Linked to " in page.text and "Open project" in page.text and "View handoff" in page.text
+    assert f"/admin/studio/projects/{saved['project_id']}" in page.text
+    assert page.context["position"] == (1 if disposition == "keep" else None)
+    assert ("data-followup-command" in page.text) is (disposition == "keep")
+    if disposition in {"complete", "cancel"}:
+        state = db.one("SELECT * FROM tasks WHERE id=?", (tid,))
+        assert bool(state["done"]) == (disposition == "complete")
+        assert bool(state["canceled_at"]) == (disposition == "cancel")
+    # Navigation may change on an exact retry without changing its business identity.
+    again = admin.post(
+        f"{ROOT}/{pid}/handoff?" + urlencode(nav | {"q": "Changed search"}),
+        data=payload,
+        follow_redirects=False,
+    )
+    assert again.status_code == 303
+    assert parse_qs(urlsplit(again.headers["location"]).query)["q"] == ["Changed search"]
+    assert (count("clients"), count("projects"), count("tasks"), count("audit_log")) == counts
+    assert unrelated() == before
+
+
+@pytest.mark.parametrize(
+    "nav",
+    [
+        {},
+        {"review": "bogus"},
+        {"review": "due", "review_origin": "//elsewhere.example"},
+        {"review": "due", "review_origin": "0"},
+        {"return_url": "https://elsewhere.example"},
+    ],
+)
+def test_handoff_invalid_navigation_keeps_standalone_destination(admin, nav):
+    pid = prospect()
+    payload = reviewed(admin, pid, form(admin, pid))
+    response = admin.post(
+        f"{ROOT}/{pid}/handoff?" + urlencode(nav), data=payload, follow_redirects=False
+    )
+    project_id = db.one("SELECT project_id FROM prospect_handoffs WHERE prospect_id=?", (pid,))[
+        "project_id"
+    ]
+    assert response.headers["location"] == f"/admin/studio/projects/{project_id}"
+
+
+def test_review_origin_and_success_query_never_choose_write_target_or_link(admin):
+    target = prospect()
+    origin = prospect("Other synthetic café", email="other@fixture.example", phone="")
+    task(origin)
+    payload = reviewed(admin, target, form(admin, target))
+    response = admin.post(
+        f"{ROOT}/{target}/handoff?" + urlencode(navigation(origin, q="")),
+        data=payload,
+        follow_redirects=False,
+    )
+    assert parse_qs(urlsplit(response.headers["location"]).query)["prospect_id"] == [str(origin)]
+    assert db.one("SELECT prospect_id FROM prospect_handoffs")["prospect_id"] == target
+    page = admin.get(response.headers["location"] + "&saved=1")
+    assert "Linked to " not in page.text and "Open project" not in page.text
+    assert "Start opportunity" in page.text
+
+
+def test_recorded_handoff_remains_visible_after_hold_without_work_forms(admin, monkeypatch):
+    from app.admin import prospect_followups
+
+    pid = prospect()
+    task(pid)
+    save(admin, pid, reviewed(admin, pid, form(admin, pid)))
+    detail = prospect_followups.detail_context
+
+    def held(prospect_id):
+        result = detail(prospect_id)
+        result["outreach"] = result["outreach"] | {"held": True}
+        return result
+
+    monkeypatch.setattr(prospect_followups, "detail_context", held)
+    before = (count("audit_log"), count("tasks"), unrelated())
+    page = admin.get(f"{ROOT}/review-work?prospect_id={pid}")
+    assert "Linked to " in page.text and "Open project" in page.text
+    assert page.context["position"] is None
+    assert "data-followup-command" not in page.text and 'name="channel"' not in page.text
+    assert (count("audit_log"), count("tasks"), unrelated()) == before
+
+
+def test_stale_handoff_and_changed_retry_preserve_context_without_extra_writes(admin):
+    pid = prospect()
+    task(pid)
+    nav = navigation(pid)
+    url = f"{ROOT}/{pid}/handoff?" + urlencode(nav)
+    values = form(admin, pid)
+    payload = reviewed(admin, pid, values)
+    db.run("UPDATE prospects SET notes='Other tab changed research' WHERE id=?", (pid,))
+    before = (count("clients"), count("projects"), count("audit_log"))
+    stale = admin.post(url, data=payload)
+    assert stale.status_code == 409
+    assert stale.context["values"] == values
+    assert stale.context["review_params"] == nav
+    assert (count("clients"), count("projects"), count("audit_log")) == before
+    payload = reviewed(admin, pid, values)
+    assert admin.post(url, data=payload, follow_redirects=False).status_code == 303
+    before = (count("clients"), count("projects"), count("audit_log"))
+    changed = admin.post(url, data=payload | {"photography_need": "Different request"})
+    assert changed.status_code == 409
+    assert changed.context["review_params"] == nav
+    assert (count("clients"), count("projects"), count("audit_log")) == before
+
+
+def test_handoff_navigation_bounds_search_and_accepts_missing_optional_origin(admin):
+    pid = prospect()
+    query = "?" + urlencode({"review": "upcoming", "q": "  " + "x" * 210 + "  "})
+    page = admin.get(f"{ROOT}/{pid}/handoff{query}")
+    assert page.context["review_params"] == {"review": "upcoming", "q": "x" * 200}
+    payload = reviewed(admin, pid, form(admin, pid))
+    result = admin.post(f"{ROOT}/{pid}/handoff{query}", data=payload, follow_redirects=False)
+    assert parse_qs(urlsplit(result.headers["location"]).query) == {
+        "review": ["upcoming"],
+        "q": ["x" * 200],
+        "prospect_id": [str(pid)],
+    }
 
 
 @pytest.mark.parametrize("screening_room", [True, False])

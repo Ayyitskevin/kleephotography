@@ -196,6 +196,14 @@ def review_work(request: Request, review: str = "due", q: str = "", prospect_id:
         context = {}
         ids.remove(selected)
         position = None
+    # A completed task or a hold can remove the origin from this live queue.
+    # Show its recorded link without restoring its work forms or claiming a new save.
+    recorded_handoff = context.get("handoff") or db.one(
+        "SELECT h.project_id, h.created_at, p.title AS project_title "
+        "FROM prospect_handoffs h JOIN projects p ON p.id=h.project_id "
+        "WHERE h.prospect_id=?",
+        (selected,),
+    )
     previous_id = next_id = None
     if position is not None and len(ids) > 1:
         previous_id = ids[(position - 1) % len(ids)]
@@ -211,6 +219,7 @@ def review_work(request: Request, review: str = "due", q: str = "", prospect_id:
             **_options(),
             **context,
             "prospect_id": selected,
+            "recorded_handoff": recorded_handoff,
             "review": review,
             "q": q,
             "review_query": query,
