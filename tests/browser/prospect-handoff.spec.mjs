@@ -44,12 +44,13 @@ test('draft copy, manual contact and new opportunity return to the changed revie
   await page.getByRole('link', { name: 'Prepare message in a new tab', exact: true }).click();
   const draft = await draftPromise;
   await draft.bringToFront();
-  await draft.getByLabel('Channel', { exact: true }).selectOption('email');
+  // Exact label text includes nested options; match the control's accessible name.
+  await draft.getByRole('combobox', { name: 'Channel', exact: true }).selectOption('email');
   await draft.getByLabel('Personal sentence to include (optional)').fill('Synthetic seasonal menu photography context.');
   await draft.getByRole('button', { name: 'Prepare draft', exact: true }).click();
   await draft.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(draft.getByRole('heading', { name: 'Edit saved draft', exact: true })).toBeVisible();
-  const text = await draft.getByLabel('Email message', { exact: true }).inputValue();
+  const text = await draft.getByRole('textbox', { name: 'Email message', exact: true }).inputValue();
   await draft.getByRole('button', { name: 'Copy message', exact: true }).click();
   await expect(draft.locator('[data-draft-feedback]')).toHaveText('Message copied. Nothing sent or logged.');
   expect(await draft.evaluate(() => navigator.clipboard.readText())).toBe(text);
@@ -65,8 +66,8 @@ test('draft copy, manual contact and new opportunity return to the changed revie
   await contact.getByLabel('Direction').selectOption('in');
   await contact.getByLabel('Channel').selectOption('email');
   await contact.getByLabel('Outcome', { exact: false }).selectOption('reply_received');
-  await contact.getByLabel('Contact notes', { exact: true }).fill('Synthetic reply already received: interested in menu photography.');
-  await contact.getByLabel('Update next action', { exact: true }).selectOption('keep');
+  await contact.getByRole('textbox', { name: 'Contact notes', exact: true }).fill('Synthetic reply already received: interested in menu photography.');
+  await contact.getByRole('combobox', { name: 'Update next action', exact: true }).selectOption('keep');
   await contact.getByRole('button', { name: 'Record contact', exact: true }).click();
   await expectContext(page, search, origin);
   await expect(page.locator('.sr-followup-history > summary')).toContainText('1 contact record');
@@ -74,7 +75,7 @@ test('draft copy, manual contact and new opportunity return to the changed revie
   await page.getByRole('link', { name: 'Start opportunity', exact: true }).click();
   await expectDetour(page, search, origin);
   await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
-  await page.getByLabel('Client', { exact: true }).selectOption('new');
+  await page.getByRole('combobox', { name: 'Client', exact: true }).selectOption('new');
   await page.getByRole('button', { name: 'Choose client', exact: true }).click();
   await expectDetour(page, search, origin);
   await prepareHandoff(page, { title, need: 'Synthetic menu and dining room photography.', disposition: 'complete' });
@@ -134,7 +135,7 @@ test('existing client and project retain context through validation and stale re
     name: `Use ${info.project.name} Existing Studio · ${info.project.name} Existing contact`, exact: true,
   }).click();
   await expectDetour(page, search, origin);
-  await page.getByLabel('Project', { exact: true }).selectOption({ label: `Link ${projectTitle} · consultation_call` });
+  await page.getByRole('combobox', { name: 'Project', exact: true }).selectOption({ label: `Link ${projectTitle} · consultation_call` });
   await prepareHandoff(page, { title: 'This must not rename the existing project', need: '   ' });
   await page.getByRole('button', { name: 'Review handoff', exact: true }).click();
   await expectDetour(page, search, origin);
@@ -147,7 +148,7 @@ test('existing client and project retain context through validation and stale re
 
   const current = await context.newPage();
   await current.goto(researchURL);
-  await current.getByLabel('Research notes', { exact: true }).fill('New synthetic research arrived after the signed review.');
+  await current.getByRole('textbox', { name: 'Research notes', exact: true }).fill('New synthetic research arrived after the signed review.');
   await current.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expectContext(current, search, origin);
   await page.getByRole('button', { name: 'Link existing project', exact: true }).click();
@@ -186,7 +187,7 @@ test('a hold arriving after handoff review refuses the stale save and returns wi
   const origin = await openReview(page, search);
   const preferencesURL = await page.getByRole('link', { name: 'Manage this prospect’s outreach' }).getAttribute('href');
   await page.getByRole('link', { name: 'Start opportunity', exact: true }).click();
-  await page.getByLabel('Client', { exact: true }).selectOption('new');
+  await page.getByRole('combobox', { name: 'Client', exact: true }).selectOption('new');
   await page.getByRole('button', { name: 'Choose client', exact: true }).click();
   await prepareHandoff(page, { title: `${info.project.name} Held proposal`, need: 'Synthetic opportunity before a newly recorded hold.' });
   await page.getByRole('button', { name: 'Review handoff', exact: true }).click();
@@ -282,7 +283,7 @@ test('keyboard-only handoff validates, edits, saves and returns to its review re
   await keyboardActivate(page, page.getByRole('link', { name: 'Start opportunity', exact: true }));
   await expectDetour(page, search, origin);
   await keyboardFocusClear(page.getByRole('heading', { level: 1 }));
-  await keyboardChoose(page, page.getByLabel('Client', { exact: true }), 'new');
+  await keyboardChoose(page, page.getByRole('combobox', { name: 'Client', exact: true }), 'new');
   await keyboardActivate(page, page.getByRole('button', { name: 'Choose client', exact: true }));
   await expectDetour(page, search, origin);
   await keyboardReplace(page, page.getByLabel('Title for a new opportunity'), title);
