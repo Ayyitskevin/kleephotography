@@ -751,15 +751,21 @@ record from the live queue, the explicit changed/empty view still shows the proj
 link while keeping work forms and queue position absent. Invalid or absent navigation
 context retains the standalone project redirect. Navigation never changes the route
 write target, request digest, signed business snapshot or explicit task decision.
+For an initially eligible record, the page rechecks the existing queue projection
+after its detail/link reads so a handoff arriving during loading cannot retain a
+stale position or work forms. This adds one read-only queue projection; it does not
+make the whole detail view a single database snapshot.
 
 The handoff page uses the existing focus script for its destination and errors, and
 its read responses are no-store. Drafts still open separately. Added desktop/mobile
 browser cases cover draft save/copy, explicitly recorded contact, new/existing
-opportunities, completion/keep, exact retry, validation, stale recovery and a late
-hold. Python cases cover the complete client/project and none/keep/complete/cancel
-matrix, invalid context, bounded search and origin-versus-target independence.
+opportunities, completion/keep, exact retry, validation, stale recovery, a late
+hold and a keyboard-only handoff. Python cases cover the complete client/project
+and none/keep/complete/cancel matrix, handoffs arriving during review loading,
+invalid context, bounded search and origin-versus-target independence.
 
-Verification: the focused handoff suite passed 77 cases on Python 3.12. The PR records
+Verification: the focused handoff and guided-review suites passed 115 cases on
+Python 3.12. The PR records
 full local gates, non-author review and GitHub-hosted browser/axe evidence at its exact
 head; those later checks are not claimed by this focused result. Existing provider
 mocks and dependency deprecation warnings remain. No deployment, sending, schema,

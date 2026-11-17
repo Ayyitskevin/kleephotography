@@ -191,11 +191,6 @@ def review_work(request: Request, review: str = "due", q: str = "", prospect_id:
     selected = prospect_id if prospect_id is not None else (ids[0] if ids else None)
     position = ids.index(selected) if selected in ids else None
     context = detail_context(selected) if position is not None else {}
-    # The policy can change between the queue projection and detail reads.
-    if (context.get("outreach") or {}).get("held"):
-        context = {}
-        ids.remove(selected)
-        position = None
     # A completed task or a hold can remove the origin from this live queue.
     # Show its recorded link without restoring its work forms or claiming a new save.
     recorded_handoff = context.get("handoff")
@@ -207,6 +202,16 @@ def review_work(request: Request, review: str = "due", q: str = "", prospect_id:
             "WHERE h.prospect_id=?",
             (selected,),
         )
+    if position is not None:
+        # A handoff can finish while detail is loading. Reuse the live queue's
+        # rules after reading the link, retaining the original selection even
+        # when it no longer has a position or actionable work context.
+        ids = [row["id"] for row in _queue_rows(review, q)]
+        if (context.get("outreach") or {}).get("held") and selected in ids:
+            ids.remove(selected)
+        position = ids.index(selected) if selected in ids else None
+        if position is None:
+            context = {}
     previous_id = next_id = None
     if position is not None and len(ids) > 1:
         previous_id = ids[(position - 1) % len(ids)]

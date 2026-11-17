@@ -874,6 +874,46 @@ def test_missing_review_selection_outside_database_id_range_stays_read_only(admi
     assert (count("audit_log"), count("projects"), unrelated()) == before
 
 
+@pytest.mark.parametrize("timing", ["before_detail", "after_detail"])
+@pytest.mark.parametrize("disposition", ["none", "keep", "complete", "cancel"])
+def test_handoff_during_review_load_rechecks_eligibility(admin, monkeypatch, timing, disposition):
+    from app.admin import prospect_followups
+
+    pid = prospect()
+    peer = prospect("Other eligible business", email="peer@fixture.example", phone="")
+    review = "unplanned" if disposition == "none" else "due"
+    if disposition != "none":
+        task(pid)
+        task(peer)
+    values = form(admin, pid, task_disposition=disposition, task_note="Follow-up decision")
+    payload = reviewed(admin, pid, values)
+    original = prospect_followups.detail_context
+    after_save = None
+
+    def changed(selected):
+        nonlocal after_save
+        result = original(selected) if timing == "after_detail" else None
+        assert save(admin, pid, payload).status_code == 303
+        after_save = (count("audit_log"), count("tasks"), count("projects"), unrelated())
+        return result if result is not None else original(selected)
+
+    monkeypatch.setattr(prospect_followups, "detail_context", changed)
+    page = admin.get(f"{ROOT}/review-work?review={review}&prospect_id={pid}")
+    assert page.status_code == 200
+    assert "Linked to " in page.text and "View handoff" in page.text
+    assert page.context["prospect_id"] == pid
+    if disposition == "keep":
+        assert page.context["position"] == 1 and page.context["total"] == 2
+        assert "data-followup-command" in page.text
+    else:
+        assert page.context["position"] is None and page.context["total"] == 1
+        assert "This prospect is no longer in this queue" in page.text
+        assert "data-contact-form" not in page.text
+        assert "sr-followup-form" not in page.text
+        assert parse_qs(urlsplit(page.context["next_url"]).query)["prospect_id"] == [str(peer)]
+    assert (count("audit_log"), count("tasks"), count("projects"), unrelated()) == after_save
+
+
 @pytest.mark.parametrize("screening_room", [True, False])
 def test_both_styles_escape_and_preserve_review_forms_without_nested_forms(
     admin, monkeypatch, screening_room
