@@ -69,7 +69,13 @@ def run(*, check=False):
                 )
 
             for index, name in enumerate(
-                ("Handoff Café & Bar", "Reuse Handoff Bistro", "Held Handoff Bistro"), start=1
+                (
+                    "Handoff Café & Bar",
+                    "Reuse Handoff Bistro",
+                    "Held Handoff Bistro",
+                    "Keyboard Handoff Bistro",
+                ),
+                start=1,
             ):
                 business = f"{viewport} {name}"
                 email = f"{viewport}-handoff-{index}@fixture.example"
@@ -127,8 +133,8 @@ def run(*, check=False):
                     )
                     page = with_client.get("/admin/studio/prospects/follow-ups")
                     assert page.status_code == 200 and "desktop Café &amp; Bar A" in page.text
-                    assert db.one("SELECT COUNT(*) n FROM prospects")["n"] == 20
-                    assert db.one("SELECT COUNT(*) n FROM tasks")["n"] == 20
+                    assert db.one("SELECT COUNT(*) n FROM prospects")["n"] == 22
+                    assert db.one("SELECT COUNT(*) n FROM tasks")["n"] == 22
                     assert db.one("SELECT COUNT(*) n FROM clients")["n"] == 2
                     assert db.one("SELECT COUNT(*) n FROM projects")["n"] == 2
                     assert db.one("SELECT COUNT(*) n FROM prospect_handoffs")["n"] == 0

@@ -210,3 +210,118 @@ test('a hold arriving after handoff review refuses the stale save and returns wi
   await scan(page, info, 'handoff-held-review');
   await current.close();
 });
+
+// Match the keyboard-review.spec.mjs contract: inspect only; no DOM focus or value writes.
+async function keyboardReach(page, target, key = 'Tab') {
+  await expect(target).toBeVisible();
+  for (let index = 0; index < 90; index++) {
+    if (await target.evaluate(element => element === document.activeElement)) return;
+    await page.keyboard.press(key);
+  }
+  throw new Error(`Could not reach ${target} using ${key}`);
+}
+
+async function keyboardFocusClear(target) {
+  await expect(target).toBeFocused();
+  await expect.poll(() => target.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+    const view = window.visualViewport;
+    const left = view ? view.offsetLeft : 0, top = view ? view.offsetTop : 0;
+    const width = view ? view.width : innerWidth, height = view ? view.height : innerHeight;
+    const hit = document.elementFromPoint(x, y);
+    return x >= left && y >= top && x < left + width && y < top + height
+      && (hit === element || element.contains(hit));
+  })).toBe(true);
+}
+
+async function keyboardActivate(page, target, key = 'Tab') {
+  await keyboardReach(page, target, key);
+  await keyboardFocusClear(target);
+  await page.keyboard.press('Enter');
+}
+
+async function keyboardReplace(page, target, value) {
+  await keyboardReach(page, target);
+  await keyboardFocusClear(target);
+  await page.keyboard.press('Control+a');
+  await page.keyboard.type(value);
+}
+
+async function keyboardChoose(page, target, value) {
+  await keyboardReach(page, target);
+  await keyboardFocusClear(target);
+  const index = await target.evaluate((element, wanted) =>
+    [...element.options].findIndex(option => option.value === wanted), value);
+  expect(index).toBeGreaterThanOrEqual(0);
+  await page.keyboard.press('Home');
+  for (let step = 0; step < index; step++) await page.keyboard.press('ArrowDown');
+  await expect(target).toHaveValue(value);
+}
+
+test('keyboard-only handoff validates, edits, saves and returns to its review record', async ({ page }, info) => {
+  const search = `${info.project.name} Keyboard Handoff Bistro`;
+  const title = `${info.project.name} Keyboard opportunity`;
+  await page.goto('/admin/login');
+  await keyboardReplace(page, page.getByLabel('Password', { exact: true }), 'test-pw');
+  await keyboardActivate(page, page.getByRole('button', { name: 'Take the deck', exact: true }));
+  await expect(page).toHaveURL(/\/admin\/home$/);
+  await page.waitForLoadState('domcontentloaded');
+  await page.keyboard.press('Control+k');
+  await expect(page.getByLabel('Search pages and actions')).toBeFocused();
+  await page.keyboard.type('Daily follow-ups');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/prospects\/follow-ups$/);
+  await keyboardReplace(page, page.getByLabel('Find a prospect'), search);
+  await keyboardActivate(page, page.getByRole('button', { name: 'Search', exact: true }));
+  await keyboardActivate(page, page.getByRole('link', { name: 'Review one at a time', exact: true }));
+  await keyboardFocusClear(page.getByRole('heading', { name: search, exact: true }));
+  const edit = page.getByRole('link', { name: 'Edit prospect', exact: true });
+  const origin = new URL(await edit.getAttribute('href'), baseURL).pathname.split('/').at(-1);
+
+  await keyboardActivate(page, page.getByRole('link', { name: 'Start opportunity', exact: true }));
+  await expectDetour(page, search, origin);
+  await keyboardFocusClear(page.getByRole('heading', { level: 1 }));
+  await keyboardChoose(page, page.getByLabel('Client', { exact: true }), 'new');
+  await keyboardActivate(page, page.getByRole('button', { name: 'Choose client', exact: true }));
+  await expectDetour(page, search, origin);
+  await keyboardReplace(page, page.getByLabel('Title for a new opportunity'), title);
+  // Nonempty whitespace passes the native required check and reaches real server validation.
+  await keyboardReplace(page, page.getByLabel('What photography do they need?'), '   ');
+  await keyboardChoose(page, page.getByLabel('What happens to the submitted follow-up?'), 'keep');
+  const confirmation = page.getByRole('checkbox', { name: 'I have confirmed a real photography opportunity' });
+  await keyboardReach(page, confirmation);
+  await keyboardFocusClear(confirmation);
+  await page.keyboard.press('Space');
+  await expect(confirmation).toBeChecked();
+  await keyboardActivate(page, page.getByRole('button', { name: 'Review handoff', exact: true }));
+  await expectDetour(page, search, origin);
+  await keyboardFocusClear(page.getByRole('alert'));
+  await expect(page.getByRole('alert')).toContainText('Enter the photography need');
+  await expect(page.getByLabel('Title for a new opportunity')).toHaveValue(title);
+  await scan(page, info, 'keyboard-handoff-validation');
+
+  await keyboardReplace(page, page.getByLabel('What photography do they need?'), 'Synthetic brief entered using only the keyboard.');
+  await keyboardActivate(page, page.getByRole('button', { name: 'Review handoff', exact: true }));
+  await expectDetour(page, search, origin);
+  await expect(page.getByRole('heading', { name: 'Review before creating or linking', exact: true })).toBeVisible();
+  await keyboardActivate(page, page.getByRole('button', { name: 'Back to edit', exact: true }), 'Shift+Tab');
+  await expectDetour(page, search, origin);
+  await expect(page.getByLabel('What photography do they need?')).toHaveValue('Synthetic brief entered using only the keyboard.');
+  await expect(page.getByLabel('What happens to the submitted follow-up?')).toHaveValue('keep');
+  await keyboardActivate(page, page.getByRole('button', { name: 'Review handoff', exact: true }));
+  await expectDetour(page, search, origin);
+  await scan(page, info, 'keyboard-handoff-review');
+  await keyboardActivate(page, page.getByRole('button', { name: 'Create opportunity', exact: true }));
+  await expectContext(page, search, origin);
+  await keyboardFocusClear(page.getByRole('heading', { name: search, exact: true }));
+  await expect(page.getByRole('heading', { name: `Linked to ${title}`, exact: true })).toBeVisible();
+  await expect(page.getByText(`Review ${search}`, { exact: true }).first()).toBeVisible();
+  await keyboardActivate(page, page.getByRole('link', { name: 'View handoff', exact: true }));
+  await expectDetour(page, search, origin);
+  await expect(page.getByText(/Follow-up decision: Kept on the prospect/)).toBeVisible();
+  await keyboardActivate(page, page.getByRole('link', { name: 'Back to guided review', exact: true }));
+  await expectContext(page, search, origin);
+  await keyboardFocusClear(page.getByRole('heading', { name: search, exact: true }));
+  await scan(page, info, 'keyboard-handoff-return');
+});
