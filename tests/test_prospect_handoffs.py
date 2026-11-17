@@ -874,7 +874,7 @@ def test_missing_review_selection_outside_database_id_range_stays_read_only(admi
     assert (count("audit_log"), count("projects"), unrelated()) == before
 
 
-@pytest.mark.parametrize("timing", ["before_detail", "after_detail"])
+@pytest.mark.parametrize("timing", ["before_detail", "after_detail", "before_recheck"])
 @pytest.mark.parametrize("disposition", ["none", "keep", "complete", "cancel"])
 def test_handoff_during_review_load_rechecks_eligibility(admin, monkeypatch, timing, disposition):
     from app.admin import prospect_followups
@@ -890,14 +890,30 @@ def test_handoff_during_review_load_rechecks_eligibility(admin, monkeypatch, tim
     original = prospect_followups.detail_context
     after_save = None
 
-    def changed(selected):
+    def commit_handoff():
         nonlocal after_save
-        result = original(selected) if timing == "after_detail" else None
         assert save(admin, pid, payload).status_code == 303
         after_save = (count("audit_log"), count("tasks"), count("projects"), unrelated())
+
+    def changed(selected):
+        result = original(selected) if timing == "after_detail" else None
+        commit_handoff()
         return result if result is not None else original(selected)
 
-    monkeypatch.setattr(prospect_followups, "detail_context", changed)
+    if timing == "before_recheck":
+        original_queue = prospect_followups._queue_rows
+        reads = 0
+
+        def queue(filter, q, **kwargs):
+            nonlocal reads
+            reads += 1
+            if reads == 2:
+                commit_handoff()
+            return original_queue(filter, q, **kwargs)
+
+        monkeypatch.setattr(prospect_followups, "_queue_rows", queue)
+    else:
+        monkeypatch.setattr(prospect_followups, "detail_context", changed)
     page = admin.get(f"{ROOT}/review-work?review={review}&prospect_id={pid}")
     assert page.status_code == 200
     assert "Linked to " in page.text and "View handoff" in page.text
@@ -912,6 +928,35 @@ def test_handoff_during_review_load_rechecks_eligibility(admin, monkeypatch, tim
         assert "sr-followup-form" not in page.text
         assert parse_qs(urlsplit(page.context["next_url"]).query)["prospect_id"] == [str(peer)]
     assert (count("audit_log"), count("tasks"), count("projects"), unrelated()) == after_save
+
+
+def test_review_eligibility_and_handoff_link_share_a_read_snapshot(admin, monkeypatch):
+    from app.admin import prospect_followups
+
+    pid = prospect()
+    payload = reviewed(admin, pid, form(admin, pid))
+    original_queue = prospect_followups._queue_rows
+    reads = 0
+
+    def queue(filter, q, **kwargs):
+        nonlocal reads
+        reads += 1
+        rows = original_queue(filter, q, **kwargs)
+        if reads == 2:
+            assert save(admin, pid, payload).status_code == 303
+        return rows
+
+    monkeypatch.setattr(prospect_followups, "_queue_rows", queue)
+    url = f"{ROOT}/review-work?review=unplanned&prospect_id={pid}"
+    page = admin.get(url)
+    # The handoff committed after the final queue read. This response represents
+    # the earlier snapshot, never an old position paired with a newer saved link.
+    assert page.context["position"] == 1
+    assert "Linked to " not in page.text and "Start opportunity" in page.text
+    assert count("prospect_handoffs") == 1
+    refreshed = admin.get(url)
+    assert refreshed.context["position"] is None
+    assert "Linked to " in refreshed.text and "data-contact-form" not in refreshed.text
 
 
 @pytest.mark.parametrize("screening_room", [True, False])

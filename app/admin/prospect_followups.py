@@ -4,7 +4,7 @@ import datetime as dt
 import json
 import sqlite3
 import uuid
-from contextlib import closing
+from contextlib import closing, nullcontext
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -114,7 +114,7 @@ def _error(request, prospect_id, values, kind, error):
     )
 
 
-def _queue_rows(filter, q):
+def _queue_rows(filter, q, *, connection=None):
     today = studio_mod._today().isoformat()
     predicates = {
         "due": "t.id IS NOT NULL AND t.due_date <= ?",
@@ -147,8 +147,9 @@ def _queue_rows(filter, q):
         + where
         + " ORDER BY (t.due_date IS NULL), t.due_date ASC, p.id ASC"
     )
-    with closing(db.connect()) as con:
-        con.execute("BEGIN")
+    with closing(db.connect()) if connection is None else nullcontext(connection) as con:
+        if connection is None:
+            con.execute("BEGIN")
         policies = outreach.index(con, today)["prospects"]
         rows = [{**dict(r), "outreach": policies[r["id"]]} for r in con.execute(query, args)]
         if filter != "all":
@@ -191,22 +192,22 @@ def review_work(request: Request, review: str = "due", q: str = "", prospect_id:
     selected = prospect_id if prospect_id is not None else (ids[0] if ids else None)
     position = ids.index(selected) if selected in ids else None
     context = detail_context(selected) if position is not None else {}
-    # A completed task or a hold can remove the origin from this live queue.
-    # Show its recorded link without restoring its work forms or claiming a new save.
-    recorded_handoff = context.get("handoff")
-    if recorded_handoff is None and selected is not None and 0 < selected < 2**63:
-        # Arbitrary query integers need not fit SQLite's signed row-id range.
-        recorded_handoff = db.one(
-            "SELECT h.project_id, h.created_at, p.title AS project_title "
-            "FROM prospect_handoffs h JOIN projects p ON p.id=h.project_id "
-            "WHERE h.prospect_id=?",
-            (selected,),
-        )
+    # Eligibility and the saved link must describe one snapshot: a handoff can
+    # finish during detail loading or between these final projection reads.
+    recorded_handoff = None
+    with closing(db.connect()) as con:
+        con.execute("BEGIN")
+        if position is not None:
+            ids = [row["id"] for row in _queue_rows(review, q, connection=con)]
+        if selected is not None and 0 < selected < 2**63:
+            # Arbitrary query integers need not fit SQLite's signed row-id range.
+            recorded_handoff = con.execute(
+                "SELECT h.project_id, h.created_at, p.title AS project_title "
+                "FROM prospect_handoffs h JOIN projects p ON p.id=h.project_id "
+                "WHERE h.prospect_id=?",
+                (selected,),
+            ).fetchone()
     if position is not None:
-        # A handoff can finish while detail is loading. Reuse the live queue's
-        # rules after reading the link, retaining the original selection even
-        # when it no longer has a position or actionable work context.
-        ids = [row["id"] for row in _queue_rows(review, q)]
         if (context.get("outreach") or {}).get("held") and selected in ids:
             ids.remove(selected)
         position = ids.index(selected) if selected in ids else None
