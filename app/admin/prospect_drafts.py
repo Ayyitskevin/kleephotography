@@ -1,6 +1,7 @@
 """Editable, deterministic outreach starters. No provider calls or contact writes."""
 
 import json
+import logging
 import sqlite3
 import uuid
 from contextlib import closing
@@ -14,7 +15,11 @@ from ..render import templates
 from ..sales import rules
 from . import studio
 
+log = logging.getLogger("mise.admin.prospect_drafts")
 router = APIRouter(prefix="/admin/studio/prospects", dependencies=[Depends(security.require_admin)])
+# Copy failures stay specific in the log. The JSON body is generic so a client
+# never receives exception text from this check.
+COPY_ERROR = "Could not verify this draft. Reopen it before copying."
 PURPOSES = {
     "introduction": "Introduction",
     "follow_up": "Follow-up to an attempt",
@@ -513,6 +518,9 @@ def copy_text(
             headers={"Cache-Control": "no-store"},
         )
     except rules.ActivityError as exc:
+        log.exception(
+            "prospect draft copy rejected prospect_id=%s draft_id=%s", prospect_id, draft_id
+        )
         return JSONResponse(
-            {"error": str(exc)}, status_code=exc.status, headers={"Cache-Control": "no-store"}
+            {"error": COPY_ERROR}, status_code=exc.status, headers={"Cache-Control": "no-store"}
         )

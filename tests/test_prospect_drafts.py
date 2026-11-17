@@ -432,6 +432,27 @@ def test_edit_retry_stale_form_and_cross_record_tokens(admin):
     )
 
 
+def test_copy_failure_hides_exception_text(admin, monkeypatch, caplog):
+    pid = prospect()
+    page = create(admin, pid)
+    did = drafts()[0]["id"]
+    sentinel = "secret-draft-exception-token"
+
+    def fail(*_args, **_kwargs):
+        raise prospect_drafts.rules.ActivityError(sentinel, 409)
+
+    monkeypatch.setattr(prospect_drafts, "_fresh", fail)
+    response = admin.post(f"{ROOT}/{pid}/drafts/{did}/copy", data=edit_values(page))
+    assert response.status_code == 409
+    assert response.json() == {"error": prospect_drafts.COPY_ERROR}
+    assert sentinel not in response.text
+    assert "ActivityError" not in response.text
+    assert "Traceback" not in response.text
+    assert sentinel in caplog.text
+    assert response.headers["cache-control"] == "no-store"
+    assert drafts()[0]["version"] == 1
+
+
 @pytest.mark.parametrize(
     "channel,subject,body",
     [
