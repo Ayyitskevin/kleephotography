@@ -88,6 +88,8 @@ html { scroll-padding-top: var(--prospect-focus-top, 1rem); scroll-padding-botto
   .admin-shell .sr-followup-row > .sr-prospect-actions { grid-column: 1 / -1; justify-self: start; }
 }
 @media (max-width: 650px) {
+  .admin-shell .pgtop { flex-wrap: wrap; }
+  .admin-shell .pgtop-actions { flex-basis: 100%; margin-left: 0; }
   .admin-shell .sr-prospect-grid { grid-template-columns: 1fr; }
   .admin-shell .sr-followup-row { grid-template-columns: 1fr; gap: 1rem; }
   .admin-shell .sr-followup-search { display: flex; flex-direction: column; align-items: stretch; }

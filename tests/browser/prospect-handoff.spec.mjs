@@ -312,6 +312,7 @@ test('keyboard-only handoff validates, edits, saves and returns to its review re
   await expect(page.getByLabel('What happens to the submitted follow-up?')).toHaveValue('keep');
   await keyboardActivate(page, page.getByRole('button', { name: 'Review handoff', exact: true }));
   await expectDetour(page, search, origin);
+  await expect(page.getByRole('heading', { name: 'Review before creating or linking', exact: true })).toBeVisible();
   await scan(page, info, 'keyboard-handoff-review');
   await keyboardActivate(page, page.getByRole('button', { name: 'Create opportunity', exact: true }));
   await expectContext(page, search, origin);
