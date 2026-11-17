@@ -544,7 +544,7 @@ provider semantics change. Integration cases cover both directions, wraps,
 search/queue preservation, single/empty/removed selections, hold races and partial
 channel restrictions. The hosted keyboard journey traverses both directions on
 desktop/mobile and checks focus, viewport overflow and automated accessibility.
-Handoff continuity and the full draft/contact/opportunity journey remain S2.
+Handoff continuity and the full draft/contact/opportunity journey are implemented in the S2 candidate described below.
 
 Verification on Python 3.12.14 against main `36d916f`: 27 focused review cases,
 508 unit, 1,337 integration (nine additional cases), 188 smoke and 66 JavaScript
@@ -704,7 +704,7 @@ The proposed [sales workbench build specification](SALES-WORKBENCH-SPEC.md)
 expands the next work into review navigation/handoff, history, internal notes,
 Home commitments and outbound reporting. It records current behavior separately
 from planned features, with explicit data, retry, policy and acceptance contracts.
-S1 is implemented above; continue with S2 and the complete browser journey, one
+S1 and the S2 candidate are implemented above/below; continue with S3 unified history after S2 review and merge, one
 slice per PR. The original specification PR #168 changed documentation only.
 
 Specification review (12 November 2026): reconciled current behavior against main
@@ -735,3 +735,32 @@ visible truncation count, auth, escaping, read-only GET, and refreshed stage-mov
 fragments against disposable SQLite. The route test does not start background
 jobs or senders. Full integration/smoke run in hosted CI. Browser appearance and
 production deployment require separate verification.
+
+
+## Guided opportunity handoff continuity (S2, 2026-11-17)
+
+A guided review now offers Start opportunity or the recorded project/handoff links.
+The handoff retains the validated queue, bounded search and optional original prospect
+through client selection, matching-client links, review, Back to edit, errors and
+stale-review recovery. The prospect-detail detour retains the same context.
+
+A successful handoff or identical retry returns to that original review record.
+The linked indication comes from the saved handoff, never a query flag. If completing
+or canceling the task, an unplanned handoff, a changed search or a hold removes that
+record from the live queue, the explicit changed/empty view still shows the project
+link while keeping work forms and queue position absent. Invalid or absent navigation
+context retains the standalone project redirect. Navigation never changes the route
+write target, request digest, signed business snapshot or explicit task decision.
+
+The handoff page uses the existing focus script for its destination and errors, and
+its read responses are no-store. Drafts still open separately. Added desktop/mobile
+browser cases cover draft save/copy, explicitly recorded contact, new/existing
+opportunities, completion/keep, exact retry, validation, stale recovery and a late
+hold. Python cases cover the complete client/project and none/keep/complete/cancel
+matrix, invalid context, bounded search and origin-versus-target independence.
+
+Verification: the focused handoff suite passed 77 cases on Python 3.12. The PR records
+full local gates, non-author review and GitHub-hosted browser/axe evidence at its exact
+head; those later checks are not claimed by this focused result. Existing provider
+mocks and dependency deprecation warnings remain. No deployment, sending, schema,
+payment or booking change is included.

@@ -68,6 +68,48 @@ def run(*, check=False):
                     (f"Review {business}", DAY.isoformat(), pid),
                 )
 
+            for index, name in enumerate(
+                ("Handoff Café & Bar", "Reuse Handoff Bistro", "Held Handoff Bistro"), start=1
+            ):
+                business = f"{viewport} {name}"
+                email = f"{viewport}-handoff-{index}@fixture.example"
+                pid = db.run(
+                    "INSERT INTO prospects "
+                    "(business,contact_name,email,source,qualification,notes,business_key,contact_key) "
+                    "VALUES (?, ?, ?, 'Synthetic browser fixture', 'potential_fit', ?, ?, ?)",
+                    (
+                        business,
+                        f"{viewport} Fixture Contact {index}",
+                        email,
+                        "Synthetic photography research; no outreach has been recorded.",
+                        business.casefold(),
+                        f"{viewport} fixture contact {index}",
+                    ),
+                )
+                db.run(
+                    "INSERT INTO tasks (title,due_date,prospect_id) VALUES (?, ?, ?)",
+                    (f"Review {business}", DAY.isoformat(), pid),
+                )
+                if name == "Reuse Handoff Bistro":
+                    client_id = db.run(
+                        "INSERT INTO clients (name,company,email,notes) VALUES (?, ?, ?, ?)",
+                        (
+                            f"{viewport} Existing contact",
+                            f"{viewport} Existing Studio",
+                            email,
+                            "Original existing client notes",
+                        ),
+                    )
+                    db.run(
+                        "INSERT INTO projects (client_id,title,status,shoot_date,notes) "
+                        "VALUES (?, ?, 'consultation_call', '2037-05-01', ?)",
+                        (
+                            client_id,
+                            f"{viewport} Existing opportunity",
+                            "Original existing project brief",
+                        ),
+                    )
+
         with (
             patch.object(socket.socket, "connect", deny_connection),
             patch.object(socket.socket, "connect_ex", deny_connection),
@@ -85,7 +127,12 @@ def run(*, check=False):
                     )
                     page = with_client.get("/admin/studio/prospects/follow-ups")
                     assert page.status_code == 200 and "desktop Café &amp; Bar A" in page.text
-                    assert db.one("SELECT COUNT(*) n FROM prospects")["n"] == 14
+                    assert db.one("SELECT COUNT(*) n FROM prospects")["n"] == 20
+                    assert db.one("SELECT COUNT(*) n FROM tasks")["n"] == 20
+                    assert db.one("SELECT COUNT(*) n FROM clients")["n"] == 2
+                    assert db.one("SELECT COUNT(*) n FROM projects")["n"] == 2
+                    assert db.one("SELECT COUNT(*) n FROM prospect_handoffs")["n"] == 0
+                    assert db.one("SELECT COUNT(*) n FROM prospect_contact_events")["n"] == 0
                     print("Browser fixtures and real login/queue routes passed; workers off.")
                 finally:
                     with_client.close()
