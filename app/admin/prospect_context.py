@@ -22,7 +22,7 @@ def review_context(request):
             return {}
         context["review_origin"] = int(origin)
         params["review_origin"] = str(int(origin))
-    return {**context, "review_query": "?" + urlencode(params)}
+    return {**context, "review_query": "?" + urlencode(params), "review_params": params}
 
 
 def redirect_to_prospect(prospect_id, request=None):

@@ -1,16 +1,17 @@
 {% extends "admin/base_admin.html" %}
 {% from "admin/_outreach_preferences.html" import summary as outreach_summary %}
 {% block title %}Start opportunity · {{ prospect.business }} · Mise{% endblock %}
-{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}">{% endblock %}
+{% block admin_head %}<link rel="stylesheet" href="/static/studio-prospects.css?v={{ static_rev }}"><script src="/static/prospect-focus.js?v={{ static_rev }}" defer></script>{% endblock %}
 {% block topbar %}
 <header class="admin-topbar pgtop">
-  <div class="pgtop-lead"><h1>{{ 'Project handoff' if handoff else 'Start a photography opportunity' }}</h1><p class="pgtop-sub">{{ prospect.business }} · Outbound prospect</p></div>
-  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}#prospect-activity">Prospect and contact history</a></div>
+  <div class="pgtop-lead"><h1{% if not error %} tabindex="-1" data-prospect-focus{% endif %}>{{ 'Project handoff' if handoff else 'Start a photography opportunity' }}</h1><p class="pgtop-sub">{{ prospect.business }} · Outbound prospect</p></div>
+  <div class="pgtop-actions"><a class="pgtop-link" href="/admin/studio/prospects/{{ prospect_id }}{{ review_query|default('') }}#prospect-activity">Prospect and contact history</a></div>
 </header>
 {% endblock %}
 {% block admin_body %}
 <main class="admin-main sr-prospects">
-  {% if error %}<section class="sr-prospect-review"><p class="sr-error" role="alert">{{ error }}</p><p>Your entries are preserved below.</p>{% if conflict %}<a href="/admin/studio/prospects/{{ prospect_id }}/handoff" target="_blank" rel="noopener">Reopen the current handoff in a new tab</a>{% endif %}</section>{% endif %}
+  {% if review_query %}<p><a href="/admin/studio/prospects/review-work{{ review_query }}&amp;prospect_id={{ review_origin|default(prospect_id) }}">Back to guided review</a></p>{% endif %}
+  {% if error %}<section class="sr-prospect-review"><p class="sr-error" role="alert" tabindex="-1" data-prospect-focus>{{ error }}</p><p>Your entries are preserved below.</p>{% if conflict %}<a href="/admin/studio/prospects/{{ prospect_id }}/handoff{{ review_query|default('') }}" target="_blank" rel="noopener">Reopen the current handoff in a new tab</a>{% endif %}</section>{% endif %}
   {% if handoff %}
     <section class="sr-card sr-handoff-card" aria-labelledby="handoff-saved-heading">
       <h2 id="handoff-saved-heading">Linked to {{ handoff.project_title }}</h2>
@@ -37,18 +38,19 @@
       <p class="sr-hint">Research and contact history stay linked to the prospect. Existing client details stay unchanged. You can prepare a proposal from the project afterward.</p>
       <p>After this handoff, restrictions from this prospect and any other prospects linked to the selected client apply across that client’s outbound sales work. Review the combined controls below.</p>
       {{ outreach_summary(review.outreach) }}
-      <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/handoff" class="sr-prospect-actions">
+      <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/handoff{{ review_query|default('') }}" class="sr-prospect-actions">
         {% for field, value in values.items() %}<input type="hidden" name="{{ field }}" value="{{ value }}">{% endfor %}
         <input type="hidden" name="review_token" value="{{ review_token }}">
         <button type="submit" class="sr-btn">{{ 'Link existing project' if review.project else 'Create opportunity' }}</button>
-        <button type="submit" class="sr-btn sr-btn--ghost" formaction="/admin/studio/prospects/{{ prospect_id }}/handoff/edit">Back to edit</button>
+        <button type="submit" class="sr-btn sr-btn--ghost" formaction="/admin/studio/prospects/{{ prospect_id }}/handoff/edit{{ review_query|default('') }}">Back to edit</button>
       </form>
     </section>
   {% elif not handoff or error %}
     <section class="sr-handoff-card sr-card" aria-labelledby="handoff-client-heading">
       <h2 id="handoff-client-heading">1. Review the client</h2>
-      {% if matches %}<p>These records match the prospect. Review them before creating another client.</p><ul>{% for c in matches %}<li><a href="?client_id={{ c.id }}">Use {{ c.company or c.name }} · {{ c.name }}</a> — {{ c.reason }} · <a href="/admin/studio/clients/{{ c.id }}" target="_blank" rel="noopener">View record</a></li>{% endfor %}</ul>{% else %}<p>No exact client match found. Check the list for another spelling or contact before choosing a new client.</p>{% endif %}
+      {% if matches %}<p>These records match the prospect. Review them before creating another client.</p><ul>{% for c in matches %}<li><a href="{{ review_query ~ '&' if review_query else '?' }}client_id={{ c.id }}">Use {{ c.company or c.name }} · {{ c.name }}</a> — {{ c.reason }} · <a href="/admin/studio/clients/{{ c.id }}" target="_blank" rel="noopener">View record</a></li>{% endfor %}</ul>{% else %}<p>No exact client match found. Check the list for another spelling or contact before choosing a new client.</p>{% endif %}
       <form method="get" action="/admin/studio/prospects/{{ prospect_id }}/handoff" class="sr-prospect-form">
+        {% for key, value in (review_params|default({})).items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
         <label class="sr-field"><span class="sr-label">Client</span><select name="client_id" required>
           <option value="">Choose a client</option><option value="new"{% if values.client_id == 'new' %} selected{% endif %}>Create a client from this prospect</option>
           {% for c in clients %}<option value="{{ c.id }}"{% if values.client_id == c.id|string %} selected{% endif %}>{{ c.company or c.name }} · {{ c.name }}{% if c.email %} · {{ c.email }}{% endif %}</option>{% endfor %}
@@ -58,7 +60,7 @@
       </form>
     </section>
     {% if values.client_id == 'new' or selected_client or error %}
-    <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/handoff/review" class="sr-prospect-form sr-handoff-card sr-card">
+    <form method="post" action="/admin/studio/prospects/{{ prospect_id }}/handoff/review{{ review_query|default('') }}" class="sr-prospect-form sr-handoff-card sr-card">
       <input type="hidden" name="client_id" value="{{ values.client_id }}"><input type="hidden" name="operation_key" value="{{ values.operation_key }}">
       <input type="hidden" name="task_id" value="{{ values.task_id }}"><input type="hidden" name="task_version" value="{{ values.task_version }}">
       <h2>2. Define the opportunity</h2>
@@ -85,7 +87,7 @@
       {% else %}<input type="hidden" name="task_disposition" value="{{ values.task_disposition }}"><input type="hidden" name="task_note" value="{{ values.task_note }}"><p>No pending follow-up was selected.</p>{% endif %}
       <label class="sr-handoff-confirm"><input type="checkbox" name="interest_confirmed" value="yes"{% if values.interest_confirmed == 'yes' %} checked{% endif %} required><span>I have confirmed a real photography opportunity and reviewed the client and project choice.</span></label>
       <p class="sr-hint">A new opportunity starts in Inquiry. No proposal, booking or payment is created by this handoff.</p>
-      <div class="sr-prospect-actions"><button type="submit" class="sr-btn"{% if handoff %} disabled{% endif %}>Review handoff</button><a href="/admin/studio/prospects/{{ prospect_id }}">Back to prospect</a></div>
+      <div class="sr-prospect-actions"><button type="submit" class="sr-btn"{% if handoff %} disabled{% endif %}>Review handoff</button><a href="/admin/studio/prospects/{{ prospect_id }}{{ review_query|default('') }}">Back to prospect</a></div>
     </form>
     {% endif %}
   {% endif %}

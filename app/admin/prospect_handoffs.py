@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import audit, db, outreach, security, specialties
 from ..render import templates
 from ..sales import commands, rules
-from . import studio
+from . import prospect_context, studio
 
 router = APIRouter(prefix="/admin/studio/prospects", dependencies=[Depends(security.require_admin)])
 REVIEW_MAX_AGE = 3600
@@ -239,6 +239,7 @@ def _page(
         request,
         "admin/prospect_handoff.html",
         {
+            **prospect_context.review_context(request),
             "prospect": prospect,
             "prospect_id": prospect_id,
             "values": values,
@@ -256,7 +257,14 @@ def _page(
             "conflict": status == 409,
         },
         status_code=status,
+        headers={"Cache-Control": "no-store"},
     )
+
+
+def _redirect(request, prospect_id, project_id):
+    if prospect_context.review_context(request):
+        return prospect_context.redirect_to_prospect(prospect_id, request)
+    return RedirectResponse(f"/admin/studio/projects/{project_id}", status_code=303)
 
 
 @router.get("/{prospect_id}/handoff", response_class=HTMLResponse)
@@ -331,9 +339,7 @@ def commit_handoff(
                     and previous["operation_key"] == values["operation_key"]
                     and previous["request_digest"] == digest
                 ):
-                    return RedirectResponse(
-                        f"/admin/studio/projects/{previous['project_id']}", status_code=303
-                    )
+                    return _redirect(request, prospect_id, previous["project_id"])
                 raise rules.ActivityError(
                     "This handoff was already saved. Review the linked project instead of creating another.",
                     409,
@@ -428,7 +434,7 @@ def commit_handoff(
                     "interest_confirmed_by": "operator",
                 },
             )
-        return RedirectResponse(f"/admin/studio/projects/{project_id}", status_code=303)
+        return _redirect(request, prospect_id, project_id)
     except rules.ActivityError as exc:
         return _page(request, prospect_id, values, error=str(exc), status=exc.status)
     except sqlite3.IntegrityError:
