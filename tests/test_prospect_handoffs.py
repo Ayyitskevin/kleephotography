@@ -864,6 +864,16 @@ def test_handoff_navigation_bounds_search_and_accepts_missing_optional_origin(ad
     }
 
 
+@pytest.mark.parametrize("selected", [10**30, -(10**30), 0])
+def test_missing_review_selection_outside_database_id_range_stays_read_only(admin, selected):
+    before = (count("audit_log"), count("projects"), unrelated())
+    page = admin.get(f"{ROOT}/review-work?prospect_id={selected}&saved=1")
+    assert page.status_code == 200
+    assert "No eligible prospects in this queue" in page.text
+    assert "Linked to " not in page.text
+    assert (count("audit_log"), count("projects"), unrelated()) == before
+
+
 @pytest.mark.parametrize("screening_room", [True, False])
 def test_both_styles_escape_and_preserve_review_forms_without_nested_forms(
     admin, monkeypatch, screening_room

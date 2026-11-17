@@ -198,12 +198,15 @@ def review_work(request: Request, review: str = "due", q: str = "", prospect_id:
         position = None
     # A completed task or a hold can remove the origin from this live queue.
     # Show its recorded link without restoring its work forms or claiming a new save.
-    recorded_handoff = context.get("handoff") or db.one(
-        "SELECT h.project_id, h.created_at, p.title AS project_title "
-        "FROM prospect_handoffs h JOIN projects p ON p.id=h.project_id "
-        "WHERE h.prospect_id=?",
-        (selected,),
-    )
+    recorded_handoff = context.get("handoff")
+    if recorded_handoff is None and selected is not None and 0 < selected < 2**63:
+        # Arbitrary query integers need not fit SQLite's signed row-id range.
+        recorded_handoff = db.one(
+            "SELECT h.project_id, h.created_at, p.title AS project_title "
+            "FROM prospect_handoffs h JOIN projects p ON p.id=h.project_id "
+            "WHERE h.prospect_id=?",
+            (selected,),
+        )
     previous_id = next_id = None
     if position is not None and len(ids) > 1:
         previous_id = ids[(position - 1) % len(ids)]
